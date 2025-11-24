@@ -499,7 +499,7 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
                             type="button"
                             onClick={handleClose}
                             disabled={isSubmitting}
-                            className={`px-4 py-2 rounded-lg border border-gray-300 text-gray-700 font-medium transition-colors ${
+                            className={`px-4 py-2 rounded-lg border bg-white border-gray-300 text-gray-700 font-medium transition-colors ${
                                 isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'
                             }`}
                         >
@@ -510,7 +510,7 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
                             disabled={!title.trim() || isSubmitting}
                             className={`px-4 py-2 rounded-lg font-medium text-white transition-all flex items-center gap-1 ${
                                 title.trim() && !isSubmitting
-                                    ? 'bg-primary-500 hover:bg-primary-600 shadow-md'
+                                    ? 'bg-secondary-500 hover:bg-secondary-600 shadow-md'
                                     : 'bg-gray-300 cursor-not-allowed'
                             }`}
                         >

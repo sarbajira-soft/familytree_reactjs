@@ -82,37 +82,57 @@ export function calculateHierarchicalLayout(tree) {
     // Step 3: Calculate subtree widths recursively
     const subtreeWidths = new Map(); // personId -> width of their subtree
     
-    function calculateSubtreeWidth(personId) {
-        if (subtreeWidths.has(personId)) {
-            return subtreeWidths.get(personId);
-        }
-        
-        const person = tree.people.get(personId);
-        if (!person) return CARD_WIDTH * 2 + SPOUSE_SPACING;
-        
-        // Get children
-        const children = childrenMap.get(personId) || [];
-        
-        if (children.length === 0) {
-            // Leaf node - width is couple width
-            const width = CARD_WIDTH * 2 + SPOUSE_SPACING;
-            subtreeWidths.set(personId, width);
-            return width;
-        }
-        
-        // Calculate total width of all children's subtrees
-        let childrenTotalWidth = 0;
-        children.forEach(childId => {
-            childrenTotalWidth += calculateSubtreeWidth(childId) + HORIZONTAL_SPACING;
-        });
-        childrenTotalWidth -= HORIZONTAL_SPACING; // Remove last spacing
-        
-        // Subtree width is max of couple width or children width
-        const coupleWidth = CARD_WIDTH * 2 + SPOUSE_SPACING;
-        const width = Math.max(coupleWidth, childrenTotalWidth);
+    function calculateSubtreeWidth(personId, visited = new Set()) {
+      // Prevent infinite recursion due to cycles
+      if (visited.has(personId)) {
+        console.warn("Cycle detected at:", personId);
+        return CARD_WIDTH * 2 + SPOUSE_SPACING;
+      }
+
+      // check cached width
+      if (subtreeWidths.has(personId)) {
+        return subtreeWidths.get(personId);
+      }
+
+      visited.add(personId);
+
+      const person = tree.people.get(personId);
+      if (!person) {
+        visited.delete(personId);
+        const width = CARD_WIDTH * 2 + SPOUSE_SPACING;
         subtreeWidths.set(personId, width);
         return width;
+      }
+
+      const children = childrenMap.get(personId) || [];
+
+      // Leaf node
+      if (children.length === 0) {
+        const width = CARD_WIDTH * 2 + SPOUSE_SPACING;
+        subtreeWidths.set(personId, width);
+        visited.delete(personId);
+        return width;
+      }
+
+      // Sum widths of all child subtrees
+      let childrenTotalWidth = 0;
+
+      children.forEach((childId) => {
+        childrenTotalWidth +=
+          calculateSubtreeWidth(childId, new Set(visited)) + HORIZONTAL_SPACING;
+      });
+
+      childrenTotalWidth -= HORIZONTAL_SPACING; // remove extra space
+
+      const coupleWidth = CARD_WIDTH * 2 + SPOUSE_SPACING;
+      const finalWidth = Math.max(coupleWidth, childrenTotalWidth);
+
+      subtreeWidths.set(personId, finalWidth);
+      visited.delete(personId);
+
+      return finalWidth;
     }
+
     
     // Step 4: Position people recursively, generation by generation
     const sortedGens = Array.from(generations.keys()).sort((a, b) => a - b);

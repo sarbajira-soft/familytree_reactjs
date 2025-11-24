@@ -55,7 +55,7 @@ export const useNotificationSocket = (userInfo) => {
     }
 
     console.log('🔌 Connecting to notification WebSocket for user:', userInfo.userId);
-
+    console.log(token);
     // Create socket connection
     const socket = io(`${SOCKET_URL}/notifications`, {
       auth: {
@@ -116,6 +116,24 @@ export const useNotificationSocket = (userInfo) => {
       // Update React Query cache
       queryClient.setQueryData(['unreadCount'], data.count);
     });
+
+    socket.on("post-like", (data) => {
+      console.log("👍 Post like event received:", data);
+
+      // Example: Add it to notifications list
+      setNotifications((prev) => [
+        {
+          type: "post_like",
+          title: "New Like",
+          message: `${data.userName} liked your post`,
+          postId: data.postId,
+          userId: data.userId,
+          time: new Date(),
+        },
+        ...prev,
+      ]);
+    });
+
 
     socket.on('notification-updated', (data) => {
       console.log('🔄 Notification updated:', data);

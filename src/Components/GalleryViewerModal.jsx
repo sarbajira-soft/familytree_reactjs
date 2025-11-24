@@ -435,24 +435,24 @@ const GalleryViewerModal = ({
               </div>
               {/* Prev/Next */}
               {/* Prev Button — show only if NOT the first image */}
-              {currentPhotoIndex > 0 && (
-                <button
-                  onClick={goToPrev}
-                  className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 p-3 rounded-full text-white shadow-lg select-none z-20"
-                >
-                  <FaChevronLeft size={24} />
-                </button>
-              )}
+{currentPhotoIndex > 0 && (
+  <button
+    onClick={goToPrev}
+    className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 p-3 rounded-full text-white shadow-lg select-none z-20"
+  >
+    <FaChevronLeft size={24} />
+  </button>
+)}
 
-              {/* Next Button — show only if NOT the last image */}
-              {currentPhotoIndex < album.photos.length - 1 && (
-                <button
-                  onClick={goToNext}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 p-3 rounded-full text-white shadow-lg select-none z-20"
-                >
-                  <FaChevronRight size={24} />
-                </button>
-              )}
+{/* Next Button — show only if NOT the last image */}
+{currentPhotoIndex < album.photos.length - 1 && (
+  <button
+    onClick={goToNext}
+    className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 p-3 rounded-full text-white shadow-lg select-none z-20"
+  >
+    <FaChevronRight size={24} />
+  </button>
+)}
 
               {/* Pagination */}
               <div className="absolute bottom-7 w-full flex justify-center gap-2">
