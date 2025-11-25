@@ -433,13 +433,13 @@ const EditEventModal = ({
         </div>
 
         {/* Footer */}
-        <div className="bg-gray-50 p-6 border-t border-gray-200">
+        <div className="bg-gray-50 p-6 pb-16 border-t border-gray-200">
           <div className="flex gap-3">
             <button
               type="button"
               onClick={onClose}
               disabled={isLoading}
-              className="flex-1 py-3 px-6 border border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-100 transition-colors disabled:opacity-50"
+              className="flex-1 py-3 px-6 border bg-white border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-100 transition-colors disabled:opacity-50"
             >
               Cancel
             </button>
@@ -447,7 +447,7 @@ const EditEventModal = ({
               type="submit"
               onClick={handleSubmit}
               disabled={isLoading}
-              className="flex-1 bg-gradient-to-r from-primary-600 to-primary-700 text-white py-3 px-6 rounded-xl font-semibold hover:from-primary-700 hover:to-primary-800 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="flex-1 bg-gradient-to-r from-secondary-500 to-secondary-600 text-white py-3 px-6 rounded-xl font-semibold hover:from-secondary-600 hover:to-secondary-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {isLoading ? (
                 <>

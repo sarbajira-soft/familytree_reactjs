@@ -6,6 +6,7 @@ import {
   FaTimes,
   FaChevronLeft,
   FaChevronRight,
+  FaUndoAlt,
 } from "react-icons/fa";
 import { AnimatePresence, motion } from "framer-motion";
 import CommentItem from "./CommentItem";
@@ -29,6 +30,7 @@ const GalleryViewerModal = ({
   const carouselRef = useRef(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const fsCarouselRef = useRef(null);
+  const [rotation, setRotation] = useState(0);
 
   const goToIndexFS = (i) => {
     if (fsCarouselRef.current) {
@@ -39,12 +41,23 @@ const GalleryViewerModal = ({
     }
     setCurrentPhotoIndex(i);
   };
-  const goToPrev = () =>
+  const goToPrevFS = () =>
     goToIndexFS(
       (currentPhotoIndex - 1 + album.photos.length) % album.photos.length
     );
-  const goToNext = () =>
+  const goToNextFS = () =>
     goToIndexFS((currentPhotoIndex + 1) % album.photos.length);
+
+  const goToPrev = () => {
+    const width = carouselRef.current.clientWidth;
+    carouselRef.current.scrollBy({ left: -width, behavior: "smooth" });
+  };
+
+  const goToNext = () => {
+    const width = carouselRef.current.clientWidth;
+    carouselRef.current.scrollBy({ left: width, behavior: "smooth" });
+  };
+
 
 
   useEffect(() => {
@@ -170,21 +183,12 @@ const GalleryViewerModal = ({
   };
 
   // Scroll listener: update current image index
-  const handleScroll = () => {
-    const container = carouselRef.current;
-    if (!container) return;
-    const index = Math.round(container.scrollLeft / container.clientWidth);
-    setCurrentPhotoIndex(index);
-  };
-
-  // Navigation
-  const goToIndex = (i) => {
-    const container = carouselRef.current;
-    container.scrollTo({
-      left: i * container.clientWidth,
-      behavior: "smooth",
-    });
-  };
+ const handleScroll = () => {
+   const container = carouselRef.current;
+   if (!container) return;
+   const index = Math.round(container.scrollLeft / container.clientWidth);
+   setCurrentPhotoIndex(index);
+ };
 
 
   const backdropVariants = {
@@ -228,49 +232,53 @@ const GalleryViewerModal = ({
 
             <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
               {/* IMAGE/CAROUSEL - left */}
-              <div className="md:w-1/2 bg-black flex items-center justify-center relative">
+              <div className="md:w-1/2 bg-black relative flex items-center justify-center">
                 {/* Carousel */}
                 <div
                   ref={carouselRef}
-                  className="w-full h-[33vh] md:h-auto flex overflow-x-auto snap-x snap-mandatory no-scrollbar"
+                  className="w-full h-[35vh] md:h-[80vh] overflow-x-auto snap-x snap-mandatory no-scrollbar flex relative"
                   onScroll={handleScroll}
                 >
                   {album.photos.map((img, idx) => (
                     <div
                       key={idx}
-                      className="w-full h-full flex-shrink-0 snap-center flex items-center justify-center p-4 bg-black"
+                      className="w-full h-full flex-shrink-0 snap-center flex items-center justify-center bg-black"
                     >
                       <img
                         src={img.url}
                         alt={img.caption}
-                        className="max-w-full max-h-full object-contain rounded-2xl cursor-pointer"
+                        className="max-w-full max-h-full object-contain mx-auto my-auto"
                         onClick={() => setIsFullScreen(true)}
                         onError={(e) => (e.target.src = "/fallback-image.png")}
                       />
                     </div>
                   ))}
                 </div>
-                {/* Prev/Next */}
-                {album.photos.length > 1 && (
+
+                {/* Prev Button — show only if NOT the first image */}
+                {currentPhotoIndex > 0 && (
                   <button
                     onClick={goToPrev}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 p-3 rounded-full text-white shadow"
+                    className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 p-3 rounded-full text-white shadow-lg select-none z-20"
                   >
                     <FaChevronLeft size={24} />
                   </button>
                 )}
-                {album.photos.length > 1 && (
+
+                {/* Next Button — show only if NOT the last image */}
+                {currentPhotoIndex < album.photos.length - 1 && (
                   <button
                     onClick={goToNext}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 p-3 rounded-full text-white shadow"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 p-3 rounded-full text-white shadow-lg select-none z-20"
                   >
                     <FaChevronRight size={24} />
                   </button>
                 )}
-                {/* Title */}
-                <div className="absolute top-0 left-0 p-4 text-white bg-gradient-to-b from-black/70 to-transparent w-full">
+
+                {/* Gradient Title */}
+                <div className="absolute top-0 left-0 p-4 text-white bg-gradient-to-b from-black/70 to-transparent w-full z-10">
                   <h2 className="text-lg font-semibold">{album.title}</h2>
-                  <p className="text-sm opacity-75">by {album.author}</p>
+                  <p className="text-sm opacity-80">by {album.author}</p>
                 </div>
               </div>
 
@@ -378,13 +386,23 @@ const GalleryViewerModal = ({
               className="relative w-full h-full flex items-center justify-center"
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Close button */}
-              <button
-                onClick={() => setIsFullScreen(false)}
-                className="absolute top-5 right-7 bg-white/70 hover:bg-white/90 rounded-full p-2 shadow"
-              >
-                <FaTimes size={28} />
-              </button>
+              {/* Header action buttons */}
+              <div className="fixed top-5 right-7 flex gap-3 z-50">
+                <button
+                  onClick={() => setRotation((r) => r + 90)}
+                  className="bg-white/70 hover:bg-white/90 rounded-full p-2 shadow"
+                  title="Rotate"
+                >
+                  <FaUndoAlt size={26} />
+                </button>
+                <button
+                  onClick={() => setIsFullScreen(false)}
+                  className="bg-white/70 hover:bg-white/90 rounded-full p-2 shadow"
+                  title="Close"
+                >
+                  <FaTimes size={28} />
+                </button>
+              </div>
               {/* Carousel */}
               <div
                 ref={fsCarouselRef}
@@ -407,27 +425,35 @@ const GalleryViewerModal = ({
                       src={img.url}
                       alt={img.caption}
                       className="max-w-full max-h-full object-contain"
+                      style={{
+                        transform: `rotate(${rotation % 360}deg)`,
+                        transition: "transform 0.3s",
+                      }}
                     />
                   </div>
                 ))}
               </div>
               {/* Prev/Next */}
-              {album.photos.length > 1 && (
-                <>
-                  <button
-                    onClick={goToPrev}
-                    className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/80 p-3 rounded-full text-white shadow"
-                  >
-                    <FaChevronLeft size={28} />
-                  </button>
-                  <button
-                    onClick={goToNext}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/80 p-3 rounded-full text-white shadow"
-                  >
-                    <FaChevronRight size={28} />
-                  </button>
-                </>
-              )}
+              {/* Prev Button — show only if NOT the first image */}
+{currentPhotoIndex > 0 && (
+  <button
+    onClick={goToPrev}
+    className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 p-3 rounded-full text-white shadow-lg select-none z-20"
+  >
+    <FaChevronLeft size={24} />
+  </button>
+)}
+
+{/* Next Button — show only if NOT the last image */}
+{currentPhotoIndex < album.photos.length - 1 && (
+  <button
+    onClick={goToNext}
+    className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 p-3 rounded-full text-white shadow-lg select-none z-20"
+  >
+    <FaChevronRight size={24} />
+  </button>
+)}
+
               {/* Pagination */}
               <div className="absolute bottom-7 w-full flex justify-center gap-2">
                 {album.photos.map((_, idx) => (

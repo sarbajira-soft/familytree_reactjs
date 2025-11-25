@@ -574,7 +574,7 @@ const PostPage = () => {
                 {/* Caption */}
                 {post.caption && (
                   <div className="px-4 pb-2 text-sm text-gray-800">
-                    <span className="font-semibold mr-1">{post.author}</span>
+                    {/* <span className="font-semibold mr-1">{post.author}</span> */}
                     {post.caption}
                   </div>
                 )}

@@ -1,17 +1,50 @@
 // BottomNavBar.jsx
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiHome, FiCalendar, FiShare2, FiGift, FiUser } from 'react-icons/fi';
+import {
+  FiHome,
+  FiCalendar,
+  FiShare2,
+  FiGift,
+  FiUser,
+  } from "react-icons/fi";
 
+import { RiGitMergeLine } from "react-icons/ri";
 const BottomNavBar = ({ activeTab, setActiveTab }) => {
   const navigate = useNavigate();
 
   const tabs = [
-    { id: 'home', label: 'Home', icon: <FiHome size={20} />, path: '/dashboard' },
-    { id: 'upcomingEvent', label: 'Events', icon: <FiCalendar size={20} />, path: '/events' },
-    { id: 'postsStories', label: 'Posts', icon: <FiShare2 size={20} />, path: '/posts-and-feeds' },
-    { id: 'gifts', label: 'Gifts', icon: <FiGift size={20} />, path: '/gifts-memories' },
-    { id: 'profile', label: 'Profile', icon: <FiUser size={20} />, path: '/myprofile' },
+    {
+      id: "home",
+      label: "Home",
+      icon: <FiHome size={20} />,
+      path: "/dashboard",
+    },
+    {
+      id: "upcomingEvent",
+      label: "Events",
+      icon: <FiCalendar size={20} />,
+      path: "/events",
+    },
+    // { id: 'postsStories', label: 'Posts', icon: <FiShare2 size={20} />, path: '/posts-and-feeds' },
+    {
+      id: "familyTree",
+      label: "Family",
+      path: "/family-tree",
+      icon: <RiGitMergeLine size={19} />,
+    },
+    {
+      id: "gifts",
+      label: "Gifts",
+      icon: <FiGift size={20} />,
+      path: "/gifts-memories",
+    },
+    {
+      id: "profile",
+      label: "Profile",
+      icon: <FiUser size={20} />,
+      path: "/myprofile",
+    },
   ];
 
   const handleItemClick = (item) => {

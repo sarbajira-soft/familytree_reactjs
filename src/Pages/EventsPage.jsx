@@ -374,7 +374,7 @@ const EventsPage = () => {
 
   return (
     <>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 pb-16">
         <div className="max-w-7xl mx-auto px-4 py-8 md:px-6 lg:px-8 space-y-10">
           {/* Header Section */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">

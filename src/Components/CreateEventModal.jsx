@@ -422,7 +422,7 @@ const CreateEventModal = ({
         </div>
 
         {/* Footer */}
-        <div className="bg-gray-50 p-6 border-t border-gray-200">
+        <div className="bg-gray-50 p-6 pb-20 border-t border-gray-200">
           <div className="flex gap-3">
             <button
               type="button"

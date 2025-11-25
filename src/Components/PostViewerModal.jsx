@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { FaRegHeart, FaHeart, FaCommentDots, FaTimes } from "react-icons/fa";
+import { FaRegHeart, FaHeart, FaCommentDots, FaTimes, FaUndoAlt } from "react-icons/fa";
 import { AnimatePresence, motion } from "framer-motion";
 import CommentItem from "./CommentItem";
 import { buildCommentTree, countComments } from "../utils/commentUtils";
@@ -20,6 +20,7 @@ const PostViewerModal = ({
   const [isLikeLoading, setIsLikeLoading] = useState(false);
   const commentsRef = useRef(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [rotation, setRotation] = useState(0);
 
   useEffect(() => {
     if (isOpen && post) {
@@ -342,22 +343,45 @@ const PostViewerModal = ({
             exit={{ opacity: 0 }}
             onClick={() => setIsFullScreen(false)}
           >
-            {/* Close button positioned relative to viewport */}
-            <button
-              onClick={() => setIsFullScreen(false)}
-              className="fixed top-4 right-4 bg-white/70 hover:bg-white/90 rounded-full p-2 shadow z-50"
-            >
-              <FaTimes size={28} />
-            </button>
+            {/* Close & Rotate Buttons */}
+            <div className="fixed top-4 right-4 flex gap-3 z-50">
+              {/* ROTATE BUTTON */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setRotation((prev) => prev + 90);
+                }}
+                className="bg-white/70 hover:bg-white/90 rounded-full p-2 shadow"
+                title="Rotate"
+              >
+                <FaUndoAlt size={26} />
+              </button>
 
+              {/* CLOSE BUTTON */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsFullScreen(false);
+                }}
+                className="bg-white/70 hover:bg-white/90 rounded-full p-2 shadow"
+                title="Close"
+              >
+                <FaTimes size={28} />
+              </button>
+            </div>
+
+            {/* IMAGE WRAPPER */}
             <div
               onClick={(e) => e.stopPropagation()}
-              className="relative max-w-full max-h-full p-4"
+              className="relative max-w-full max-h-full p-4 flex items-center justify-center"
             >
               <img
                 src={post.url || post.fullImageUrl}
                 alt="Full screen"
-                className="max-w-screen max-h-screen object-contain rounded"
+                className="max-w-screen max-h-screen object-contain transition-transform duration-300"
+                style={{
+                  transform: `rotate(${rotation % 360}deg)`,
+                }}
               />
             </div>
           </motion.div>
