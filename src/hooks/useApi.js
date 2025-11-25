@@ -177,6 +177,43 @@ export const useTogglePostLike = () => {
   });
 };
 
+// =======================
+// Family Merge hooks
+// =======================
+
+// List merge requests for the logged-in admin (optionally filtered by status)
+export const useMergeRequests = (status, enabled = true) => {
+  return useQuery({
+    queryKey: ['mergeRequests', status],
+    queryFn: () =>
+      fetchWithAuth(
+        status ? `/family-merge/requests?status=${encodeURIComponent(status)}` : '/family-merge/requests',
+      ),
+    enabled,
+    staleTime: 5 * 60 * 1000,
+  });
+};
+
+// Fetch merge analysis (matches, conflicts, new persons, generation mapping)
+export const useMergeAnalysis = (requestId, enabled = true) => {
+  return useQuery({
+    queryKey: ['mergeAnalysis', requestId],
+    queryFn: () => fetchWithAuth(`/family-merge/${requestId}/analysis`),
+    enabled: enabled && !!requestId,
+    staleTime: 5 * 60 * 1000,
+  });
+};
+
+// Fetch cached merge state (selection/cache)
+export const useMergeState = (requestId, enabled = true) => {
+  return useQuery({
+    queryKey: ['mergeState', requestId],
+    queryFn: () => fetchWithAuth(`/family-merge/${requestId}/state`),
+    enabled: enabled && !!requestId,
+    staleTime: 5 * 60 * 1000,
+  });
+};
+
 // Mutation hook for deleting posts
 export const useDeletePost = () => {
   const queryClient = useQueryClient();

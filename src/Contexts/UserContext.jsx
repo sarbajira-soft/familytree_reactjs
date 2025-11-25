@@ -130,8 +130,12 @@ export const UserProvider = ({ children }) => {
         contactNumber: userProfile.contactNumber || '',
         bio: userProfile.bio || '',
         profileUrl: userProfile.profile || '',
-        familyCode: userProfile.familyMember?.familyCode || '',
-        approveStatus: userProfile.familyMember?.approveStatus || 'pending',
+        // Prefer profile.familyCode as primary; if missing, fall back to membership familyCode
+        familyCode: userProfile.familyCode || userProfile.familyMember?.familyCode || '',
+        // If no familyMember join row but profile has a familyCode, treat as approved
+        approveStatus:
+          userProfile.familyMember?.approveStatus ||
+          (userProfile.familyCode ? 'approved' : 'pending'),
         name: `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim(),
         
         countryCode: countryCode || '',

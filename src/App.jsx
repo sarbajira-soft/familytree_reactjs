@@ -35,6 +35,8 @@ const FamilyTreeHierarchical = lazy(() =>
 const PendingFamilyRequests = lazy(() =>
   import("./Pages/PendingFamilyRequests")
 );
+const MergeFamilyPage = lazy(() => import("./Pages/MergeFamilyPage"));
+const MergeFamilyDetailPage = lazy(() => import("./Pages/MergeFamilyDetailPage"));
 // const PostsAndFeedsPage = lazy(() => import("./Pages/PostsAndFeedsPage"));
 const FamilyGalleryPage = lazy(() => import("./Pages/FamilyGalleryPage"));
 const GiftListingPage = lazy(() => import("./Pages/GiftListingPage"));
@@ -206,6 +208,15 @@ function App() {
                 <Route
                   path="/pending-approvals"
                   element={<PendingFamilyRequests />}
+                />
+                <Route path="/merge-family" element={<MergeFamilyPage />} />
+                <Route
+                  path="/merge-family/:id"
+                  element={
+                    <FamilyTreeProvider>
+                      <MergeFamilyDetailPage />
+                    </FamilyTreeProvider>
+                  }
                 />
                 {/* <Route
                   path="/posts-and-feeds"
