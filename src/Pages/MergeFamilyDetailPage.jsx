@@ -51,12 +51,15 @@ const Table = ({ columns, data, title }) => (
   </div>
 );
 
+import { useUser } from '../Contexts/UserContext';
+
 const MergeFamilyDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const requestId = Number(id);
 
   const { getLabel } = useFamilyTreeLabels();
+  const { userInfo } = useUser();
 
   const {
     data: familyAResp,
@@ -118,6 +121,11 @@ const MergeFamilyDetailPage = () => {
 
   const primaryCode = analysisData?.primaryFamilyCode || familyAResp?.familyCode;
   const secondaryCode = analysisData?.secondaryFamilyCode || familyBResp?.familyCode;
+
+  const isPrimarySide =
+    !!userInfo?.familyCode &&
+    !!primaryCode &&
+    String(userInfo.familyCode).toUpperCase() === String(primaryCode).toUpperCase();
 
   const personColumnsA = [
     { key: 'name', label: 'Name' },
@@ -407,42 +415,50 @@ const MergeFamilyDetailPage = () => {
 
     return (
       <>
-        <div className="flex items-center justify-between mb-2 text-xs md:text-sm">
-          <div className="flex items-center gap-2">
-            <span className="text-gray-600">Decisions:</span>
-            <button
-              type="button"
-              className="px-2 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-xs"
-              onClick={() => bulkUpdateMatches('approve')}
-            >
-              Bulk Approve Selected
-            </button>
-            <button
-              type="button"
-              className="px-2 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-xs"
-              onClick={() => bulkUpdateMatches('reject')}
-            >
-              Bulk Reject Selected
-            </button>
+        {isPrimarySide && (
+          <div className="flex items-center justify-between mb-2 text-xs md:text-sm">
+            <div className="flex items-center gap-2">
+              <span className="text-gray-600">Decisions:</span>
+              <button
+                type="button"
+                className="px-2 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-xs"
+                onClick={() => bulkUpdateMatches('approve')}
+              >
+                Bulk Approve Selected
+              </button>
+              <button
+                type="button"
+                className="px-2 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-xs"
+                onClick={() => bulkUpdateMatches('reject')}
+              >
+                Bulk Reject Selected
+              </button>
+            </div>
           </div>
-        </div>
+        )}
         <div className="overflow-x-auto">
           <table className="min-w-full text-xs md:text-sm border">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-2 py-2 border text-center">
-                  <input
-                    type="checkbox"
-                    checked={allMatchesSelected}
-                    onChange={(e) => toggleSelectAllMatches(e.target.checked)}
-                  />
-                </th>
+                {isPrimarySide && (
+                  <th className="px-2 py-2 border text-center">
+                    <input
+                      type="checkbox"
+                      checked={allMatchesSelected}
+                      onChange={(e) => toggleSelectAllMatches(e.target.checked)}
+                    />
+                  </th>
+                )}
                 <th className="px-3 py-2 border text-left">Family A (Primary)</th>
                 <th className="px-3 py-2 border text-left">Family B (Secondary)</th>
                 <th className="px-3 py-2 border text-left">Match Level</th>
-                <th className="px-3 py-2 border text-left">Approve?</th>
-                <th className="px-3 py-2 border text-left">Preferred Version</th>
-                <th className="px-3 py-2 border text-left">Make Admin</th>
+                {isPrimarySide && (
+                  <>
+                    <th className="px-3 py-2 border text-left">Approve?</th>
+                    <th className="px-3 py-2 border text-left">Preferred Version</th>
+                    <th className="px-3 py-2 border text-left">Make Admin</th>
+                  </>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -450,18 +466,20 @@ const MergeFamilyDetailPage = () => {
                 const inHardConflict = isMatchInHardConflict(row);
                 return (
                 <tr key={row.key} className={`hover:bg-gray-50 align-top ${inHardConflict ? 'bg-red-50' : ''}`}>
-                  <td className="px-2 py-2 border text-center">
-                    <input
-                      type="checkbox"
-                      checked={row.selected}
-                      onChange={(e) => {
-                        const checked = e.target.checked;
-                        setMatchRows((rows) =>
-                          rows.map((r, i) => (i === index ? { ...r, selected: checked } : r)),
-                        );
-                      }}
-                    />
-                  </td>
+                  {isPrimarySide && (
+                    <td className="px-2 py-2 border text-center">
+                      <input
+                        type="checkbox"
+                        checked={row.selected}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setMatchRows((rows) =>
+                            rows.map((r, i) => (i === index ? { ...r, selected: checked } : r)),
+                          );
+                        }}
+                      />
+                    </td>
+                  )}
                   <td className="px-3 py-2 border">
                     <div className="font-semibold text-gray-800 text-xs md:text-sm">{row.primary.name}</div>
                     <div className="text-[11px] text-gray-500">
@@ -491,56 +509,60 @@ const MergeFamilyDetailPage = () => {
                       Differing: {row.differingFields?.join(', ') || '-'}
                     </div>
                   </td>
-                  <td className="px-3 py-2 border text-xs md:text-sm">
-                    <select
-                      className="border rounded-md px-2 py-1 text-xs md:text-sm"
-                      value={row.decision}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setMatchRows((rows) =>
-                          rows.map((r, i) => (i === index ? { ...r, decision: value } : r)),
-                        );
-                      }}
-                    >
-                      <option value="approve">Approve</option>
-                      <option value="reject">Reject</option>
-                    </select>
-                  </td>
-                  <td className="px-3 py-2 border text-xs md:text-sm">
-                    <select
-                      className="border rounded-md px-2 py-1 text-xs md:text-sm"
-                      value={row.source}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setMatchRows((rows) =>
-                          rows.map((r, i) => (i === index ? { ...r, source: value } : r)),
-                        );
-                      }}
-                    >
-                      <option value="primary">Use Family A</option>
-                      <option value="secondary">Use Family B</option>
-                    </select>
-                  </td>
-                  <td className="px-3 py-2 border text-xs md:text-sm">
-                    <label className="inline-flex items-center gap-1 text-[11px] text-gray-700">
-                      <input
-                        type="checkbox"
-                        checked={row.makeAdmin || false}
-                        onChange={(e) => {
-                          const checked = e.target.checked;
-                          setMatchRows((rows) =>
-                            rows.map((r, i) => (i === index ? { ...r, makeAdmin: checked } : r)),
-                          );
-                        }}
-                      />
-                      <span>Admin</span>
-                    </label>
-                    {inHardConflict && (
-                      <div className="text-[10px] text-red-600 font-semibold mt-1">
-                        ⚠️ Hard Conflict
-                      </div>
-                    )}
-                  </td>
+                  {isPrimarySide && (
+                    <>
+                      <td className="px-3 py-2 border text-xs md:text-sm">
+                        <select
+                          className="border rounded-md px-2 py-1 text-xs md:text-sm"
+                          value={row.decision}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setMatchRows((rows) =>
+                              rows.map((r, i) => (i === index ? { ...r, decision: value } : r)),
+                            );
+                          }}
+                        >
+                          <option value="approve">Approve</option>
+                          <option value="reject">Reject</option>
+                        </select>
+                      </td>
+                      <td className="px-3 py-2 border text-xs md:text-sm">
+                        <select
+                          className="border rounded-md px-2 py-1 text-xs md:text-sm"
+                          value={row.source}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setMatchRows((rows) =>
+                              rows.map((r, i) => (i === index ? { ...r, source: value } : r)),
+                            );
+                          }}
+                        >
+                          <option value="primary">Use Family A</option>
+                          <option value="secondary">Use Family B</option>
+                        </select>
+                      </td>
+                      <td className="px-3 py-2 border text-xs md:text-sm">
+                        <label className="inline-flex items-center gap-1 text-[11px] text-gray-700">
+                          <input
+                            type="checkbox"
+                            checked={row.makeAdmin || false}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setMatchRows((rows) =>
+                                rows.map((r, i) => (i === index ? { ...r, makeAdmin: checked } : r)),
+                              );
+                            }}
+                          />
+                          <span>Admin</span>
+                        </label>
+                        {inHardConflict && (
+                          <div className="text-[10px] text-red-600 font-semibold mt-1">
+                            ⚠️ Hard Conflict
+                          </div>
+                        )}
+                      </td>
+                    </>
+                  )}
                 </tr>
               );
               })}
@@ -809,57 +831,63 @@ const MergeFamilyDetailPage = () => {
 
     return (
       <>
-        <div className="flex items-center justify-between mb-2 text-xs md:text-sm">
-          <div className="flex items-center gap-2">
-            <span className="text-gray-600">Decisions:</span>
-            <button
-              type="button"
-              className="px-2 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-xs"
-              onClick={() => bulkUpdateNewPersons('approve')}
-            >
-              Bulk Approve Selected
-            </button>
-            <button
-              type="button"
-              className="px-2 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-xs"
-              onClick={() => bulkUpdateNewPersons('reject')}
-            >
-              Bulk Reject Selected
-            </button>
+        {isPrimarySide && (
+          <div className="flex items-center justify-between mb-2 text-xs md:text-sm">
+            <div className="flex items-center gap-2">
+              <span className="text-gray-600">Decisions:</span>
+              <button
+                type="button"
+                className="px-2 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-xs"
+                onClick={() => bulkUpdateNewPersons('approve')}
+              >
+                Bulk Approve Selected
+              </button>
+              <button
+                type="button"
+                className="px-2 py-1 bg-red-600 text-white rounded-md hover:bg-red-700 text-xs"
+                onClick={() => bulkUpdateNewPersons('reject')}
+              >
+                Bulk Reject Selected
+              </button>
+            </div>
           </div>
-        </div>
+        )}
         <div className="overflow-x-auto">
           <table className="min-w-full text-xs md:text-sm border">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-2 py-2 border text-center">
-                  <input
-                    type="checkbox"
-                    checked={allNewSelected}
-                    onChange={(e) => toggleSelectAllNewPersons(e.target.checked)}
-                  />
-                </th>
+                {isPrimarySide && (
+                  <th className="px-2 py-2 border text-center">
+                    <input
+                      type="checkbox"
+                      checked={allNewSelected}
+                      onChange={(e) => toggleSelectAllNewPersons(e.target.checked)}
+                    />
+                  </th>
+                )}
                 <th className="px-3 py-2 border text-left">Person (Family B)</th>
                 <th className="px-3 py-2 border text-left">Contact & Codes</th>
                 <th className="px-3 py-2 border text-left">App / Admin</th>
-                <th className="px-3 py-2 border text-left">Approve?</th>
+                {isPrimarySide && <th className="px-3 py-2 border text-left">Approve?</th>}
               </tr>
             </thead>
             <tbody>
               {newPersonRows.map((row, index) => (
                 <tr key={row.person.personId} className="hover:bg-gray-50 align-top">
-                  <td className="px-2 py-2 border text-center">
-                    <input
-                      type="checkbox"
-                      checked={row.selected}
-                      onChange={(e) => {
-                        const checked = e.target.checked;
-                        setNewPersonRows((rows) =>
-                          rows.map((r, i) => (i === index ? { ...r, selected: checked } : r)),
-                        );
-                      }}
-                    />
-                  </td>
+                  {isPrimarySide && (
+                    <td className="px-2 py-2 border text-center">
+                      <input
+                        type="checkbox"
+                        checked={row.selected}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setNewPersonRows((rows) =>
+                            rows.map((r, i) => (i === index ? { ...r, selected: checked } : r)),
+                          );
+                        }}
+                      />
+                    </td>
+                  )}
                   <td className="px-3 py-2 border">
                     <div className="text-sm font-semibold text-gray-800 mb-1">{row.person.name}</div>
                     <div className="text-[11px] text-gray-500 mb-1">
@@ -881,35 +909,39 @@ const MergeFamilyDetailPage = () => {
                     <div className="text-[11px] text-gray-500 mb-1">
                       App User: {row.person.isAppUser ? 'Yes' : 'No'}
                     </div>
-                    <label className="inline-flex items-center gap-1 text-[11px] text-gray-700">
-                      <input
-                        type="checkbox"
-                        checked={row.makeAdmin}
+                    {isPrimarySide && (
+                      <label className="inline-flex items-center gap-1 text-[11px] text-gray-700">
+                        <input
+                          type="checkbox"
+                          checked={row.makeAdmin}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setNewPersonRows((rows) =>
+                              rows.map((r, i) => (i === index ? { ...r, makeAdmin: checked } : r)),
+                            );
+                          }}
+                        />
+                        <span>Make Admin</span>
+                      </label>
+                    )}
+                  </td>
+                  {isPrimarySide && (
+                    <td className="px-3 py-2 border text-xs md:text-sm">
+                      <select
+                        className="border rounded-md px-2 py-1 text-xs md:text-sm"
+                        value={row.decision}
                         onChange={(e) => {
-                          const checked = e.target.checked;
+                          const value = e.target.value;
                           setNewPersonRows((rows) =>
-                            rows.map((r, i) => (i === index ? { ...r, makeAdmin: checked } : r)),
+                            rows.map((r, i) => (i === index ? { ...r, decision: value } : r)),
                           );
                         }}
-                      />
-                      <span>Make Admin</span>
-                    </label>
-                  </td>
-                  <td className="px-3 py-2 border text-xs md:text-sm">
-                    <select
-                      className="border rounded-md px-2 py-1 text-xs md:text-sm"
-                      value={row.decision}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        setNewPersonRows((rows) =>
-                          rows.map((r, i) => (i === index ? { ...r, decision: value } : r)),
-                        );
-                      }}
-                    >
-                      <option value="approve">Approve</option>
-                      <option value="reject">Reject</option>
-                    </select>
-                  </td>
+                      >
+                        <option value="approve">Approve</option>
+                        <option value="reject">Reject</option>
+                      </select>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -1103,6 +1135,7 @@ const MergeFamilyDetailPage = () => {
                   className="w-full border rounded-md px-2 py-1 text-[11px] md:text-xs"
                   value={relationshipLabel}
                   onChange={(e) => setRelationshipLabel(e.target.value)}
+                  disabled={!isPrimarySide}
                 >
                   <option value="">Select relationship label (optional)</option>
                   <option value="SELF">SELF (same person)</option>
@@ -1143,7 +1176,7 @@ const MergeFamilyDetailPage = () => {
         {renderNewPersonsTable()}
       </div>
 
-      <div className="mt-4 flex items-center justify-end gap-3">
+      <div className="mt-4 flex flex-col items-end gap-2">
         {saveMessage && (
           <span className={`text-xs md:text-sm ${saveError ? 'text-red-600' : 'text-green-600'}`}>
             {saveMessage}
@@ -1154,23 +1187,28 @@ const MergeFamilyDetailPage = () => {
             {executeMessage}
           </span>
         )}
-        <button
-          type="button"
-          className="px-4 py-2 bg-green-600 text-white text-sm rounded-md hover:bg-green-700 disabled:opacity-60"
-          onClick={handleExecuteMerge}
-          disabled={executing}
-        >
-          {executing ? 'Merging...' : 'Execute Final Merge'}
-        </button>
-        <button
-          type="button"
-          className="px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 disabled:opacity-60"
-          onClick={handleSaveDecisions}
-          disabled={saving}
-        >
-          {saving ? 'Saving...' : 'Save Decisions'}
-        </button>
       </div>
+
+      {isPrimarySide && (
+        <div className="mt-4 flex items-center justify-end gap-3">
+          <button
+            type="button"
+            className="px-4 py-2 text-sm rounded-md bg-green-600 text-white hover:bg-green-700 disabled:opacity-60"
+            onClick={handleExecuteMerge}
+            disabled={executing}
+          >
+            {executing ? 'Merging...' : 'Execute Final Merge'}
+          </button>
+          <button
+            type="button"
+            className="px-4 py-2 text-sm rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+            onClick={handleSaveDecisions}
+            disabled={saving}
+          >
+            {saving ? 'Saving...' : 'Save Decisions'}
+          </button>
+        </div>
+      )}
     </div>
   );
 };

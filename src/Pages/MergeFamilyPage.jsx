@@ -50,12 +50,18 @@ const MergeFamilyPage = () => {
 
   const handleCreateRequest = async (targetFamilyCode) => {
     if (!userInfo?.familyCode) {
-      alert('Your family code is missing; cannot determine primary family.');
+      alert('Your family code is missing; cannot determine your current family.');
+      return;
+    }
+    if (targetFamilyCode === userInfo.familyCode) {
+      alert('You cannot create a merge request with the same family as both primary and secondary.');
       return;
     }
     try {
-      await createMergeRequest(userInfo.familyCode, targetFamilyCode);
-      alert(`Merge request sent to family ${targetFamilyCode}`);
+      // Current family (userInfo.familyCode) is the requestor/secondary;
+      // the searched target family becomes the primary (target) tree.
+      await createMergeRequest(targetFamilyCode, userInfo.familyCode);
+      alert(`Merge request sent to primary family ${targetFamilyCode}`);
       refetchRequests();
     } catch (err) {
       console.error(err);
@@ -104,7 +110,7 @@ const MergeFamilyPage = () => {
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Merge Family Tree</h1>
           <p className="text-sm text-gray-500">
-            Primary (your current family):{' '}
+            Your current family (will be secondary/requestor in merge):{' '}
             <span className="font-semibold">{userInfo?.familyCode || 'Unknown'}</span>
           </p>
         </div>
@@ -168,7 +174,9 @@ const MergeFamilyPage = () => {
                 </tr>
               </thead>
               <tbody>
-                {searchResults.map((fam) => (
+                {searchResults.map((fam) => {
+                  const isCurrentFamily = userInfo?.familyCode && fam.familyCode === userInfo.familyCode;
+                  return (
                   <tr key={fam.familyCode} className="hover:bg-gray-50">
                     <td className="px-3 py-2 border font-mono text-xs md:text-sm">{fam.familyCode}</td>
                     <td className="px-3 py-2 border">{fam.familyName || '-'}</td>
@@ -189,13 +197,15 @@ const MergeFamilyPage = () => {
                     <td className="px-3 py-2 border text-center">
                       <button
                         className="px-3 py-1 text-xs md:text-sm bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-60"
-                        onClick={() => handleCreateRequest(fam.familyCode)}
+                        disabled={isCurrentFamily}
+                        onClick={() => !isCurrentFamily && handleCreateRequest(fam.familyCode)}
                       >
-                        Send Merge Request
+                        {isCurrentFamily ? 'Current Family' : 'Send Merge Request'}
                       </button>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -242,6 +252,10 @@ const MergeFamilyPage = () => {
               <tbody>
                 {requests.map((req) => {
                   const primaryStatus = req.primaryStatus || req.status || '';
+                  const isPrimarySide = userInfo?.familyCode && req.primaryFamilyCode === userInfo.familyCode;
+                  // Primary admin can always view. Secondary admin can only view once request is accepted/merged.
+                  const canView =
+                    isPrimarySide || primaryStatus === 'accepted' || primaryStatus === 'merged';
                   return (
                   <tr key={req.id} className="hover:bg-gray-50">
                     <td className="px-3 py-2 border">{req.id}</td>
@@ -257,7 +271,7 @@ const MergeFamilyPage = () => {
                     </td>
                     <td className="px-3 py-2 border text-center">
                       <div className="flex items-center justify-center gap-1 md:gap-2">
-                        {primaryStatus === 'open' && (
+                        {primaryStatus === 'open' && isPrimarySide && (
                           <>
                             <button
                               className="px-2 py-1 text-[11px] md:text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700"
@@ -274,8 +288,11 @@ const MergeFamilyPage = () => {
                           </>
                         )}
                         <button
-                          className="px-2 py-1 text-[11px] md:text-xs bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
-                          onClick={() => navigate(`/merge-family/${req.id}`)}
+                          className="px-2 py-1 text-[11px] md:text-xs bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 disabled:opacity-60"
+                          disabled={!canView}
+                          onClick={() => {
+                            if (canView) navigate(`/merge-family/${req.id}`);
+                          }}
                         >
                           View
                         </button>
