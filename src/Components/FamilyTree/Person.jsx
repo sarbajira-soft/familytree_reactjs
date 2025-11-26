@@ -822,27 +822,32 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
                     </h3>
                 </div>
 
-                {/* Relationship Label - Clean with Border */}
-                {relationshipText && !isEditingLabel && !viewOnly && (
+                {/* Relationship Label - Clean with Border (viewOnly shows label without editing) */}
+                {relationshipText && !isEditingLabel && (
                     <div className="px-2">
-                        <div 
-                            className={`text-center py-1 px-2 rounded-lg font-bold cursor-pointer transition-all duration-200 border-2 shadow-sm ${
-                                isViewingBirthFamily 
-                                    ? 'bg-gradient-to-r from-cyan-50 to-sky-50 text-sky-700 border-cyan-400 hover:from-cyan-100 hover:to-sky-100 hover:shadow-md' 
-                                    : 'bg-gradient-to-r from-pink-50 to-fuchsia-50 text-pink-700 border-pink-400 hover:from-pink-100 hover:to-fuchsia-100 hover:shadow-md'
-                            }`}
+                        <div
+                            className={`text-center py-1 px-2 rounded-lg font-bold transition-all duration-200 border-2 shadow-sm ${
+                                isViewingBirthFamily
+                                    ? 'bg-gradient-to-r from-cyan-50 to-sky-50 text-sky-700 border-cyan-400'
+                                    : 'bg-gradient-to-r from-pink-50 to-fuchsia-50 text-pink-700 border-pink-400'
+                            } ${!viewOnly ? 'cursor-pointer hover:from-cyan-100 hover:to-sky-100 hover:shadow-md' : ''}`}
                             style={{
                                 fontSize: `${fontSizeRelationship}px`,
                                 lineHeight: '1.2',
                                 display: '-webkit-box',
                                 WebkitLineClamp: 2,
                                 WebkitBoxOrient: 'vertical',
-                                overflow: 'hidden'
+                                overflow: 'hidden',
                             }}
-                            title="Click to edit label"
-                            onClick={handleEditLabelClick}
+                            {...(!viewOnly
+                                ? {
+                                    title: 'Click to edit label',
+                                    onClick: handleEditLabelClick,
+                                }
+                                : {})}
                         >
-                            {relationshipText} ✏️
+                            {relationshipText}
+                            {!viewOnly && ' ✏️'}
                         </div>
                     </div>
                 )}

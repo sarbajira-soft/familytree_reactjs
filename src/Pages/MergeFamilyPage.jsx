@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import Swal from 'sweetalert2';
 import { useMergeRequests } from '../hooks/useApi';
 import {
   searchMergeFamilies,
   createMergeRequest,
   acceptMergeRequest,
   rejectMergeRequest,
+  getFamilyPreviewForAnchor,
 } from '../utils/familyMergeApi';
 import { useUser } from '../Contexts/UserContext';
 
@@ -18,6 +20,13 @@ const MergeFamilyPage = () => {
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState('');
   const [searchResults, setSearchResults] = useState([]);
+
+  const [anchorModalOpen, setAnchorModalOpen] = useState(false);
+  const [anchorLoading, setAnchorLoading] = useState(false);
+  const [anchorPrimaryFamilyCode, setAnchorPrimaryFamilyCode] = useState('');
+  const [anchorPrimaryMembers, setAnchorPrimaryMembers] = useState([]);
+  const [anchorSelectedPrimaryId, setAnchorSelectedPrimaryId] = useState('');
+  const [anchorRelation, setAnchorRelation] = useState('');
 
   const [statusFilter, setStatusFilter] = useState(''); // '', 'open', 'accepted', 'rejected', 'merged'
 
@@ -48,24 +57,69 @@ const MergeFamilyPage = () => {
     }
   };
 
-  const handleCreateRequest = async (targetFamilyCode) => {
+  const openAnchorModal = async (targetFamilyCode) => {
     if (!userInfo?.familyCode) {
-      alert('Your family code is missing; cannot determine your current family.');
+      await Swal.fire({
+        icon: 'error',
+        title: 'Missing Family Code',
+        text: 'Your family code is missing; cannot determine your current family.',
+      });
       return;
     }
     if (targetFamilyCode === userInfo.familyCode) {
-      alert('You cannot create a merge request with the same family as both primary and secondary.');
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Invalid Merge',
+        text: 'You cannot create a merge request with the same family as both primary and secondary.',
+      });
       return;
     }
+    setAnchorPrimaryFamilyCode(targetFamilyCode);
+    setAnchorSelectedPrimaryId('');
+    setAnchorRelation('');
+    setAnchorLoading(true);
     try {
-      // Current family (userInfo.familyCode) is the requestor/secondary;
-      // the searched target family becomes the primary (target) tree.
-      await createMergeRequest(targetFamilyCode, userInfo.familyCode);
-      alert(`Merge request sent to primary family ${targetFamilyCode}`);
+      const res = await getFamilyPreviewForAnchor(targetFamilyCode);
+      const data = Array.isArray(res?.data) ? res.data : [];
+      setAnchorPrimaryMembers(data);
+      setAnchorModalOpen(true);
+    } catch (err) {
+      console.error(err);
+      await Swal.fire({
+        icon: 'error',
+        title: 'Failed to Load Family Members',
+        text: err?.message || 'Failed to load primary family members for anchor',
+      });
+    } finally {
+      setAnchorLoading(false);
+    }
+  };
+
+  const handleCreateRequest = async () => {
+    if (!userInfo?.familyCode || !anchorPrimaryFamilyCode) return;
+    const anchorConfig =
+      anchorSelectedPrimaryId && anchorRelation
+        ? {
+            primaryPersonId: Number(anchorSelectedPrimaryId),
+            relationToSecondaryAdmin: anchorRelation,
+          }
+        : null;
+    try {
+      await createMergeRequest(anchorPrimaryFamilyCode, userInfo.familyCode, anchorConfig);
+      await Swal.fire({
+        icon: 'success',
+        title: 'Merge Request Sent',
+        text: `Merge request sent to primary family ${anchorPrimaryFamilyCode}`,
+      });
+      setAnchorModalOpen(false);
       refetchRequests();
     } catch (err) {
       console.error(err);
-      alert(err.message || 'Failed to create merge request');
+      await Swal.fire({
+        icon: 'error',
+        title: 'Failed to Create Request',
+        text: err?.message || 'Failed to create merge request',
+      });
     }
   };
 
@@ -75,7 +129,11 @@ const MergeFamilyPage = () => {
       refetchRequests();
     } catch (err) {
       console.error(err);
-      alert(err.message || 'Failed to accept merge request');
+      await Swal.fire({
+        icon: 'error',
+        title: 'Failed to Accept Request',
+        text: err?.message || 'Failed to accept merge request',
+      });
     }
   };
 
@@ -85,7 +143,11 @@ const MergeFamilyPage = () => {
       refetchRequests();
     } catch (err) {
       console.error(err);
-      alert(err.message || 'Failed to reject merge request');
+      await Swal.fire({
+        icon: 'error',
+        title: 'Failed to Reject Request',
+        text: err?.message || 'Failed to reject merge request',
+      });
     }
   };
 
@@ -198,7 +260,7 @@ const MergeFamilyPage = () => {
                       <button
                         className="px-3 py-1 text-xs md:text-sm bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-60"
                         disabled={isCurrentFamily}
-                        onClick={() => !isCurrentFamily && handleCreateRequest(fam.familyCode)}
+                        onClick={() => !isCurrentFamily && openAnchorModal(fam.familyCode)}
                       >
                         {isCurrentFamily ? 'Current Family' : 'Send Merge Request'}
                       </button>
@@ -306,6 +368,106 @@ const MergeFamilyPage = () => {
           </div>
         )}
       </div>
+      {anchorModalOpen && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-40">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-lg mx-4 p-4 md:p-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-2">Confirm Relationship Anchor</h2>
+            <p className="text-xs md:text-sm text-gray-600 mb-3">
+              You are requesting to merge your family ({userInfo?.familyCode}) into primary family{' '}
+              <span className="font-semibold">{anchorPrimaryFamilyCode}</span>. Optionally choose a
+              specific person in the primary family and how they relate to you. This will help connect the
+              trees more accurately. You can also skip this step.
+            </p>
+
+            {anchorLoading ? (
+              <p className="text-xs text-gray-500 mb-2">Loading primary family members...</p>
+            ) : (
+              <>
+                <div className="mb-3">
+                  <label className="block text-[11px] md:text-xs font-semibold text-gray-700 mb-1">
+                    Primary family member
+                  </label>
+                  <select
+                    className="w-full border rounded-md px-2 py-1 text-[11px] md:text-xs"
+                    value={anchorSelectedPrimaryId}
+                    onChange={(e) => setAnchorSelectedPrimaryId(e.target.value)}
+                  >
+                    <option value="">(None selected)</option>
+                    {anchorPrimaryMembers
+                      .filter((p) => p && p.personId != null)
+                      .map((p) => (
+                        <option key={p.personId} value={p.personId}>
+                          {p.name || `Person ${p.personId}`} (Gen: {p.generation ?? '-'})
+                        </option>
+                      ))}
+                  </select>
+                </div>
+                <div className="mb-3">
+                  <label className="block text-[11px] md:text-xs font-semibold text-gray-700 mb-1">
+                    Relationship of this primary member to you (secondary admin)
+                  </label>
+                  <select
+                    className="w-full border rounded-md px-2 py-1 text-[11px] md:text-xs"
+                    value={anchorRelation}
+                    onChange={(e) => setAnchorRelation(e.target.value)}
+                  >
+                    <option value="">(No anchor / unsure)</option>
+                    <option value="PARENT">This person is my parent</option>
+                    <option value="CHILD">This person is my child</option>
+                    <option value="SAME_GEN">Same generation as me (sibling/cousin)</option>
+                  </select>
+                </div>
+              </>
+            )}
+
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                type="button"
+                className="px-3 py-1.5 text-xs md:text-sm border rounded-md text-gray-600 hover:bg-gray-50"
+                onClick={() => setAnchorModalOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="px-3 py-1.5 text-xs md:text-sm bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300"
+                disabled={anchorLoading}
+                onClick={async () => {
+                  // Skip anchor, just send merge request
+                  if (!userInfo?.familyCode || !anchorPrimaryFamilyCode) return;
+                  try {
+                    await createMergeRequest(anchorPrimaryFamilyCode, userInfo.familyCode, null);
+                    await Swal.fire({
+                      icon: 'success',
+                      title: 'Merge Request Sent',
+                      text: `Merge request sent to primary family ${anchorPrimaryFamilyCode}`,
+                    });
+                    setAnchorModalOpen(false);
+                    refetchRequests();
+                  } catch (err) {
+                    console.error(err);
+                    await Swal.fire({
+                      icon: 'error',
+                      title: 'Failed to Create Request',
+                      text: err?.message || 'Failed to create merge request',
+                    });
+                  }
+                }}
+              >
+                Skip Anchor & Send
+              </button>
+              <button
+                type="button"
+                className="px-3 py-1.5 text-xs md:text-sm bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-60"
+                disabled={anchorLoading}
+                onClick={handleCreateRequest}
+              >
+                Confirm Anchor & Send
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

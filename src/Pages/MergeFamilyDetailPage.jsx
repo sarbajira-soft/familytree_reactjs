@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import Swal from 'sweetalert2';
 import {
   getMergeFamilyAPreview,
   getMergeFamilyBPreview,
@@ -113,6 +114,7 @@ const MergeFamilyDetailPage = () => {
   const [executeMessage, setExecuteMessage] = useState('');
   const [executeError, setExecuteError] = useState(false);
   const [relationshipLabel, setRelationshipLabel] = useState('');
+  const [anchorConfig, setAnchorConfig] = useState(null);
   const [familyARelationshipCodes, setFamilyARelationshipCodes] = useState({});
   const [familyBRelationshipCodes, setFamilyBRelationshipCodes] = useState({});
 
@@ -307,6 +309,8 @@ const MergeFamilyDetailPage = () => {
       ? currentAnalysis.matches.map((m) => {
           const key = `${m.primary.personId}-${m.secondary.personId}`;
           const existing = matchDecisionMap.get(key);
+          const requiredChain = !!m.requiredChain || !!(m.secondary && m.secondary.requiredChain);
+          const decision = existing?.decision || 'approve';
           return {
             key,
             primary: m.primary,
@@ -316,8 +320,10 @@ const MergeFamilyDetailPage = () => {
             matchingFields: m.matchingFields,
             differingFields: m.differingFields,
             selected: false,
-            decision: existing?.decision || 'approve',
+            decision,
             source: existing?.source || 'primary',
+            requiredChain,
+            makeAdmin: existing?.makeAdmin || false,
           };
         })
       : [];
@@ -325,11 +331,23 @@ const MergeFamilyDetailPage = () => {
     const updatedNewPersonRows = Array.isArray(currentAnalysis.newPersons)
       ? currentAnalysis.newPersons.map((p) => {
           const existing = newDecisionMap.get(p.personId);
+          const requiredChain = !!p.requiredChain;
+          const decision = existing?.decision || 'approve';
+          const linkPrimaryPersonIdRaw = existing && existing.linkPrimaryPersonId != null
+            ? Number(existing.linkPrimaryPersonId)
+            : null;
+          const linkPrimaryPersonId =
+            typeof linkPrimaryPersonIdRaw === 'number' && !Number.isNaN(linkPrimaryPersonIdRaw)
+              ? linkPrimaryPersonIdRaw
+              : null;
           return {
             person: p,
             selected: false,
-            decision: existing?.decision || 'approve',
+            decision,
             makeAdmin: existing?.makeAdmin || false,
+            requiredChain,
+            linkRelationToPrimary: existing?.linkRelationToPrimary || null,
+            linkPrimaryPersonId,
           };
         })
       : [];
@@ -341,7 +359,16 @@ const MergeFamilyDetailPage = () => {
     if (meta.relationshipLabel && typeof meta.relationshipLabel === 'string') {
       setRelationshipLabel(meta.relationshipLabel);
     }
-  }, [analysis, existingState]);
+
+    // Initialize anchorConfig from saved state or analysis only once
+    if (!anchorConfig) {
+      if (meta.anchorConfig) {
+        setAnchorConfig(meta.anchorConfig);
+      } else if (currentAnalysis && currentAnalysis.anchorConfig) {
+        setAnchorConfig(currentAnalysis.anchorConfig);
+      }
+    }
+  }, [analysis, existingState, anchorConfig]);
 
   const renderConflicts = (list, title, color) => (
     <div className="bg-white rounded-lg shadow mb-6 p-4 md:p-6">
@@ -376,11 +403,15 @@ const MergeFamilyDetailPage = () => {
   };
 
   const bulkUpdateMatches = (decision) => {
-    setMatchRows((rows) => rows.map((r) => (r.selected ? { ...r, decision } : r)));
+    setMatchRows((rows) =>
+      rows.map((r) => (r.selected && !r.requiredChain ? { ...r, decision } : r)),
+    );
   };
 
   const bulkUpdateNewPersons = (decision) => {
-    setNewPersonRows((rows) => rows.map((r) => (r.selected ? { ...r, decision } : r)));
+    setNewPersonRows((rows) =>
+      rows.map((r) => (r.selected && !r.requiredChain ? { ...r, decision } : r)),
+    );
   };
 
   const getHardConflictPersonIds = () => {
@@ -497,6 +528,11 @@ const MergeFamilyDetailPage = () => {
                     <div className="text-[11px] text-gray-500">
                       Phone: {row.secondary.phone || '-'} | Email: {row.secondary.email || '-'}
                     </div>
+                    {row.requiredChain && (
+                      <div className="mt-1 inline-flex items-center px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 text-[10px] font-semibold">
+                        Required parent (secondary admin)
+                      </div>
+                    )}
                   </td>
                   <td className="px-3 py-2 border text-xs md:text-sm">
                     <div className="inline-flex items-center px-2 py-1 rounded-full bg-blue-50 text-blue-700 font-semibold text-[11px] mb-1">
@@ -589,7 +625,7 @@ const MergeFamilyDetailPage = () => {
     });
 
     matchRows.forEach((row) => {
-      if (!row || row.decision !== 'approve') return;
+      if (!row || (row.decision !== 'approve' && !row.requiredChain)) return;
       const finalId = primaryIdToFinal.get(row.primary.personId);
       if (finalId != null) {
         secondaryIdToFinal.set(row.secondary.personId, finalId);
@@ -597,7 +633,7 @@ const MergeFamilyDetailPage = () => {
     });
 
     newPersonRows.forEach((row) => {
-      if (!row || row.decision !== 'approve') return;
+      if (!row || (row.decision !== 'approve' && !row.requiredChain)) return;
       const pid = row.person.personId;
       if (!secondaryIdToFinal.has(pid)) {
         secondaryIdToFinal.set(pid, nextId++);
@@ -612,7 +648,10 @@ const MergeFamilyDetailPage = () => {
       if (!finalId) return;
 
       const matchRow = matchRows.find(
-        (r) => r.primary && r.primary.personId === a.personId && r.decision === 'approve',
+        (r) =>
+          r.primary &&
+          r.primary.personId === a.personId &&
+          (r.decision === 'approve' || r.requiredChain),
       );
 
       const useSecondary = matchRow && matchRow.source === 'secondary';
@@ -636,7 +675,7 @@ const MergeFamilyDetailPage = () => {
 
     // Create members for approved new persons from Family B
     newPersonRows.forEach((row) => {
-      if (!row || row.decision !== 'approve') return;
+      if (!row || (row.decision !== 'approve' && !row.requiredChain)) return;
       const p = row.person;
       const finalId = secondaryIdToFinal.get(p.personId);
       if (!finalId || membersById.has(finalId)) return;
@@ -784,14 +823,96 @@ const MergeFamilyDetailPage = () => {
       });
     });
 
-    // Apply relationship path between primary admin (Family A) and secondary admin (Family B)
-    if (relationshipLabel) {
-      const primaryAdmin = familyA.find((p) => p && p.isAdmin && p.personId != null);
-      const secondaryAdmin = familyB.find((p) => p && p.isAdmin && p.personId != null);
+    newPersonRows.forEach((row) => {
+      if (!row || (row.decision !== 'approve' && !row.requiredChain)) return;
+      if (!row.linkRelationToPrimary || !row.linkPrimaryPersonId) return;
+      const primaryFinalId = primaryIdToFinal.get(row.linkPrimaryPersonId);
+      const secPid = row.person.personId;
+      const secFinalId = secondaryIdToFinal.get(secPid);
+      if (!primaryFinalId || !secFinalId) return;
+      const rel = String(row.linkRelationToPrimary).toUpperCase();
+      if (rel === 'PARENT') {
+        addRel(secFinalId, primaryFinalId, 'parents');
+        addRel(primaryFinalId, secFinalId, 'children');
+      } else if (rel === 'CHILD') {
+        addRel(secFinalId, primaryFinalId, 'children');
+        addRel(primaryFinalId, secFinalId, 'parents');
+      } else if (rel === 'SAME_GEN') {
+        addRel(primaryFinalId, secFinalId, 'siblings');
+        addRel(secFinalId, primaryFinalId, 'siblings');
+      } else if (rel === 'SPOUSE') {
+        addRel(primaryFinalId, secFinalId, 'spouses');
+        addRel(secFinalId, primaryFinalId, 'spouses');
+      }
+    });
 
-      if (primaryAdmin && secondaryAdmin) {
+    // Ensure secondary admin exists in final tree if we need it for anchor or admin relationship
+    const secondaryAdminPerson = familyB.find((p) => p && p.isAdmin && p.personId != null);
+    let secondaryAdminFinalId = null;
+    if (secondaryAdminPerson) {
+      const secPid = secondaryAdminPerson.personId;
+      secondaryAdminFinalId = secondaryIdToFinal.get(secPid);
+      if (!secondaryAdminFinalId) {
+        secondaryAdminFinalId = nextId++;
+        secondaryIdToFinal.set(secPid, secondaryAdminFinalId);
+      }
+      if (!membersById.has(secondaryAdminFinalId)) {
+        membersById.set(secondaryAdminFinalId, {
+          id: secondaryAdminFinalId,
+          base: secondaryAdminPerson,
+          primary: null,
+          secondary: secondaryAdminPerson,
+          parents: [],
+          children: [],
+          spouses: [],
+          siblings: [],
+          userId: secondaryAdminPerson.userId || null,
+          memberId: secondaryAdminPerson.memberId || null,
+          relationshipCode: secondaryAdminPerson.relationshipCode || undefined,
+          lifeStatus: secondaryAdminPerson.lifeStatus || 'living',
+        });
+      }
+    }
+
+    // Apply anchor mapping between a chosen primary member and the secondary admin
+    if (anchorConfig && anchorConfig.primaryPersonId && anchorConfig.relationToSecondaryAdmin && secondaryAdminPerson) {
+      const primaryAnchor = familyA.find(
+        (p) => p && p.personId != null && p.personId === anchorConfig.primaryPersonId,
+      );
+      if (primaryAnchor) {
+        const primaryAnchorId = primaryIdToFinal.get(primaryAnchor.personId);
+        const secId = secondaryAdminFinalId || secondaryIdToFinal.get(secondaryAdminPerson.personId);
+        if (primaryAnchorId && secId) {
+          const rel = String(anchorConfig.relationToSecondaryAdmin).toUpperCase();
+          switch (rel) {
+            case 'PARENT':
+              // Primary member is parent of secondary admin
+              addRel(secId, primaryAnchorId, 'parents');
+              addRel(primaryAnchorId, secId, 'children');
+              break;
+            case 'CHILD':
+              // Primary member is child of secondary admin
+              addRel(secId, primaryAnchorId, 'children');
+              addRel(primaryAnchorId, secId, 'parents');
+              break;
+            case 'SAME_GEN':
+              addRel(primaryAnchorId, secId, 'siblings');
+              addRel(secId, primaryAnchorId, 'siblings');
+              break;
+            default:
+              break;
+          }
+        }
+      }
+    }
+
+    // Apply relationship path between primary admin (Family A) and secondary admin (Family B)
+    if (relationshipLabel && secondaryAdminPerson) {
+      const primaryAdmin = familyA.find((p) => p && p.isAdmin && p.personId != null);
+
+      if (primaryAdmin) {
         const primaryAdminId = primaryIdToFinal.get(primaryAdmin.personId);
-        const secondaryAdminId = secondaryIdToFinal.get(secondaryAdmin.personId);
+        const secondaryAdminId = secondaryAdminFinalId || secondaryIdToFinal.get(secondaryAdminPerson.personId);
 
         if (primaryAdminId && secondaryAdminId) {
           applyAdminRelationshipCode(relationshipLabel, primaryAdminId, secondaryAdminId);
@@ -868,6 +989,9 @@ const MergeFamilyDetailPage = () => {
                 <th className="px-3 py-2 border text-left">Person (Family B)</th>
                 <th className="px-3 py-2 border text-left">Contact & Codes</th>
                 <th className="px-3 py-2 border text-left">App / Admin</th>
+                {isPrimarySide && (
+                  <th className="px-3 py-2 border text-left">Link to Primary Member</th>
+                )}
                 {isPrimarySide && <th className="px-3 py-2 border text-left">Approve?</th>}
               </tr>
             </thead>
@@ -893,6 +1017,11 @@ const MergeFamilyDetailPage = () => {
                     <div className="text-[11px] text-gray-500 mb-1">
                       Age: {row.person.age ?? '-'} | Gender: {row.person.gender || '-'} | Gen: {row.person.generation ?? '-'}
                     </div>
+                    {row.requiredChain && (
+                      <div className="inline-flex items-center px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 text-[10px] font-semibold">
+                        Required parent (secondary admin)
+                      </div>
+                    )}
                   </td>
                   <td className="px-3 py-2 border">
                     <div className="text-[11px] text-gray-500 mb-1">
@@ -927,6 +1056,65 @@ const MergeFamilyDetailPage = () => {
                   </td>
                   {isPrimarySide && (
                     <td className="px-3 py-2 border text-xs md:text-sm">
+                      <div className="mb-2">
+                        <select
+                          className="w-full border rounded-md px-2 py-1 text-[11px] md:text-xs"
+                          value={row.linkPrimaryPersonId || ''}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            const idNum = value ? Number(value) : null;
+                            setNewPersonRows((rows) =>
+                              rows.map((r, i) =>
+                                i === index
+                                  ? {
+                                      ...r,
+                                      linkPrimaryPersonId:
+                                        typeof idNum === 'number' && !Number.isNaN(idNum) ? idNum : null,
+                                    }
+                                  : r,
+                              ),
+                            );
+                          }}
+                        >
+                          <option value="">(No specific primary member)</option>
+                          {familyA
+                            .filter((p) => p && p.personId != null)
+                            .map((p) => (
+                              <option key={p.personId} value={p.personId}>
+                                {p.name || `Person ${p.personId}`} (Gen: {p.generation ?? '-'})
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                      <div>
+                        <select
+                          className="w-full border rounded-md px-2 py-1 text-[11px] md:text-xs"
+                          value={row.linkRelationToPrimary || ''}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setNewPersonRows((rows) =>
+                              rows.map((r, i) =>
+                                i === index
+                                  ? {
+                                      ...r,
+                                      linkRelationToPrimary: value || null,
+                                    }
+                                  : r,
+                              ),
+                            );
+                          }}
+                        >
+                          <option value="">(No extra relation)</option>
+                          <option value="PARENT">Primary member is parent of this person</option>
+                          <option value="CHILD">Primary member is child of this person</option>
+                          <option value="SAME_GEN">Same generation as this person (sibling/cousin)</option>
+                          <option value="SPOUSE">Primary member is spouse of this person</option>
+                        </select>
+                      </div>
+                    </td>
+                  )}
+                  {isPrimarySide && (
+                    <td className="px-3 py-2 border text-xs md:text-sm">
                       <select
                         className="border rounded-md px-2 py-1 text-xs md:text-sm"
                         value={row.decision}
@@ -952,10 +1140,12 @@ const MergeFamilyDetailPage = () => {
   };
 
   const handleSaveDecisions = async () => {
-    if (!requestId) return;
+    if (!requestId) return false;
     setSaving(true);
     setSaveMessage('');
     setSaveError(false);
+
+    let success = false;
 
     try {
       const decisions = {
@@ -969,6 +1159,8 @@ const MergeFamilyDetailPage = () => {
           personId: row.person.personId,
           decision: row.decision,
           makeAdmin: !!row.makeAdmin,
+          linkRelationToPrimary: row.linkRelationToPrimary || null,
+          linkPrimaryPersonId: row.linkPrimaryPersonId || null,
         })),
       };
 
@@ -1005,32 +1197,64 @@ const MergeFamilyDetailPage = () => {
         meta: {
           ...(existingState && existingState.meta ? existingState.meta : {}),
           relationshipLabel: relationshipLabel || null,
+          anchorConfig: anchorConfig || null,
         },
       };
 
       await saveMergeState(requestId, payload);
       setSaveMessage('Decisions saved successfully.');
       setSaveError(false);
+      success = true;
     } catch (err) {
       setSaveMessage(err?.message || 'Failed to save decisions.');
       setSaveError(true);
     } finally {
       setSaving(false);
     }
+
+    return success;
   };
 
   const handleExecuteMerge = async () => {
     if (!requestId) return;
+
+    // Ensure latest decisions and final tree are saved before executing or previewing
+    const saveOk = await handleSaveDecisions();
+    if (!saveOk) {
+      return;
+    }
+
     const { primaryCount, approvedNewPersons, finalCount, approvedMatches } = getPreviewCounts();
-    const confirmed = window.confirm(
-      `Preview:\n` +
-      `Primary Family: ${primaryCount} members\n` +
-      `Approved Matches: ${approvedMatches}\n` +
-      `Approved New Persons: ${approvedNewPersons}\n` +
-      `Final Tree: ${finalCount} members\n\n` +
-      `This will apply the final merged tree to the primary family and cannot be easily undone. Are you sure?`,
-    );
-    if (!confirmed) return;
+    const html = [
+      '<div style="text-align:left; font-size:13px; line-height:1.5;">',
+      '<strong>Preview:</strong><br/>',
+      `Primary Family: ${primaryCount} members<br/>`,
+      `Approved Matches: ${approvedMatches}<br/>`,
+      `Approved New Persons: ${approvedNewPersons}<br/>`,
+      `Final Tree: ${finalCount} members`,
+      '<br/><br/>',
+      'This will apply the final merged tree to the primary family and cannot be easily undone. Are you sure?',
+      '</div>',
+    ].join('');
+
+    const result = await Swal.fire({
+      icon: 'warning',
+      title: 'Execute Merge?',
+      html,
+      showCancelButton: true,
+      showDenyButton: true,
+      confirmButtonText: 'OK',
+      denyButtonText: 'Tree View',
+      cancelButtonText: 'Cancel',
+      reverseButtons: true,
+    });
+
+    if (result.isDenied) {
+      navigate(`/merge-family/${requestId}/preview-tree`);
+      return;
+    }
+
+    if (!result.isConfirmed) return;
 
     setExecuting(true);
     setExecuteMessage('');
@@ -1160,6 +1384,74 @@ const MergeFamilyDetailPage = () => {
                   This label will be saved with merge state and can be used by backend crisis analysis to interpret
                   generation alignment and how to connect Family B branch into Family A.
                 </p>
+
+                {isPrimarySide && (
+                  <div className="mt-3 pt-2 border-t border-dashed border-gray-200 space-y-2">
+                    <div className="text-[11px] md:text-xs font-semibold text-gray-700">
+                      Anchor between a primary member and the secondary admin
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 items-center">
+                      <div>
+                        <label className="block text-[10px] md:text-[11px] text-gray-600 mb-1">
+                          Primary family member
+                        </label>
+                        <select
+                          className="w-full border rounded-md px-2 py-1 text-[11px] md:text-xs"
+                          value={anchorConfig?.primaryPersonId || ''}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (!value) {
+                              setAnchorConfig((prev) =>
+                                prev ? { ...prev, primaryPersonId: null } : { primaryPersonId: null },
+                              );
+                              return;
+                            }
+                            const idNum = Number(value);
+                            if (!idNum || Number.isNaN(idNum)) return;
+                            setAnchorConfig((prev) => ({
+                              ...(prev || {}),
+                              primaryPersonId: idNum,
+                            }));
+                          }}
+                        >
+                          <option value="">(None selected)</option>
+                          {familyA
+                            .filter((p) => p && p.personId != null)
+                            .map((p) => (
+                              <option key={p.personId} value={p.personId}>
+                                {p.name || `Person ${p.personId}`} (Gen: {p.generation ?? '-'})
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] md:text-[11px] text-gray-600 mb-1">
+                          Relationship of this primary member to the secondary admin
+                        </label>
+                        <select
+                          className="w-full border rounded-md px-2 py-1 text-[11px] md:text-xs"
+                          value={anchorConfig?.relationToSecondaryAdmin || ''}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setAnchorConfig((prev) => ({
+                              ...(prev || {}),
+                              relationToSecondaryAdmin: value || null,
+                            }));
+                          }}
+                        >
+                          <option value="">(No anchor / use admin-to-admin only)</option>
+                          <option value="PARENT">Primary member is parent of secondary admin</option>
+                          <option value="CHILD">Primary member is child of secondary admin</option>
+                          <option value="SAME_GEN">Same generation as secondary admin (sibling/cousin)</option>
+                        </select>
+                      </div>
+                    </div>
+                    <p className="mt-1 text-[10px] md:text-[11px] text-gray-500">
+                      This anchor helps connect the two trees. Secondary admin gave an initial guess when sending the
+                      request; as primary admin you can adjust it here before saving decisions.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           ) : (

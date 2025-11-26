@@ -35,13 +35,26 @@ export async function searchMergeFamilies({ familyCode, adminPhone } = {}) {
   return handleResponse(res, 'Failed to search families for merge');
 }
 
-export async function createMergeRequest(primaryFamilyCode, secondaryFamilyCode) {
+export async function createMergeRequest(primaryFamilyCode, secondaryFamilyCode, anchorConfig) {
   const res = await fetch(`${API_BASE}/request`, {
     method: 'POST',
     headers: authHeaders(),
-    body: JSON.stringify({ primaryFamilyCode, secondaryFamilyCode }),
+    body: JSON.stringify({
+      primaryFamilyCode,
+      secondaryFamilyCode,
+      ...(anchorConfig ? { anchorConfig } : {}),
+    }),
   });
   return handleResponse(res, 'Failed to create merge request');
+}
+
+export async function getFamilyPreviewForAnchor(familyCode) {
+  if (!familyCode) throw new Error('familyCode is required');
+  const res = await fetch(`${API_BASE}/preview/${encodeURIComponent(familyCode)}`, {
+    method: 'GET',
+    headers: authHeaders(),
+  });
+  return handleResponse(res, 'Failed to fetch family preview for anchor');
 }
 
 export async function getMergeRequests(status) {

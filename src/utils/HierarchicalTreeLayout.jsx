@@ -82,13 +82,31 @@ export function calculateHierarchicalLayout(tree) {
   // Step 3: Calculate subtree widths recursively
   const subtreeWidths = new Map(); // personId -> width of their subtree
 
-  function calculateSubtreeWidth(personId) {
+  // Recursively calculate width of a subtree while guarding against cycles.
+  // `stack` tracks the current recursion path; if we see the same personId again
+  // we treat it as a leaf to avoid infinite recursion.
+  function calculateSubtreeWidth(personId, stack = new Set()) {
     if (subtreeWidths.has(personId)) {
       return subtreeWidths.get(personId);
     }
 
+    if (stack.has(personId)) {
+      // Cycle detected in parent-child graph - treat as leaf
+      // so layout can still be computed without blowing the stack.
+      const leafWidth = CARD_WIDTH * 2 + SPOUSE_SPACING;
+      subtreeWidths.set(personId, leafWidth);
+      return leafWidth;
+    }
+
+    stack.add(personId);
+
     const person = tree.people.get(personId);
-    if (!person) return CARD_WIDTH * 2 + SPOUSE_SPACING;
+    if (!person) {
+      const width = CARD_WIDTH * 2 + SPOUSE_SPACING;
+      subtreeWidths.set(personId, width);
+      stack.delete(personId);
+      return width;
+    }
 
     // Get children
     const children = childrenMap.get(personId) || [];
@@ -97,13 +115,14 @@ export function calculateHierarchicalLayout(tree) {
       // Leaf node - width is couple width
       const width = CARD_WIDTH * 2 + SPOUSE_SPACING;
       subtreeWidths.set(personId, width);
+      stack.delete(personId);
       return width;
     }
 
     // Calculate total width of all children's subtrees
     let childrenTotalWidth = 0;
     children.forEach((childId) => {
-      childrenTotalWidth += calculateSubtreeWidth(childId) + HORIZONTAL_SPACING;
+      childrenTotalWidth += calculateSubtreeWidth(childId, stack) + HORIZONTAL_SPACING;
     });
     childrenTotalWidth -= HORIZONTAL_SPACING; // Remove last spacing
 
@@ -111,6 +130,7 @@ export function calculateHierarchicalLayout(tree) {
     const coupleWidth = CARD_WIDTH * 2 + SPOUSE_SPACING;
     const width = Math.max(coupleWidth, childrenTotalWidth);
     subtreeWidths.set(personId, width);
+    stack.delete(personId);
     return width;
   }
 
@@ -271,7 +291,7 @@ export function calculateHierarchicalLayout(tree) {
 
   // Calculate widths for all people
   tree.people.forEach((person) => {
-    calculateSubtreeWidth(person.id);
+    calculateSubtreeWidth(person.id, new Set());
   });
 
   // Position starting from first generation
