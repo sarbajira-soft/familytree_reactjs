@@ -4,7 +4,8 @@ import { X, UserPlus, Users, Edit, Plus, UserMinus, Camera, Save, ArrowLeft, Sen
 import { fetchRelationships } from '../../utils/familyTreeApi';
 import Swal from 'sweetalert2';
 
-const PRIMARY_COLOR = '#3f982c';
+const PRIMARY_COLOR = "#1976D2";
+const SECONDARY_COLOR = "#f97316";
 
 const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, token, existingMemberIds = [] }) => {
     const [count, setCount] = useState(1);
@@ -584,7 +585,8 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Modal Header */}
-                <div style={{ 
+                <div
+                style={{ 
                     padding: '28px 32px 20px 32px', 
                     borderBottom: '1px solid rgba(0, 0, 0, 0.08)', 
                     display: 'flex', 
@@ -594,7 +596,9 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                     borderRadius: '24px 24px 0 0'
                 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <div style={{
+                        <div
+                        
+                        style={{
                             width: 40,
                             height: 40,
                             borderRadius: 12,
@@ -603,6 +607,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                             alignItems: 'center',
                             justifyContent: 'center',
                             boxShadow: '0 4px 15px rgba(63, 152, 44, 0.18)'
+
                         }}>
                             {action.type === 'parents' && <Users size={20} color="#fff" />}
                             {action.type === 'spouse' && <UserPlus size={20} color="#fff" />}
@@ -1519,7 +1524,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                             type="submit" 
                             className="btn-success-upgraded" 
                             style={{ 
-                                background: PRIMARY_COLOR, 
+                                background: SECONDARY_COLOR, 
                                 color: '#fff', 
                                 borderRadius: 12, 
                                 padding: '12px 28px', 
@@ -1531,15 +1536,15 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                 gap: 8,
                                 transition: 'all 0.3s ease',
                                 cursor: 'pointer',
-                                boxShadow: `0 4px 15px ${PRIMARY_COLOR}33`
+                                boxShadow: `0 4px 15px ${SECONDARY_COLOR}33`
                             }}
                             onMouseEnter={(e) => {
                                 e.target.style.transform = 'translateY(-2px)';
-                                e.target.style.boxShadow = `0 6px 20px ${PRIMARY_COLOR}44`;
+                                e.target.style.boxShadow = `0 6px 20px ${SECONDARY_COLOR}44`;
                             }}
                             onMouseLeave={(e) => {
                                 e.target.style.transform = 'translateY(0)';
-                                e.target.style.boxShadow = `0 4px 15px ${PRIMARY_COLOR}33`;
+                                e.target.style.boxShadow = `0 4px 15px ${SECONDARY_COLOR}33`;
                             }}
                         >
                             <Save size={16} />
