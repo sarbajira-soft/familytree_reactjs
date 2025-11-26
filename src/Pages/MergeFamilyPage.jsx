@@ -177,7 +177,7 @@ const MergeFamilyPage = () => {
           </p>
         </div>
         <button
-          className="px-3 py-2 text-sm border rounded-md text-gray-600 hover:bg-gray-50"
+          className="px-3  py-2 bg-primary-600 text-sm border rounded-md text-white hover:bg-primary-700"
           onClick={() => navigate('/family-tree')}
         >
           Back to Family Tree
@@ -212,7 +212,7 @@ const MergeFamilyPage = () => {
             <button
               type="submit"
               disabled={searchLoading}
-              className="px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 disabled:opacity-60"
+              className="px-4 py-2 bg-primary-500 text-white text-sm rounded-md hover:bg-primary-700 disabled:opacity-60"
             >
               {searchLoading ? 'Searching...' : 'Search'}
             </button>

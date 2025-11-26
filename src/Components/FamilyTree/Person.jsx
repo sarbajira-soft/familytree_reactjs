@@ -6,6 +6,7 @@ import { FiEye, FiShare2, FiMoreVertical, FiUserX, FiUserCheck } from 'react-ico
 import Swal from 'sweetalert2';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getToken } from '../../utils/auth';
+import { Mars, Venus } from 'lucide-react';
 
 // Helper function to get inverse/opposite relationship code
 const getInverseRelationship = (relationshipCode) => {
@@ -101,10 +102,10 @@ const getGenderLabel = (person, tree, currentUserId) => {
     switch (normalizedGender) {
         case 'male':
         case 'm':
-            return 'Male';
+            return 'M';
         case 'female':
         case 'f':
-            return 'Female';
+            return 'F';
         case 'unknown':
         case '':
         case 'man': // Handle 'MAN' case
@@ -167,7 +168,7 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
             return {
                 width: isMobile ? 140 : 190,
                 height: isMobile ? 145 : 185,
-                fontSizeName: isMobile ? 14 : 16,
+                fontSizeName: isMobile ? 12 : 14,
                 fontSizeDetails: isMobile ? 12 : 13,
                 fontSizeRelationship: isMobile ? 12 : 14,
                 profileSize: isMobile ? 80 : 100,
@@ -577,250 +578,321 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
     const shadowIntensity = isLargeTree ? 0.05 : 0.08;
 
     return (
-        <div id={`person-${person.id}`} className="person-container" style={{ position: 'absolute', left: `${person.x - width / 2}px`, top: `${person.y - height / 2}px`, zIndex: 10 }}>
-            {/* Main Person Card */}
-            <div
-                className={`person ${person.gender} ${isRoot ? 'root' : ''} ${isNew ? 'person-new' : ''} ${isSelected ? 'person-selected' : ''} ${
-                    person.lifeStatus === 'remembering' ? 'remembering' : ''
-                } ${isHighlighted ? 'person-highlighted' : ''} ${isSearchResult ? 'person-search-result' : ''} group transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:ring-4 hover:ring-green-200`}
+      <div
+        id={`person-${person.id}`}
+        className="person-container"
+        style={{
+          position: "absolute",
+          left: `${person.x - width / 2}px`,
+          top: `${person.y - height / 2}px`,
+          zIndex: 10,
+        }}
+      >
+        {/* Main Person Card */}
+        <div
+          className={`person ${person.gender} ${isRoot ? "root" : ""} ${
+            isNew ? "person-new" : ""
+          } ${isSelected ? "person-selected" : ""} ${
+            person.lifeStatus === "remembering" ? "remembering" : ""
+          } ${isHighlighted ? "person-highlighted" : ""} ${
+            isSearchResult ? "person-search-result" : ""
+          } group transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:ring-4 hover:ring-green-200`}
+          style={{
+            position: "relative",
+            minWidth: width,
+            maxWidth: memberCount > 50 ? 200 : 250,
+            width: width, // Fixed width instead of fit-content
+            minHeight: height,
+            height: height, // Fixed height
+            margin: margin,
+            padding: padding,
+            // borderRadius, display, flexDirection, alignItems, justifyContent defined later with more specific logic
+            opacity:
+              person.lifeStatus === "remembering"
+                ? 0.8 * cardOpacity
+                : cardOpacity,
+            background: isRoot
+              ? "linear-gradient(135deg, #fef2f2 0%, #ffe4e6 50%, #fce7f3 100%)" // premium rose gradient for root
+              : isNew
+              ? "linear-gradient(135deg, #f0f9ff 0%, #dbeafe 50%, #e0f2fe 100%)" // premium sky gradient for new
+              : person.gender === "male"
+              ? "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)" // premium blue gradient for males
+              : person.gender === "female"
+              ? "linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)" // premium rose gradient for females
+              : "linear-gradient(135deg, #f8fafc 0%, #e0f2fe 100%)", // premium light gradient for others
+            border: isHighlighted
+              ? "3px solid #ec4899" // vibrant pink border for highlighted
+              : isSearchResult
+              ? "3px solid #06b6d4" // vibrant cyan border for search results
+              : isRoot
+              ? "3px solid #db2777" // deep pink border for root
+              : isNew
+              ? "2.5px dashed #0891b2" // vibrant cyan border for new
+              : isSelected
+              ? "3px solid #ec4899" // vibrant pink border for selected
+              : person.gender === "male"
+              ? "3px solid #0ea5e9" // vibrant sky blue border for males
+              : person.gender === "female"
+              ? "3px solid #f472b6" // vibrant pink border for females
+              : "3px solid #22d3ee", // vibrant cyan border for others
+            borderRadius: memberCount > 50 ? 12 : 18,
+            boxShadow: isHighlighted
+              ? "0 0 0 4px rgba(236, 72, 153, 0.3), 0 8px 24px rgba(236, 72, 153, 0.25), 0 4px 16px rgba(236, 72, 153, 0.2)" // vibrant pink glow
+              : isSearchResult
+              ? "0 0 0 4px rgba(6, 182, 212, 0.3), 0 8px 24px rgba(6, 182, 212, 0.25), 0 4px 16px rgba(6, 182, 212, 0.2)" // vibrant cyan glow
+              : isRoot
+              ? "0 0 0 8px rgba(219, 39, 119, 0.4), 0 0 25px rgba(219, 39, 119, 0.5), 0 0 40px rgba(219, 39, 119, 0.35), 0 12px 32px rgba(219, 39, 119, 0.3)" // premium pink glitter for root
+              : isSelected
+              ? "0 0 0 4px rgba(236, 72, 153, 0.35), 0 8px 24px rgba(236, 72, 153, 0.3), 0 4px 16px rgba(236, 72, 153, 0.25)" // vibrant pink for selected
+              : person.gender === "male"
+              ? "0 6px 16px rgba(14, 165, 233, 0.2), 0 3px 8px rgba(14, 165, 233, 0.15)" // vibrant sky blue shadow
+              : person.gender === "female"
+              ? "0 6px 16px rgba(244, 114, 182, 0.2), 0 3px 8px rgba(244, 114, 182, 0.15)" // vibrant pink shadow
+              : "0 6px 16px rgba(34, 211, 238, 0.18), 0 3px 8px rgba(34, 211, 238, 0.12)", // vibrant cyan shadow
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "flex-start",
+            zIndex: 2,
+            fontFamily: "Poppins, Arial, sans-serif",
+            transition: "box-shadow 0.18s, border 0.18s, background 0.18s",
+            overflow: "visible",
+          }}
+          onClick={viewOnly ? undefined : handleCardClick}
+          data-person-id={person.id}
+        >
+          {/* Family Tree Navigation Icon (simple approach using person.familyCode) */}
+          {!viewOnly && hasAssociatedTree && (
+            <div className="absolute top-1 left-1 flex flex-col items-center z-10">
+              <button
+                className="w-6 h-6 bg-gradient-to-br from-cyan-50 to-sky-50 hover:from-cyan-100 hover:to-sky-100 text-sky-700 rounded-full flex items-center justify-center shadow-md transition-all duration-200 border-2 border-cyan-400"
+                onClick={handleViewPersonBirthFamily}
+                title={`Go to ${person.name}'s Family Tree`}
                 style={{
-                    position: 'relative',
-                    minWidth: width,
-                    maxWidth: memberCount > 50 ? 200 : 250,
-                    width: width, // Fixed width instead of fit-content
-                    minHeight: height,
-                    height: height, // Fixed height
-                    margin: margin,
-                    padding: padding,
-                    // borderRadius, display, flexDirection, alignItems, justifyContent defined later with more specific logic
-                    opacity: person.lifeStatus === 'remembering' ? 0.8 * cardOpacity : cardOpacity,
-                    background: isRoot
-                      ? 'linear-gradient(135deg, #fef2f2 0%, #ffe4e6 50%, #fce7f3 100%)' // premium rose gradient for root
-                      : isNew
-                      ? 'linear-gradient(135deg, #f0f9ff 0%, #dbeafe 50%, #e0f2fe 100%)' // premium sky gradient for new
-                      : person.gender === 'male'
-                      ? 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)' // premium blue gradient for males
-                      : person.gender === 'female'
-                      ? 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)' // premium rose gradient for females
-                      : 'linear-gradient(135deg, #f8fafc 0%, #e0f2fe 100%)', // premium light gradient for others
-                    border: isHighlighted
-                      ? '3px solid #ec4899' // vibrant pink border for highlighted
-                      : isSearchResult
-                      ? '3px solid #06b6d4' // vibrant cyan border for search results
-                      : isRoot
-                      ? '3px solid #db2777' // deep pink border for root
-                      : isNew
-                      ? '2.5px dashed #0891b2' // vibrant cyan border for new
-                      : isSelected
-                      ? '3px solid #ec4899' // vibrant pink border for selected
-                      : person.gender === 'male'
-                      ? '3px solid #0ea5e9' // vibrant sky blue border for males
-                      : person.gender === 'female'
-                      ? '3px solid #f472b6' // vibrant pink border for females
-                      : '3px solid #22d3ee', // vibrant cyan border for others
-                    borderRadius: memberCount > 50 ? 12 : 18,
-                    boxShadow: isHighlighted
-                      ? '0 0 0 4px rgba(236, 72, 153, 0.3), 0 8px 24px rgba(236, 72, 153, 0.25), 0 4px 16px rgba(236, 72, 153, 0.2)' // vibrant pink glow
-                      : isSearchResult
-                      ? '0 0 0 4px rgba(6, 182, 212, 0.3), 0 8px 24px rgba(6, 182, 212, 0.25), 0 4px 16px rgba(6, 182, 212, 0.2)' // vibrant cyan glow
-                      : isRoot
-                      ? '0 0 0 8px rgba(219, 39, 119, 0.4), 0 0 25px rgba(219, 39, 119, 0.5), 0 0 40px rgba(219, 39, 119, 0.35), 0 12px 32px rgba(219, 39, 119, 0.3)' // premium pink glitter for root
-                      : isSelected
-                      ? '0 0 0 4px rgba(236, 72, 153, 0.35), 0 8px 24px rgba(236, 72, 153, 0.3), 0 4px 16px rgba(236, 72, 153, 0.25)' // vibrant pink for selected
-                      : person.gender === 'male'
-                      ? '0 6px 16px rgba(14, 165, 233, 0.2), 0 3px 8px rgba(14, 165, 233, 0.15)' // vibrant sky blue shadow
-                      : person.gender === 'female'
-                      ? '0 6px 16px rgba(244, 114, 182, 0.2), 0 3px 8px rgba(244, 114, 182, 0.15)' // vibrant pink shadow
-                      : '0 6px 16px rgba(34, 211, 238, 0.18), 0 3px 8px rgba(34, 211, 238, 0.12)', // vibrant cyan shadow
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'flex-start',
-                    zIndex: 2,
-                    fontFamily: 'Poppins, Arial, sans-serif',
-                    transition: 'box-shadow 0.18s, border 0.18s, background 0.18s',
-                    overflow: 'visible',
+                  width: "24px",
+                  height: "24px",
+                  top: memberCount > 50 ? "0px" : "0px",
+                  left: memberCount > 50 ? "0px" : "0px",
                 }}
-                onClick={viewOnly ? undefined : handleCardClick}
-                data-person-id={person.id}
+              >
+                <FiEye size={16} />
+              </button>
+            </div>
+          )}
+          {/* Radial Menu Button - Top Right Corner (hide in viewOnly mode) */}
+          {!viewOnly && (
+            <div
+              className="absolute flex flex-col items-center space-y-1 z-30"
+              style={{
+                top: memberCount > 50 ? "2px" : "8px",
+                right: memberCount > 50 ? "2px" : "8px",
+              }}
             >
-            {/* Family Tree Navigation Icon (simple approach using person.familyCode) */}
-            {!viewOnly && hasAssociatedTree && (
-                <div className="absolute top-1 left-1 flex flex-col items-center z-10">
-                    <button
-                        className="w-6 h-6 bg-gradient-to-br from-cyan-50 to-sky-50 hover:from-cyan-100 hover:to-sky-100 text-sky-700 rounded-full flex items-center justify-center shadow-md transition-all duration-200 border-2 border-cyan-400"
-                        onClick={handleViewPersonBirthFamily}
-                        title={`Go to ${person.name}'s Family Tree`}
-                        style={{
-                            width: '24px',
-                            height: '24px',
-                            top: memberCount > 50 ? '0px' : '0px',
-                            left: memberCount > 50 ? '0px' : '0px',
-                        }}
-                    >
-                        <FiEye size={16} />
-                    </button>
-                </div>
-            )}
-            {/* Radial Menu Button - Top Right Corner (hide in viewOnly mode) */}
-            {!viewOnly && (
-                <div
-                    className="absolute flex flex-col items-center space-y-1 z-30"
-                    style={{
-                        top: memberCount > 50 ? '2px' : '8px',
-                        right: memberCount > 50 ? '2px' : '8px',
-                    }}
-                >
-                    {canShowAdminMenu && (
-                        <div className="relative">
-                            <button
-                                onClick={handleMenuToggle}
-                                className="w-5 h-5 md:w-6 md:h-6 bg-white/90 hover:bg-white text-gray-700 hover:text-gray-900 rounded-full flex items-center justify-center shadow-md border border-gray-200"
-                                title="More actions"
-                            >
-                                <FiMoreVertical size={14} />
-                            </button>
-                            {isMenuOpen && (
-                                <div className="absolute right-0 mt-1 w-40 bg-white rounded-md shadow-lg border border-gray-200 z-20">
-                                    {canShowBlockAction && (
-                                        <button
-                                            onClick={(e) => handleToggleBlock(e, !isBlocked)}
-                                            className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
-                                        >
-                                            {isBlocked ? (
-                                                <>
-                                                    <FiUserCheck size={14} className="text-green-600" />
-                                                    <span>Unblock member</span>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <FiUserX size={14} className="text-red-600" />
-                                                    <span>Block member</span>
-                                                </>
-                                            )}
-                                        </button>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    )}
-                    {canShare && (
-                        <button
-                            onClick={handleShareClick}
-                            className="w-5 h-5 md:w-6 md:h-6 bg-white/90 hover:bg-white text-sky-600 hover:text-sky-700 rounded-full flex items-center justify-center shadow-md border border-cyan-300"
-                            title="Share profile link"
-                        >
-                            <FiShare2 size={14} />
-                        </button>
-                    )}
-                    <button
-                        className="radial-menu-button w-5 h-5 md:w-6 md:h-6 bg-gradient-to-br from-cyan-500 to-sky-600 hover:from-cyan-600 hover:to-sky-700 text-white rounded-full flex items-center justify-center font-bold text-xs shadow-lg hover:shadow-xl border-2 border-white"
-                        onClick={handleRadialMenuClick}
-                        style={{
-                            boxShadow: '0 4px 14px rgba(6, 182, 212, 0.45)',
-                            width: memberCount > 50 ? '16px' : '24px',
-                            height: memberCount > 50 ? '16px' : '24px',
-                        }}
-                        title="Add family member"
-                    >
-                        +
-                    </button>
-                </div>
-            )}
-            {/* Profile Picture - Overlapping Top Edge */}
-            <div className="absolute left-1/2 transform -translate-x-1/2 z-20" style={{ top: `-${profileSize / 3}px` }}>
+              {canShowAdminMenu && (
                 <div className="relative">
-                    {person.lifeStatus === 'remembering' && (
-                        <span
-                            className="absolute -top-1 -left-1 bg-red-600 text-white text-[10px] font-semibold px-[6px] py-[1px] rounded-sm rotate-[-12deg] shadow-lg select-none z-30"
-                            title="In Loving Memory"
+                  <button
+                    onClick={handleMenuToggle}
+                    className="w-5 h-5 md:w-6 md:h-6 bg-white/90 hover:bg-white text-gray-700 hover:text-gray-900 rounded-full flex items-center justify-center shadow-md border border-gray-200"
+                    title="More actions"
+                  >
+                    <FiMoreVertical size={14} />
+                  </button>
+                  {isMenuOpen && (
+                    <div className="absolute right-0 mt-1 w-40 bg-white rounded-md shadow-lg border border-gray-200 z-20">
+                      {canShowBlockAction && (
+                        <button
+                          onClick={(e) => handleToggleBlock(e, !isBlocked)}
+                          className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
                         >
-                            ✝
-                        </span>
-                    )}
-                    <div 
-                        className="rounded-full overflow-hidden bg-white border-4 shadow-lg"
-                        style={{
-                            width: `${profileSize}px`,
-                            height: `${profileSize}px`,
-                            borderColor: isRoot ? '#db2777' : isSelected ? '#ec4899' : person.gender === 'male' ? '#0ea5e9' : person.gender === 'female' ? '#f472b6' : '#22d3ee',
-                            borderWidth: '4px',
-                            boxShadow: isRoot 
-                              ? '0 0 24px rgba(219, 39, 119, 0.45), 0 6px 16px rgba(219, 39, 119, 0.35)'
-                              : isSelected
-                              ? '0 0 20px rgba(236, 72, 153, 0.4), 0 6px 14px rgba(236, 72, 153, 0.3)'
-                              : person.gender === 'male'
-                              ? '0 6px 16px rgba(14, 165, 233, 0.25)'
-                              : '0 6px 16px rgba(244, 114, 182, 0.25)'
-                        }}
-                    >
-                        <img
-                            src={person.imgPreview ? person.imgPreview : (typeof person.img === 'string' && person.img ? person.img : 'https://cdn-icons-png.flaticon.com/512/149/149071.png')}
-                            alt="Profile"
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                                e.target.src = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
-                            }}
-                        />
+                          {isBlocked ? (
+                            <>
+                              <FiUserCheck
+                                size={14}
+                                className="text-green-600"
+                              />
+                              <span>Unblock member</span>
+                            </>
+                          ) : (
+                            <>
+                              <FiUserX size={14} className="text-red-600" />
+                              <span>Block member</span>
+                            </>
+                          )}
+                        </button>
+                      )}
                     </div>
-                    {isNew && !viewOnly && (
-                      <span className="absolute -bottom-1 -right-1 bg-gradient-to-br from-cyan-500 to-sky-600 text-white rounded-full w-5 h-5 flex items-center justify-center font-bold text-xs shadow-lg" style={{ boxShadow: '0 4px 14px rgba(6, 182, 212, 0.45)' }}>+</span>
-                    )}
-                    {isSelected && !isNew && !viewOnly && !isHighlighted && (
-                      <span className="absolute -bottom-1 -right-1 bg-gradient-to-br from-pink-500 to-fuchsia-600 text-white rounded-full w-5 h-5 flex items-center justify-center font-bold text-xs shadow-lg" style={{ boxShadow: '0 4px 14px rgba(236, 72, 153, 0.45)' }}>✓</span>
-                    )}
-                    {isHighlighted && (
-                      <span className="absolute -bottom-1 -right-1 bg-gradient-to-br from-pink-500 to-fuchsia-600 text-white rounded-full w-6 h-6 flex items-center justify-center font-bold text-xs shadow-lg animate-pulse" style={{ boxShadow: '0 6px 18px rgba(236, 72, 153, 0.55)' }}>🔍</span>
-                    )}
+                  )}
                 </div>
+              )}
+              {canShare && (
+                <button
+                  onClick={handleShareClick}
+                  className="w-5 h-5 md:w-6 md:h-6 bg-white/90 hover:bg-white text-sky-600 hover:text-sky-700 rounded-full flex items-center justify-center shadow-md border border-cyan-300"
+                  title="Share profile link"
+                >
+                  <FiShare2 size={14} />
+                </button>
+              )}
+              <button
+                className="radial-menu-button w-5 h-5 md:w-6 md:h-6 bg-gradient-to-br from-cyan-500 to-sky-600 hover:from-cyan-600 hover:to-sky-700 text-white rounded-full flex items-center justify-center font-bold text-xs shadow-lg hover:shadow-xl border-2 border-white"
+                onClick={handleRadialMenuClick}
+                style={{
+                  boxShadow: "0 4px 14px rgba(6, 182, 212, 0.45)",
+                  width: memberCount > 50 ? "16px" : "24px",
+                  height: memberCount > 50 ? "16px" : "24px",
+                }}
+                title="Add family member"
+              >
+                +
+              </button>
+            </div>
+          )}
+          {/* Profile Picture - Overlapping Top Edge */}
+          <div
+            className="absolute left-1/2 transform -translate-x-1/2 z-20"
+            style={{ top: `-${profileSize / 3}px` }}
+          >
+            <div className="relative">
+              {person.lifeStatus === "remembering" && (
+                <span
+                  className="absolute -top-1 -left-1 bg-red-600 text-white text-[10px] font-semibold px-[6px] py-[1px] rounded-sm rotate-[-12deg] shadow-lg select-none z-30"
+                  title="In Loving Memory"
+                >
+                  ✝
+                </span>
+              )}
+              <div
+                className="rounded-full overflow-hidden bg-white border-4 shadow-lg"
+                style={{
+                  width: `${profileSize}px`,
+                  height: `${profileSize}px`,
+                  borderColor: isRoot
+                    ? "#db2777"
+                    : isSelected
+                    ? "#ec4899"
+                    : person.gender === "male"
+                    ? "#0ea5e9"
+                    : person.gender === "female"
+                    ? "#f472b6"
+                    : "#22d3ee",
+                  borderWidth: "4px",
+                  boxShadow: isRoot
+                    ? "0 0 24px rgba(219, 39, 119, 0.45), 0 6px 16px rgba(219, 39, 119, 0.35)"
+                    : isSelected
+                    ? "0 0 20px rgba(236, 72, 153, 0.4), 0 6px 14px rgba(236, 72, 153, 0.3)"
+                    : person.gender === "male"
+                    ? "0 6px 16px rgba(14, 165, 233, 0.25)"
+                    : "0 6px 16px rgba(244, 114, 182, 0.25)",
+                }}
+              >
+                <img
+                  src={
+                    person.imgPreview
+                      ? person.imgPreview
+                      : typeof person.img === "string" && person.img
+                      ? person.img
+                      : "https://cdn-icons-png.flaticon.com/512/149/149071.png"
+                  }
+                  alt="Profile"
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.target.src =
+                      "https://cdn-icons-png.flaticon.com/512/149/149071.png";
+                  }}
+                />
+              </div>
+              {isNew && !viewOnly && (
+                <span
+                  className="absolute -bottom-1 -right-1 bg-gradient-to-br from-cyan-500 to-sky-600 text-white rounded-full w-5 h-5 flex items-center justify-center font-bold text-xs shadow-lg"
+                  style={{ boxShadow: "0 4px 14px rgba(6, 182, 212, 0.45)" }}
+                >
+                  +
+                </span>
+              )}
+              {isSelected && !isNew && !viewOnly && !isHighlighted && (
+                <span
+                  className="absolute -bottom-1 -right-1 bg-gradient-to-br from-pink-500 to-fuchsia-600 text-white rounded-full w-5 h-5 flex items-center justify-center font-bold text-xs shadow-lg"
+                  style={{ boxShadow: "0 4px 14px rgba(236, 72, 153, 0.45)" }}
+                >
+                  ✓
+                </span>
+              )}
+              {isHighlighted && (
+                <span
+                  className="absolute -bottom-1 -right-1 bg-gradient-to-br from-pink-500 to-fuchsia-600 text-white rounded-full w-6 h-6 flex items-center justify-center font-bold text-xs shadow-lg animate-pulse"
+                  style={{ boxShadow: "0 6px 18px rgba(236, 72, 153, 0.55)" }}
+                >
+                  🔍
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Card Content - Grid Layout */}
+          <div
+            className="w-full h-full flex justify-evenly flex-col"
+            style={{ paddingTop: `${profileSize * 0.7}px` }}
+          >
+            {person.lifeStatus === "remembering" && (
+              <div className="text-center mb-1 px-2 py-0.5 bg-red-50 text-red-700 text-xs font-semibold rounded">
+                In Memory
+              </div>
+            )}
+
+            {/* 2-Column Grid for Age & Gender */}
+            <div className="grid grid-cols-2 gap-1 px-2 mb-1">
+              {person.age && (
+                <div className="text-center">
+                  <div
+                    className="text-sky-600 font-extrabold"
+                    style={{ fontSize: `${fontSizeDetails}px` }}
+                  >
+                    {person.age} Yrs
+                  </div>
+                  {/* <div className="text-cyan-500 text-[8px] font-bold uppercase tracking-wider">AGE</div> */}
+                </div>
+              )}
+              {getGenderLabel(person, tree, currentUserId) && (
+                <div className="text-center">
+                  <div className="text-pink-600 font-extrabold  flex justify-center" style={{ fontSize: `${fontSizeDetails}px` }}>
+                                {getGenderLabel(person, tree, currentUserId)}
+
+                            </div>
+                  {/* <div className="text-fuchsia-500 text-[8px] font-bold uppercase tracking-wider">GENDER</div> */}
+                </div>
+              )}
             </div>
 
-            {/* Card Content - Grid Layout */}
-            <div className="w-full h-full flex flex-col" style={{ paddingTop: `${profileSize * 0.7}px` }}>
-                {person.lifeStatus === 'remembering' && (
-                    <div className="text-center mb-1 px-2 py-0.5 bg-red-50 text-red-700 text-xs font-semibold rounded">
-                        In Memory
-                    </div>
-                )}
-                
-                {/* 2-Column Grid for Age & Gender */}
-                <div className="grid grid-cols-2 gap-1 px-2 mb-1">
-                    {person.age && (
-                        <div className="text-center">
-                            <div className="text-sky-600 font-extrabold" style={{ fontSize: `${fontSizeDetails}px` }}>
-                                {person.age}
-                            </div>
-                            <div className="text-cyan-500 text-[8px] font-bold uppercase tracking-wider">AGE</div>
-                        </div>
-                    )}
-                    {getGenderLabel(person, tree, currentUserId) && (
-                        <div className="text-center">
-                            <div className="text-pink-600 font-extrabold" style={{ fontSize: `${fontSizeDetails}px` }}>
-                                {getGenderLabel(person, tree, currentUserId)}
-                            </div>
-                            <div className="text-fuchsia-500 text-[8px] font-bold uppercase tracking-wider">GENDER</div>
-                        </div>
-                    )}
-                </div>
-
-                {/* Name - Clean, No Background - AFTER Age/Gender */}
-                <div className="text-center px-2 mb-1">
-                    <h3 
-                        className="font-black text-gray-900 leading-tight"
-                        style={{
-                            fontSize: `${fontSizeName}px`,
-                            lineHeight: '1.2',
-                            display: '-webkit-box',
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: 'vertical',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis'
-                        }}
-                        title={person.name || [person.firstName, person.lastName].filter(Boolean).join(' ').trim() || 'Unnamed'}
-                    >
-                        {person.name || [person.firstName, person.lastName].filter(Boolean).join(' ').trim() || (language === 'tamil' ? 'பெயரில்லாத' : 'Member')}
-                    </h3>
-                </div>
+            {/* Name - Clean, No Background - AFTER Age/Gender */}
+            <div className="text-center px-2 mb-1">
+              <h3
+                className="font-black text-gray-900 leading-tight"
+                style={{
+                  fontSize: `${fontSizeName}px`,
+                  lineHeight: "1.2",
+                  display: "-webkit-box",
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: "vertical",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+                title={
+                  person.name ||
+                  [person.firstName, person.lastName]
+                    .filter(Boolean)
+                    .join(" ")
+                    .trim() ||
+                  "Unnamed"
+                }
+              >
+                {person.name ||
+                  [person.firstName, person.lastName]
+                    .filter(Boolean)
+                    .join(" ")
+                    .trim() ||
+                  (language === "tamil" ? "பெயரில்லாத" : "Member")}
+              </h3>
+            </div>
 
                 {/* Relationship Label - Clean with Border (viewOnly shows label without editing) */}
                 {relationshipText && !isEditingLabel && (
@@ -852,25 +924,35 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
                     </div>
                 )}
 
-                {/* Editing UI */}
-                {isEditingLabel && !viewOnly && (
-                    <div className="px-2 mt-auto">
-                        <div className="flex items-center gap-1">
-                            <input
-                                type="text"
-                                className="flex-1 px-2 py-1 rounded border-2 border-blue-300 text-blue-700 font-semibold text-center focus:outline-none focus:ring-2 focus:ring-blue-400"
-                                value={editLabelValue}
-                                onChange={e => setEditLabelValue(e.target.value)}
-                                style={{fontSize: `${fontSizeRelationship - 1}px`}}
-                            />
-                            <button className="px-2 py-1 rounded bg-blue-500 text-white font-bold text-xs" onClick={handleSaveLabel}>✓</button>
-                            <button className="px-2 py-1 rounded bg-gray-300 text-gray-700 font-bold text-xs" onClick={handleCancelEdit}>✕</button>
-                        </div>
-                    </div>
-                )}
-            </div>
+            {/* Editing UI */}
+            {isEditingLabel && !viewOnly && (
+              <div className="px-2 mt-auto">
+                <div className="flex items-center gap-1">
+                  <input
+                    type="text"
+                    className="flex-1 px-2 py-1 rounded border-2 border-blue-300 text-blue-700 font-semibold text-center focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    value={editLabelValue}
+                    onChange={(e) => setEditLabelValue(e.target.value)}
+                    style={{ fontSize: `${fontSizeRelationship - 1}px` }}
+                  />
+                  <button
+                    className="px-2 py-1 rounded bg-blue-500 text-white font-bold text-xs"
+                    onClick={handleSaveLabel}
+                  >
+                    ✓
+                  </button>
+                  <button
+                    className="px-2 py-1 rounded bg-gray-300 text-gray-700 font-bold text-xs"
+                    onClick={handleCancelEdit}
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-    </div>
+      </div>
     );
 };
 

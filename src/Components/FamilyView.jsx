@@ -30,7 +30,7 @@ const FamilyView = ({ familyData, totalMembers, males, females, averageAge, onMa
                 className="flex items-center bg-white bg-opacity-20 hover:bg-opacity-30 backdrop-blur-sm px-4 py-2 rounded-full transition-all"
               >
                 <FiShare2 className="mr-2" />
-                Share Family Code: <span className="font-mono ml-1">{familyData.familyCode}</span>
+                Share Family Code: <span className="font-mono ml-1 ">{familyData.familyCode}</span>
               </button>
             </div>
           </div>
