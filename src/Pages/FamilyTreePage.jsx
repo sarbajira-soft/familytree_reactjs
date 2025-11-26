@@ -678,11 +678,16 @@ const FamilyTreePage = () => {
     };
 
     const handleAddPersons = (persons) => {
+
+
         if (!tree) return;
 
         if (!persons || persons.length === 0) {
             return;
         }
+
+        
+        console.log("Update personssssssssssss :-----", persons);
 
         const newTree = new FamilyTree();
         newTree.people = new Map(tree.people);
@@ -694,27 +699,43 @@ const FamilyTreePage = () => {
         let duplicateFound = false;
         const { type, person: basePerson } = modal.action;
 
+        console.log("Update person :-----", basePerson);
         // Special handling for edit: only update, never create
-        if (type === 'edit' && basePerson) {
-            const existingPerson = newTree.people.get(basePerson.id);
-            if (existingPerson && persons.length > 0) {
-                const updatedPerson = {
-                    ...existingPerson,
-                    name: persons[0].name,
-                    gender: persons[0].gender,
-                    age: persons[0].age,
-                    img: persons[0].img,
-                    lifeStatus: persons[0].lifeStatus || 'living',
-                    memberId: persons[0].memberId || persons[0].userId || null,
-                };
-                newTree.people.set(existingPerson.id, updatedPerson);
-            }
-            setTree(newTree);
-            updateStats(newTree);
-            arrangeTree(newTree);
-            setHasUnsavedChanges(true); // 🚀 Mark as changed
-            return;
+        if (type === "edit" && basePerson) {
+          const existingPerson = newTree.people.get(basePerson.id);
+
+          if (existingPerson && persons.length > 0) {
+            const updatedPerson = {
+              ...existingPerson,
+              name: persons[0].name,
+              gender: persons[0].gender,
+              age: persons[0].age,
+
+              // FIX: Preserve old image if none uploaded
+              img: persons[0].img || existingPerson.img || null,
+
+              // FIX: Preserve preview
+              imgPreview:
+                persons[0].imgPreview || existingPerson.imgPreview || null,
+
+              lifeStatus: persons[0].lifeStatus || "living",
+              memberId:
+                persons[0].memberId ||
+                persons[0].userId ||
+                existingPerson.memberId ||
+                null,
+            };
+
+            newTree.people.set(existingPerson.id, updatedPerson);
+          }
+
+          setTree(newTree);
+          updateStats(newTree);
+          arrangeTree(newTree);
+          setHasUnsavedChanges(true);
+          return;
         }
+
 
         persons.forEach(personData => {
             // Try to find an existing person by memberId or userId
@@ -1135,6 +1156,8 @@ const FamilyTreePage = () => {
             const formData = new FormData();
             let index = 0;
             for (const person of tree.people.values()) {
+
+                console.log("Person to save:", person);
                 formData.append(`person_${index}_id`, person.id);
                 formData.append(`person_${index}_name`, person.name);
                 formData.append(`person_${index}_gender`, person.gender);
@@ -1149,17 +1172,37 @@ const FamilyTreePage = () => {
                 formData.append(`person_${index}_siblings`, person.siblings ? Array.from(person.siblings).join(',') : '');
                 formData.append(`person_${index}_relationshipCode`, person.relationshipCode || '');
                 // For image
-                if (person.img) {
-                    if (person.img instanceof File) {
-                        formData.append(`person_${index}_img`, person.img);
-                    } else if (typeof person.img === 'string') {
-                        // Extract filename from URL if it's a URL, otherwise use as is
-                        const imgValue = person.img.includes('/')
-                            ? person.img.split('/').pop()
-                            : person.img;
-                        formData.append(`person_${index}_img`, imgValue);
-                    }
+                if (person.img instanceof File) {
+                  // case 1: new image selected
+                  formData.append(`person_${index}_img`, person.img);
+                } else if (
+                  typeof person.img === "string" &&
+                  person.img.trim() !== ""
+                ) {
+                  // case 2: existing server image
+                  const imgValue = person.img.includes("/")
+                    ? person.img.split("/").pop()
+                    : person.img;
+                  formData.append(`person_${index}_img`, imgValue);
+                } else if (
+                  person.imgPreview &&
+                  person.imgPreview.startsWith("blob:")
+                ) {
+                  // case 3: preview exists but img missing (your current problem)
+                  const fileFromBlob = await fetch(person.imgPreview)
+                    .then((r) => r.blob())
+                    .then(
+                      (blob) =>
+                        new File([blob], `person_${index}.jpg`, {
+                          type: blob.type,
+                        })
+                    );
+
+                  formData.append(`person_${index}_img`, fileFromBlob);
                 }
+
+                console.log("✅ Appended personame:",person);
+
                 index++;
             }
             formData.append('person_count', index);
@@ -1168,7 +1211,7 @@ const FamilyTreePage = () => {
                 formData.append('familyCode', userInfo.familyCode);
             }
             const apiStartTime = Date.now();
-            console.log(`📤 Sending ${index} members to API...`);
+            console.log(`📤 Sending ${index} members to API... ${formData}`);
 
             const response = await authFetch(`${import.meta.env.VITE_API_BASE_URL}/family/tree/create`, {
                 method: 'POST',

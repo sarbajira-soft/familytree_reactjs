@@ -385,6 +385,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                     if (sel.selectedMemberId && !sel.showManualEntry) {
                         // Existing member selected
                         const member = familyMembers.find(m => m.user?.id === parseInt(sel.selectedMemberId));
+                        console.log('Selected existing member for :', member);
                         if (member) {
                             parentPersons.push({
                                 name: member.user.fullName,
@@ -490,6 +491,8 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                         lifeStatus: formData.get(`lifeStatus_${form.index}`) || 'living',
                         birthOrder: parseInt(formData.get(`birthOrder_${form.index}`)) || 1,
                     };
+
+                    console.log('Prepared person object for submission:', personObj);
                     if (action.type === 'edit' && action.person) {
                         personObj.id = action.person.id;
                         if (action.person.memberId) personObj.memberId = action.person.memberId;

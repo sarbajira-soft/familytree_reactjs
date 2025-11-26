@@ -246,9 +246,9 @@ const PostPage = () => {
 
   const handleLike = async (postId) => {
     console.log("Post ID liked:", postId);
-    await toggleLike(postId); // Your existing like toggle logic
     setShowHeart(postId);
     setTimeout(() => setShowHeart(null), 1000); // Hide heart after 0.8s
+    await toggleLike(postId); // Your existing like toggle logic
   };
 
   const fetchComments = async (postId, authToken) => {
