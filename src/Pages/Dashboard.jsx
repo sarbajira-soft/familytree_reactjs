@@ -141,29 +141,47 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
         </div> */}
 
         {/* Cards Section */}
-        <div className="hidden lg:grid grid-cols-2  sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-5">
+        <div className="hidden lg:grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-5">
           {dashboardCards.map((card) => (
             <div
               key={card.name}
               onClick={card.onClick}
-              className="relative bg-white rounded-xl border border-gray-100 shadow-sm flex items-center p-1 sm:p-2 gap-3 cursor-pointer group hover:shadow-lg hover:scale-[1.02] transition-all duration-300"
+              className="relative bg-white rounded-xl border border-gray-200 shadow-sm 
+                 flex items-center p-1 sm:p-2 gap-3 cursor-pointer group 
+                 hover:shadow-md hover:scale-[1.02] transition-all duration-300"
             >
-              {/* Hover gradient */}
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-100 via-pink-100 to-purple-100 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl"></div>
+              {/* Hover background (soft blue/orange tint) */}
+              <div
+                className="absolute inset-0 bg-primary-50 opacity-0 group-hover:opacity-100 
+                      transition-opacity rounded-xl"
+              ></div>
 
               {/* Icon + Count */}
               <div className="relative z-10 ml-5 flex items-center justify-center">
-                <div className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-gradient-to-tr from-blue-500 to-purple-500 text-white shadow-md group-hover:from-pink-500 group-hover:to-purple-600 transition-all duration-500">
+                <div
+                  className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 
+                        rounded-lg bg-primary-700 text-white shadow-sm 
+                        group-hover:bg-secondary-500 transition-all duration-300"
+                >
                   {card.icon}
                 </div>
-                <span className="absolute -top-1 -right-2 bg-pink-500 text-white text-[10px] rounded-full w-5 h-5 flex items-center justify-center font-semibold shadow-sm group-hover:scale-110 transition-transform duration-300">
+
+                <span
+                  className="absolute -top-1 -right-2 bg-secondary-500 text-white text-[10px] 
+                         rounded-full w-5 h-5 flex items-center justify-center 
+                         font-semibold shadow-sm group-hover:scale-110 
+                         transition-transform duration-300"
+                >
                   {card.count}
                 </span>
               </div>
 
               {/* Name */}
               <div className="flex flex-col ml-10 justify-center z-10">
-                <h3 className="text-gray-800 font-semibold text-sm sm:text-base group-hover:text-pink-600 transition-colors">
+                <h3
+                  className="text-gray-800 font-semibold text-sm sm:text-base 
+                      group-hover:text-blue-600 transition-colors"
+                >
                   {card.name}
                 </h3>
               </div>
@@ -173,43 +191,48 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
 
         {/* Quick Actions */}
         <div className="grid grid-cols-3 gap-2 sm:gap-4">
+          {/* Upload Photo */}
           <button
             onClick={() => setIsCreateAlbumModalOpen(true)}
             className="flex items-center justify-center gap-1 sm:gap-2 
-      bg-gradient-to-r from-blue-500 to-indigo-600 text-white 
-      rounded-md sm:rounded-lg px-1 sm:px-3 py-2 sm:py-3 text-xs sm:text-sm 
-      hover:-translate-y-1 hover:shadow-md sm:hover:shadow-lg transition-all duration-300"
+               bg-primary-700 text-white rounded-md sm:rounded-lg 
+               px-1 sm:px-3 py-2 sm:py-3 text-xs sm:text-sm 
+               hover:bg-primary-800 hover:-translate-y-1 hover:shadow-md 
+               transition-all duration-300"
           >
             <FiImage className="text-base sm:text-lg" />
             <span className="hidden sm:inline">Upload Photo</span>
             <span className="sm:hidden">Photo</span>
           </button>
 
+          {/* Send Gift */}
           <button
             onClick={() => navigate("/gifts-memories")}
             className="flex items-center justify-center gap-1 sm:gap-2 
-      bg-gradient-to-r from-pink-500 to-rose-600 text-white 
-      rounded-md sm:rounded-lg px-1 sm:px-3 py-2 sm:py-3 text-xs sm:text-sm 
-      hover:-translate-y-1 hover:shadow-md sm:hover:shadow-lg transition-all duration-300"
+               bg-secondary-500 text-white rounded-md sm:rounded-lg 
+               px-1 sm:px-3 py-2 sm:py-3 text-xs sm:text-sm 
+               hover:bg-secondary-600 hover:-translate-y-1 hover:shadow-md 
+               transition-all duration-300"
           >
             <FiGift className="text-base sm:text-lg" />
             <span className="hidden sm:inline">Send Gift</span>
             <span className="sm:hidden">Gift</span>
           </button>
 
+          {/* Schedule Event */}
           <button
             onClick={() => setIsCreateEventModalOpen(true)}
             className="flex items-center justify-center gap-1 sm:gap-2 
-      bg-gradient-to-r from-purple-500 to-violet-600 text-white 
-      rounded-md sm:rounded-lg px-1 sm:px-3 py-2 sm:py-3 text-xs sm:text-sm 
-      hover:-translate-y-1 hover:shadow-md sm:hover:shadow-lg transition-all duration-300"
+               bg-primary-700 text-white rounded-md sm:rounded-lg 
+               px-1 sm:px-3 py-2 sm:py-3 text-xs sm:text-sm 
+               hover:bg-primary-800 hover:-translate-y-1 hover:shadow-md 
+               transition-all duration-300"
           >
             <FiCalendar className="text-base sm:text-lg" />
             <span className="hidden sm:inline">Schedule Event</span>
             <span className="sm:hidden">Event</span>
           </button>
         </div>
-        
 
         {/* Posts Section */}
         <div className="bg-white rounded-xl shadow-md p-4 sm:p-6 border border-gray-100">

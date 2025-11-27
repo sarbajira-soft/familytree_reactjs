@@ -369,7 +369,7 @@ const MergeFamilyPage = () => {
         )}
       </div>
       {anchorModalOpen && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-40">
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-lg mx-4 p-4 md:p-6">
             <h2 className="text-lg font-semibold text-gray-800 mb-2">Confirm Relationship Anchor</h2>
             <p className="text-xs md:text-sm text-gray-600 mb-3">
