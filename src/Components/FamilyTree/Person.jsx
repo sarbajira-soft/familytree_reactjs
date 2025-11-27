@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import RelationshipCalculator from '../../utils/relationshipCalculator';
 import { useFamilyTreeLabels } from '../../Contexts/FamilyTreeContext';
 import { useUser } from '../../Contexts/UserContext';
@@ -12,6 +12,9 @@ import { Mars, Venus } from 'lucide-react';
 const getInverseRelationship = (relationshipCode) => {
     if (!relationshipCode || relationshipCode === 'SELF') return relationshipCode;
     
+
+    
+
     // Mapping of relationships to their inverses
     const inverseMap = {
         // Spouse relationships (opposite gender)
@@ -131,7 +134,8 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
     const isSelf = !!(person.memberId && userInfo?.userId && person.memberId === userInfo.userId);
     const isBlocked = !!person.isBlocked;
     const canShowBlockAction = canShowAdminMenu && !isSelf;
-    
+    const menuRef = useRef(null);
+
     // Get source relationship from URL parameters
     const urlParams = new URLSearchParams(window.location.search);
     const urlSourceRelationship = urlParams.get('source');
@@ -293,6 +297,21 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
         e.stopPropagation();
         setIsEditingLabel(false);
     };
+
+    useEffect(() => {
+      if (!isMenuOpen) return;
+
+      function handleClickOutside(event) {
+        if (menuRef.current && !menuRef.current.contains(event.target)) {
+          setIsMenuOpen(false);
+        }
+      }
+
+      document.addEventListener("mousedown", handleClickOutside, true);
+      return () => {
+        document.removeEventListener("mousedown", handleClickOutside, true);
+      };
+    }, [isMenuOpen]);
 
     const handleCardClick = (e) => {
         // Only trigger onClick if the click is not on the radial menu button
@@ -698,11 +717,11 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
                     <FiMoreVertical size={14} />
                   </button>
                   {isMenuOpen && (
-                    <div className="absolute right-0 mt-1 w-40 bg-white rounded-md shadow-lg border border-gray-200 z-20">
+                    <div ref={menuRef} className="absolute right-0 mt-1 w-40 bg-white rounded-md shadow-lg border border-gray-200 z-20">
                       {canShowBlockAction && (
                         <button
                           onClick={(e) => handleToggleBlock(e, !isBlocked)}
-                          className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
+                          className="w-full px-3 py-2 text-left text-sm text-gray-700 bg-white flex items-center space-x-2"
                         >
                           {isBlocked ? (
                             <>

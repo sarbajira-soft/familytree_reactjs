@@ -1649,7 +1649,7 @@ const FamilyTreePage = () => {
                         )}
                         <div
                             ref={treeCanvasRef}
-                            className="tree-canvas relative w-max h-max mx-auto flex flex-col items-start justify-start sm:items-center sm:justify-center"
+                            className="tree-canvas   relative w-max h-max mx-auto flex flex-col items-start justify-start sm:items-center sm:justify-center"
                             style={{
                                 minWidth: tree && tree.people.size > 50 ? (window.innerWidth <= 640 ? '600px' : '1200px') : (window.innerWidth <= 640 ? '400px' : '900px'),
                                 minHeight: tree && tree.people.size > 50 ? (window.innerWidth <= 640 ? '500px' : '800px') : (window.innerWidth <= 640 ? '400px' : '600px'),
