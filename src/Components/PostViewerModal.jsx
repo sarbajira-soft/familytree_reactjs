@@ -205,7 +205,7 @@ const PostViewerModal = ({
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90 backdrop-blur"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur"
           variants={backdropVariants}
           initial="hidden"
           animate="visible"
@@ -213,7 +213,7 @@ const PostViewerModal = ({
           onClick={onClose}
         >
           <motion.div
-            className="relative bg-white rounded-3xl m-2 shadow-2xl w-full max-w-4xl h-[100vh] flex flex-col overflow-hidden"
+            className="relative bg-white rounded-3xl  shadow-2xl w-full max-w-4xl h-[100vh] flex flex-col overflow-hidden"
             variants={modalVariants}
             onClick={(e) => e.stopPropagation()}
           >

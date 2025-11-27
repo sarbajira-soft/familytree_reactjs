@@ -20,6 +20,7 @@ import { getToken } from "../utils/auth";
 import { useQuery } from "@tanstack/react-query";
 import PostPage from "./PostPage";
 import DashboardShimmer from "./DashboardShimmer";
+import GalleryViewerModal from "../Components/GalleryViewerModal";
 
 const getLocalDateKey = (dateValue) => {
   if (!dateValue) return "";
@@ -267,6 +268,8 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
   const { userInfo } = useUser();
   const navigate = useNavigate();
   const token = getToken();
+  const [isGalleryModalOpen, setIsGalleryModalOpen] = useState(false);
+  const [selectedAlbum, setSelectedAlbum] = useState(null);
 
   // Dashboard data query
   const { data: dashboardData, isLoading } = useQuery({
@@ -285,7 +288,7 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
           fetch(`${apiBaseUrl}/family/member/${userInfo.familyCode}/stats`, {
             headers,
           }),
-          fetch(`${apiBaseUrl}/event/upcoming`, { headers }),
+          fetch(`${apiBaseUrl}/event/upcoming/all`, { headers }),
           fetch(
             `${apiBaseUrl}/gallery/by-options?familyCode=${userInfo.familyCode}`,
             { headers }
@@ -305,6 +308,40 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
     enabled: !!userInfo?.familyCode && !!token,
   });
 
+  const formatAlbumForModal = (album) => {
+    return {
+      id: album.id,
+      title: album.galleryTitle || album.title || "Album",
+      description: album.galleryDescription || album.description || "",
+      author: album.user?.name || "Unknown",
+      privacy: album.privacy,
+      photosCount: album.galleryAlbums?.length || 0,
+      likes: album.likeCount || 0,
+      isLiked: album.isLiked || false,
+      comments: new Array(album.commentCount || 0).fill(""),
+      coverPhoto:
+        album.coverPhoto ||
+        (album.galleryAlbums &&
+          album.galleryAlbums[0] &&
+          album.galleryAlbums[0].album) ||
+        "https://via.placeholder.com/400x300?text=Photo",
+      photos: (album.galleryAlbums || []).map((photo, index) => ({
+        id: photo.id,
+        url: photo.album,
+        caption: photo.caption || `Photo ${index + 1}`,
+        likes: photo.likeCount || 0,
+        comments: photo.commentCount
+          ? new Array(photo.commentCount).fill("")
+          : [],
+      })),
+    };
+  };
+
+  const openGalleryModal = (album) => {
+    const formattedAlbum = formatAlbumForModal(album);
+    setSelectedAlbum(formattedAlbum);
+    setIsGalleryModalOpen(true);
+  };
   const processedData = useMemo(() => {
     if (!dashboardData)
       return {
@@ -464,21 +501,8 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
   return (
     <>
       <div className="max-w-7xl mx-auto px-3 sm:px-5 py-6 pt-3 space-y-7">
-        {/* Header */}
-        {/* <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center">
-          <div>
-            <h1 className="text-md sm:text-2xl font-bold text-gray-900">
-              Your Family Hub
-            </h1>
-            <p className="text-gray-600 mt-1 text-sm sm:text-base">
-              Welcome, {userInfo?.firstName || "User"}{" "}
-              {userInfo?.lastName || ""}!
-            </p>
-          </div>
-        </div> */}
-
         {/* Cards Section */}
-        <div className="hidden lg:grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-5">
+        {/* <div className="hidden lg:grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-5">
           {dashboardCards.map((card) => (
             <div
               key={card.name}
@@ -487,13 +511,12 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
                  flex items-center p-1 sm:p-2 gap-3 cursor-pointer group 
                  hover:shadow-md hover:scale-[1.02] transition-all duration-300"
             >
-              {/* Hover background (soft blue/orange tint) */}
+              
               <div
                 className="absolute inset-0 bg-primary-50 opacity-0 group-hover:opacity-100 
                       transition-opacity rounded-xl"
               ></div>
 
-              {/* Icon + Count */}
               <div className="relative z-10 ml-5 flex items-center justify-center">
                 <div
                   className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 
@@ -513,7 +536,6 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
                 </span>
               </div>
 
-              {/* Name */}
               <div className="flex flex-col ml-10 justify-center z-10">
                 <h3
                   className="text-gray-800 font-semibold text-sm sm:text-base 
@@ -524,7 +546,7 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
               </div>
             </div>
           ))}
-        </div>
+        </div> */}
 
         {/* Quick Actions */}
         <div className="grid grid-cols-3 gap-2 sm:gap-4">
@@ -545,7 +567,7 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
           {/* Send Gift */}
           <button
             onClick={() => navigate("/gifts-memories")}
-            className="flex items-center justify-center gap-1 sm:gap-2 
+            className="flex items-center justify-center  gap-1 sm:gap-2 
                bg-secondary-500 text-white rounded-md sm:rounded-lg 
                px-1 sm:px-3 py-2 sm:py-3 text-xs sm:text-sm 
                hover:bg-secondary-600 hover:-translate-y-1 hover:shadow-md 
@@ -589,7 +611,7 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
                   </p>
                   <button
                     onClick={() => navigate("/family-gallery")}
-                    className="text-xs font-semibold text-primary-700 hover:text-primary-900"
+                    className="text-xs font-semibold bg-white text-primary-700 hover:text-primary-900"
                   >
                     View all
                   </button>
@@ -605,13 +627,22 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
                     return (
                       <div
                         key={album.id}
-                        className="relative w-full pt-[100%] overflow-hidden rounded-lg"
+                        className="relative w-full pt-[100%] overflow-hidden rounded-lg cursor-pointer group"
+                        onClick={() => openGalleryModal(album)}
                       >
                         <img
                           src={cover}
                           alt={album.galleryTitle || album.title || "Album"}
-                          className="absolute inset-0 w-full h-full object-cover"
+                          className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
                         />
+                        {/* Hover overlay */}
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                          <div className="text-white text-xs font-semibold text-center px-2">
+                            <p className="line-clamp-2">
+                              {album.galleryTitle || album.title || "Album"}
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     );
                   })}
@@ -631,7 +662,7 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
                   </p>
                   <button
                     onClick={() => navigate("/events")}
-                    className="text-xs font-semibold text-primary-700 hover:text-primary-900"
+                    className="text-xs bg-white font-semibold text-primary-700 hover:text-primary-900"
                   >
                     View all
                   </button>
@@ -649,7 +680,9 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
                         key={event.id || index}
                         className="group relative rounded-xl overflow-hidden bg-white shadow-sm border border-gray-100 hover:shadow-md hover:-translate-y-0.5 transition-all duration-300"
                         style={{
-                          animation: `fadeInUp 0.5s ease-out ${index * 0.05}s both`,
+                          animation: `fadeInUp 0.5s ease-out ${
+                            index * 0.05
+                          }s both`,
                         }}
                       >
                         <div
@@ -711,7 +744,10 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
                             <div className="flex flex-col gap-1 text-[11px] text-gray-600">
                               {(dateValue || timeValue) && (
                                 <div className="flex items-center gap-1">
-                                  <FiCalendar size={12} className="text-gray-500" />
+                                  <FiCalendar
+                                    size={12}
+                                    className="text-gray-500"
+                                  />
                                   <span className="truncate">
                                     {dateValue}
                                     {timeValue ? ` • ${timeValue}` : ""}
@@ -730,7 +766,7 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
 
                             <button
                               onClick={() => navigate("/gifts-memories")}
-                              className="ml-3 inline-flex items-center gap-1 text-[11px] font-semibold text-secondary-600 hover:text-secondary-800 whitespace-nowrap"
+                              className="ml-3 inline-flex bg-white items-center gap-1 text-[11px] font-semibold text-secondary-600 hover:text-secondary-800 whitespace-nowrap"
                             >
                               <FiGift className="text-[13px]" />
                               <span>Send Gift</span>
@@ -752,13 +788,17 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
                     <FiGift className="text-secondary-600" size={16} />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-gray-800">Gift Ideas</p>
-                    <p className="text-xs text-gray-500">Make upcoming events more special</p>
+                    <p className="text-sm font-semibold text-gray-800">
+                      Gift Ideas
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Make upcoming events more special
+                    </p>
                   </div>
                 </div>
                 <button
                   onClick={() => navigate("/gifts-memories")}
-                  className="text-xs font-semibold text-secondary-600 hover:text-secondary-800"
+                  className="text-xs font-semibold bg-white text-secondary-600 hover:text-secondary-800"
                 >
                   View all
                 </button>
@@ -791,6 +831,16 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
           isOpen={isCreatePostModalOpen}
           onClose={() => setIsCreatePostModalOpen(false)}
         />
+        {/* Gallery Viewer Modal */}
+        {selectedAlbum && (
+          <GalleryViewerModal
+            isOpen={isGalleryModalOpen}
+            onClose={() => setIsGalleryModalOpen(false)}
+            album={selectedAlbum}
+            currentUser={userInfo}
+            authToken={token}
+          />
+        )}
       </div>
     </>
   );
