@@ -29,26 +29,17 @@ const GalleryCollage = ({ photos = [], onOpenAlbum }) => {
   if (!photos.length) return null;
 
   const peripheralPositions = [
-    // Top row
-    "top-4 left-4 w-[18%] h-[30%]",
-    "top-4 left-[28%] w-[18%] h-[30%]",
-    "top-4 left-[52%] w-[18%] h-[30%]",
-    "top-4 left-[76%] w-[18%] h-[30%]",
-    // Bottom row
-    "bottom-4 left-4 w-[18%] h-[30%]",
-    "bottom-4 left-[28%] w-[18%] h-[30%]",
-    "bottom-4 left-[52%] w-[18%] h-[30%]",
-    "bottom-4 left-[76%] w-[18%] h-[30%]",
-    // Middle left & right
-    "top-[26%] left-4 w-[18%] h-[30%]",
-    "top-[26%] left-[76%] w-[18%] h-[30%]",
+    // Left column (top, middle, bottom)
+    "top-[4%] left-4 w-[18%] h-[28%]",
+    "top-[36%] left-4 w-[18%] h-[28%]",
+    "top-[68%] left-4 w-[18%] h-[28%]",
+    // Right column (top, middle, bottom)
+    "top-[4%] left-[78%] w-[18%] h-[28%]",
+    "top-[36%] left-[78%] w-[18%] h-[28%]",
+    "top-[68%] left-[78%] w-[18%] h-[28%]",
   ];
 
   const peripheralRotations = [
-    "rotate-0",
-    "rotate-0",
-    "rotate-0",
-    "rotate-0",
     "rotate-0",
     "rotate-0",
     "rotate-0",
@@ -89,7 +80,7 @@ const GalleryCollage = ({ photos = [], onOpenAlbum }) => {
             return (
               <div
                 key={photo.id || globalIndex}
-                className="absolute top-[10%] left-[16%] w-[68%] h-[72%] lg:left-[18%] lg:w-[64%] transition-all duration-500 ease-out origin-center z-30 scale-105 rotate-0 shadow-2xl ring-4 ring-secondary-500 overflow-hidden rounded-3xl"
+                className="absolute top-1/2 left-1/2 w-[72%] h-[78%] -translate-x-1/2 -translate-y-1/2 transition-all duration-500 ease-out origin-center z-30 scale-105 rotate-0 shadow-2xl ring-4 ring-secondary-500 overflow-hidden rounded-3xl"
               >
                 <img
                   src={photo.url}
