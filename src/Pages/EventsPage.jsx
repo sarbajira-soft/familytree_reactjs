@@ -421,7 +421,7 @@ const EventsPage = () => {
               <FiPlusSquare size={20} /> Create Event
             </button>
           </div>
-          
+
           {/* Filter Tabs – Responsive (Mobile vs Desktop) */}
           <div className="flex justify-center w-full mt-2">
             {/* Container */}
@@ -519,61 +519,8 @@ const EventsPage = () => {
           </div>
 
           {/* Events Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {eventsLoading ? (
-              <div className="col-span-full text-center py-20 bg-white rounded-2xl shadow-lg border border-gray-100">
-                {/* <div className="max-w-md mx-auto">
-                  <div className="w-32 h-32 bg-gradient-to-br from-gray-100 to-gray-200 rounded-full flex items-center justify-center mx-auto mb-8">
-                    <FiLoader className="text-6xl text-[#1976D2] animate-spin" />
-                  </div>
-                  <h3 className="text-3xl font-bold text-gray-800 mb-4">
-                    Loading Events...
-                  </h3>
-                  <p className="text-gray-600 mb-8 text-lg leading-relaxed">
-                    Please wait while we fetch your events.
-                  </p>
-                </div> */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {Array(3)
-                    .fill(null)
-                    .map((_, i) => (
-                      <div
-                        key={i}
-                        className="bg-gray-100 rounded-xl shadow p-4 flex flex-col gap-4 overflow-hidden relative w-full"
-                        style={{ minHeight: 340 }}
-                      >
-                        {/* Image shimmer */}
-                        <div className="w-full h-40 bg-gray-300 rounded-xl relative overflow-hidden mb-4">
-                          <div className="shimmer-glow"></div>
-                        </div>
-                        {/* Title shimmer */}
-                        <div className="h-6 w-2/3 bg-gray-300 rounded mb-2 relative overflow-hidden">
-                          <div className="shimmer-glow"></div>
-                        </div>
-                        {/* Date shimmer */}
-                        <div className="h-4 w-1/2 bg-gray-300 rounded mb-2 relative overflow-hidden">
-                          <div className="shimmer-glow"></div>
-                        </div>
-                        {/* Location shimmer */}
-                        <div className="h-4 w-1/3 bg-gray-300 rounded mb-4 relative overflow-hidden">
-                          <div className="shimmer-glow"></div>
-                        </div>
-                        {/* Description shimmer */}
-                        <div className="h-3 w-full bg-gray-300 rounded mb-1 relative overflow-hidden">
-                          <div className="shimmer-glow"></div>
-                        </div>
-                        <div className="h-3 w-2/3 bg-gray-300 rounded relative overflow-hidden">
-                          <div className="shimmer-glow"></div>
-                        </div>
-                        {/* View link shimmer */}
-                        <div className="h-5 w-16 bg-gray-300 rounded-full mt-auto relative overflow-hidden">
-                          <div className="shimmer-glow"></div>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              </div>
-            ) : displayedEvents.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {displayedEvents.length > 0 ? (
               displayedEvents.map((event) => {
                 const eventStyle = getEventTypeStyle(event.eventType);
                 const EventIcon = eventStyle.icon;
@@ -595,7 +542,7 @@ const EventsPage = () => {
                     }
                   >
                     {/* Event Image */}
-                    <div className="relative h-48 overflow-hidden">
+                    <div className="relative h-40 overflow-hidden">
                       {event.eventImages && event.eventImages.length > 0 ? (
                         <img
                           src={event.eventImages[0]}
@@ -622,7 +569,7 @@ const EventsPage = () => {
                         <div
                           className={`w-full h-full ${eventStyle.bgColor} flex items-center justify-center`}
                         >
-                          <EventIcon size={48} className="text-white" />
+                          <EventIcon size={40} className="text-white" />
                         </div>
                       )}
 
@@ -655,15 +602,15 @@ const EventsPage = () => {
                     </div>
 
                     {/* Event Content */}
-                    <div className="p-4 space-y-3">
+                    <div className="p-3 space-y-2">
                       <h3
-                        className={`text-lg font-bold text-gray-900 line-clamp-2 group-hover:${eventStyle.textColor} transition-colors duration-300`}
+                        className={`text-base font-bold text-gray-900 line-clamp-2 group-hover:${eventStyle.textColor} transition-colors duration-300`}
                       >
                         {event.title}
                       </h3>
 
                       {event.message && (
-                        <p className="text-sm text-gray-600 italic bg-gray-50 p-2 rounded-lg">
+                        <p className="text-xs text-gray-600 italic bg-gray-50 p-2 rounded-lg line-clamp-2">
                           "{event.message}"
                         </p>
                       )}
@@ -698,12 +645,12 @@ const EventsPage = () => {
                       </div>
 
                       {event.description && (
-                        <p className="text-gray-600 text-sm leading-relaxed line-clamp-2">
+                        <p className="text-gray-600 text-xs leading-relaxed line-clamp-2">
                           {event.description}
                         </p>
                       )}
 
-                      <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                      <div className="flex items-center justify-between pt-2 border-t border-gray-100">
                         <div className="flex items-center gap-4 text-sm text-gray-600">
                           {event.attendeesCount && (
                             <div className="flex items-center gap-2">
@@ -715,7 +662,7 @@ const EventsPage = () => {
                           )}
                         </div>
 
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
                           {activeTab === "my-events" &&
                             event.eventType === "custom" && (
                               <>
@@ -723,30 +670,30 @@ const EventsPage = () => {
                                   onClick={(e) =>
                                     handleEditEventFromCard(event, e)
                                   }
-                                  className="bg-unset p-2 text-gray-500 hover:text-[#1976D2] hover:bg-[#1976D2]/10 rounded-lg transition-all duration-200"
+                                  className="bg-unset p-1.5 text-gray-500 hover:text-[#1976D2] hover:bg-[#1976D2]/10 rounded-lg transition-all duration-200"
                                   title="Edit Event"
                                 >
-                                  <FiEdit3 size={16} />
+                                  <FiEdit3 size={14} />
                                 </button>
                                 <button
                                   onClick={(e) =>
                                     handleDeleteEventFromCard(event, e)
                                   }
-                                  className="bg-unset p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200"
+                                  className="bg-unset p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200"
                                   title="Delete Event"
                                 >
-                                  <FiTrash2 size={16} />
+                                  <FiTrash2 size={14} />
                                 </button>
                               </>
                             )}
 
                           {event.eventType === "custom" && (
                             <div
-                              className={`flex items-center gap-2 ${eventStyle.textColor} font-semibold group-hover:${eventStyle.hoverColor} transition-colors`}
+                              className={`flex items-center gap-1 ${eventStyle.textColor} font-semibold group-hover:${eventStyle.hoverColor} transition-colors`}
                             >
-                              <span className="text-sm">View</span>
+                              <span className="text-xs">View</span>
                               <FiArrowRight
-                                size={14}
+                                size={12}
                                 className="transform group-hover:translate-x-1 transition-transform"
                               />
                             </div>
@@ -758,33 +705,8 @@ const EventsPage = () => {
                 );
               })
             ) : (
-              <div className="col-span-full text-center py-20 bg-white rounded-2xl shadow-lg border border-gray-100">
-                <div className="max-w-md mx-auto">
-                  <div className="w-32 h-32 bg-[#1976D2]/10 rounded-full flex items-center justify-center mx-auto mb-8">
-                    <FiCalendar size={48} className="text-[#1976D2]" />
-                  </div>
-                  <h3 className="text-3xl font-bold text-[#1976D2] mb-4">
-                    {activeTab === "upcoming"
-                      ? "No Upcoming Events"
-                      : activeTab === "my-events"
-                      ? "No Events Created"
-                      : "No Events Found"}
-                  </h3>
-                  <p className="text-gray-600 mb-8 text-lg leading-relaxed">
-                    {activeTab === "upcoming"
-                      ? "No upcoming events scheduled. Start planning your next family gathering!"
-                      : activeTab === "my-events"
-                      ? "You haven't created any events yet. Begin creating memorable family moments."
-                      : "No events found in the system. Be the first to create an event!"}
-                  </p>
-                  <button
-                    onClick={handleCreateEventClick}
-                    className="bg-[#1976D2] text-white px-10 py-4 rounded-xl shadow-lg hover:bg-[#1565C0] transition-all duration-300 font-semibold text-lg focus:outline-none focus:ring-2 focus:ring-[#1976D2] focus:ring-opacity-75 transform hover:-translate-y-1 hover:shadow-xl"
-                  >
-                    <FiPlusSquare size={24} className="inline mr-3" />
-                    Create Your First Event
-                  </button>
-                </div>
+              <div className="col-span-full text-center py-12 text-gray-500">
+                No events found
               </div>
             )}
           </div>

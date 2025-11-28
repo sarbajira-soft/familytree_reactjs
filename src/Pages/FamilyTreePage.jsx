@@ -627,16 +627,24 @@ const FamilyTreePage = () => {
                 icon: icons['Add Parents']
             });
         }
-        items.push({
-            label: 'Add Spouse',
-            action: () => setModal({ isOpen: true, action: { type: 'spouse', person } }),
-            icon: icons['Add Spouse']
-        });
+
+        if(person.spouses.size === 0)
+        {
+
+            items.push({
+                label: 'Add Spouse',
+                action: () => setModal({ isOpen: true, action: { type: 'spouse', person } }),
+                icon: icons['Add Spouse']
+            });
+        }
+
+
         items.push({
             label: 'Add Child',
             action: () => setModal({ isOpen: true, action: { type: 'children', person } }),
             icon: icons['Add Child']
         });
+
         if (person.parents.size > 0) {
             items.push({
                 label: 'Add Sibling',
@@ -1459,7 +1467,7 @@ const FamilyTreePage = () => {
                                 
                                     <div className="flex items-center justify-center lg:justify-end gap-3 lg:gap-4 flex-shrink-0">
                                       
-                                        <div className="flex items-center">
+                                        <div className="flex items-center p-4">
                                             <LanguageSwitcher />
                                         </div>
 

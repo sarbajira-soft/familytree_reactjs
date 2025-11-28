@@ -205,7 +205,7 @@ const PostViewerModal = ({
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90 backdrop-blur"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur"
           variants={backdropVariants}
           initial="hidden"
           animate="visible"
@@ -337,7 +337,7 @@ const PostViewerModal = ({
       <AnimatePresence>
         {isFullScreen && (
           <motion.div
-            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-95"
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-85 backdrop-blur"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}

@@ -337,7 +337,7 @@ const SearchBar = ({
     // Desktop: inline search in the header
     return (
         <div className="relative inline-flex flex-col w-40">
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-blue-600 rounded-md shadow-sm">
+            <div className="flex items-center gap-1.5 px-3  bg-white border border-blue-600 rounded-md shadow-sm">
                 <FaSearch className="text-blue-500 text-xs" />
                 <input
                     ref={searchInputRef}

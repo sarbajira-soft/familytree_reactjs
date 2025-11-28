@@ -107,7 +107,7 @@ export const useNotificationSocket = (userInfo) => {
           tag: `notification-${notification.id}`,
         });
       }
-    });
+    })
 
     socket.on('unread-count-update', (data) => {
       console.log('📊 Unread count updated:', data.count);

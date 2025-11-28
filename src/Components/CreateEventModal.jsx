@@ -138,39 +138,32 @@ const CreateEventModal = ({
     e.preventDefault();
     setIsLoading(true);
 
-    if (!userInfo?.userId || !userInfo?.familyCode) {
-      Swal.fire({
-        icon: "warning",
-        title: "Missing info",
-        text: "User ID or Family Code missing.",
-      });
-      setIsLoading(false);
-      return;
-    }
-
     try {
       const token = localStorage.getItem("access_token");
-
       const formData = new FormData();
-      formData.append("userId", userInfo?.userId);
+
+      // Add event fields
       formData.append("eventTitle", title);
       formData.append("eventDescription", description);
       formData.append("eventDate", date);
       formData.append("eventTime", time);
       formData.append("location", location);
-      formData.append("familyCode", userInfo?.familyCode);
 
-      images.forEach((img) => {
+      // **NEW: Send images to REMOVE (if user removed any)**
+      if (imagesToRemove.length > 0) {
+        imagesToRemove.forEach((id) =>
+          formData.append("imagesToRemove", id.toString())
+        );
+      }
+
+      // Add NEW images
+      newImages.forEach((img) => {
         formData.append("eventImages", img);
       });
 
-      const createEndpoint = `${apiBaseUrl}/event/create`;
-
-      const response = await fetch(createEndpoint, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+      const response = await fetch(`${apiBaseUrl}/event/${eventId}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
 

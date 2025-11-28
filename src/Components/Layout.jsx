@@ -124,7 +124,7 @@ const Layout = ({ noScroll = false }) => {
                 />
               </div>
               {!sidebarCollapsed && (
-                <h2 className="text-2xl font-bold text-gray-800">Familyss</h2>
+                <h2 className="text-2xl font-bold text-primary-700">Familyss</h2>
               )}
             </div>
           </div>
@@ -161,7 +161,7 @@ const Layout = ({ noScroll = false }) => {
                 className="w-full h-full object-cover rounded-full"
               />
             </div>
-            <h2 className="text-xl font-bold text-gray-800">Familyss</h2>
+            <h2 className="text-xl font-bold text-primary-900">Familyss</h2>
           </div>
 
           <Sidebar
@@ -189,7 +189,7 @@ const Layout = ({ noScroll = false }) => {
                 </button>
               ) : (
                 sidebarCollapsed && (
-                  <h2 className="font-semibold text-lg text-gray-800">
+                  <h2 className="font-semibold text-lg text-primary-700">
                     Familyss
                   </h2>
                 )

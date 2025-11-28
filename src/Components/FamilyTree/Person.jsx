@@ -7,6 +7,7 @@ import Swal from 'sweetalert2';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getToken } from '../../utils/auth';
 import { Mars, Venus } from 'lucide-react';
+import { FaFemale, FaMale } from 'react-icons/fa';
 
 // Helper function to get inverse/opposite relationship code
 const getInverseRelationship = (relationshipCode) => {
@@ -874,7 +875,8 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
               {getGenderLabel(person, tree, currentUserId) && (
                 <div className="text-center">
                   <div className="text-pink-600 font-extrabold  flex justify-center" style={{ fontSize: `${fontSizeDetails}px` }}>
-                                {getGenderLabel(person, tree, currentUserId)}
+                                {getGenderLabel(person, tree, currentUserId) === "M" ?<FaMale className="mx-auto text-sky-600 text-2xl" /> : 
+                                            <FaFemale className="mx-auto text-pink-500 text-2xl" />}
 
                             </div>
                   {/* <div className="text-fuchsia-500 text-[8px] font-bold uppercase tracking-wider">GENDER</div> */}
