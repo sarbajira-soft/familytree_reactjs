@@ -152,6 +152,10 @@ export const UserProvider = ({ children }) => {
       
     } catch (err) {
       console.error('Error fetching user:', err);
+      // If we cannot load the user while a token exists, treat this as an
+      // invalid session and clear all auth state to avoid redirect loops
+      // between GuestRoute and PrivateRoute.
+      clearUserData();
     } finally {
       setUserLoading(false);
     }
