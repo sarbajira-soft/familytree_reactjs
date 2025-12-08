@@ -694,13 +694,6 @@ const FamilyTreePage = () => {
     };
 
     const items = [];
-
-    // Determine if this node represents an app user other than the logged-in user
-    const isOtherAppUser =
-      person.isAppUser &&
-      person.memberId &&
-      userInfo &&
-      String(person.memberId) !== String(userInfo.userId);
     if (person.parents.size === 0) {
       items.push({
         label: "Add Parents",
@@ -709,23 +702,18 @@ const FamilyTreePage = () => {
         icon: icons["Add Parents"],
       });
     }
-
-    if (person.spouses.size === 0) {
-      items.push({
-        label: "Add Spouse",
-        action: () =>
-          setModal({ isOpen: true, action: { type: "spouse", person } }),
-        icon: icons["Add Spouse"],
-      });
-    }
-
+    items.push({
+      label: "Add Spouse",
+      action: () =>
+        setModal({ isOpen: true, action: { type: "spouse", person } }),
+      icon: icons["Add Spouse"],
+    });
     items.push({
       label: "Add Child",
       action: () =>
         setModal({ isOpen: true, action: { type: "children", person } }),
       icon: icons["Add Child"],
     });
-
     if (person.parents.size > 0) {
       items.push({
         label: "Add Sibling",
@@ -734,16 +722,12 @@ const FamilyTreePage = () => {
         icon: icons["Add Sibling"],
       });
     }
-
-    // Allow Edit only for non-app users, or when the logged-in user is editing their own node
-    if (!isOtherAppUser) {
-      items.push({
-        label: "Edit",
-        action: () =>
-          setModal({ isOpen: true, action: { type: "edit", person } }),
-        icon: icons["Edit"],
-      });
-    }
+    items.push({
+      label: "Edit",
+      action: () =>
+        setModal({ isOpen: true, action: { type: "edit", person } }),
+      icon: icons["Edit"],
+    });
     if (person.id !== tree?.rootId) {
       items.push({
         label: "Delete",
@@ -1487,7 +1471,7 @@ const FamilyTreePage = () => {
       {/* All components that use useFamilyTreeLabels must be children here */}
       <>
         {/* Main container for tree and controls */}
-        <div className="relative flex flex-col h-full w-full bg-gray-100 overflow-x-hidden">
+        <div className="relative flex flex-col h-full w-full bg-gray-100">
           {/* Navigation buttons when viewing another family's tree */}
 
           {/* Mobile Top Header - Edit Mode */}
@@ -1648,7 +1632,7 @@ const FamilyTreePage = () => {
                   </div>
 
                   <div className="flex items-center justify-center lg:justify-end gap-3 lg:gap-4 flex-shrink-0">
-                    <div className="flex items-center p-4">
+                    <div className="flex items-center">
                       <LanguageSwitcher />
                     </div>
 
@@ -1894,7 +1878,6 @@ const FamilyTreePage = () => {
                 transformOrigin:
                   window.innerWidth <= 640 ? "top left" : "center center",
                 padding: window.innerWidth <= 640 ? "10px" : "20px",
-                marginTop: window.innerWidth <= 640 ? "16px" : "56px",
               }}
             >
               {/* Tree SVG connections */}

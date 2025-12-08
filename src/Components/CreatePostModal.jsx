@@ -185,8 +185,10 @@ const CreatePostModal = ({
     const formData = new FormData();
     formData.append("caption", content.trim());
     formData.append("privacy", privacy === "family" ? "private" : privacy);
-    formData.append("status", "1");
-    formData.append("familyCode", privacy === "family" ? familyCode : "");
+    formData.append("status", "1");if (privacy === "family") {
+      formData.append("familyCode", familyCode);
+    }
+
 
     if (imageFile) {
       formData.append("postImage", imageFile);
