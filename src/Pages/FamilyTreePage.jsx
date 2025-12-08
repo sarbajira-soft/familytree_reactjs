@@ -1471,7 +1471,7 @@ const FamilyTreePage = () => {
       {/* All components that use useFamilyTreeLabels must be children here */}
       <>
         {/* Main container for tree and controls */}
-        <div className="relative flex flex-col h-full w-full bg-gray-100">
+        <div className="relative flex flex-col h-full w-full bg-gray-100 overflow-x-hidden">
           {/* Navigation buttons when viewing another family's tree */}
 
           {/* Mobile Top Header - Edit Mode */}
@@ -1878,6 +1878,7 @@ const FamilyTreePage = () => {
                 transformOrigin:
                   window.innerWidth <= 640 ? "top left" : "center center",
                 padding: window.innerWidth <= 640 ? "10px" : "20px",
+                marginTop: window.innerWidth <= 640 ? "16px" : "56px",
               }}
             >
               {/* Tree SVG connections */}
