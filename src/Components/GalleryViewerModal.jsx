@@ -8,7 +8,9 @@ import {
   FaChevronRight,
   FaUndoAlt,
 } from "react-icons/fa";
+import { FiSmile } from "react-icons/fi";
 import { AnimatePresence, motion } from "framer-motion";
+import EmojiPicker from "emoji-picker-react";
 import CommentItem from "./CommentItem";
 import { buildCommentTree, countComments } from "../utils/commentUtils";
 
@@ -31,6 +33,9 @@ const GalleryViewerModal = ({
   const [isFullScreen, setIsFullScreen] = useState(false);
   const fsCarouselRef = useRef(null);
   const [rotation, setRotation] = useState(0);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const textareaRef = useRef(null);
+  const emojiPickerRef = useRef(null);
 
   const goToIndexFS = (i) => {
     if (fsCarouselRef.current) {
@@ -71,6 +76,25 @@ const GalleryViewerModal = ({
     }
   }, [album]);
 
+  useEffect(() => {
+    const handleClickOutsideEmoji = (event) => {
+      if (
+        emojiPickerRef.current &&
+        !emojiPickerRef.current.contains(event.target)
+      ) {
+        setShowEmojiPicker(false);
+      }
+    };
+
+    if (showEmojiPicker) {
+      document.addEventListener("mousedown", handleClickOutsideEmoji);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutsideEmoji);
+    };
+  }, [showEmojiPicker]);
+
   if (!album || !album.photos || album.photos.length === 0) {
     return null;
   }
@@ -100,6 +124,34 @@ const GalleryViewerModal = ({
       console.error("Like failed", err);
     }
     setLikeLoading(false);
+  };
+
+  const handleEmojiClick = (emojiData) => {
+    const { emoji } = emojiData;
+    const textarea = textareaRef.current;
+
+    if (!textarea) {
+      setNewComment((prev) => (prev || "") + emoji);
+      return;
+    }
+
+    const currentValue = newComment || "";
+    const start = textarea.selectionStart ?? currentValue.length;
+    const end = textarea.selectionEnd ?? start;
+    const before = currentValue.substring(0, start);
+    const after = currentValue.substring(end);
+    const updated = before + emoji + after;
+
+    setNewComment(updated);
+
+    setTimeout(() => {
+      if (textareaRef.current) {
+        const el = textareaRef.current;
+        const caretPosition = start + emoji.length;
+        el.focus();
+        el.setSelectionRange(caretPosition, caretPosition);
+      }
+    }, 0);
   };
 
   // Fetch comments
@@ -138,6 +190,7 @@ const GalleryViewerModal = ({
         }),
       });
       setNewComment("");
+      setShowEmojiPicker(false);
       await fetchComments();
     } catch (err) {
       console.error("Post failed", err);
@@ -340,15 +393,25 @@ const GalleryViewerModal = ({
                     )}
                   </div>
                   {/* Comment input */}
-                  <div className="flex mb-14 items-end gap-2 p-4 pt-0 bg-gray-50 flex-shrink-0 border-t">
-                    <textarea
-                      rows="1"
-                      value={newComment}
-                      onChange={(e) => setNewComment(e.target.value)}
-                      placeholder="Write a comment..."
-                      className="flex-1 p-3 mt-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-400 text-sm resize-none min-h-[38px] max-h-[100px] md:min-h-[38px] md:max-h-[60px]"
-                      style={{ lineHeight: "1.4" }}
-                    />
+                  <div className="flex mb-14 items-end gap-2 p-4 pt-0 bg-gray-50 flex-shrink-0 border-t relative">
+                    <div className="flex items-end gap-2 flex-1">
+                      <textarea
+                        ref={textareaRef}
+                        rows="1"
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        placeholder="Write a comment..."
+                        className="flex-1 p-3 mt-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-400 text-sm resize-none min-h-[38px] max-h-[100px] md:min-h-[38px] md:max-h-[60px]"
+                        style={{ lineHeight: "1.4" }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowEmojiPicker((prev) => !prev)}
+                        className="mb-1 p-2 rounded-full bg-white text-primary-600 border border-gray-300 hover:bg-yellow-50 shadow-sm transition-colors flex items-center justify-center"
+                      >
+                        <FiSmile size={20} />
+                      </button>
+                    </div>
                     <button
                       onClick={handlePostComment}
                       disabled={!newComment.trim() || commentLoading}
@@ -363,6 +426,22 @@ const GalleryViewerModal = ({
                     >
                       {commentLoading ? "..." : "Post"}
                     </button>
+                    {showEmojiPicker && (
+                      <div
+                        ref={emojiPickerRef}
+                        className="absolute bottom-16 left-4 z-50 shadow-2xl rounded-xl bg-white"
+                      >
+                        <EmojiPicker
+                          onEmojiClick={handleEmojiClick}
+                          width={300}
+                          height={350}
+                          previewConfig={{ showPreview: false }}
+                          searchDisabled
+                          skinTonesDisabled
+                          lazyLoadEmojis
+                        />
+                      </div>
+                    )}
                   </div>
                   <div className="mt-2 pt-2 border-t text-center text-sm text-gray-600">
                     Photo {currentPhotoIndex + 1} of {album.photos.length}

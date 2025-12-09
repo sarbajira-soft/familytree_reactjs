@@ -1704,6 +1704,7 @@ const FamilyTreePage = () => {
               </div>
             </div>
           )}
+          
           {/* Mobile Top Header - View Mode */}
           {!canEdit && (
             <>

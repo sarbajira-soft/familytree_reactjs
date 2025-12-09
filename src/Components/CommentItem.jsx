@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { FaEdit, FaTrash, FaReply, FaSave, FaTimes } from 'react-icons/fa';
+import { FiSmile } from 'react-icons/fi';
 import { motion } from 'framer-motion';
+import EmojiPicker from 'emoji-picker-react';
 
 const CommentItem = ({ 
   comment, 
@@ -16,6 +18,9 @@ const CommentItem = ({
   const [editText, setEditText] = useState(comment.comment || comment.content || '');
   const [replyText, setReplyText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const replyTextareaRef = useRef(null);
+  const emojiPickerRef = useRef(null);
 
   const isOwner = comment.userId === currentUserId;
   const hasReplies = comment.replies && comment.replies.length > 0;
@@ -32,6 +37,53 @@ const CommentItem = ({
     } finally {
       setIsLoading(false);
     }
+  };
+
+  useEffect(() => {
+    const handleClickOutsideEmoji = (event) => {
+      if (
+        emojiPickerRef.current &&
+        !emojiPickerRef.current.contains(event.target)
+      ) {
+        setShowEmojiPicker(false);
+      }
+    };
+
+    if (showEmojiPicker) {
+      document.addEventListener('mousedown', handleClickOutsideEmoji);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutsideEmoji);
+    };
+  }, [showEmojiPicker]);
+
+  const handleEmojiClick = (emojiData) => {
+    const { emoji } = emojiData;
+    const textarea = replyTextareaRef.current;
+
+    if (!textarea) {
+      setReplyText((prev) => (prev || '') + emoji);
+      return;
+    }
+
+    const currentValue = replyText || '';
+    const start = textarea.selectionStart ?? currentValue.length;
+    const end = textarea.selectionEnd ?? start;
+    const before = currentValue.substring(0, start);
+    const after = currentValue.substring(end);
+    const updated = before + emoji + after;
+
+    setReplyText(updated);
+
+    setTimeout(() => {
+      if (replyTextareaRef.current) {
+        const el = replyTextareaRef.current;
+        const caretPosition = start + emoji.length;
+        el.focus();
+        el.setSelectionRange(caretPosition, caretPosition);
+      }
+    }, 0);
   };
 
   const handleDelete = async () => {
@@ -52,6 +104,7 @@ const CommentItem = ({
       await onReply(comment.id, replyText.trim());
       setReplyText('');
       setIsReplying(false);
+      setShowEmojiPicker(false);
     } catch (error) {
       console.error('Failed to reply:', error);
     } finally {
@@ -163,15 +216,25 @@ const CommentItem = ({
 
         {/* Reply Input */}
         {isReplying && (
-          <div className="mt-2 ml-2">
-            <textarea
-              value={replyText}
-              onChange={(e) => setReplyText(e.target.value)}
-              placeholder="Write a reply..."
-              className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-400 text-sm resize-none"
-              rows="2"
-              disabled={isLoading}
-            />
+          <div className="mt-2 ml-2 relative">
+            <div className="flex items-end gap-2">
+              <textarea
+                ref={replyTextareaRef}
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value)}
+                placeholder="Write a reply..."
+                className="flex-1 w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-400 text-sm resize-none"
+                rows="2"
+                disabled={isLoading}
+              />
+              <button
+                type="button"
+                onClick={() => setShowEmojiPicker((prev) => !prev)}
+                className="mb-1 p-2 rounded-full bg-white text-primary-600 border border-gray-300 hover:bg-yellow-50 shadow-sm transition-colors flex items-center justify-center"
+              >
+                <FiSmile size={16} />
+              </button>
+            </div>
             <div className="flex gap-2 mt-2">
               <button
                 onClick={handleReply}
@@ -184,6 +247,7 @@ const CommentItem = ({
                 onClick={() => {
                   setIsReplying(false);
                   setReplyText('');
+                  setShowEmojiPicker(false);
                 }}
                 disabled={isLoading}
                 className="flex items-center gap-1 px-3 py-1 bg-gray-300 text-gray-700 rounded-lg text-xs hover:bg-gray-400"
@@ -191,6 +255,22 @@ const CommentItem = ({
                 <FaTimes size={12} /> Cancel
               </button>
             </div>
+            {showEmojiPicker && (
+              <div
+                ref={emojiPickerRef}
+                className="absolute bottom-12 left-0 z-50 shadow-2xl rounded-xl bg-white"
+              >
+                <EmojiPicker
+                  onEmojiClick={handleEmojiClick}
+                  width={260}
+                  height={320}
+                  previewConfig={{ showPreview: false }}
+                  searchDisabled
+                  skinTonesDisabled
+                  lazyLoadEmojis
+                />
+              </div>
+            )}
           </div>
         )}
 

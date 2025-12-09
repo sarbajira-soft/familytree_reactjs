@@ -75,11 +75,11 @@ const FamilyOverView = ({ familyCode, token }) => {
             <p className="text-2xl font-bold text-gray-900">{females}</p>
           </div>
 
-          <div className="bg-purple-50 p-4 rounded-lg text-center">
+          {/* <div className="bg-purple-50 p-4 rounded-lg text-center">
             <FaBirthdayCake className="mx-auto text-purple-500 text-3xl mb-2" />
             <p className="text-sm text-gray-600">Average Age</p>
             <p className="text-2xl font-bold text-gray-900">{averageAge}</p>
-          </div>
+          </div> */}
         </div>
       </div>
     </div>

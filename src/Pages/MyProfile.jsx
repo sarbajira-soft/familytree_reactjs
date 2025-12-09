@@ -256,9 +256,7 @@ const ProfilePage = () => {
   // Use mutation for like toggle with optimistic updates
   const likeMutation = useMutation({
     mutationFn: async ({ postId, currentIsLiked }) => {
-      const url = `${import.meta.env.VITE_API_BASE_URL}/post/${postId}/${
-        currentIsLiked ? "unlike" : "like"
-      }`;
+      const url = `${import.meta.env.VITE_API_BASE_URL}/post/${postId}/like-toggle`;
       const response = await fetch(url, {
         method: "POST",
         headers: {

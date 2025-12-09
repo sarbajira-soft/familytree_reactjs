@@ -67,6 +67,7 @@ const FamilyMemberCard = ({ familyCode, token, onEditMember, onViewMember, curre
         contact: item.user.userProfile?.contactNumber,
         address: item.user.userProfile?.address || '',
         dob: item.user.userProfile?.dob || '',
+        age: item.user.userProfile?.age || '',
         profilePic: item.user.profileImage,
         isAdmin: item.user.role > 1,
         isBlocked: item.isBlocked,
@@ -88,6 +89,7 @@ const FamilyMemberCard = ({ familyCode, token, onEditMember, onViewMember, curre
 }, [familyCode, token]);
 
   const calculateAge = (dob) => {
+    console.log('Calculating age for DOB:', dob);
     if (!dob) return 'N/A';
     const birthDate = new Date(dob);
     const today = new Date();
@@ -267,10 +269,10 @@ const FamilyMemberCard = ({ familyCode, token, onEditMember, onViewMember, curre
           </span>
           <div className="mt-2 flex items-center text-sm text-gray-600">
             <FaBirthdayCake className="mr-2 text-primary-500" size={16} />
-            <span className="font-medium">{calculateAge(member.dob)} years old</span>
+            <span className="font-medium">{  member.age ||calculateAge(member.dob)} years old</span>
           </div>
           <div className="mt-1 flex items-center text-sm text-gray-600">
-            {member.gender === 'Male' ? (
+            {member.gender === 'male' ? (
               <FaMale className="mr-2 text-blue-500" size={16} />
             ) : (
               <FaFemale className="mr-2 text-pink-500" size={16} />
@@ -396,7 +398,9 @@ const FamilyMemberCard = ({ familyCode, token, onEditMember, onViewMember, curre
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
           {filteredMembers.length ? (
-            filteredMembers.map((member) => <SingleMemberCard key={member.id} member={member} />)
+            filteredMembers.map((member) =>{
+              console.log('Rendering member:', member);
+               return <SingleMemberCard key={member.id} member={member} />})
           ) : (
             <p className="text-center text-gray-500 col-span-full">No family members found.</p>
           )}

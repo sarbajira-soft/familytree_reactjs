@@ -300,7 +300,7 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
           }),
           fetch(`${apiBaseUrl}/event/upcoming`, { headers }),
           fetch(
-            `${apiBaseUrl}/gallery/by-options?familyCode=${userInfo.familyCode}`,
+            `${apiBaseUrl}/gallery/by-options?privacy=public`,
             { headers }
           ),
           fetch(`${apiBaseUrl}/product`, { headers: { accept: "*/*" } }),

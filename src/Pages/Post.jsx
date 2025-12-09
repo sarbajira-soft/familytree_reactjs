@@ -10,10 +10,12 @@ import {
   FiSearch,
   FiGlobe,
   FiClock,
+  FiSmile,
 } from "react-icons/fi";
 import { FaRegHeart, FaHeart, FaCommentDots } from "react-icons/fa";
 import { MdPublic, MdPeople } from "react-icons/md";
 import PostsShimmer from "./PostsShimmer";
+import EmojiPicker from "emoji-picker-react";
 
 const PostPage = () => {
   const [token, setToken] = useState(null);
@@ -41,6 +43,9 @@ const PostPage = () => {
   const [editCommentText, setEditCommentText] = useState({});
   const [replyingToCommentId, setReplyingToCommentId] = useState(null);
   const [replyText, setReplyText] = useState({});
+  const [activeEmojiPostId, setActiveEmojiPostId] = useState(null);
+  const commentInputRefs = useRef({});
+  const emojiPickerRef = useRef(null);
 
   useEffect(() => {
     const storedToken = localStorage.getItem("access_token");
@@ -57,6 +62,25 @@ const PostPage = () => {
       familyCode: userInfo.familyCode || "Not assigned",
     });
   }, [userInfo]);
+
+  useEffect(() => {
+    const handleClickOutsideEmoji = (event) => {
+      if (
+        emojiPickerRef.current &&
+        !emojiPickerRef.current.contains(event.target)
+      ) {
+        setActiveEmojiPostId(null);
+      }
+    };
+
+    if (activeEmojiPostId !== null) {
+      document.addEventListener("mousedown", handleClickOutsideEmoji);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutsideEmoji);
+    };
+  }, [activeEmojiPostId]);
 
   const fetchPosts = async (captionSearch = "") => {
     setLoadingFeed(true);
@@ -152,6 +176,40 @@ const PostPage = () => {
     });
   };
 
+  const handleEmojiClickForPost = (postId, emojiData) => {
+    const { emoji } = emojiData;
+    const inputEl = commentInputRefs.current[postId];
+    const currentValue = newComment[postId] || "";
+
+    if (!inputEl) {
+      setNewComment((prev) => ({
+        ...prev,
+        [postId]: (prev[postId] || "") + emoji,
+      }));
+      return;
+    }
+
+    const start = inputEl.selectionStart ?? currentValue.length;
+    const end = inputEl.selectionEnd ?? start;
+    const before = currentValue.substring(0, start);
+    const after = currentValue.substring(end);
+    const updated = before + emoji + after;
+
+    setNewComment((prev) => ({
+      ...prev,
+      [postId]: updated,
+    }));
+
+    setTimeout(() => {
+      const el = commentInputRefs.current[postId];
+      if (el) {
+        const caretPosition = start + emoji.length;
+        el.focus();
+        el.setSelectionRange(caretPosition, caretPosition);
+      }
+    }, 0);
+  };
+
     const handlePostComment = async (postId) => {
       const commentText = newComment[postId]?.trim();
       if (!commentText) return;
@@ -209,6 +267,7 @@ const PostPage = () => {
               c.id === tempComment.id ? newCommentData : c
             ),
           }));
+          setActiveEmojiPostId((prev) => (prev === postId ? null : prev));
         } else {
           console.error("Failed to post comment");
           // Rollback
@@ -842,29 +901,43 @@ const PostPage = () => {
                     )}
 
                     {/* ✏️ Add comment box */}
-                    <div className="flex items-center gap-2 mt-4">
-                      <input
-                        type="text"
-                        placeholder="Add a comment..."
-                        value={newComment[post.id] || ""}
-                        onChange={(e) =>
-                          setNewComment((prev) => ({
-                            ...prev,
-                            [post.id]: e.target.value,
-                          }))
-                        }
-                        onKeyDown={(e) => {
-                          if (
-                            e.key === "Enter" &&
-                            !e.shiftKey &&
-                            newComment[post.id]?.trim()
-                          ) {
-                            e.preventDefault();
-                            handlePostComment(post.id);
+                    <div className="flex items-center gap-2 mt-4 relative">
+                      <div className="flex items-center gap-2 flex-1">
+                        <input
+                          ref={(el) => (commentInputRefs.current[post.id] = el)}
+                          type="text"
+                          placeholder="Add a comment..."
+                          value={newComment[post.id] || ""}
+                          onChange={(e) =>
+                            setNewComment((prev) => ({
+                              ...prev,
+                              [post.id]: e.target.value,
+                            }))
                           }
-                        }}
-                        className="flex-1 border border-gray-300 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      />
+                          onKeyDown={(e) => {
+                            if (
+                              e.key === "Enter" &&
+                              !e.shiftKey &&
+                              newComment[post.id]?.trim()
+                            ) {
+                              e.preventDefault();
+                              handlePostComment(post.id);
+                            }
+                          }}
+                          className="flex-1 border border-gray-300 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setActiveEmojiPostId((prev) =>
+                              prev === post.id ? null : post.id
+                            )
+                          }
+                          className="p-2 rounded-full bg-white text-primary-600 border border-gray-300 hover:bg-yellow-50 shadow-sm transition-colors flex items-center justify-center"
+                        >
+                          <FiSmile size={18} />
+                        </button>
+                      </div>
 
                       <button
                         onClick={() => handlePostComment(post.id)}
@@ -913,6 +986,25 @@ const PostPage = () => {
                           </svg>
                         )}
                       </button>
+
+                      {activeEmojiPostId === post.id && (
+                        <div
+                          ref={emojiPickerRef}
+                          className="absolute bottom-12 left-0 z-40 shadow-2xl rounded-xl bg-white"
+                        >
+                          <EmojiPicker
+                            onEmojiClick={(emojiData) =>
+                              handleEmojiClickForPost(post.id, emojiData)
+                            }
+                            width={300}
+                            height={350}
+                            previewConfig={{ showPreview: false }}
+                            searchDisabled
+                            skinTonesDisabled
+                            lazyLoadEmojis
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

@@ -74,13 +74,16 @@ const GalleryCollage = ({ photos = [], onOpenAlbum }) => {
     <div className="w-full mb-10">
       <div className="relative w-full aspect-[16/9] bg-black rounded-3xl overflow-hidden shadow-2xl">
         {orderedPhotos.map((photo, index) => {
+
+           if (!photo) return null; 
+
           const globalIndex = orderedIndices[index];
 
           if (index === 0) {
             return (
               <div
                 key={photo.id || globalIndex}
-                className="absolute top-1/2 left-1/2 w-[72%] h-[78%] -translate-x-1/2 -translate-y-1/2 transition-all duration-500 ease-out origin-center z-30 scale-105 rotate-0 shadow-2xl ring-4 ring-secondary-500 overflow-hidden rounded-3xl"
+                className="absolute top-1/2 left-1/2 w-[62%] h-[68%] -translate-x-1/2 -translate-y-1/2 transition-all duration-500 ease-out origin-center z-30 scale-105 rotate-0 shadow-2xl ring-4 ring-secondary-500 overflow-hidden rounded-3xl"
               >
                 <img
                   src={photo.url}
@@ -219,17 +222,21 @@ const FamilyGalleryPage = () => {
 
   const filteredAlbums = galleryAlbums; // No need to filter here, API should return filtered results
 
-  const collagePhotos = useMemo(() => {
-    if (!filteredAlbums.length) return [];
+ const collagePhotos = useMemo(() => {
+   if (!filteredAlbums.length) return [];
 
-    return filteredAlbums.map((album) => ({
-      id: album.id,
-      url: album.coverPhoto,
-      caption: album.title,
-      albumTitle: album.title,
-      albumId: album.id,
-    }));
-  }, [filteredAlbums]);
+   return filteredAlbums
+     .filter((a) => a && a.coverPhoto) // prevents undefined
+     .map((album) => ({
+       id: album.id,
+       url:
+         album.coverPhoto || "https://picsum.photos/seed/default_album/400/300",
+       caption: album.title,
+       albumTitle: album.title,
+       albumId: album.id,
+     }));
+ }, [filteredAlbums]);
+
 
   const openGalleryModal = (album) => {
     setSelectedAlbum(album);
