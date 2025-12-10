@@ -41,14 +41,14 @@ const Sidebar = ({
       label: "Home",
       route: "/dashboard",
       icon: <FiHome size={19} />,
-      requiresApproval: true,
+      // requiresApproval: true,
     },
     {
       id: "events",
       label: "Events",
       route: "/events",
       icon: <FiCalendar size={19} />,
-      requiresApproval: true,
+      // requiresApproval: true,
     },
     {
       id: "familyTree",

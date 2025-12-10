@@ -166,35 +166,7 @@ export const UserProvider = ({ children }) => {
   }, [fetchUserDetails]);
 
   // Listen for localStorage changes (when user logs in)
-  useEffect(() => {
-    const handleStorageChange = (e) => {
-      if (e.key === 'access_token' && e.newValue) {
-        // New token added, fetch user details
-        fetchUserDetails();
-      } else if (e.key === 'access_token' && !e.newValue) {
-        // Token removed, clear user data
-        clearUserData();
-      }
-    };
-
-    // Listen for storage events from other tabs/windows
-    window.addEventListener('storage', handleStorageChange);
-
-    // Also check for token changes in the same tab
-    const checkTokenInterval = setInterval(() => {
-      const currentToken = getToken();
-      if (currentToken && !userInfo && !userLoading) {
-        // Token exists but no user info, fetch it
-        fetchUserDetails();
-      }
-    }, 1000); // Check every second
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      clearInterval(checkTokenInterval);
-    };
-  }, [fetchUserDetails, clearUserData, userInfo, userLoading]);
-
+  
   // FIXED: Simplified session management - only handle actual browser close
   useEffect(() => {
     // Set up session management on page load
