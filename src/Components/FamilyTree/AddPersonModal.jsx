@@ -836,9 +836,21 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                                 min="0"
                                                 max="200"
                                                 onInput={(e) => {
-                                                    if (e.target.value > 200) e.target.value = 200;
-                                                    if (e.target.value < 0) e.target.value = 0;
-                                                }}
+    // Convert to number to remove leading zeros
+    let v = e.target.value;
+
+    // If user types 00006 → Number(v) = 6
+    if (v !== "") {
+        v = String(Number(v));
+    }
+
+    // Apply limits
+    if (v > 200) v = "200";
+    if (v < 0) v = "0";
+
+    e.target.value = v;
+}}
+
                                                 style={{ 
                                                     width: '100%', 
                                                     borderRadius: 12, 
@@ -970,159 +982,295 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                         // Default tab is 'new' (Add New)
                         const tab = activeTabs[form.index] || 'new';
                         return (
-                        <div key={form.index} style={{ marginBottom: 24 }}>
+                          <div key={form.index} style={{ marginBottom: 24 }}>
                             {/* Tab Toggle: Add New first, then Select Existing */}
-                            <div style={{ 
-                                display: 'flex', 
-                                gap: 0, 
-                                marginBottom: 16, 
-                                borderRadius: 12, 
-                                overflow: 'hidden', 
-                                border: `2px solid ${PRIMARY_COLOR}22`, 
-                                width: 'fit-content', 
-                                fontWeight: 600, 
+                            <div
+                              style={{
+                                display: "flex",
+                                gap: 0,
+                                marginBottom: 16,
+                                borderRadius: 12,
+                                overflow: "hidden",
+                                border: `2px solid ${PRIMARY_COLOR}22`,
+                                width: "fit-content",
+                                fontWeight: 600,
                                 fontSize: 14,
-                                background: 'rgba(255, 255, 255, 0.8)',
-                                boxShadow: `0 4px 15px ${PRIMARY_COLOR}18`
-                            }}>
-                                <button 
-                                    type="button" 
-                                    onClick={() => handleTabSwitch(form.index, 'new')} 
-                                    style={{ 
-                                        padding: '10px 24px', 
-                                        background: tab === 'new' ? PRIMARY_COLOR : 'transparent', 
-                                        color: tab === 'new' ? '#fff' : PRIMARY_COLOR, 
-                                        border: 'none', 
-                                        outline: 'none', 
-                                        cursor: 'pointer', 
-                                        transition: 'all 0.3s ease',
-                                        fontWeight: 600
-                                    }}
-                                >
-                                    Add New
-                                </button>
-                                <button 
-                                    type="button" 
-                                    onClick={() => handleTabSwitch(form.index, 'existing')} 
-                                    style={{ 
-                                        padding: '10px 24px', 
-                                        background: tab === 'existing' ? PRIMARY_COLOR : 'transparent', 
-                                        color: tab === 'existing' ? '#fff' : PRIMARY_COLOR, 
-                                        border: 'none', 
-                                        outline: 'none', 
-                                        cursor: 'pointer', 
-                                        transition: 'all 0.3s ease',
-                                        fontWeight: 600
-                                    }} 
-                                    disabled={eligible.length === 0}
-                                >
-                                    Select Existing
-                                </button>
+                                background: "rgba(255, 255, 255, 0.8)",
+                                boxShadow: `0 4px 15px ${PRIMARY_COLOR}18`,
+                              }}
+                            >
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleTabSwitch(form.index, "new")
+                                }
+                                style={{
+                                  padding: "10px 24px",
+                                  background:
+                                    tab === "new"
+                                      ? PRIMARY_COLOR
+                                      : "transparent",
+                                  color: tab === "new" ? "#fff" : PRIMARY_COLOR,
+                                  border: "none",
+                                  outline: "none",
+                                  cursor: "pointer",
+                                  transition: "all 0.3s ease",
+                                  fontWeight: 600,
+                                }}
+                              >
+                                Add New
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleTabSwitch(form.index, "existing")
+                                }
+                                style={{
+                                  padding: "10px 24px",
+                                  background:
+                                    tab === "existing"
+                                      ? PRIMARY_COLOR
+                                      : "transparent",
+                                  color:
+                                    tab === "existing" ? "#fff" : PRIMARY_COLOR,
+                                  border: "none",
+                                  outline: "none",
+                                  cursor: "pointer",
+                                  transition: "all 0.3s ease",
+                                  fontWeight: 600,
+                                }}
+                                disabled={eligible.length === 0}
+                              >
+                                Select Existing
+                              </button>
                             </div>
 
                             {/* Existing Member Dropdown */}
-                            {tab === 'existing' && eligible.length > 0 && !formSelections[form.index]?.showManualEntry && (
-                                <div className="form-group-upgraded" style={{ marginBottom: 16 }}>
-                                    <label style={{ 
-                                        fontWeight: 600, 
-                                        color: '#333',
-                                        marginBottom: 8,
-                                        display: 'block'
-                                    }}>
-                                        Select Existing Member:
-                                    </label>
-                                    <select
-                                        value={formSelections[form.index]?.selectedMemberId || ''}
-                                        onChange={e => handleFormDropdown(form.index, e.target.value)}
-                                        style={{ 
-                                            width: '100%', 
-                                            borderRadius: 12, 
-                                            border: `2px solid ${PRIMARY_COLOR}22`, 
-                                            padding: '12px 16px', 
-                                            background: 'rgba(255, 255, 255, 0.9)',
-                                            fontSize: 14,
-                                            fontWeight: 500,
-                                            transition: 'all 0.3s ease',
-                                            outline: 'none'
-                                        }}
-                                        onFocus={(e) => {
-                                            e.target.style.borderColor = PRIMARY_COLOR;
-                                            e.target.style.boxShadow = `0 0 0 3px ${PRIMARY_COLOR}18`;
-                                        }}
-                                        onBlur={(e) => {
-                                            e.target.style.borderColor = `${PRIMARY_COLOR}22`;
-                                            e.target.style.boxShadow = 'none';
-                                        }}
-                                    >
-                                        <option value="">-- Select --</option>
-                                        {eligible.map(member => (
-                                            <option key={member.user.id} value={member.user.id} disabled={existingMemberIds.includes(member.user.id)}>
-                                                {member.user.fullName} {member.user.userProfile && member.user.userProfile.gender ? `(${member.user.userProfile.gender}${member.user.userProfile.dob ? ', ' + member.user.userProfile.dob.split('T')[0] : ''})` : ''} {existingMemberIds.includes(member.user.id) ? '(Already in tree)' : ''}
-                                            </option>
-                                        ))}
-                                        <option value="manual">Add New Member</option>
-                                    </select>
+                            {tab === "existing" &&
+                              eligible.length > 0 &&
+                              !formSelections[form.index]?.showManualEntry && (
+                                <div
+                                  className="form-group-upgraded"
+                                  style={{ marginBottom: 16 }}
+                                >
+                                  <label
+                                    style={{
+                                      fontWeight: 600,
+                                      color: "#333",
+                                      marginBottom: 8,
+                                      display: "block",
+                                    }}
+                                  >
+                                    Select Existing Member:
+                                  </label>
+                                  <select
+                                    value={
+                                      formSelections[form.index]
+                                        ?.selectedMemberId || ""
+                                    }
+                                    onChange={(e) =>
+                                      handleFormDropdown(
+                                        form.index,
+                                        e.target.value
+                                      )
+                                    }
+                                    style={{
+                                      width: "100%",
+                                      borderRadius: 12,
+                                      border: `2px solid ${PRIMARY_COLOR}22`,
+                                      padding: "12px 16px",
+                                      background: "rgba(255, 255, 255, 0.9)",
+                                      fontSize: 14,
+                                      fontWeight: 500,
+                                      transition: "all 0.3s ease",
+                                      outline: "none",
+                                    }}
+                                    onFocus={(e) => {
+                                      e.target.style.borderColor =
+                                        PRIMARY_COLOR;
+                                      e.target.style.boxShadow = `0 0 0 3px ${PRIMARY_COLOR}18`;
+                                    }}
+                                    onBlur={(e) => {
+                                      e.target.style.borderColor = `${PRIMARY_COLOR}22`;
+                                      e.target.style.boxShadow = "none";
+                                    }}
+                                  >
+                                    <option value="">-- Select --</option>
+                                    {eligible.map((member) => (
+                                      <option
+                                        key={member.user.id}
+                                        value={member.user.id}
+                                        disabled={existingMemberIds.includes(
+                                          member.user.id
+                                        )}
+                                      >
+                                        {member.user.fullName}{" "}
+                                        {member.user.userProfile &&
+                                        member.user.userProfile.gender
+                                          ? `(${
+                                              member.user.userProfile.gender
+                                            }${
+                                              member.user.userProfile.dob
+                                                ? ", " +
+                                                  member.user.userProfile.dob.split(
+                                                    "T"
+                                                  )[0]
+                                                : ""
+                                            })`
+                                          : ""}{" "}
+                                        {existingMemberIds.includes(
+                                          member.user.id
+                                        )
+                                          ? "(Already in tree)"
+                                          : ""}
+                                      </option>
+                                    ))}
+                                    <option value="manual">
+                                      Add New Member
+                                    </option>
+                                  </select>
                                 </div>
-                            )}
+                              )}
 
                             {/* Manual entry for other types if needed */}
-                            {tab === 'new' && (
-                                <div className="person-form-upgraded" style={{ 
-                                    background: '#f6fdf7',
-                                    borderRadius: 16, 
-                                    marginBottom: 0, 
-                                    border: `1px solid ${PRIMARY_COLOR}10`
-                                }}>
-                                    {form.type === 'spouse' && (
-                                        <>
-                                            <h4 style={{ 
-                                                marginBottom: 16, 
-                                                fontWeight: 700, 
-                                                fontSize: 18,
-                                                color: '#333',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: 8
-                                            }}>
-                                                💕 Spouse
-                                            </h4>
+                            {tab === "new" && (
+                              <div
+                                className="person-form-upgraded"
+                                style={{
+                                  background: "#f6fdf7",
+                                  borderRadius: 16,
+                                  marginBottom: 0,
+                                  border: `1px solid ${PRIMARY_COLOR}10`,
+                                }}
+                              >
+                                {form.type === "spouse" && (
+                                  <>
+                                    <h4
+                                      style={{
+                                        marginBottom: 16,
+                                        fontWeight: 700,
+                                        fontSize: 18,
+                                        color: "#333",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 8,
+                                      }}
+                                    >
+                                      💕 Spouse
+                                    </h4>
 
-                                            {/* --- Mobile Invite Section --- */}
-                                            <div style={{ marginBottom: 20, background:'#fff', padding:16, borderRadius:12, border:`1px solid ${PRIMARY_COLOR}33` }}>
-                                                <label style={{ fontWeight:600, color:'#333', display:'block', marginBottom:6 }}>Invite Spouse by Mobile Number:</label>
-                                                <div style={{ display:'flex', gap:8 }}>
-                                                    <input
-                                                        type="text"
-                                                        placeholder="10-digit mobile"
-                                                        value={phoneInvite.phone}
-                                                        maxLength={10}
-                                                        onChange={e => setPhoneInvite(p => ({...p, phone: e.target.value}))}
-                                                        style={{ flex:1, borderRadius:8, padding:'10px 12px', border:`2px solid ${PRIMARY_COLOR}22`, outline:'none' }}
-                                                    />
-                                                    <button 
-                                                        type="button" 
-                                                        onClick={handlePhoneSearch} 
-                                                        disabled={!phoneRegex.test(phoneInvite.phone) || phoneInvite.loading}
-                                                        style={{ padding:'10px 18px', background:PRIMARY_COLOR, color:'#fff', border:'none', borderRadius:8, cursor:'pointer', fontWeight:600 }}
-                                                    >
-                                                        {phoneInvite.loading ? 'Searching...' : 'Search'}
-                                                    </button>
-                                                </div>
+                                    {/* --- Mobile Invite Section --- */}
+                                    <div
+                                      style={{
+                                        marginBottom: 20,
+                                        background: "#fff",
+                                        padding: 16,
+                                        borderRadius: 12,
+                                        border: `1px solid ${PRIMARY_COLOR}33`,
+                                      }}
+                                    >
+                                      <label
+                                        style={{
+                                          fontWeight: 600,
+                                          color: "#333",
+                                          display: "block",
+                                          marginBottom: 6,
+                                        }}
+                                      >
+                                        Invite Spouse by Mobile Number:
+                                      </label>
+                                      <div style={{ display: "flex", gap: 8 }}>
+                                        <input
+                                          type="text"
+                                          placeholder="10-digit mobile"
+                                          value={phoneInvite.phone}
+                                          maxLength={10}
+                                          onChange={(e) =>
+                                            setPhoneInvite((p) => ({
+                                              ...p,
+                                              phone: e.target.value,
+                                            }))
+                                          }
+                                          style={{
+                                            flex: 1,
+                                            borderRadius: 8,
+                                            padding: "10px 12px",
+                                            border: `2px solid ${PRIMARY_COLOR}22`,
+                                            outline: "none",
+                                          }}
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={handlePhoneSearch}
+                                          disabled={
+                                            !phoneRegex.test(
+                                              phoneInvite.phone
+                                            ) || phoneInvite.loading
+                                          }
+                                          style={{
+                                            padding: "10px 18px",
+                                            background: PRIMARY_COLOR,
+                                            color: "#fff",
+                                            border: "none",
+                                            borderRadius: 8,
+                                            cursor: "pointer",
+                                            fontWeight: 600,
+                                          }}
+                                        >
+                                          {phoneInvite.loading
+                                            ? "Searching..."
+                                            : "Search"}
+                                        </button>
+                                      </div>
 
-                                                {phoneInvite.result && (
-                                                    <div style={{ marginTop:12, fontSize:14 }}>
-                                                        {phoneInvite.result.exists ? (
-                                                            <>
-                                                                <div style={{ marginBottom: '10px' }}>
-                                                                    <span style={{ fontWeight:600 }}>User:</span> {phoneInvite.result.user.firstName} {phoneInvite.result.user.lastName}
-                                                                </div>
-                                                                <div style={{ marginBottom: '10px' }}>
-                                                                    <span style={{ fontWeight:600 }}>Family Code:</span> {phoneInvite.result.user.familyCode || 'N/A'}
-                                                                </div>
-                                                                 {!phoneInvite.result.sameFamily && (
-                                                                    <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                                                                        {/* Invite button hidden as requested */}
-                                                                        {/* <button 
+                                      {phoneInvite.result && (
+                                        <div
+                                          style={{
+                                            marginTop: 12,
+                                            fontSize: 14,
+                                          }}
+                                        >
+                                          {phoneInvite.result.exists ? (
+                                            <>
+                                              <div
+                                                style={{ marginBottom: "10px" }}
+                                              >
+                                                <span
+                                                  style={{ fontWeight: 600 }}
+                                                >
+                                                  User:
+                                                </span>{" "}
+                                                {
+                                                  phoneInvite.result.user
+                                                    .firstName
+                                                }{" "}
+                                                {
+                                                  phoneInvite.result.user
+                                                    .lastName
+                                                }
+                                              </div>
+                                              <div
+                                                style={{ marginBottom: "10px" }}
+                                              >
+                                                <span
+                                                  style={{ fontWeight: 600 }}
+                                                >
+                                                  Family Code:
+                                                </span>{" "}
+                                                {phoneInvite.result.user
+                                                  .familyCode || "N/A"}
+                                              </div>
+                                              {!phoneInvite.result
+                                                .sameFamily && (
+                                                <div
+                                                  style={{
+                                                    display: "flex",
+                                                    gap: "10px",
+                                                    marginTop: "10px",
+                                                  }}
+                                                >
+                                                  {/* Invite button hidden as requested */}
+                                                  {/* <button 
                                                                             type="button" 
                                                                             onClick={handleSendInvite} 
                                                                             disabled={phoneInvite.sending}
@@ -1142,340 +1290,477 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                                                             <Send size={16} />
                                                                             {phoneInvite.sending ? 'Sending...' : 'Invite'}
                                                                         </button> */}
-                                                                        <button 
-                                                                            type="button" 
-                                                                            onClick={handleSendRequest} 
-                                                                            disabled={phoneInvite.requesting}
-                                                                            title="Request to associate family"
-                                                                            style={{ 
-                                                                                padding: '8px 16px', 
-                                                                                background: '#2196F3', 
-                                                                                color: '#fff', 
-                                                                                border: 'none', 
-                                                                                borderRadius: 8, 
-                                                                                cursor: 'pointer', 
-                                                                                fontWeight: 600,
-                                                                                display: 'flex',
-                                                                                alignItems: 'center',
-                                                                                gap: '5px'
-                                                                            }}
-                                                                        >
-                                                                            <UserPlus size={16} />
-                                                                            {phoneInvite.requesting ? 'Requesting...' : 'Request'}
-                                                                        </button>
-                                                                    </div>
-                                                                )}
-                                                                {phoneInvite.result.sameFamily && (
-                                                                    <span style={{ color:PRIMARY_COLOR, fontWeight:600 }}>Already in same family</span>
-                                                                )}
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <span>No Familyss account found.</span><br/>
-                                                                <button 
-                                                                    type="button" 
-                                                                    onClick={handleSendInvite} 
-                                                                    disabled={phoneInvite.sending}
-                                                                    style={{ 
-                                                                        marginTop: 8, 
-                                                                        padding: '8px 16px', 
-                                                                        background: PRIMARY_COLOR, 
-                                                                        color: '#fff', 
-                                                                        border: 'none', 
-                                                                        borderRadius: 8, 
-                                                                        cursor: 'pointer', 
-                                                                        fontWeight: 600,
-                                                                        display: 'flex',
-                                                                        alignItems: 'center',
-                                                                        gap: '5px'
-                                                                    }}
-                                                                >
-                                                                    <Send size={16} />
-                                                                    {phoneInvite.sending ? 'Sending...' : 'Invite via WhatsApp'}
-                                                                </button>
-                                                            </>
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </>
-                                    )}
-                                {form.type === 'person' && (
-                                    <h4 style={{ 
-                                        marginBottom: 16, 
-                                        fontWeight: 700, 
-                                        fontSize: 18,
-                                        color: '#333',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: 8
-                                    }}>
-                                        👤 Person {form.index + 1}
-                                    </h4>
-                                )}
-                                 <div className="form-row-upgraded" style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
-                                    <div className="form-group-upgraded" style={{ flex: 1 }}>
-                                        <label style={{ 
-                                            fontWeight: 600, 
-                                            color: '#333',
-                                            marginBottom: 8,
-                                            display: 'block'
-                                        }}>
-                                            Name:
-                                        </label>
-                                        <input 
-                                            type="text" 
-                                            name={`name_${form.index}`}
-                                            defaultValue={action.type === 'edit' && action.person ? action.person.name : ''}
-                                            required 
-                                            style={{ 
-                                                width: '100%', 
-                                                borderRadius: 12, 
-                                                border: '2px solid rgba(102, 126, 234, 0.2)', 
-                                                padding: '12px 16px', 
-                                                background: 'rgba(255, 255, 255, 0.9)',
-                                                fontSize: 14,
-                                                fontWeight: 500,
-                                                transition: 'all 0.3s ease',
-                                                outline: 'none'
-                                            }}
-                                            onFocus={(e) => {
-                                                e.target.style.borderColor = '#667eea';
-                                                e.target.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
-                                            }}
-                                            onBlur={(e) => {
-                                                e.target.style.borderColor = 'rgba(102, 126, 234, 0.2)';
-                                                e.target.style.boxShadow = 'none';
-                                            }}
-                                        />
-                                        </div>
-                                        {form.type !== 'father' && form.type !== 'mother' && (
-                                            <div className="form-group-upgraded" style={{ flex: 1 }}>
-                                                <label style={{ 
-                                                    fontWeight: 600, 
-                                                    color: '#333',
-                                                    marginBottom: 8,
-                                                    display: 'block'
-                                                }}>
-                                                    Gender:
-                                                </label>
-                                                <select 
-                                                    name={`gender_${form.index}`} 
-                                                    defaultValue={action.type === 'edit' && action.person ? action.person.gender : (action.type === 'spouse' && action.person ? (action.person.gender === 'female' ? 'male' : 'female') : 'male')}
-                                                    style={{ 
-                                                        width: '100%', 
-                                                        borderRadius: 12, 
-                                                        border: '2px solid rgba(102, 126, 234, 0.2)', 
-                                                        padding: '12px 16px', 
-                                                        background: 'rgba(255, 255, 255, 0.9)',
-                                                        fontSize: 14,
-                                                        fontWeight: 500,
-                                                        transition: 'all 0.3s ease',
-                                                        outline: 'none'
+                                                  <button
+                                                    type="button"
+                                                    onClick={handleSendRequest}
+                                                    disabled={
+                                                      phoneInvite.requesting
+                                                    }
+                                                    title="Request to associate family"
+                                                    style={{
+                                                      padding: "8px 16px",
+                                                      background: "#2196F3",
+                                                      color: "#fff",
+                                                      border: "none",
+                                                      borderRadius: 8,
+                                                      cursor: "pointer",
+                                                      fontWeight: 600,
+                                                      display: "flex",
+                                                      alignItems: "center",
+                                                      gap: "5px",
                                                     }}
-                                                    onFocus={(e) => {
-                                                        e.target.style.borderColor = '#667eea';
-                                                        e.target.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
-                                                    }}
-                                                    onBlur={(e) => {
-                                                        e.target.style.borderColor = 'rgba(102, 126, 234, 0.2)';
-                                                        e.target.style.boxShadow = 'none';
-                                                    }}
-                                                >
-                                                    <option value="male">Male</option>
-                                                    <option value="female">Female</option>
-                                                </select>
-                                            </div>
-                                        )}
-                                        <div className="form-group-upgraded" style={{ flex: 1 }}>
-                                            <label style={{ 
-                                                fontWeight: 600, 
-                                                color: '#333',
-                                                marginBottom: 8,
-                                                display: 'block'
-                                            }}>
-                                                Life Status:
-                                            </label>
-                                            <select 
-                                                name={`lifeStatus_${form.index}`} 
-                                                defaultValue={action.type === 'edit' && action.person ? action.person.lifeStatus || 'living' : 'living'}
-                                                style={{ 
-                                                    width: '100%', 
-                                                    borderRadius: 12, 
-                                                    border: '2px solid rgba(102, 126, 234, 0.2)', 
-                                                    padding: '12px 16px', 
-                                                    background: 'rgba(255, 255, 255, 0.9)',
-                                                    fontSize: 14,
-                                                    fontWeight: 500,
-                                                    transition: 'all 0.3s ease',
-                                                    outline: 'none'
-                                                }}
-                                                onFocus={(e) => {
-                                                    e.target.style.borderColor = '#667eea';
-                                                    e.target.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
-                                                }}
-                                                onBlur={(e) => {
-                                                    e.target.style.borderColor = 'rgba(102, 126, 234, 0.2)';
-                                                    e.target.style.boxShadow = 'none';
-                                                }}
-                                            >
-                                                <option value="living">Living</option>
-                                                <option value="remembering">In Loving Memory</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div className="form-row-upgraded" style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
-                                        <div className="form-group-upgraded" style={{ flex: 1 }}>
-                                            <label style={{ 
-                                                fontWeight: 600, 
-                                                color: '#333',
-                                                marginBottom: 8,
-                                                display: 'block'
-                                            }}>
-                                                Age:
-                                            </label>
-                                            <input 
-                                                type="number" 
-                                                name={`age_${form.index}`}
-                                                min="0"
-                                                max="200"
-                                                defaultValue={action.type === 'edit' && action.person ? action.person.age : ''}
-                                                onInput={(e) => {
-                                                    if (e.target.value > 200) e.target.value = 200;
-                                                    if (e.target.value < 0) e.target.value = 0;
-                                                }}
-                                                style={{ 
-                                                    width: '100%', 
-                                                    borderRadius: 12, 
-                                                    border: '2px solid rgba(102, 126, 234, 0.2)', 
-                                                    padding: '12px 16px', 
-                                                    background: 'rgba(255, 255, 255, 0.9)',
-                                                    fontSize: 14,
-                                                    fontWeight: 500,
-                                                    transition: 'all 0.3s ease',
-                                                    outline: 'none'
-                                                }}
-                                                onFocus={(e) => {
-                                                    e.target.style.borderColor = '#667eea';
-                                                    e.target.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
-                                                }}
-                                                onBlur={(e) => {
-                                                    e.target.style.borderColor = 'rgba(102, 126, 234, 0.2)';
-                                                    e.target.style.boxShadow = 'none';
-                                                }}
-                                            />
-                                        </div>
-                                        {/* Birth Order Field for Siblings and Children */}
-                                        {(action.type === 'siblings' || action.type === 'children') && (
-                                            <div className="form-group-upgraded" style={{ flex: 1 }}>
-                                                <label style={{ 
-                                                    fontWeight: 600, 
-                                                    color: '#333',
-                                                    marginBottom: 8,
-                                                    display: 'block'
-                                                }}>
-                                                    Birth Order:
-                                                </label>
-                                                <input 
-                                                    type="number" 
-                                                    name={`birthOrder_${form.index}`}
-                                                    min="1"
-                                                    defaultValue="1"
-                                                    style={{ 
-                                                        width: '100%', 
-                                                        borderRadius: 12, 
-                                                        border: '2px solid rgba(102, 126, 234, 0.2)', 
-                                                        padding: '12px 16px', 
-                                                        background: 'rgba(255, 255, 255, 0.9)',
-                                                        fontSize: 14,
-                                                        fontWeight: 500,
-                                                        transition: 'all 0.3s ease',
-                                                        outline: 'none'
-                                                    }}
-                                                    onFocus={(e) => {
-                                                        e.target.style.borderColor = '#667eea';
-                                                        e.target.style.boxShadow = '0 0 0 3px rgba(102, 126, 234, 0.1)';
-                                                    }}
-                                                    onBlur={(e) => {
-                                                        e.target.style.borderColor = 'rgba(102, 126, 234, 0.2)';
-                                                        e.target.style.boxShadow = 'none';
-                                                    }}
-                                                />
-                                                <p style={{ 
-                                                    fontSize: 12, 
-                                                    color: '#666', 
-                                                    marginTop: 4,
-                                                    fontStyle: 'italic'
-                                                }}>
-                                                    Older sibling has lower number, younger sibling has higher number
-                                                </p>
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div className="form-row-upgraded" style={{ display: 'flex', gap: 16 }}>
-                                        <div className="form-group-upgraded" style={{ flex: 1 }}>
-                                            <label style={{ 
-                                                fontWeight: 600, 
-                                                color: '#333',
-                                                marginBottom: 8,
-                                                display: 'block'
-                                            }}>
-                                                Profile Image (optional):
-                                            </label>
-                                            <div style={{
-                                                position: 'relative',
-                                                display: 'inline-block',
-                                                cursor: 'pointer'
-                                            }}>
-                                                <input 
-                                                    type="file" 
-                                                    accept="image/*"
-                                                    onChange={(e) => handleImageUpload(e, form.index)}
-                                                    style={{ 
-                                                        position: 'absolute',
-                                                        opacity: 0,
-                                                        width: '100%',
-                                                        height: '100%',
-                                                        cursor: 'pointer'
-                                                    }}
-                                                />
-                                                <div style={{
-                                                    padding: '12px 20px',
-                                                    borderRadius: 12,
-                                                    border: '2px dashed rgba(102, 126, 234, 0.3)',
-                                                    background: 'rgba(102, 126, 234, 0.05)',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: 8,
-                                                    transition: 'all 0.3s ease',
-                                                    fontSize: 14,
-                                                    fontWeight: 500,
-                                                    color: '#667eea'
-                                                }}
-                                                onMouseEnter={(e) => {
-                                                    e.target.style.borderColor = '#667eea';
-                                                    e.target.style.background = 'rgba(102, 126, 234, 0.1)';
-                                                }}
-                                                onMouseLeave={(e) => {
-                                                    e.target.style.borderColor = 'rgba(102, 126, 234, 0.3)';
-                                                    e.target.style.background = 'rgba(102, 126, 234, 0.05)';
-                                                }}
-                                                >
-                                                    <Camera size={16} />
-                                                    Choose Image
+                                                  >
+                                                    <UserPlus size={16} />
+                                                    {phoneInvite.requesting
+                                                      ? "Requesting..."
+                                                      : "Request"}
+                                                  </button>
                                                 </div>
-                                            </div>
-                                            <input 
-                                                type="hidden" 
-                                                name={`img_data_${form.index}`}
-                                                value={imageData[form.index] || ''}
-                                            />
+                                              )}
+                                              {phoneInvite.result
+                                                .sameFamily && (
+                                                <span
+                                                  style={{
+                                                    color: PRIMARY_COLOR,
+                                                    fontWeight: 600,
+                                                  }}
+                                                >
+                                                  Already in same family
+                                                </span>
+                                              )}
+                                            </>
+                                          ) : (
+                                            <>
+                                              <span>
+                                                No Familyss account found.
+                                              </span>
+                                              <br />
+                                              <button
+                                                type="button"
+                                                onClick={handleSendInvite}
+                                                disabled={phoneInvite.sending}
+                                                style={{
+                                                  marginTop: 8,
+                                                  padding: "8px 16px",
+                                                  background: PRIMARY_COLOR,
+                                                  color: "#fff",
+                                                  border: "none",
+                                                  borderRadius: 8,
+                                                  cursor: "pointer",
+                                                  fontWeight: 600,
+                                                  display: "flex",
+                                                  alignItems: "center",
+                                                  gap: "5px",
+                                                }}
+                                              >
+                                                <Send size={16} />
+                                                {phoneInvite.sending
+                                                  ? "Sending..."
+                                                  : "Invite via WhatsApp"}
+                                              </button>
+                                            </>
+                                          )}
                                         </div>
+                                      )}
                                     </div>
+                                  </>
+                                )}
+                                {form.type === "person" && (
+                                  <h4
+                                    style={{
+                                      marginBottom: 16,
+                                      fontWeight: 700,
+                                      fontSize: 18,
+                                      color: "#333",
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: 8,
+                                    }}
+                                  >
+                                    👤 Person {form.index + 1}
+                                  </h4>
+                                )}
+                                <div
+                                  className="form-row-upgraded"
+                                  style={{
+                                    display: "flex",
+                                    gap: 16,
+                                    marginBottom: 16,
+                                  }}
+                                >
+                                  <div
+                                    className="form-group-upgraded"
+                                    style={{ flex: 1 }}
+                                  >
+                                    <label
+                                      style={{
+                                        fontWeight: 600,
+                                        color: "#333",
+                                        marginBottom: 8,
+                                        display: "block",
+                                      }}
+                                    >
+                                      Name:
+                                    </label>
+                                    <input
+                                      type="text"
+                                      name={`name_${form.index}`}
+                                      defaultValue={
+                                        action.type === "edit" && action.person
+                                          ? action.person.name
+                                          : ""
+                                      }
+                                      required
+                                      style={{
+                                        width: "100%",
+                                        borderRadius: 12,
+                                        border:
+                                          "2px solid rgba(102, 126, 234, 0.2)",
+                                        padding: "12px 16px",
+                                        background: "rgba(255, 255, 255, 0.9)",
+                                        fontSize: 14,
+                                        fontWeight: 500,
+                                        transition: "all 0.3s ease",
+                                        outline: "none",
+                                      }}
+                                      onFocus={(e) => {
+                                        e.target.style.borderColor = "#667eea";
+                                        e.target.style.boxShadow =
+                                          "0 0 0 3px rgba(102, 126, 234, 0.1)";
+                                      }}
+                                      onBlur={(e) => {
+                                        e.target.style.borderColor =
+                                          "rgba(102, 126, 234, 0.2)";
+                                        e.target.style.boxShadow = "none";
+                                      }}
+                                    />
+                                  </div>
+                                  {form.type !== "father" &&
+                                    form.type !== "mother" && (
+                                      <div
+                                        className="form-group-upgraded"
+                                        style={{ flex: 1 }}
+                                      >
+                                        <label
+                                          style={{
+                                            fontWeight: 600,
+                                            color: "#333",
+                                            marginBottom: 8,
+                                            display: "block",
+                                          }}
+                                        >
+                                          Gender:
+                                        </label>
+                                        <select
+                                          name={`gender_${form.index}`}
+                                          defaultValue={
+                                            action.type === "edit" &&
+                                            action.person
+                                              ? action.person.gender
+                                              : action.type === "spouse" &&
+                                                action.person
+                                              ? action.person.gender ===
+                                                "female"
+                                                ? "male"
+                                                : "female"
+                                              : "male"
+                                          }
+                                          style={{
+                                            width: "100%",
+                                            borderRadius: 12,
+                                            border:
+                                              "2px solid rgba(102, 126, 234, 0.2)",
+                                            padding: "12px 16px",
+                                            background:
+                                              "rgba(255, 255, 255, 0.9)",
+                                            fontSize: 14,
+                                            fontWeight: 500,
+                                            transition: "all 0.3s ease",
+                                            outline: "none",
+                                          }}
+                                          onFocus={(e) => {
+                                            e.target.style.borderColor =
+                                              "#667eea";
+                                            e.target.style.boxShadow =
+                                              "0 0 0 3px rgba(102, 126, 234, 0.1)";
+                                          }}
+                                          onBlur={(e) => {
+                                            e.target.style.borderColor =
+                                              "rgba(102, 126, 234, 0.2)";
+                                            e.target.style.boxShadow = "none";
+                                          }}
+                                        >
+                                          <option value="male">Male</option>
+                                          <option value="female">Female</option>
+                                        </select>
+                                      </div>
+                                    )}
+                                  <div
+                                    className="form-group-upgraded"
+                                    style={{ flex: 1 }}
+                                  >
+                                    <label
+                                      style={{
+                                        fontWeight: 600,
+                                        color: "#333",
+                                        marginBottom: 8,
+                                        display: "block",
+                                      }}
+                                    >
+                                      Life Status:
+                                    </label>
+                                    <select
+                                      name={`lifeStatus_${form.index}`}
+                                      defaultValue={
+                                        action.type === "edit" && action.person
+                                          ? action.person.lifeStatus || "living"
+                                          : "living"
+                                      }
+                                      style={{
+                                        width: "100%",
+                                        borderRadius: 12,
+                                        border:
+                                          "2px solid rgba(102, 126, 234, 0.2)",
+                                        padding: "12px 16px",
+                                        background: "rgba(255, 255, 255, 0.9)",
+                                        fontSize: 14,
+                                        fontWeight: 500,
+                                        transition: "all 0.3s ease",
+                                        outline: "none",
+                                      }}
+                                      onFocus={(e) => {
+                                        e.target.style.borderColor = "#667eea";
+                                        e.target.style.boxShadow =
+                                          "0 0 0 3px rgba(102, 126, 234, 0.1)";
+                                      }}
+                                      onBlur={(e) => {
+                                        e.target.style.borderColor =
+                                          "rgba(102, 126, 234, 0.2)";
+                                        e.target.style.boxShadow = "none";
+                                      }}
+                                    >
+                                      <option value="living">Living</option>
+                                      <option value="remembering">
+                                        In Loving Memory
+                                      </option>
+                                    </select>
+                                  </div>
                                 </div>
+                                <div
+                                  className="form-row-upgraded"
+                                  style={{
+                                    display: "flex",
+                                    gap: 16,
+                                    marginBottom: 16,
+                                  }}
+                                >
+                                  <div
+                                    className="form-group-upgraded"
+                                    style={{ flex: 1 }}
+                                  >
+                                    <label
+                                      style={{
+                                        fontWeight: 600,
+                                        color: "#333",
+                                        marginBottom: 8,
+                                        display: "block",
+                                      }}
+                                    >
+                                      Age:
+                                    </label>
+                                    <input
+                                      type="number"
+                                      name={`age_${form.index}`}
+                                      min="0"
+                                      max="200"
+                                      defaultValue={
+                                        action.type === "edit" && action.person
+                                          ? action.person.age
+                                          : ""
+                                      }
+                                      onInput={(e) => {
+                                        // Convert to number to remove leading zeros
+                                        let v = e.target.value;
+
+                                        // If user types 00006 → Number(v) = 6
+                                        if (v !== "") {
+                                          v = String(Number(v));
+                                        }
+
+                                        // Apply limits
+                                        if (v > 200) v = "200";
+                                        if (v < 0) v = "0";
+
+                                        e.target.value = v;
+                                      }}
+                                      style={{
+                                        width: "100%",
+                                        borderRadius: 12,
+                                        border:
+                                          "2px solid rgba(102, 126, 234, 0.2)",
+                                        padding: "12px 16px",
+                                        background: "rgba(255, 255, 255, 0.9)",
+                                        fontSize: 14,
+                                        fontWeight: 500,
+                                        transition: "all 0.3s ease",
+                                        outline: "none",
+                                      }}
+                                      onFocus={(e) => {
+                                        e.target.style.borderColor = "#667eea";
+                                        e.target.style.boxShadow =
+                                          "0 0 0 3px rgba(102, 126, 234, 0.1)";
+                                      }}
+                                      onBlur={(e) => {
+                                        e.target.style.borderColor =
+                                          "rgba(102, 126, 234, 0.2)";
+                                        e.target.style.boxShadow = "none";
+                                      }}
+                                    />
+                                  </div>
+                                  {/* Birth Order Field for Siblings and Children */}
+                                  {(action.type === "siblings" ||
+                                    action.type === "children") && (
+                                    <div
+                                      className="form-group-upgraded"
+                                      style={{ flex: 1 }}
+                                    >
+                                      <label
+                                        style={{
+                                          fontWeight: 600,
+                                          color: "#333",
+                                          marginBottom: 8,
+                                          display: "block",
+                                        }}
+                                      >
+                                        Birth Order:
+                                      </label>
+                                      <input
+                                        type="number"
+                                        name={`birthOrder_${form.index}`}
+                                        min="1"
+                                        defaultValue="1"
+                                        style={{
+                                          width: "100%",
+                                          borderRadius: 12,
+                                          border:
+                                            "2px solid rgba(102, 126, 234, 0.2)",
+                                          padding: "12px 16px",
+                                          background:
+                                            "rgba(255, 255, 255, 0.9)",
+                                          fontSize: 14,
+                                          fontWeight: 500,
+                                          transition: "all 0.3s ease",
+                                          outline: "none",
+                                        }}
+                                        onFocus={(e) => {
+                                          e.target.style.borderColor =
+                                            "#667eea";
+                                          e.target.style.boxShadow =
+                                            "0 0 0 3px rgba(102, 126, 234, 0.1)";
+                                        }}
+                                        onBlur={(e) => {
+                                          e.target.style.borderColor =
+                                            "rgba(102, 126, 234, 0.2)";
+                                          e.target.style.boxShadow = "none";
+                                        }}
+                                      />
+                                      <p
+                                        style={{
+                                          fontSize: 12,
+                                          color: "#666",
+                                          marginTop: 4,
+                                          fontStyle: "italic",
+                                        }}
+                                      >
+                                        Older sibling has lower number, younger
+                                        sibling has higher number
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+                                <div
+                                  className="form-row-upgraded"
+                                  style={{ display: "flex", gap: 16 }}
+                                >
+                                  <div
+                                    className="form-group-upgraded"
+                                    style={{ flex: 1 }}
+                                  >
+                                    <label
+                                      style={{
+                                        fontWeight: 600,
+                                        color: "#333",
+                                        marginBottom: 8,
+                                        display: "block",
+                                      }}
+                                    >
+                                      Profile Image (optional):
+                                    </label>
+                                    <div
+                                      style={{
+                                        position: "relative",
+                                        display: "inline-block",
+                                        cursor: "pointer",
+                                      }}
+                                    >
+                                      <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) =>
+                                          handleImageUpload(e, form.index)
+                                        }
+                                        style={{
+                                          position: "absolute",
+                                          opacity: 0,
+                                          width: "100%",
+                                          height: "100%",
+                                          cursor: "pointer",
+                                        }}
+                                      />
+                                      <div
+                                        style={{
+                                          padding: "12px 20px",
+                                          borderRadius: 12,
+                                          border:
+                                            "2px dashed rgba(102, 126, 234, 0.3)",
+                                          background:
+                                            "rgba(102, 126, 234, 0.05)",
+                                          display: "flex",
+                                          alignItems: "center",
+                                          gap: 8,
+                                          transition: "all 0.3s ease",
+                                          fontSize: 14,
+                                          fontWeight: 500,
+                                          color: "#667eea",
+                                        }}
+                                        onMouseEnter={(e) => {
+                                          e.target.style.borderColor =
+                                            "#667eea";
+                                          e.target.style.background =
+                                            "rgba(102, 126, 234, 0.1)";
+                                        }}
+                                        onMouseLeave={(e) => {
+                                          e.target.style.borderColor =
+                                            "rgba(102, 126, 234, 0.3)";
+                                          e.target.style.background =
+                                            "rgba(102, 126, 234, 0.05)";
+                                        }}
+                                      >
+                                        <Camera size={16} />
+                                        Choose Image
+                                      </div>
+                                    </div>
+                                    <input
+                                      type="hidden"
+                                      name={`img_data_${form.index}`}
+                                      value={imageData[form.index] || ""}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
                             )}
-                        </div>
-                    );})}
+                          </div>
+                        );})}
 
                     {/* Modal Footer */}
                     <div className="modal-buttons-upgraded" style={{ 

@@ -1581,49 +1581,69 @@ const FamilyTreePage = () => {
           {/* Desktop Header */}
           {canEdit && (
             <div className="hidden sm:flex w-full bg-white border-b-2 border-gray-100 shadow-sm z-40">
-              <div className="w-full max-w-none 2xl:max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
-                <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-3 lg:gap-6">
-                  <div className="flex items-center justify-center lg:justify-start gap-3 xl:gap-6 flex-wrap">
+              <div className="w-full max-w-none 2xl:max-w-7xl mx-auto px-4 sm:px-6 py-2.5 sm:py-3">
+                <div className="flex items-center justify-between gap-3 lg:gap-5">
+                  {/* LEFT: back + stats (compact, responsive labels) */}
+                  <div className="flex items-center gap-3 lg:gap-5 flex-shrink-0">
                     {code && code !== userInfo.familyCode && (
                       <div className="flex items-center gap-2 pr-3 border-r border-gray-300">
                         <button
-                          className="inline-flex items-center justify-center w-9 h-9 bg-gray-100 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-200 hover:border-gray-400 active:scale-95 transition-all duration-200 shadow-sm"
+                          className="inline-flex items-center justify-center w-8 h-8 bg-gray-100 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-200 hover:border-gray-400 active:scale-95 transition-all duration-200 shadow-sm"
                           onClick={() => navigate(-1)}
                           title="Back"
                         >
-                          <FaArrowLeft className="text-sm" />
+                          <FaArrowLeft className="text-xs" />
                         </button>
                         <button
-                          className="inline-flex items-center justify-center w-9 h-9 bg-blue-600 border border-blue-600 text-white rounded-lg hover:bg-blue-700 active:scale-95 transition-all duration-200 shadow-sm"
+                          className="inline-flex items-center justify-center w-8 h-8 bg-blue-600 border border-blue-600 text-white rounded-lg hover:bg-blue-700 active:scale-95 transition-all duration-200 shadow-sm"
                           onClick={() => navigate("/family-tree")}
                           title="My Birth Family Tree"
                         >
-                          <FaHome className="text-sm" />
+                          <FaHome className="text-xs" />
                         </button>
                       </div>
                     )}
 
-                    <div className="flex items-center gap-6 text-sm">
+                    <div className="flex items-center gap-3 text-xs md:text-sm">
+                      {/* Total */}
                       <span className="text-gray-700">
-                        <span className="font-medium">Total:</span>{" "}
+                        <span className="font-medium">
+                          <span className="hidden md:inline">Total</span>
+                          <span className="inline md:hidden">T</span>:
+                        </span>{" "}
                         <span className="font-bold text-gray-900">
                           {stats.total}
                         </span>
                       </span>
+
+                      {/* Male */}
                       <span className="text-gray-700">
-                        <span className="font-medium">Male:</span>{" "}
+                        <span className="font-medium">
+                          <span className="hidden md:inline">Male</span>
+                          <span className="inline md:hidden">M</span>:
+                        </span>{" "}
                         <span className="font-bold text-gray-900">
                           {stats.male}
                         </span>
                       </span>
+
+                      {/* Female */}
                       <span className="text-gray-700">
-                        <span className="font-medium">Female:</span>{" "}
+                        <span className="font-medium">
+                          <span className="hidden md:inline">Female</span>
+                          <span className="inline md:hidden">F</span>:
+                        </span>{" "}
                         <span className="font-bold text-gray-900">
                           {stats.female}
                         </span>
                       </span>
+
+                      {/* Generations */}
                       <span className="text-gray-700">
-                        <span className="font-medium">Generations:</span>{" "}
+                        <span className="font-medium">
+                          <span className="hidden md:inline">Generations</span>
+                          <span className="inline md:hidden">G</span>:
+                        </span>{" "}
                         <span className="font-bold text-gray-900">
                           {stats.generations}
                         </span>
@@ -1631,51 +1651,73 @@ const FamilyTreePage = () => {
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-center lg:justify-end gap-3 lg:gap-4 flex-shrink-0">
-                    <div className="flex items-center">
+                  {/* RIGHT: language + search + actions */}
+                  <div className="flex items-center gap-2 md:gap-3 flex-1 justify-end min-w-0">
+                    <div className="flex items-center flex-shrink-0">
                       <LanguageSwitcher />
                     </div>
 
-                    <SearchBar
-                      tree={tree}
-                      onSearchResults={handleSearchResults}
-                      onFocusPerson={handleFocusPerson}
-                      onClearSearch={handleClearSearch}
-                      language={language}
-                    />
+                    <div className="flex-1 min-w-[140px] max-w-sm">
+                      <SearchBar
+                        tree={tree}
+                        onSearchResults={handleSearchResults}
+                        onFocusPerson={handleFocusPerson}
+                        onClearSearch={handleClearSearch}
+                        language={language}
+                      />
+                    </div>
 
-                    <div className="w-px h-8 bg-gray-300"></div>
-
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      {/* New Tree */}
                       <button
-                        className="flex items-center gap-1.5 px-3 py-2 bg-white border-2 border-green-600 text-green-600 rounded-lg hover:bg-green-50 text-sm font-semibold active:scale-95 transition-all duration-200 shadow-sm"
+                        className="flex items-center gap-1 px-2.5 py-2 bg-white border-2 border-green-600 text-green-600 rounded-lg hover:bg-green-50 text-xs font-semibold active:scale-95 transition-all duration-200 shadow-sm"
                         onClick={resetTree}
                       >
-                        <FaPlus className="text-sm" />
-                        <span>New Tree</span>
+                        <FaPlus className="text-xs" />
+                        <span className="whitespace-nowrap">
+                          <span className="hidden md:inline">New Tree</span>
+                          <span className="inline md:hidden">New</span>
+                        </span>
                       </button>
-                      <button
-                        className="flex items-center gap-1.5 px-3 py-2 bg-purple-600 border-2 border-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-semibold active:scale-95 transition-all duration-200 shadow-sm"
-                        onClick={() => navigate("/merge-family")}
-                      >
-                        <span>Merge Family Tree</span>
-                      </button>
-                      {hasPendingMerge && (
+
+                      {/* Merge + Execute */}
+                      <div className="flex items-center gap-1">
                         <button
-                          className="flex items-center gap-1.5 px-3 py-2 bg-red-600 border-2 border-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-semibold active:scale-95 transition-all duration-200 shadow-sm"
-                          onClick={handleExecuteMergeFromTree}
+                          className="flex items-center gap-1 px-2.5 py-2 bg-purple-600 border-2 border-purple-600 text-white rounded-lg hover:bg-purple-700 text-xs font-semibold active:scale-95 transition-all duration-200 shadow-sm"
+                          onClick={() => navigate("/merge-family")}
                         >
-                          <span>Execute Merge</span>
+                          <span className="whitespace-nowrap">
+                            <span className="hidden md:inline">
+                              Merge Family
+                            </span>
+                            <span className="inline md:hidden">Merge</span>
+                          </span>
                         </button>
-                      )}
+
+                        {hasPendingMerge && (
+                          <button
+                            className="flex items-center gap-1 px-2 py-1.5 bg-red-600 border-2 border-red-600 text-white rounded-lg hover:bg-red-700 text-[11px] font-semibold active:scale-95 transition-all duration-200 shadow-sm"
+                            onClick={handleExecuteMergeFromTree}
+                          >
+                            <span className="whitespace-nowrap">
+                              <span className="hidden md:inline">
+                                Execute Merge
+                              </span>
+                              <span className="inline md:hidden">Exec</span>
+                            </span>
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Save */}
                       <button
-                        className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 border-2 border-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-semibold active:scale-95 transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed shadow-sm"
+                        className="flex items-center gap-1 px-2.5 py-2 bg-blue-600 border-2 border-blue-600 text-white rounded-lg hover:bg-blue-700 text-xs font-semibold active:scale-95 transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed shadow-sm"
                         onClick={saveTreeToApi}
                         disabled={saveStatus === "loading"}
                       >
                         {saveStatus === "loading" && (
                           <svg
-                            className="animate-spin h-4 w-4 text-white"
+                            className="animate-spin h-3.5 w-3.5 text-white"
                             xmlns="http://www.w3.org/2000/svg"
                             fill="none"
                             viewBox="0 0 24 24"
@@ -1695,8 +1737,8 @@ const FamilyTreePage = () => {
                             ></path>
                           </svg>
                         )}
-                        <FaSave className="text-sm" />
-                        <span>Save</span>
+                        <FaSave className="text-xs" />
+                        <span className="whitespace-nowrap">Save</span>
                       </button>
                     </div>
                   </div>
@@ -1704,7 +1746,7 @@ const FamilyTreePage = () => {
               </div>
             </div>
           )}
-          
+
           {/* Mobile Top Header - View Mode */}
           {!canEdit && (
             <>
