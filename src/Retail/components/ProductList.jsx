@@ -4,6 +4,7 @@ import { useRetail } from '../context/RetailContext';
 import ProductCard from './ProductCard';
 import ProductDetail from './ProductDetail';
 import { getVariantPriceAmount } from '../utils/helpers';
+import { ArrowLeft } from 'lucide-react';
 
 const ProductList = () => {
   const { products, fetchProducts, loading, error, addToCart } = useRetail();
@@ -158,7 +159,7 @@ const ProductList = () => {
         </div>
       )}
 
-      {showSkeleton && (
+      {showSkeleton && !detailOpen && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {Array.from({ length: 8 }).map((_, idx) => (
             <div
@@ -174,7 +175,7 @@ const ProductList = () => {
         </div>
       )}
 
-      {!showSkeleton && filteredProducts.length > 0 && (
+      {!showSkeleton && filteredProducts.length > 0 && !detailOpen && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filteredProducts.map((product) => (
             <ProductCard
@@ -184,6 +185,33 @@ const ProductList = () => {
               onAddToCart={handleAddToCart}
             />
           ))}
+        </div>
+      )}
+
+      {!showSkeleton && filteredProducts.length > 0 && detailOpen && selectedProduct && (
+        <div className="mt-2 space-y-3">
+          <button
+            type="button"
+            onClick={() => {
+              setDetailOpen(false);
+              setSelectedProduct(null);
+            }}
+            className="inline-flex bg-white items-center rounded-full border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:border-blue-400 hover:text-blue-700"
+          >
+              <ArrowLeft size={14} />
+            Back to products
+          </button>
+
+          <ProductDetail
+            product={selectedProduct}
+            isOpen
+            onClose={() => {
+              setDetailOpen(false);
+              setSelectedProduct(null);
+            }}
+            onAddToCart={handleAddToCart}
+            mode="page"
+          />
         </div>
       )}
 
@@ -210,19 +238,12 @@ const ProductList = () => {
         </div>
       )}
 
-      {loading && products.length > 0 && (
+      {loading && products.length > 0 && !detailOpen && (
         <div className="mt-4 flex items-center justify-center gap-2 text-xs text-gray-500">
           <FiLoader className="animate-spin" />
           <span>Refreshing products...</span>
         </div>
       )}
-
-      <ProductDetail
-        product={selectedProduct}
-        isOpen={detailOpen}
-        onClose={() => setDetailOpen(false)}
-        onAddToCart={handleAddToCart}
-      />
     </section>
   );
 };

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { FiShoppingCart, FiEye, FiCheckCircle } from 'react-icons/fi';
+import { FiShoppingCart, FiCheckCircle } from 'react-icons/fi';
 import { formatAmount, getProductDefaultVariant, getProductThumbnail, getVariantPriceAmount } from '../utils/helpers';
 
 const ProductCard = ({ product, onViewDetails, onAddToCart }) => {
@@ -16,8 +16,8 @@ const ProductCard = ({ product, onViewDetails, onAddToCart }) => {
   }, [defaultVariant]);
 
   const [selectedOptions, setSelectedOptions] = useState(initialOptions);
-  const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
+  const [adding, setAdding] = useState(false);
 
   const currentVariant = useMemo(() => {
     if (!Array.isArray(product.variants) || product.variants.length === 0) {
@@ -58,17 +58,15 @@ const ProductCard = ({ product, onViewDetails, onAddToCart }) => {
   };
 
   const handleAddToCart = async () => {
-    if (!currentVariant || !onAddToCart || !inStock) return;
-    await onAddToCart(currentVariant.id, quantity);
-    setAdded(true);
-    setTimeout(() => setAdded(false), 2000);
-  };
-
-  const handleQuantityChange = (delta) => {
-    setQuantity((prev) => {
-      const next = Math.min(Math.max(prev + delta, 1), 10);
-      return next;
-    });
+    if (!currentVariant || !onAddToCart || !inStock || adding) return;
+    try {
+      setAdding(true);
+      await onAddToCart(currentVariant.id, 1);
+      setAdded(true);
+      setTimeout(() => setAdded(false), 2000);
+    } finally {
+      setAdding(false);
+    }
   };
 
   const options = Array.isArray(product.options) ? product.options : [];
@@ -92,9 +90,9 @@ const ProductCard = ({ product, onViewDetails, onAddToCart }) => {
       tabIndex={0}
       onClick={handleCardClick}
       onKeyDown={handleCardKeyDown}
-      className="group flex flex-col overflow-hidden rounded-lg bg-white text-left shadow-md outline-none ring-0 transition-transform duration-200 hover:scale-105 hover:shadow-xl focus-visible:ring-2 focus-visible:ring-blue-500"
+      className="group flex flex-col overflow-hidden rounded-lg bg-white text-left shadow-md outline-none ring-0 transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-blue-500"
     >
-      <div className="relative aspect-square w-full overflow-hidden bg-gray-100">
+      <div className="relative aspect-[2/3] w-full overflow-hidden bg-gray-100">
         <img
           src={image}
           alt={product.title}
@@ -114,106 +112,39 @@ const ProductCard = ({ product, onViewDetails, onAddToCart }) => {
           {product.collection?.title || 'Featured'}
         </div>
       </div>
-      <div className="flex flex-1 flex-col p-4">
-        <div className="mb-2 flex flex-1 flex-col">
-          <h3 className="mb-1 line-clamp-2 text-sm font-semibold text-gray-900">{product.title}</h3>
-          {product.subtitle && (
-            <p className="mb-1 line-clamp-1 text-xs text-gray-500">{product.subtitle}</p>
-          )}
-          <p className="mt-1 text-lg font-bold text-blue-600">{formatAmount(priceAmount)}</p>
-        </div>
-
-        {options.length > 0 && (
-          <div className="mb-3 space-y-2">
-            {options.map((option) => (
-              <div key={option.id} className="flex flex-col gap-1">
-                <span className="text-[11px] font-medium text-gray-600">{option.title}</span>
-                <div className="flex flex-wrap gap-1.5">
-                  {option.values?.map((value) => {
-                    const selected = selectedOptions[option.id] === value.value;
-                    return (
-                      <button
-                        key={value.id || value.value}
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOptionChange(option.id, value.value);
-                        }}
-                        className={`rounded-full border px-2.5 py-1 text-[11px] font-medium transition ${
-                          selected
-                            ? 'border-blue-500 bg-blue-50 text-blue-700'
-                            : 'border-gray-200 bg-white text-gray-700 hover:border-blue-300 hover:text-blue-600'
-                        }`}
-                      >
-                        {value.value}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
+      <div className="flex flex-1 flex-col p-2.5">
+        <h3 className="mb-0.5 line-clamp-2 text-[13px] font-semibold text-gray-900">{product.title}</h3>
+        {product.subtitle ? (
+          <p className="mb-0.5 line-clamp-1 text-[11px] text-gray-500">{product.subtitle}</p>
+        ) : (
+          product.description && (
+            <p className="mb-0.5 line-clamp-2 text-[11px] text-gray-500">
+              {product.description}
+            </p>
+          )
         )}
-
-        <div className="mt-auto flex items-center justify-between gap-3 pt-2">
-          <div className="inline-flex items-center rounded-full border border-gray-200 bg-gray-50 px-2 text-xs text-gray-600">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleQuantityChange(-1);
-              }}
-              disabled={quantity <= 1}
-              className="px-2 text-gray-500 disabled:opacity-40"
-            >
-              -
-            </button>
-            <span className="min-w-[1.5rem] text-center font-semibold">{quantity}</span>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleQuantityChange(1);
-              }}
-              disabled={quantity >= 10}
-              className="px-2 text-gray-500 disabled:opacity-40"
-            >
-              +
-            </button>
-          </div>
-
-          <div className="flex flex-col items-end gap-1 text-xs">
-            <span className="text-[11px] text-gray-500">
-              {Array.isArray(product.variants) && product.variants.length > 0
-                ? `${product.variants.length} variant${product.variants.length === 1 ? '' : 's'}`
-                : 'No variants'}
-            </span>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-blue-600 group-hover:text-blue-700">
-                View Details 
-              </span>
-              <button
-                type="button"
-                disabled={!inStock}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleAddToCart();
-                }}
-                className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold shadow-sm transition ${
-                  inStock
-                    ? 'bg-orange-500 text-white hover:bg-orange-600'
-                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                }`}
-              >
-                {added ? <FiCheckCircle className="text-xs" /> : <FiShoppingCart className="text-xs" />}
-                <span>{added ? 'Added' : 'Add to cart'}</span>
-              </button>
-            </div>
-          </div>
+        <div className="mt-1.5 flex items-center justify-between">
+          <p className="text-sm font-bold text-blue-600">{formatAmount(priceAmount)}</p>
+          <button
+            type="button"
+            disabled={!inStock || adding}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleAddToCart();
+            }}
+            className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-[11px] font-semibold shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed ${
+              inStock
+                ? 'bg-orange-500 text-white hover:bg-orange-600'
+                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+            }`}
+          >
+            {added ? <FiCheckCircle className="text-xs" /> : <FiShoppingCart className="text-xs" />}
+            <span>{added ? 'Added' : 'Add to cart'}</span>
+          </button>
         </div>
       </div>
     </div>
   );
-};
+}
 
 export default ProductCard;

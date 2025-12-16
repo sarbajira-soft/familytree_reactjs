@@ -364,7 +364,7 @@ const Profile = () => {
                   <button
                     type="button"
                     onClick={() => handleEditAddress(addr)}
-                    className="inline-flex items-center gap-1 rounded-full border border-gray-200 px-2 py-0.5 text-[10px] text-gray-600 hover:border-blue-400 hover:text-blue-600"
+                    className="inline-flex items-center bg-white gap-1 rounded-full border border-gray-200 px-2 py-0.5 text-[10px] text-gray-600 hover:border-blue-400 hover:text-blue-600"
                     disabled={addressSaving}
                   >
                     <FiEdit2 className="text-[10px]" /> Edit
@@ -372,7 +372,7 @@ const Profile = () => {
                   <button
                     type="button"
                     onClick={() => handleDeleteAddress(addr.id)}
-                    className="inline-flex items-center gap-1 rounded-full border border-red-200 px-2 py-0.5 text-[10px] text-red-600 hover:bg-red-50"
+                    className="inline-flex items-center gap-1 bg-white rounded-full border border-red-200 px-2 py-0.5 text-[10px] text-red-600 hover:bg-red-50"
                     disabled={addressSaving}
                   >
                     <FiTrash2 className="text-[10px]" /> Delete
@@ -394,7 +394,7 @@ const Profile = () => {
                   <button
                     type="button"
                     onClick={handleAddressClear}
-                    className="text-[11px] text-gray-500 hover:text-gray-700"
+                    className="text-[11px] bg-white text-gray-500 hover:text-gray-700"
                     disabled={addressSaving}
                   >
                     Clear
@@ -403,7 +403,7 @@ const Profile = () => {
                 <button
                   type="button"
                   onClick={handleAddressCancel}
-                  className="text-[11px] text-gray-500 hover:text-gray-700"
+                  className="text-[11px] bg-white text-gray-500 hover:text-gray-700"
                   disabled={addressSaving}
                 >
                   Cancel

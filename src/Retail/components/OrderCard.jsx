@@ -23,7 +23,7 @@ const StatusBadge = ({ label, status }) => {
   );
 };
 
-const OrderCard = ({ order, onViewDetails, onReorder }) => {
+const OrderCard = ({ order, onViewDetails, onReorder, isReordering }) => {
   const createdAt = order.created_at || order.createdAt || order.created_at;
   const dateLabel = createdAt ? new Date(createdAt).toLocaleDateString('en-IN') : '';
 
@@ -74,14 +74,15 @@ const OrderCard = ({ order, onViewDetails, onReorder }) => {
           <button
             type="button"
             onClick={() => onReorder?.(order)}
-            className="inline-flex items-center rounded-full border border-orange-400 px-2.5 py-1 text-[11px] font-semibold text-orange-600 hover:bg-orange-50"
+            disabled={isReordering}
+            className="inline-flex items-center bg-white rounded-full border border-orange-400 px-2.5 py-1 text-[11px] font-semibold text-orange-600 hover:bg-orange-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <FiCreditCard className="mr-1" /> Reorder
           </button>
           <button
             type="button"
             onClick={() => onViewDetails?.(order)}
-            className="inline-flex items-center rounded-full border border-gray-200 px-2 py-1 text-[11px] font-medium text-gray-600 hover:border-blue-400 hover:text-blue-700"
+            className="inline-flex items-center bg-white rounded-full border border-gray-200 px-2 py-1 text-[11px] font-medium text-gray-600 hover:border-blue-400 hover:text-blue-700"
           >
             View details <FiChevronDown className="ml-1" />
           </button>

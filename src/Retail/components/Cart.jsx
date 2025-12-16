@@ -12,16 +12,29 @@ const Cart = ({ onContinueShopping }) => {
   const [showCheckout, setShowCheckout] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState(null);
   const [showProductDetail, setShowProductDetail] = useState(false);
+  const [updatingItemId, setUpdatingItemId] = useState(null);
 
   const items = cart?.items || [];
 
-  const handleIncrease = (item) => {
-    updateCartQuantity(item.id, (item.quantity || 0) + 1);
+  const handleIncrease = async (item) => {
+    if (updatingItemId === item.id) return;
+    setUpdatingItemId(item.id);
+    try {
+      await updateCartQuantity(item.id, (item.quantity || 0) + 1);
+    } finally {
+      setUpdatingItemId(null);
+    }
   };
 
-  const handleDecrease = (item) => {
+  const handleDecrease = async (item) => {
     if ((item.quantity || 0) <= 1) return;
-    updateCartQuantity(item.id, (item.quantity || 0) - 1);
+    if (updatingItemId === item.id) return;
+    setUpdatingItemId(item.id);
+    try {
+      await updateCartQuantity(item.id, (item.quantity || 0) - 1);
+    } finally {
+      setUpdatingItemId(null);
+    }
   };
 
   const handleRemove = (item) => {
@@ -76,7 +89,7 @@ const Cart = ({ onContinueShopping }) => {
           <button
             type="button"
             onClick={refreshCart}
-            className="text-xs text-gray-500 hover:text-blue-600"
+            className="text-xs bg-white text-gray-500 hover:text-blue-600"
           >
             Refresh
           </button>
@@ -98,6 +111,7 @@ const Cart = ({ onContinueShopping }) => {
               onDecrease={() => handleDecrease(item)}
               onRemove={() => handleRemove(item)}
               onViewDetails={() => handleViewItemDetails(item)}
+              isUpdating={updatingItemId === item.id}
             />
           ))}
         </div>

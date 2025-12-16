@@ -2,7 +2,7 @@ import React from 'react';
 import { FiMinus, FiPlus, FiTrash2 } from 'react-icons/fi';
 import { formatAmount } from '../utils/helpers';
 
-const CartItem = ({ item, onIncrease, onDecrease, onRemove, onViewDetails }) => {
+const CartItem = ({ item, onIncrease, onDecrease, onRemove, onViewDetails, isUpdating }) => {
   const unitPrice = item.unit_price || 0;
   const total = item.total || unitPrice * (item.quantity || 0);
   const image =
@@ -45,7 +45,8 @@ const CartItem = ({ item, onIncrease, onDecrease, onRemove, onViewDetails }) => 
           <button
             type="button"
             onClick={onRemove}
-            className="inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-red-50 text-red-500 hover:bg-red-100"
+            disabled={isUpdating}
+            className="inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-red-50 text-red-500 hover:bg-red-100 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <FiTrash2 className="text-xs" />
           </button>
@@ -56,8 +57,8 @@ const CartItem = ({ item, onIncrease, onDecrease, onRemove, onViewDetails }) => 
             <button
               type="button"
               onClick={onDecrease}
-              disabled={!canDecrease}
-              className="px-2 text-gray-500 disabled:opacity-40"
+              disabled={!canDecrease || isUpdating}
+              className="px-2 text-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <FiMinus />
             </button>
@@ -65,7 +66,8 @@ const CartItem = ({ item, onIncrease, onDecrease, onRemove, onViewDetails }) => 
             <button
               type="button"
               onClick={onIncrease}
-              className="px-2 text-gray-500"
+              disabled={isUpdating}
+              className="px-2 text-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <FiPlus />
             </button>

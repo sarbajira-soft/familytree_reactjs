@@ -10,13 +10,16 @@ const Orders = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedOrderId, setSelectedOrderId] = useState(null);
   const [localError, setLocalError] = useState(null);
+  const [reorderingId, setReorderingId] = useState(null);
 
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
 
   const handleReorder = async (order) => {
+    if (reorderingId) return;
     setLocalError(null);
+    setReorderingId(order.id);
     try {
       const items = Array.isArray(order.items) ? order.items : [];
       for (const item of items) {
@@ -27,6 +30,8 @@ const Orders = () => {
       }
     } catch (err) {
       setLocalError(err.message || 'Failed to reorder items');
+    } finally {
+      setReorderingId(null);
     }
   };
 
@@ -120,6 +125,7 @@ const Orders = () => {
               order={order}
               onViewDetails={() => setSelectedOrderId(order.id)}
               onReorder={handleReorder}
+              isReordering={reorderingId === order.id}
             />
           ))}
         </div>

@@ -88,7 +88,7 @@ const Header = ({ activeTab, setActiveTab }) => {
                 setAuthMode('login');
                 setAuthError(null);
               }}
-              className={`flex-1 py-2 text-sm font-semibold border-b-2 transition-colors ${
+              className={`flex-1 py-2 text-sm bg-white font-semibold border-b-2 transition-colors ${
                 authMode === 'login'
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -102,7 +102,7 @@ const Header = ({ activeTab, setActiveTab }) => {
                 setAuthMode('register');
                 setAuthError(null);
               }}
-              className={`flex-1 py-2 text-sm font-semibold border-b-2 transition-colors ${
+              className={`flex-1 bg-white py-2 text-sm font-semibold border-b-2 transition-colors ${
                 authMode === 'register'
                   ? 'border-orange-500 text-orange-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -230,12 +230,12 @@ const Header = ({ activeTab, setActiveTab }) => {
         <div className="p-4">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-1">
-              <FiShoppingCart className="text-blue-500" /> Mini Cart
+              <FiShoppingCart className="text-blue-500" /> Cart
             </h3>
             <button
               type="button"
               onClick={() => setActiveTab('cart')}
-              className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+              className="text-xs bg-white text-blue-600 hover:text-blue-700 font-medium"
             >
               View full cart
             </button>
@@ -297,7 +297,6 @@ const Header = ({ activeTab, setActiveTab }) => {
           </div>
           <div>
             <h1 className="text-base font-semibold text-gray-900">FamilyTree Store</h1>
-            <p className="text-xs text-gray-500">Powered by Medusa</p>
           </div>
         </div>
 
@@ -305,9 +304,9 @@ const Header = ({ activeTab, setActiveTab }) => {
           <button
             type="button"
             onClick={() => setActiveTab('products')}
-            className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 transition-colors ${
+            className={`inline-flex  items-center bg-white gap-1 rounded-full px-3 py-1.5 transition-colors ${
               activeTab === 'products'
-                ? 'bg-blue-50 text-blue-700'
+                ? 'bg-orange-50 text-orange-600'
                 : 'text-gray-600 hover:bg-gray-100'
             }`}
           >
@@ -316,9 +315,9 @@ const Header = ({ activeTab, setActiveTab }) => {
           <button
             type="button"
             onClick={() => setActiveTab('cart')}
-            className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 transition-colors ${
+            className={`inline-flex bg-white items-center gap-1 rounded-full px-3 py-1.5 transition-colors ${
               activeTab === 'cart'
-                ? 'bg-orange-50 text-orange-700'
+                ? 'bg-orange-50 text-orange-600'
                 : 'text-gray-600 hover:bg-gray-100'
             }`}
           >
@@ -333,9 +332,9 @@ const Header = ({ activeTab, setActiveTab }) => {
           <button
             type="button"
             onClick={() => setActiveTab('orders')}
-            className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 transition-colors ${
+            className={`inline-flex bg-white items-center gap-1 rounded-full px-3 py-1.5 transition-colors ${
               activeTab === 'orders'
-                ? 'bg-blue-50 text-blue-700'
+                ? 'bg-orange-50 text-orange-600'
                 : 'text-gray-600 hover:bg-gray-100'
             }`}
           >
@@ -344,9 +343,9 @@ const Header = ({ activeTab, setActiveTab }) => {
           <button
             type="button"
             onClick={() => setActiveTab('profile')}
-            className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 transition-colors ${
+            className={`inline-flex bg-white items-center gap-1 rounded-full px-3 py-1.5 transition-colors ${
               activeTab === 'profile'
-                ? 'bg-blue-50 text-blue-700'
+                ? 'bg-orange-50 text-orange-600'
                 : 'text-gray-600 hover:bg-gray-100'
             }`}
           >
