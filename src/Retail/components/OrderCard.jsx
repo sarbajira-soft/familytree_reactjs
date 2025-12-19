@@ -7,6 +7,8 @@ const statusBadgeClasses = {
   completed: 'bg-green-100 text-green-800',
   fulfilled: 'bg-green-100 text-green-800',
   delivered: 'bg-green-100 text-green-800',
+  captured: 'bg-green-100 text-green-800',
+  paid: 'bg-green-100 text-green-800',
   canceled: 'bg-red-100 text-red-800',
   refunded: 'bg-gray-100 text-gray-700',
   default: 'bg-gray-100 text-gray-700',
@@ -23,7 +25,7 @@ const StatusBadge = ({ label, status }) => {
   );
 };
 
-const OrderCard = ({ order, onViewDetails, onReorder, isReordering }) => {
+const OrderCard = ({ order, onViewDetails }) => {
   const createdAt = order.created_at || order.createdAt || order.created_at;
   const dateLabel = createdAt ? new Date(createdAt).toLocaleDateString('en-IN') : '';
 
@@ -34,6 +36,34 @@ const OrderCard = ({ order, onViewDetails, onReorder, isReordering }) => {
   const total = typeof order.total === 'number' ? order.total : 0;
   const paymentStatus = order.payment_status || order.paymentStatus;
   const fulfillmentStatus = order.fulfillment_status || order.fulfillmentStatus;
+
+  const payments = Array.isArray(order.payments) ? order.payments : [];
+
+  const paymentCollection =
+    order.payment_collection ||
+    (Array.isArray(order.payment_collections) ? order.payment_collections[0] : null) ||
+    (Array.isArray(order.paymentCollections) ? order.paymentCollections[0] : null);
+
+  const paymentSessions = Array.isArray(paymentCollection?.payment_sessions)
+    ? paymentCollection.payment_sessions
+    : Array.isArray(paymentCollection?.paymentSessions)
+    ? paymentCollection.paymentSessions
+    : [];
+
+  const primarySession = paymentSessions[0] || null;
+  const primaryPayment = payments[0] || null;
+
+  let providerId =
+    primarySession?.provider_id ||
+    primarySession?.providerId ||
+    primaryPayment?.provider_id ||
+    primaryPayment?.providerId ||
+    '';
+
+  let paymentMethodLabel = 'Cash on delivery';
+  if ((providerId || '').toLowerCase().includes('razorpay')) {
+    paymentMethodLabel = 'Online (Razorpay)';
+  }
 
   return (
     <article className="rounded-xl border border-gray-100 bg-white p-3 text-xs shadow-sm">
@@ -53,9 +83,15 @@ const OrderCard = ({ order, onViewDetails, onReorder, isReordering }) => {
         </div>
         <div className="text-right space-y-1">
           <p className="text-sm font-semibold text-gray-900">{formatAmount(total)}</p>
-          <div className="flex flex-wrap justify-end gap-1">
-            <StatusBadge label="Payment" status={paymentStatus} />
-            <StatusBadge label="Delivery" status={fulfillmentStatus || order.status} />
+          <div className="flex flex-col items-end gap-1">
+            <div className="flex flex-wrap justify-end gap-1">
+              <StatusBadge label="Payment" status={paymentStatus} />
+              <StatusBadge label="Delivery" status={fulfillmentStatus || order.status} />
+            </div>
+            <div className="flex items-center gap-1 text-[11px] text-gray-500">
+              <FiCreditCard className="text-gray-400" />
+              <span>{paymentMethodLabel}</span>
+            </div>
           </div>
         </div>
       </header>
@@ -71,14 +107,6 @@ const OrderCard = ({ order, onViewDetails, onReorder, isReordering }) => {
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => onReorder?.(order)}
-            disabled={isReordering}
-            className="inline-flex items-center bg-white rounded-full border border-orange-400 px-2.5 py-1 text-[11px] font-semibold text-orange-600 hover:bg-orange-50 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <FiCreditCard className="mr-1" /> Reorder
-          </button>
           <button
             type="button"
             onClick={() => onViewDetails?.(order)}

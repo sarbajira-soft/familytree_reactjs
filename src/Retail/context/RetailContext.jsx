@@ -292,19 +292,29 @@ export const RetailProvider = ({ children }) => {
     return nextCart;
   }, [setCartPersistent, state.cart, state.cartId, state.token]);
 
+  const createFreshCart = useCallback(async () => {
+    const newCart = await cartService.createCart(state.token || null);
+    setCartPersistent(newCart);
+    return newCart;
+  }, [setCartPersistent, state.token]);
+
   const fetchProducts = useCallback(async () => {
     dispatch({ type: 'SET_LOADING', payload: true });
     dispatch({ type: 'SET_ERROR', payload: null });
 
     try {
-      const products = await productService.fetchProducts({ token: state.token || null });
+      const regionId = state.cart?.region_id || state.cart?.region?.id;
+      const products = await productService.fetchProducts({
+        token: state.token || null,
+        regionId,
+      });
       dispatch({ type: 'SET_PRODUCTS', payload: products });
     } catch (err) {
       dispatch({ type: 'SET_ERROR', payload: getErrorMessage(err) });
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
-  }, [state.token]);
+  }, [state.token, state.cart]);
 
   const refreshCart = useCallback(async () => {
     try {
@@ -489,6 +499,37 @@ export const RetailProvider = ({ children }) => {
     [state.token],
   );
 
+  const createReturn = useCallback(
+    async ({ orderId, items, returnShipping }) => {
+      if (!orderId) return null;
+
+      if (!state.token) {
+        throw new Error('Not authenticated');
+      }
+
+      dispatch({ type: 'SET_LOADING', payload: true });
+      dispatch({ type: 'SET_ERROR', payload: null });
+
+      try {
+        const createdReturn = await orderService.createReturn({
+          orderId,
+          items,
+          returnShipping,
+          token: state.token,
+        });
+        await fetchOrders();
+        return createdReturn;
+      } catch (err) {
+        const message = getErrorMessage(err);
+        dispatch({ type: 'SET_ERROR', payload: message });
+        throw new Error(message);
+      } finally {
+        dispatch({ type: 'SET_LOADING', payload: false });
+      }
+    },
+    [state.token, fetchOrders],
+  );
+
   const getShippingOptionsForCart = useCallback(async () => {
     try {
       const cart = await ensureCart();
@@ -573,8 +614,7 @@ export const RetailProvider = ({ children }) => {
         await fetchOrders();
 
         // 7. Start a fresh cart for the next purchase
-        const newCart = await cartService.createCart(state.token || null);
-        setCartPersistent(newCart);
+        await createFreshCart();
 
         return order;
       } catch (err) {
@@ -585,7 +625,74 @@ export const RetailProvider = ({ children }) => {
         dispatch({ type: 'SET_LOADING', payload: false });
       }
     },
-    [ensureCart, fetchOrders, setCartPersistent, state.token],
+    [ensureCart, fetchOrders, createFreshCart, state.token],
+  );
+
+  const startOnlinePayment = useCallback(
+    async (shippingAddress, billingAddress, shippingMethodId) => {
+      dispatch({ type: 'SET_LOADING', payload: true });
+      dispatch({ type: 'SET_ERROR', payload: null });
+
+      try {
+        const cart = await ensureCart();
+
+        const updatedWithShippingAddress = await cartService.updateCart({
+          cartId: cart.id,
+          body: { shipping_address: shippingAddress },
+          token: state.token || null,
+        });
+
+        const updatedWithBilling = await cartService.updateCart({
+          cartId: updatedWithShippingAddress.id,
+          body: { billing_address: billingAddress },
+          token: state.token || null,
+        });
+
+        const updatedWithShippingMethod = await cartService.addShippingMethod({
+          cartId: updatedWithBilling.id,
+          optionId: shippingMethodId,
+          data: {},
+          token: state.token || null,
+        });
+
+        setCartPersistent(updatedWithShippingMethod);
+
+        const paymentCollection = await cartService.createPaymentCollection(
+          updatedWithShippingMethod.id,
+          state.token || null,
+        );
+
+        const collectionWithSessions = await cartService.initPaymentSession({
+          paymentCollectionId: paymentCollection.id,
+          providerId: 'pp_razorpay_razorpay',
+          token: state.token || null,
+        });
+
+        const collection =
+          collectionWithSessions.payment_collection || collectionWithSessions;
+
+        const sessionsArray = Array.isArray(collection.payment_sessions)
+          ? collection.payment_sessions
+          : Array.isArray(collection.paymentSessions)
+          ? collection.paymentSessions
+          : [];
+
+        const primarySession = sessionsArray[0] || null;
+
+        return {
+          cartId: updatedWithShippingMethod.id,
+          paymentCollectionId: collection.id,
+          razorpaySession: primarySession?.data || {},
+        };
+      } catch (err) {
+        const message = getErrorMessage(err);
+        dispatch({ type: 'SET_ERROR', payload: message });
+        throw new Error(message);
+      } finally {
+        dispatch({ type: 'SET_LOADING', payload: false });
+      }
+    },
+    [ensureCart, setCartPersistent, state.token],
   );
 
   const derived = useMemo(
@@ -613,10 +720,13 @@ export const RetailProvider = ({ children }) => {
       updateCartQuantity,
       fetchOrders,
       retrieveOrder,
+      createReturn,
       refreshCart,
+      createFreshCart,
       completeCheckout,
       getShippingOptionsForCart,
       updateCartAddressesForCheckout,
+      startOnlinePayment,
     }),
     [
       derived,
@@ -629,9 +739,11 @@ export const RetailProvider = ({ children }) => {
       fetchOrders,
       retrieveOrder,
       refreshCart,
+      createFreshCart,
       completeCheckout,
       getShippingOptionsForCart,
       updateCartAddressesForCheckout,
+      startOnlinePayment,
     ],
   );
 

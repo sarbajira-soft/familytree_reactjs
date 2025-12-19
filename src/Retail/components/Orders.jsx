@@ -5,37 +5,22 @@ import OrderCard from './OrderCard';
 import OrderDetailsModal from './OrderDetailsModal';
 
 const Orders = () => {
-  const { orders, fetchOrders, loading, error, addToCart, user } = useRetail();
+  const { orders, fetchOrders, loading, error, user } = useRetail();
 
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedOrderId, setSelectedOrderId] = useState(null);
-  const [localError, setLocalError] = useState(null);
-  const [reorderingId, setReorderingId] = useState(null);
 
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
 
-  const handleReorder = async (order) => {
-    if (reorderingId) return;
-    setLocalError(null);
-    setReorderingId(order.id);
-    try {
-      const items = Array.isArray(order.items) ? order.items : [];
-      for (const item of items) {
-        const variantId = item.variant_id || item.variant?.id;
-        if (!variantId) continue;
-        const quantity = item.quantity || 1;
-        await addToCart(variantId, quantity);
-      }
-    } catch (err) {
-      setLocalError(err.message || 'Failed to reorder items');
-    } finally {
-      setReorderingId(null);
-    }
-  };
+  const sortedOrders = [...orders].sort((a, b) => {
+    const aDate = new Date(a.created_at || a.createdAt || a.created_at || 0).getTime();
+    const bDate = new Date(b.created_at || b.createdAt || b.created_at || 0).getTime();
+    return bDate - aDate;
+  });
 
-  const filteredOrders = orders.filter((order) => {
+  const filteredOrders = sortedOrders.filter((order) => {
     if (statusFilter === 'all') return true;
     const payment = (order.payment_status || order.paymentStatus || '').toLowerCase();
     const fulfillment = (order.fulfillment_status || order.fulfillmentStatus || order.status || '').toLowerCase();
@@ -92,10 +77,10 @@ const Orders = () => {
         </div>
       </div>
 
-      {(error || localError) && (
+      {error && (
         <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
           <FiAlertCircle className="text-sm" />
-          <span className="flex-1 truncate">{error || localError}</span>
+          <span className="flex-1 truncate">{error}</span>
         </div>
       )}
 
@@ -124,8 +109,6 @@ const Orders = () => {
               key={order.id}
               order={order}
               onViewDetails={() => setSelectedOrderId(order.id)}
-              onReorder={handleReorder}
-              isReordering={reorderingId === order.id}
             />
           ))}
         </div>

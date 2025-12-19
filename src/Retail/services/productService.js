@@ -8,11 +8,14 @@ const client = axios.create({
   },
 });
 
-export async function fetchProducts({ token, query = {} } = {}) {
+export async function fetchProducts({ token, query = {}, regionId } = {}) {
   const params = {
-    region_id: "reg_01KC610QJEMH4WVG3WV68TEWW6", // 👈 REQUIRED
     ...query,
   };
+
+  if (regionId) {
+    params.region_id = regionId;
+  }
 
   const res = await client.get('/store/products', {
     params,

@@ -20,6 +20,9 @@ const RetailMain = () => {
               onContinueShopping={() => {
                 setActiveTab('products');
               }}
+              onViewOrders={() => {
+                setActiveTab('orders');
+              }}
             />
           )}
           {activeTab === 'orders' && <Orders />}

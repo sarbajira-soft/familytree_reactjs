@@ -6,7 +6,7 @@ import CartItem from './CartItem';
 import Checkout from './Checkout';
 import CartProductDetailModal from './CartProductDetailModal';
 
-const Cart = ({ onContinueShopping }) => {
+const Cart = ({ onContinueShopping, onViewOrders }) => {
   const { cart, totals, loading, error, updateCartQuantity, removeFromCart, refreshCart } = useRetail();
 
   const [showCheckout, setShowCheckout] = useState(false);
@@ -56,6 +56,16 @@ const Cart = ({ onContinueShopping }) => {
     return cart?.tax_total != null && cart.tax_total > 0;
   }, [cart]);
 
+  if (showCheckout) {
+    return (
+      <Checkout
+        onBack={() => setShowCheckout(false)}
+        onContinueShopping={onContinueShopping}
+        onViewOrders={onViewOrders}
+      />
+    );
+  }
+
   if (!cart || items.length === 0) {
     return (
       <section className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-12 text-center">
@@ -75,10 +85,6 @@ const Cart = ({ onContinueShopping }) => {
         )}
       </section>
     );
-  }
-
-  if (showCheckout) {
-    return <Checkout onBack={() => setShowCheckout(false)} />;
   }
 
   return (
@@ -165,14 +171,14 @@ const Cart = ({ onContinueShopping }) => {
           <button
             type="button"
             onClick={onContinueShopping}
-            className="mt-1 inline-flex items-center justify-center rounded-full border border-gray-200 px-4 py-1.5 text-xs font-medium text-gray-600 hover:border-blue-400 hover:text-blue-700"
+            className="mt-1 inline-flex text-white items-center justify-center rounded-full border border-gray-200 px-4 py-1.5 text-xs font-medium text-gray-600 hover:border-blue-400 hover:text-blue-700"
           >
             <FiArrowLeft className="mr-1" /> Continue shopping
           </button>
         )}
 
         <div className="mt-2 rounded-lg bg-blue-50 px-3 py-2 text-[11px] text-blue-700">
-          Secure checkout powered by your Medusa backend. Orders will appear in your order history
+          Secure checkout powered with Razor Pay. Orders will appear in your order history
           after completion.
         </div>
       </aside>

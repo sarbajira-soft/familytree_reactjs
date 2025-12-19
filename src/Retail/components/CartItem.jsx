@@ -58,7 +58,7 @@ const CartItem = ({ item, onIncrease, onDecrease, onRemove, onViewDetails, isUpd
               type="button"
               onClick={onDecrease}
               disabled={!canDecrease || isUpdating}
-              className="px-2 text-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="px-2 bg-white text-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <FiMinus />
             </button>
@@ -67,7 +67,7 @@ const CartItem = ({ item, onIncrease, onDecrease, onRemove, onViewDetails, isUpd
               type="button"
               onClick={onIncrease}
               disabled={isUpdating}
-              className="px-2 text-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="px-2 bg-white text-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <FiPlus />
             </button>
