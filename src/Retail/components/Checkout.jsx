@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import axios from 'axios';
 import {
   FiAlertCircle,
   FiArrowLeft,
@@ -12,6 +13,7 @@ import {
 } from 'react-icons/fi';
 import { useRetail } from '../context/RetailContext';
 import { formatAmount, getErrorMessage } from '../utils/helpers';
+import { MEDUSA_BASE_URL, MEDUSA_PUBLISHABLE_KEY } from '../utils/constants';
 import * as cartService from '../services/cartService';
 
 const emptyAddress = {
@@ -24,6 +26,26 @@ const emptyAddress = {
   country_code: 'in',
   phone: '',
 };
+
+async function checkShiprocketServiceability(postalCode, token) {
+  if (!postalCode || !postalCode.trim()) {
+    return { serviceable: false, error: 'postal_code_missing' };
+  }
+
+  const res = await axios.post(
+    `${MEDUSA_BASE_URL}/store/shiprocket/serviceability`,
+    { postal_code: postalCode.trim() },
+    {
+      headers: {
+        'x-publishable-api-key': MEDUSA_PUBLISHABLE_KEY,
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    },
+  );
+
+  return res.data;
+}
 
 const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
   const {
@@ -50,7 +72,7 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
-  const [paymentMethod, setPaymentMethod] = useState('cod');
+  const [paymentMethod, setPaymentMethod] = useState('');
   const [addressesUpdated, setAddressesUpdated] = useState(false);
   const [waitingForPayment, setWaitingForPayment] = useState(false);
   const [completedOrder, setCompletedOrder] = useState(null);
@@ -61,6 +83,50 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
     // No automatic shipping option fetch on mount; we now fetch after
     // setting both shipping and billing addresses on the cart.
   }, [cart && cart.id]);
+
+  useEffect(() => {
+    if (!addressesUpdated || !paymentMethod) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadShippingOptions = async () => {
+      setShippingLoading(true);
+      setError(null);
+      try {
+        const fetched = await getShippingOptionsForCart(paymentMethod);
+        if (cancelled) return;
+        setShippingOptions(fetched);
+        if (fetched && fetched.length > 0) {
+          setSelectedShippingId(fetched[0].id);
+        } else {
+          setSelectedShippingId('');
+        }
+      } catch (err) {
+        if (cancelled) return;
+        setError(getErrorMessage(err) || 'Failed to load shipping options');
+      } finally {
+        if (!cancelled) {
+          setShippingLoading(false);
+        }
+      }
+    };
+
+    loadShippingOptions();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [addressesUpdated, paymentMethod, getShippingOptionsForCart]);
+
+  useEffect(() => {
+    if (!completedOrder) return;
+    setAddressesUpdated(false);
+    setPaymentMethod('');
+    setShippingOptions([]);
+    setSelectedShippingId('');
+  }, [completedOrder]);
 
   const handleChange = (setter) => (e) => {
     const { name, value } = e.target;
@@ -127,26 +193,45 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
       return;
     }
 
-    // If addresses not yet updated, update them and load shipping options
+    // If addresses not yet updated, update them first. We will show payment
+    // mode next, and only then load shipping options (so COD flag is correct).
     if (!addressesUpdated) {
       setShippingLoading(true);
       try {
+        // Before updating cart and loading shipping options, check Shiprocket serviceability
+        const svc = await checkShiprocketServiceability(
+          shippingAddress.postal_code,
+          token || null,
+        );
+
+        if (!svc || svc.serviceable === false) {
+          const message =
+            svc && svc.error
+              ? 'We currently do not deliver to this pincode. Please use a different shipping address.'
+              : 'We could not verify delivery availability for this pincode. Please try again or use a different address.';
+
+          setError(message);
+          return;
+        }
+
         // 1. Update cart with both shipping and billing addresses in a single PUT
         await updateCartAddressesForCheckout(shippingAddress, billing);
 
-        // 2. Load shipping options after addresses are set
-        const fetched = await getShippingOptionsForCart();
-        setShippingOptions(fetched);
+        // 2. Mark that addresses are updated. We will fetch shipping options
+        // after the user chooses a payment method (COD vs online), so that
+        // the Shiprocket rate calculator can apply the correct COD flag.
         setAddressesUpdated(true);
-
-        if (fetched && fetched.length > 0) {
-          setSelectedShippingId(fetched[0].id);
-        }
       } catch (err) {
-        setError(err.message || 'Failed to update address or load shipping options');
+        setError(getErrorMessage(err) || 'Failed to update address or load shipping options');
       } finally {
         setShippingLoading(false);
       }
+      return;
+    }
+
+    // If addresses updated but no payment method selected, show error
+    if (!paymentMethod) {
+      setError('Please select a payment method.');
       return;
     }
 
@@ -160,8 +245,31 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
     setSubmitting(true);
     setWaitingForPayment(false);
     try {
+      const selectedOption =
+        shippingOptions && shippingOptions.length > 0
+          ? shippingOptions.find((opt) => opt.id === selectedShippingId) || null
+          : null;
+
+      const shippingMeta = selectedOption
+        ? {
+            shipping_type: selectedOption.metadata?.shipping_type || null,
+            shiprocket_amount:
+              typeof selectedOption.amount === 'number' ? selectedOption.amount : null,
+            shiprocket_eta: selectedOption.metadata?.eta || null,
+            shiprocket_eta_days:
+              typeof selectedOption.metadata?.eta_days === 'number'
+                ? selectedOption.metadata.eta_days
+                : null,
+          }
+        : null;
+
       if (paymentMethod === 'cod') {
-        const order = await completeCheckout(shippingAddress, billing, selectedShippingId);
+        const order = await completeCheckout(
+          shippingAddress,
+          billing,
+          selectedShippingId,
+          shippingMeta,
+        );
         setCompletedOrder(order || null);
         setSuccess('Order completed successfully!');
         return;
@@ -172,6 +280,7 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
         shippingAddress,
         billing,
         selectedShippingId,
+        shippingMeta,
       );
 
       const loadRazorpayScript = () =>
@@ -711,55 +820,6 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
           )}
 
           {addressesUpdated && (
-            <div className="mt-3 space-y-3 rounded-lg border border-gray-100 bg-gray-50 p-3">
-              <div className="flex items-center gap-2 text-xs font-semibold text-gray-800">
-                <FiTruck className="text-blue-500" /> Shipping method
-              </div>
-
-              {shippingLoading ? (
-                <div className="flex items-center gap-2 text-xs text-gray-500">
-                  <FiLoader className="animate-spin" />
-                  <span>Loading shipping options...</span>
-                </div>
-              ) : shippingOptions.length === 0 ? (
-                <p className="text-[11px] text-gray-500">
-                  No shipping options are available for this address.
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {shippingOptions.map((opt) => (
-                    <label
-                      key={opt.id}
-                      className="flex cursor-pointer items-center justify-between rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs hover:border-blue-400"
-                    >
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="radio"
-                          name="shipping_option"
-                          value={opt.id}
-                          checked={selectedShippingId === opt.id}
-                          onChange={(e) => setSelectedShippingId(e.target.value)}
-                          disabled={disabled}
-                          className="h-3.5 w-3.5 border-gray-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        <div>
-                          <p className="font-semibold text-gray-800">{opt.name || opt.label || 'Shipping'}</p>
-                          {opt.description && (
-                            <p className="text-[11px] text-gray-500">{opt.description}</p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="text-right text-xs font-semibold text-gray-900">
-                        {formatAmount(opt.amount || 0)}
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {addressesUpdated && (
             <div className="space-y-2 rounded-lg border border-gray-100 bg-gray-50 p-3">
               <div className="flex items-center gap-2 text-xs font-semibold text-gray-800">
                 <FiCreditCard className="text-orange-500" /> Payment method
@@ -793,6 +853,59 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
               <p className="flex items-center gap-1 text-[11px] text-gray-500">
                 <FiShield className="text-green-500" /> Your payment information is processed securely.
               </p>
+            </div>
+          )}
+
+          {addressesUpdated && paymentMethod && (
+            <div className="mt-3 space-y-3 rounded-lg border border-gray-100 bg-gray-50 p-3">
+              <div className="flex items-center gap-2 text-xs font-semibold text-gray-800">
+                <FiTruck className="text-blue-500" /> Shipping method
+              </div>
+
+              {shippingLoading ? (
+                <div className="flex items-center gap-2 text-xs text-gray-500">
+                  <FiLoader className="animate-spin" />
+                  <span>Loading shipping options...</span>
+                </div>
+              ) : shippingOptions.length === 0 ? (
+                <p className="text-[11px] text-gray-500">
+                  No shipping options are available for this address.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {shippingOptions.map((opt) => (
+                    <label
+                      key={opt.id}
+                      className="flex cursor-pointer items-center justify-between rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs hover:border-blue-400"
+                    >
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name="shipping_option"
+                          value={opt.id}
+                          checked={selectedShippingId === opt.id}
+                          onChange={(e) => setSelectedShippingId(e.target.value)}
+                          disabled={disabled}
+                          className="h-3.5 w-3.5 border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <div>
+                          <p className="font-semibold text-gray-800">
+                            {opt.label || opt.name || 'Shipping'}
+                          </p>
+                          {opt.metadata && opt.metadata.eta && (
+                            <p className="text-[11px] text-gray-500">
+                              ETA: {opt.metadata.eta}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right text-xs font-semibold text-gray-900">
+                        {formatAmount(opt.amount || 0)}
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -849,7 +962,7 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
                 </>
               ) : (
                 <>
-                  Update address & load shipping
+                  Update address & choose payment
                 </>
               )}
             </button>

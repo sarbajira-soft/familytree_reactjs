@@ -75,6 +75,7 @@ const OrderDetailsModal = ({ open, orderId, onClose }) => {
 
   const shippingAddress = order?.shipping_address;
   const billingAddress = order?.billing_address;
+  const orderContext = order?.context || order?.cart?.context || {};
 
   const orderStatusRaw = order?.status || '';
   const orderStatusLower = String(orderStatusRaw || '').toLowerCase();
@@ -139,13 +140,50 @@ const OrderDetailsModal = ({ open, orderId, onClose }) => {
 
   const sessionData = primarySession?.data || {};
 
+  const contextPaymentRaw =
+    (typeof orderContext.payment_type === 'string' && orderContext.payment_type) ||
+    (typeof orderContext.payment_mode === 'string' && orderContext.payment_mode) ||
+    (typeof orderContext.payment_method === 'string' && orderContext.payment_method) ||
+    '';
+
+  const contextPaymentLower = contextPaymentRaw.toLowerCase();
+
+  const paymentStatusLabel = (paymentStatus || 'unknown').replace(/_/g, ' ');
+  const paymentStatusLower = (paymentStatus || '').toLowerCase();
+
   let paymentMethodLabel = 'Cash on delivery';
+
+  const providerIdLower = providerIdRaw.toLowerCase();
+
   if (
-    providerIdRaw.toLowerCase().includes('razorpay') ||
+    providerIdLower.includes('razorpay') ||
     sessionData.razorpay_order_id ||
     sessionData.razorpay_payment_id
   ) {
     paymentMethodLabel = 'Online (Razorpay)';
+  } else if (
+    contextPaymentLower.includes('online') ||
+    contextPaymentLower.includes('razorpay') ||
+    contextPaymentLower.includes('prepaid') ||
+    contextPaymentLower.includes('card') ||
+    contextPaymentLower.includes('upi')
+  ) {
+    paymentMethodLabel = 'Online payment';
+  } else if (
+    contextPaymentLower.includes('cod') ||
+    contextPaymentLower.includes('cash_on_delivery') ||
+    contextPaymentLower.includes('cash-on-delivery')
+  ) {
+    paymentMethodLabel = 'Cash on delivery';
+  } else if (
+    paymentStatusLower === 'captured' ||
+    paymentStatusLower === 'paid' ||
+    paymentStatusLower === 'completed' ||
+    paymentStatusLower === 'succeeded'
+  ) {
+    // If we know the payment is fully completed but have no explicit COD hint,
+    // assume this was an online/prepaid payment.
+    paymentMethodLabel = 'Online payment';
   }
 
   const providerId = providerIdRaw;
@@ -170,9 +208,6 @@ const OrderDetailsModal = ({ open, orderId, onClose }) => {
     null;
 
   const razorpayStatus = razorpayStatusRaw ? String(razorpayStatusRaw).replace(/_/g, ' ') : null;
-
-  const paymentStatusLabel = (paymentStatus || 'unknown').replace(/_/g, ' ');
-  const paymentStatusLower = (paymentStatus || '').toLowerCase();
   const paymentStatusClass =
     paymentStatusLower === 'captured' || paymentStatusLower === 'paid'
       ? 'text-sm font-semibold text-green-600'
@@ -223,8 +258,9 @@ const OrderDetailsModal = ({ open, orderId, onClose }) => {
       '';
     const linesHtml = items
       .map((item) => {
-        const lineTotal = item.total || (item.unit_price || 0) * (item.quantity || 0);
-        return `<tr><td style="padding:4px 8px;border:1px solid #e5e7eb;font-size:12px;">${item.title || ''}</td><td style="padding:4px 8px;border:1px solid #e5e7eb;font-size:12px;text-align:center;">${item.quantity || 1}</td><td style="padding:4px 8px;border:1px solid #e5e7eb;font-size:12px;text-align:right;">${lineTotal}</td></tr>`;
+        const lineTotalValue = item.total || (item.unit_price || 0) * (item.quantity || 0);
+        const lineTotalFormatted = formatAmount(lineTotalValue);
+        return `<tr><td style="padding:4px 8px;border:1px solid #e5e7eb;font-size:12px;">${item.title || ''}</td><td style="padding:4px 8px;border:1px solid #e5e7eb;font-size:12px;text-align:center;">${item.quantity || 1}</td><td style="padding:4px 8px;border:1px solid #e5e7eb;font-size:12px;text-align:right;">${lineTotalFormatted}</td></tr>`;
       })
       .join('');
     const customerHtml = customerName

@@ -530,16 +530,50 @@ export const RetailProvider = ({ children }) => {
     [state.token, fetchOrders],
   );
 
-  const getShippingOptionsForCart = useCallback(async () => {
-    try {
-      const cart = await ensureCart();
-      const options = await cartService.getShippingOptions(cart.id, state.token || null);
-      return options;
-    } catch (err) {
-      dispatch({ type: 'SET_ERROR', payload: getErrorMessage(err) });
-      return [];
-    }
-  }, [ensureCart, state.token]);
+  const getShippingOptionsForCart = useCallback(
+    async (paymentMode) => {
+      try {
+        const cart = await ensureCart();
+
+        // Persist the user's chosen payment mode (cod/online) onto the cart
+        // context so that when the order is created, the backend can infer
+        // the correct Shiprocket payment_method.
+        if (paymentMode) {
+          const existingContext =
+            cart && cart.context && typeof cart.context === 'object'
+              ? cart.context
+              : {};
+
+          try {
+            await cartService.updateCart({
+              cartId: cart.id,
+              body: {
+                context: {
+                  ...existingContext,
+                  payment_type: paymentMode,
+                },
+              },
+              token: state.token || null,
+            });
+          } catch {
+            // Non-fatal: failing to persist context should not block
+            // fetching shipping options.
+          }
+        }
+
+        const options = await cartService.getShippingOptions(
+          cart.id,
+          state.token || null,
+          paymentMode,
+        );
+        return options;
+      } catch (err) {
+        dispatch({ type: 'SET_ERROR', payload: getErrorMessage(err) });
+        return [];
+      }
+    },
+    [ensureCart, state.token],
+  );
 
   const updateCartAddressesForCheckout = useCallback(
     async (shippingAddress, billingAddress) => {
@@ -566,7 +600,7 @@ export const RetailProvider = ({ children }) => {
   );
 
   const completeCheckout = useCallback(
-    async (shippingAddress, billingAddress, shippingMethodId) => {
+    async (shippingAddress, billingAddress, shippingMethodId, shippingMeta) => {
       dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'SET_ERROR', payload: null });
 
@@ -576,7 +610,9 @@ export const RetailProvider = ({ children }) => {
         // 1. Set shipping address on the cart
         const updatedWithShippingAddress = await cartService.updateCart({
           cartId: cart.id,
-          body: { shipping_address: shippingAddress },
+          body: {
+            shipping_address: shippingAddress,
+          },
           token: state.token || null,
         });
 
@@ -587,11 +623,12 @@ export const RetailProvider = ({ children }) => {
           token: state.token || null,
         });
 
-        // 3. Attach the selected shipping method directly
+        // 3. Attach the selected shipping method directly, using dynamic
+        // Shiprocket amount (if present) via the custom backend route.
         const updatedWithShippingMethod = await cartService.addShippingMethod({
           cartId: updatedWithBilling.id,
           optionId: shippingMethodId,
-          data: {},
+          data: shippingMeta || {},
           token: state.token || null,
         });
 
@@ -629,7 +666,7 @@ export const RetailProvider = ({ children }) => {
   );
 
   const startOnlinePayment = useCallback(
-    async (shippingAddress, billingAddress, shippingMethodId) => {
+    async (shippingAddress, billingAddress, shippingMethodId, shippingMeta) => {
       dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'SET_ERROR', payload: null });
 
@@ -638,7 +675,9 @@ export const RetailProvider = ({ children }) => {
 
         const updatedWithShippingAddress = await cartService.updateCart({
           cartId: cart.id,
-          body: { shipping_address: shippingAddress },
+          body: {
+            shipping_address: shippingAddress,
+          },
           token: state.token || null,
         });
 
@@ -651,7 +690,7 @@ export const RetailProvider = ({ children }) => {
         const updatedWithShippingMethod = await cartService.addShippingMethod({
           cartId: updatedWithBilling.id,
           optionId: shippingMethodId,
-          data: {},
+          data: shippingMeta || {},
           token: state.token || null,
         });
 
