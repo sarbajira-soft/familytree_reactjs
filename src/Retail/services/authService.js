@@ -54,6 +54,31 @@ export async function loginCustomer({ email, password }) {
   return { token, customer };
 }
 
+export async function loginCustomerViaAppSso(appAccessToken) {
+  if (!appAccessToken) {
+    throw new Error('Missing app access token');
+  }
+
+  const res = await client.post(
+    '/store/app-sso/login',
+    {},
+    {
+      headers: {
+        ...buildJsonHeaders(),
+        Authorization: `Bearer ${appAccessToken}`,
+      },
+    },
+  );
+
+  const token = extractToken(res.data);
+  if (!token) {
+    throw new Error('SSO login succeeded but no token was returned.');
+  }
+
+  const { customer } = await getCustomerProfile(token);
+  return { token, customer };
+}
+
 export async function getCustomerProfile(token) {
   const res = await client.get('/store/customers/me', {
     headers: buildJsonHeaders(token),

@@ -6,6 +6,7 @@ import { useNotificationSocket } from "../hooks/useNotificationSocket";
 import { FiMenu, FiBell, FiChevronDown } from "react-icons/fi";
 import { RiUser3Line } from "react-icons/ri";
 import { useUser } from "../Contexts/UserContext";
+import { MEDUSA_TOKEN_KEY, MEDUSA_CART_ID_KEY } from "../Retail/utils/constants";
 import ProfileFormModal from "./ProfileFormModal";
 import NotificationPanel from "./NotificationPanel";
 
@@ -74,6 +75,8 @@ const Layout = ({ noScroll = false }) => {
   const handleLogout = () => {
     logout();
     localStorage.removeItem("userInfo");
+    localStorage.removeItem(MEDUSA_TOKEN_KEY);
+    localStorage.removeItem(MEDUSA_CART_ID_KEY);
     navigate("/login");
   };
 
