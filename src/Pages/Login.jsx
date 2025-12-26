@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import AuthLogo from '../Components/AuthLogo';
 import { setAuthData, isAuthenticated } from '../utils/auth';
 import { useUser } from '../Contexts/UserContext';
+import { MEDUSA_TOKEN_KEY } from '../Retail/utils/constants';
+import * as retailAuthService from '../Retail/services/authService';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -73,13 +75,26 @@ const Login = () => {
 
       const data = await response.json();
       
-      // Use our auth utility to handle all storage operations
       setAuthData(data.accessToken, data.user, stayLoggedIn);
+
+      try {
+        const email = data?.user?.email;
+        if (email && formData.password) {
+          const { token: medusaToken } = await retailAuthService.loginCustomer({
+            email,
+            password: formData.password,
+          });
+
+          if (medusaToken) {
+            localStorage.setItem(MEDUSA_TOKEN_KEY, medusaToken);
+          }
+        }
+      } catch (err) {
+        console.warn('Medusa customer login failed:', err);
+      }
       
-      // Trigger user data fetch immediately after login
       await refetchUser();
       
-      // Redirect to dashboard
       navigate('/dashboard');
     } catch (error) {
       setApiError('Login failed. Please check your network or credentials.');

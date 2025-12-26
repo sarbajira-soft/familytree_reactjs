@@ -74,8 +74,22 @@ export const RetailProvider = ({ children }) => {
     dispatch({ type: 'SET_ERROR', payload: null });
 
     try {
-      const storedToken = localStorage.getItem(MEDUSA_TOKEN_KEY);
+      let storedToken = localStorage.getItem(MEDUSA_TOKEN_KEY);
       const storedCartId = localStorage.getItem(MEDUSA_CART_ID_KEY);
+
+      if (!storedToken) {
+        const appAccessToken = localStorage.getItem('access_token');
+        if (appAccessToken) {
+          try {
+            const { token, customer } = await authService.loginCustomerViaAppSso(appAccessToken);
+            storedToken = token;
+            setToken(token);
+            dispatch({ type: 'SET_USER', payload: customer });
+          } catch (err) {
+            // Ignore SSO failures to avoid blocking retail loading.
+          }
+        }
+      }
 
       if (storedToken) {
         dispatch({ type: 'SET_TOKEN', payload: storedToken });

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   FiShoppingBag,
   FiShoppingCart,
@@ -6,221 +7,25 @@ import {
   FiList,
   FiUser,
   FiLogOut,
-  FiLogIn,
 } from 'react-icons/fi';
 import { useRetail } from '../context/RetailContext';
+import { useUser } from '../../Contexts/UserContext';
 import { formatAmount } from '../utils/helpers';
-import * as authService from '../services/authService';
 
 const Header = ({ activeTab, setActiveTab }) => {
-  const { cart, cartCount, user, logout, loading, login } = useRetail();
+  const navigate = useNavigate();
+  const { logout: appLogout } = useUser();
+  const { cart, cartCount, user, logout } = useRetail();
 
-  const [showAuthPanel, setShowAuthPanel] = useState(false);
-  const [authMode, setAuthMode] = useState('login'); // 'login' | 'register'
-  const [authForm, setAuthForm] = useState({
-    email: '',
-    password: '',
-    first_name: '',
-    last_name: '',
-    phone: '',
-  });
-  const [authError, setAuthError] = useState(null);
-  const [authLoading, setAuthLoading] = useState(false);
   const [showMiniCart, setShowMiniCart] = useState(false);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setAuthForm((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setAuthError(null);
-    setAuthLoading(true);
-    try {
-      await login(authForm.email, authForm.password);
-      setShowAuthPanel(false);
-    } catch (err) {
-      setAuthError(err.message || 'Login failed');
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
-  const handleRegister = async (e) => {
-    e.preventDefault();
-    setAuthError(null);
-    setAuthLoading(true);
-
-    try {
-      const { email, password, first_name, last_name, phone } = authForm;
-
-      const { token } = await authService.registerCustomer({ email, password });
-
-      await authService.completeCustomerProfile(token, {
-        email,
-        first_name,
-        last_name,
-        phone,
-      });
-
-      await login(email, password);
-      setShowAuthPanel(false);
-    } catch (err) {
-      setAuthError(err.message || 'Registration failed');
-    } finally {
-      setAuthLoading(false);
-    }
+  const handleLogout = () => {
+    logout();
+    appLogout();
+    navigate('/login');
   };
 
   const miniCartItems = cart?.items?.slice(0, 3) || [];
-
-  const renderAuthForm = () => {
-    if (!showAuthPanel) return null;
-
-    return (
-      <div className="absolute right-0  w-80 bg-white rounded-xl shadow-lg border border-gray-100 z-40">
-        <div className="p-4">
-          <div className="flex mb-4 border-b border-gray-200">
-            <button
-              type="button"
-              onClick={() => {
-                setAuthMode('login');
-                setAuthError(null);
-              }}
-              className={`flex-1 py-2 text-sm bg-white font-semibold border-b-2 transition-colors ${
-                authMode === 'login'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              Login
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setAuthMode('register');
-                setAuthError(null);
-              }}
-              className={`flex-1 bg-white py-2 text-sm font-semibold border-b-2 transition-colors ${
-                authMode === 'register'
-                  ? 'border-orange-500 text-orange-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              Register
-            </button>
-          </div>
-
-          {authError && (
-            <div className="mb-3 text-xs text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
-              {authError}
-            </div>
-          )}
-
-          {authMode === 'login' ? (
-            <form onSubmit={handleLogin} className="space-y-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
-                <input
-                  type="email"
-                  name="email"
-                  value={authForm.email}
-                  onChange={handleChange}
-                  required
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Password</label>
-                <input
-                  type="password"
-                  name="password"
-                  value={authForm.password}
-                  onChange={handleChange}
-                  required
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={authLoading || loading}
-                className="w-full inline-flex items-center justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50"
-              >
-                {authLoading || loading ? 'Signing in...' : 'Sign in'}
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={handleRegister} className="space-y-3">
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">First name</label>
-                  <input
-                    type="text"
-                    name="first_name"
-                    value={authForm.first_name}
-                    onChange={handleChange}
-                    required
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Last name</label>
-                  <input
-                    type="text"
-                    name="last_name"
-                    value={authForm.last_name}
-                    onChange={handleChange}
-                    required
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
-                <input
-                  type="email"
-                  name="email"
-                  value={authForm.email}
-                  onChange={handleChange}
-                  required
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Phone</label>
-                <input
-                  type="tel"
-                  name="phone"
-                  value={authForm.phone}
-                  onChange={handleChange}
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Password</label>
-                <input
-                  type="password"
-                  name="password"
-                  value={authForm.password}
-                  onChange={handleChange}
-                  required
-                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={authLoading || loading}
-                className="w-full inline-flex items-center justify-center rounded-md bg-orange-500 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-orange-600 disabled:opacity-50"
-              >
-                {authLoading || loading ? 'Creating account...' : 'Create account'}
-              </button>
-            </form>
-          )}
-        </div>
-      </div>
-    );
-  };
 
   const renderMiniCart = () => {
     if (!showMiniCart || miniCartItems.length === 0) return null;
@@ -387,24 +192,15 @@ const Header = ({ activeTab, setActiveTab }) => {
                 </div>
                 <button
                   type="button"
-                  onClick={logout}
+                  onClick={handleLogout}
                   className="inline-flex h-9 items-center justify-center rounded-full bg-gray-100 px-3 text-xs font-medium text-gray-700 hover:bg-gray-200"
                 >
                   <FiLogOut className="mr-1" /> Logout
                 </button>
               </div>
             ) : (
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setShowAuthPanel((prev) => !prev)}
-                  className="inline-flex h-9 items-center justify-center rounded-full bg-blue-600 px-3 text-xs font-medium text-white shadow-sm hover:bg-blue-700"
-                >
-                  <FiLogIn className="mr-1" />
-                  <span className="hidden sm:inline">Login / Register</span>
-                  <span className="sm:hidden">Sign in</span>
-                </button>
-                {renderAuthForm()}
+              <div className="hidden sm:flex flex-col items-end">
+                <span className="text-xs font-semibold text-gray-800">Guest</span>
               </div>
             )}
           </div>
