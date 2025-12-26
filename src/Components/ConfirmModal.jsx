@@ -4,6 +4,8 @@ export default function ConfirmModal({
   open,
   title,
   message,
+  confirmText = "Delete",
+  cancelText = "Cancel",
   onConfirm,
   onCancel,
 }) {
@@ -21,14 +23,14 @@ export default function ConfirmModal({
             onClick={onCancel}
             className="px-4 py-2 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300"
           >
-            Cancel
+            {cancelText}
           </button>
 
           <button
             onClick={onConfirm}
             className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700"
           >
-            Delete
+            {confirmText}
           </button>
         </div>
       </div>
