@@ -93,28 +93,130 @@ export async function updateCart({ cartId, body, token }) {
   return data.cart || data;
 }
 
-export async function getShippingOptions(cartId, token) {
-  const res = await client.get('/store/shipping-options', {
+export async function getShippingOptions(cartId, token, paymentMode) {
+  // 1) Load real Medusa shipping options that are valid for this cart.
+  const baseRes = await client.get('/store/shipping-options', {
     params: { cart_id: cartId },
     headers: buildBaseHeaders(token),
   });
 
-  const data = res.data;
-  if (Array.isArray(data)) return data;
-  if (Array.isArray(data.shipping_options)) return data.shipping_options;
-  if (Array.isArray(data.data)) return data.data;
-  return [];
+  const baseData = baseRes.data || {};
+  let baseOptions = [];
+  if (Array.isArray(baseData)) {
+    baseOptions = baseData;
+  } else if (Array.isArray(baseData.shipping_options)) {
+    baseOptions = baseData.shipping_options;
+  } else if (Array.isArray(baseData.shippingOptions)) {
+    baseOptions = baseData.shippingOptions;
+  } else if (Array.isArray(baseData.data)) {
+    baseOptions = baseData.data;
+  }
+
+  // If no base options are available, there is nothing valid we can attach.
+  if (!Array.isArray(baseOptions) || baseOptions.length === 0) {
+    return [];
+  }
+
+  // 2) Fetch dynamic Shiprocket rates (Standard / Express) for this cart,
+  // using the current payment mode (e.g., 'cod' vs 'online') so Shiprocket
+  // can apply the correct COD flag.
+  let dynamic = null;
+  try {
+    const ratesRes = await client.post(
+      '/store/shipping/rates',
+      {
+        cart_id: cartId,
+        payment_type: paymentMode || undefined,
+      },
+      { headers: buildJsonHeaders(token) },
+    );
+    dynamic = ratesRes.data || null;
+  } catch {
+    // If Shiprocket fails, fall back to native prices.
+    dynamic = null;
+  }
+
+  const standardRate =
+    dynamic && dynamic.serviceable !== false && dynamic.standard
+      ? dynamic.standard
+      : null;
+  const expressRate =
+    dynamic && dynamic.serviceable !== false && dynamic.express
+      ? dynamic.express
+      : null;
+
+  // 3) Merge: keep real option IDs, but override label/amount for Standard/Express
+  // using Shiprocket rates when available.
+  const merged = baseOptions.map((opt) => {
+    const typeCode =
+      (opt.type && opt.type.code) ||
+      opt.code ||
+      (typeof opt.name === 'string' ? opt.name.toLowerCase() : '');
+
+    if (typeCode === 'standard' && standardRate && typeof standardRate.amount === 'number') {
+      return {
+        ...opt,
+        label: standardRate.eta
+          ? `Standard (${standardRate.eta})`
+          : opt.type?.label || opt.name || 'Standard Delivery',
+        amount: standardRate.amount,
+        metadata: {
+          ...(opt.metadata || {}),
+          shipping_type: 'standard',
+          eta: standardRate.eta || null,
+          eta_days: standardRate.eta_days ?? null,
+        },
+      };
+    }
+
+    if (typeCode === 'express' && expressRate && typeof expressRate.amount === 'number') {
+      return {
+        ...opt,
+        label: expressRate.eta
+          ? `Express (${expressRate.eta})`
+          : opt.type?.label || opt.name || 'Express Delivery',
+        amount: expressRate.amount,
+        metadata: {
+          ...(opt.metadata || {}),
+          shipping_type: 'express',
+          eta: expressRate.eta || null,
+          eta_days: expressRate.eta_days ?? null,
+        },
+      };
+    }
+
+    return opt;
+  });
+
+  return merged;
 }
 
 export async function addShippingMethod({ cartId, optionId, data = {}, token }) {
-  const res = await client.post(
-    `/store/carts/${cartId}/shipping-methods`,
-    {
-      option_id: optionId,
-      data,
-    },
-    { headers: buildJsonHeaders(token) },
-  );
+  const hasShiprocketAmount =
+    data &&
+    typeof data.shiprocket_amount === 'number' &&
+    !Number.isNaN(data.shiprocket_amount) &&
+    data.shiprocket_amount >= 0;
+
+  const endpoint = hasShiprocketAmount
+    ? '/store/shiprocket/shipping-method'
+    : `/store/carts/${cartId}/shipping-methods`;
+
+  const body = hasShiprocketAmount
+    ? {
+        cart_id: cartId,
+        shipping_option_id: optionId,
+        amount: data.shiprocket_amount,
+        data,
+      }
+    : {
+        option_id: optionId,
+        data,
+      };
+
+  const res = await client.post(endpoint, body, {
+    headers: buildJsonHeaders(token),
+  });
 
   const payload = res.data;
   return payload.cart || payload;

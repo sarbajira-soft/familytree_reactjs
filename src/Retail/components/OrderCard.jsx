@@ -60,9 +60,45 @@ const OrderCard = ({ order, onViewDetails }) => {
     primaryPayment?.providerId ||
     '';
 
+  const orderContext = order.context || order.cart?.context || {};
+
+  const contextPaymentRaw =
+    (typeof orderContext.payment_type === 'string' && orderContext.payment_type) ||
+    (typeof orderContext.payment_mode === 'string' && orderContext.payment_mode) ||
+    (typeof orderContext.payment_method === 'string' && orderContext.payment_method) ||
+    '';
+
+  const contextPaymentLower = contextPaymentRaw.toLowerCase();
+  const paymentStatusLower = (paymentStatus || '').toLowerCase();
+  const providerIdLower = (providerId || '').toLowerCase();
+
   let paymentMethodLabel = 'Cash on delivery';
-  if ((providerId || '').toLowerCase().includes('razorpay')) {
+
+  if (providerIdLower.includes('razorpay')) {
     paymentMethodLabel = 'Online (Razorpay)';
+  } else if (
+    contextPaymentLower.includes('online') ||
+    contextPaymentLower.includes('razorpay') ||
+    contextPaymentLower.includes('prepaid') ||
+    contextPaymentLower.includes('card') ||
+    contextPaymentLower.includes('upi')
+  ) {
+    paymentMethodLabel = 'Online payment';
+  } else if (
+    contextPaymentLower.includes('cod') ||
+    contextPaymentLower.includes('cash_on_delivery') ||
+    contextPaymentLower.includes('cash-on-delivery')
+  ) {
+    paymentMethodLabel = 'Cash on delivery';
+  } else if (
+    paymentStatusLower === 'captured' ||
+    paymentStatusLower === 'paid' ||
+    paymentStatusLower === 'completed' ||
+    paymentStatusLower === 'succeeded'
+  ) {
+    // If payment is clearly completed/captured but we lack context/provider hints,
+    // assume this is an online/prepaid payment.
+    paymentMethodLabel = 'Online payment';
   }
 
   return (
