@@ -147,6 +147,8 @@ export const UserProvider = ({ children }) => {
         termsVersion: termsVersion || 'v1.0.0',
         termsAcceptedAt: termsAcceptedAt || null,
 
+        isPrivate: typeof userProfile.isPrivate === 'boolean' ? userProfile.isPrivate : false,
+
         raw: userProfile,
       });
       

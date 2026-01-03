@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import CreatePostModal from "../Components/CreatePostModal";
 import PostViewerModal from "../Components/PostViewerModal";
 import { useUser } from "../Contexts/UserContext";
+import { useNavigate } from "react-router-dom";
 import {
   FiImage,
   FiUsers,
@@ -46,6 +47,17 @@ const PostPage = () => {
   const [activeEmojiPostId, setActiveEmojiPostId] = useState(null);
   const commentInputRefs = useRef({});
   const emojiPickerRef = useRef(null);
+  const navigate = useNavigate();
+
+  const goToUserProfile = (targetUserId) => {
+    if (!targetUserId) return;
+    const myId = userInfo?.userId;
+    if (myId && Number(targetUserId) === Number(myId)) {
+      navigate("/myprofile");
+    } else {
+      navigate(`/user/${targetUserId}`);
+    }
+  };
 
   useEffect(() => {
     const storedToken = localStorage.getItem("access_token");
@@ -109,6 +121,7 @@ const PostPage = () => {
           ? data.map((p) => ({
               id: p.id,
               author: p.user?.name || "Unknown",
+              authorId: p.user?.userId || p.createdBy || null,
               avatar: p.user?.profile || "/assets/user.png",
               time: new Date(p.createdAt).toLocaleString(),
               caption: p.caption,
@@ -598,10 +611,14 @@ const PostPage = () => {
                   <img
                     src={post.avatar}
                     alt={post.author}
-                    className="w-8 h-8 sm:w-9 sm:h-9 rounded-full border object-cover"
+                    className="w-8 h-8 sm:w-9 sm:h-9 rounded-full border object-cover cursor-pointer"
+                    onClick={() => goToUserProfile(post.authorId)}
                   />
                   <div>
-                    <p className="font-semibold text-gray-900 text-sm sm:text-base">
+                    <p
+                      className="font-semibold text-gray-900 text-sm sm:text-base cursor-pointer"
+                      onClick={() => goToUserProfile(post.authorId)}
+                    >
                       {post.author}
                     </p>
                     <p className="text-xs text-gray-500">{post.time}</p>
@@ -638,7 +655,12 @@ const PostPage = () => {
               {/* Caption */}
               {post.caption && (
                 <div className="px-4 py-2 text-sm text-gray-700">
-                  <span className="font-semibold mr-1">{post.author}</span>
+                  <span
+                    className="font-semibold mr-1 cursor-pointer"
+                    onClick={() => goToUserProfile(post.authorId)}
+                  >
+                    {post.author}
+                  </span>
                   {post.caption}
                 </div>
               )}

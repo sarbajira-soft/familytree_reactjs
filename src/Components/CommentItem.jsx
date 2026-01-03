@@ -3,6 +3,7 @@ import { FaEdit, FaTrash, FaReply, FaSave, FaTimes } from 'react-icons/fa';
 import { FiSmile } from 'react-icons/fi';
 import { motion } from 'framer-motion';
 import EmojiPicker from 'emoji-picker-react';
+import { useNavigate } from 'react-router-dom';
 
 const CommentItem = ({ 
   comment, 
@@ -13,6 +14,7 @@ const CommentItem = ({
   depth = 0,
   maxDepth = 3 
 }) => {
+  const navigate = useNavigate();
   const [isEditing, setIsEditing] = useState(false);
   const [isReplying, setIsReplying] = useState(false);
   const [editText, setEditText] = useState(comment.comment || comment.content || '');
@@ -113,9 +115,19 @@ const CommentItem = ({
   };
 
   const user = comment.user || {};
+  const commenterId = user.userId || comment.userId || null;
   const fullName = `${user.firstName || 'Unknown'} ${user.lastName || ''}`.trim();
   const profileUrl = user.profile || '/assets/user.png';
   const commentText = comment.comment || comment.content || '';
+
+  const goToUserProfile = (targetUserId) => {
+    if (!targetUserId) return;
+    if (currentUserId && Number(targetUserId) === Number(currentUserId)) {
+      navigate('/myprofile');
+    } else {
+      navigate(`/user/${targetUserId}`);
+    }
+  };
 
   return (
     <motion.div
@@ -128,7 +140,8 @@ const CommentItem = ({
       <img
         src={profileUrl}
         alt={fullName}
-        className="w-9 h-9 rounded-full object-cover border border-gray-300 flex-shrink-0"
+        className="w-9 h-9 rounded-full object-cover border border-gray-300 flex-shrink-0 cursor-pointer"
+        onClick={() => goToUserProfile(commenterId)}
       />
 
       {/* Comment Content */}
@@ -167,7 +180,12 @@ const CommentItem = ({
           ) : (
             <>
               <div className="text-[13px]">
-                <span className="font-semibold text-gray-900 mr-2">{fullName}</span>
+                <span
+                  className="font-semibold text-gray-900 mr-2 cursor-pointer"
+                  onClick={() => goToUserProfile(commenterId)}
+                >
+                  {fullName}
+                </span>
                 <span className="text-gray-700">{commentText}</span>
               </div>
               <div className="text-[11px] text-gray-500 mt-1">

@@ -3,6 +3,7 @@ import CreatePostModal from '../Components/CreatePostModal';
 import PostViewerModal from '../Components/PostViewerModal';
 import { useUser } from '../Contexts/UserContext';
 import {jwtDecode} from 'jwt-decode';
+import { useNavigate } from 'react-router-dom';
 
 import {
     FiImage, FiEdit3, FiTrash2, FiGlobe, FiUsers, FiPlusCircle, FiFeather, FiSearch, FiBell,
@@ -11,7 +12,6 @@ import {
 import { FaRegHeart, FaHeart, FaCommentDots, FaShareAlt } from 'react-icons/fa';
 import { MdPublic, MdPeople } from 'react-icons/md';
 import { caption } from 'framer-motion/client';
-
 
 
 const PostsAndFeedsPage = () => {
@@ -30,7 +30,18 @@ const PostsAndFeedsPage = () => {
     const [searchCaption, setSearchCaption] = useState('');
     const [feedError, setFeedError] = useState(null);
     const searchTimeoutRef = useRef(null);
+    const navigate = useNavigate();
     // Removed familyCode hook since we're using userInfo directly
+
+    const goToUserProfile = (targetUserId) => {
+        if (!targetUserId) return;
+        const myId = userInfo?.userId;
+        if (myId && Number(targetUserId) === Number(myId)) {
+            navigate('/myprofile');
+        } else {
+            navigate(`/user/${targetUserId}`);
+        }
+    };
 
     useEffect(() => {
         const storedToken = localStorage.getItem('access_token');
@@ -138,6 +149,7 @@ const PostsAndFeedsPage = () => {
             const formattedPosts = data.map(post => ({
             id: post.id,
             author: post.user?.name || 'Unknown',
+            authorId: post.user?.userId || post.createdBy || null,
             avatar: post.user?.profile || '/assets/user.png',
             time: new Date(post.createdAt).toLocaleString(),
             caption: post.caption,
@@ -372,9 +384,19 @@ const PostsAndFeedsPage = () => {
                                     {/* Post Header */}
                                     <div className="flex items-center justify-between p-4 pb-2">
                                         <div className="flex items-center">
-                                            <img src={post.avatar} alt={post.author} className="w-12 h-12 rounded-full object-cover mr-3 border-2 border-primary-200" />
+                                            <img
+                                                src={post.avatar}
+                                                alt={post.author}
+                                                className="w-12 h-12 rounded-full object-cover mr-3 border-2 border-primary-200 cursor-pointer"
+                                                onClick={() => goToUserProfile(post.authorId)}
+                                            />
                                             <div>
-                                                <p className="font-bold text-gray-900 text-base">{post.author}</p>
+                                                <p
+                                                    className="font-bold text-gray-900 text-base cursor-pointer"
+                                                    onClick={() => goToUserProfile(post.authorId)}
+                                                >
+                                                    {post.author}
+                                                </p>
                                                 <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-0.5">
                                                     <span>{post.time}</span>
                                                     {post.privacy === 'family' ? (

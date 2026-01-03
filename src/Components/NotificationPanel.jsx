@@ -79,6 +79,7 @@ const NotificationPanel = ({ open, onClose, onNotificationCountUpdate , isConnec
         data: n.data || {},
         createdAt: n.createdAt,
         triggeredBy: n.triggeredBy,
+        triggeredByUser: n.triggeredByUser || null,
       }));
 
       // Debug: Log all notifications to see what types we're getting

@@ -47,6 +47,50 @@ const ProfilePage = () => {
   const [isBioExpanded, setIsBioExpanded] = useState(false);
   const toggleBioExpanded = () => setIsBioExpanded(!isBioExpanded);
 
+  const privacyMutation = useMutation({
+    mutationFn: async (isPrivate) => {
+      if (!token) {
+        throw new Error('Not authenticated');
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL}/user/privacy`,
+        {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ isPrivate }),
+        },
+      );
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(errText || 'Failed to update privacy');
+      }
+
+      return response.json();
+    },
+    onSuccess: async () => {
+      await refetchUser();
+      Swal.fire({
+        icon: 'success',
+        title: 'Updated',
+        text: 'Privacy updated successfully.',
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    },
+    onError: (err) => {
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: err?.message || 'Failed to update privacy',
+      });
+    },
+  });
+
   useEffect(() => {
     const storedToken = localStorage.getItem("access_token");
     if (storedToken) {
@@ -545,12 +589,46 @@ const ProfilePage = () => {
                       </div>
                     )}
                   </div>
-                  <button
-                    onClick={handleEditProfileClick}
-                    className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-5 py-2.5 rounded-xl shadow-lg hover:bg-secondary-700 transition duration-300 flex items-center gap-2 font-medium text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-opacity-75"
-                  >
-                    <FiEdit3 size={18} /> Edit Profile
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-2 text-sm text-gray-700 select-none">
+                      <FiSettings size={18} />
+                      <span className="font-medium">Private Account</span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          privacyMutation.mutate(!Boolean(userInfo?.isPrivate))
+                        }
+                        disabled={
+                          privacyMutation.isPending ||
+                          !token ||
+                          typeof userInfo?.isPrivate !== 'boolean'
+                        }
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-opacity-75 ${
+                          userInfo?.isPrivate ? 'bg-primary-600' : 'bg-gray-300'
+                        } ${
+                          privacyMutation.isPending || !token
+                            ? 'opacity-60 cursor-not-allowed'
+                            : 'cursor-pointer'
+                        }`}
+                        aria-pressed={Boolean(userInfo?.isPrivate)}
+                      >
+                        <span
+                          className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+                            userInfo?.isPrivate
+                              ? 'translate-x-5'
+                              : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                    </label>
+
+                    <button
+                      onClick={handleEditProfileClick}
+                      className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-5 py-2.5 rounded-xl shadow-lg hover:bg-secondary-700 transition duration-300 flex items-center gap-2 font-medium text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-opacity-75"
+                    >
+                      <FiEdit3 size={18} /> Edit Profile
+                    </button>
+                  </div>
                 </div>
 
                 <div className="text-gray-800 leading-relaxed text-sm md:text-base whitespace-pre-wrap">
@@ -658,12 +736,8 @@ const ProfilePage = () => {
         {/* Content Display Area */}
         {showPosts ? (
           loadingPosts ? (
-            // <div className="flex justify-center items-center h-64">
-            //   <div className="animate-spin rounded-full h-10 w-10 border-t-4 border-primary-600 border-solid"></div>
-            // </div>
             <div className="flex flex-col sm:flex-row gap-4">
               {Array.from({ length: 3 }).map((_, i) => (
-                //   <ShimmerImageCard key={i} width={340} height={190} />
                 <ShimmerImageCard key={i} width={380} height={280} />
               ))}
             </div>
@@ -747,23 +821,13 @@ const ProfilePage = () => {
                   <p className="text-gray-500 text-lg mb-4">
                     No posts yet. Share your first family moment!
                   </p>
-                  {/* <button
-                                        onClick={handleCreatePostClick}
-                                        className="bg-primary-500 text-white px-8 py-3 rounded-full shadow hover:bg-primary-600 transition-colors text-base font-medium"
-                                    >
-                                        Create First Post
-                                    </button> */}
                 </div>
               )}
             </div>
           )
         ) : loadingGalleries ? (
-          //   <div className="flex justify-center items-center h-64">
-          //     <div className="animate-spin rounded-full h-10 w-10 border-t-4 border-primary-600 border-solid"></div>
-          //   </div>
           <div className="flex flex-col sm:flex-row gap-4">
             {Array.from({ length: 3 }).map((_, i) => (
-              //   <ShimmerImageCard key={i} width={340} height={190} />
               <ShimmerImageCard key={i} width={380} height={280} />
             ))}
           </div>
@@ -825,12 +889,6 @@ const ProfilePage = () => {
                 <p className="text-gray-500 text-lg mb-4">
                   No galleries yet. Organize your cherished memories!
                 </p>
-                {/* <button
-                                        onClick={handleCreateAlbumClick}
-                                        className="bg-primary-500 text-white px-8 py-3 rounded-full shadow hover:bg-primary-600 transition-colors text-base font-medium"
-                                    >
-                                        Create First Album
-                                    </button> */}
               </div>
             )}
           </div>

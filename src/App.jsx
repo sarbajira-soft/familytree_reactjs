@@ -48,6 +48,7 @@ const AssociatedFamilyTreePage = lazy(() =>
   import("./Pages/AssociatedFamilyTreePage")
 );
 const ProfileModule = lazy(() => import("./Pages/ProfileFormPage"));
+const UserProfile = lazy(() => import("./Pages/UserProfile"));
 
 // ---------------- Loading Fallback ----------------
 const LoadingFallback = () => (
@@ -187,6 +188,7 @@ function App() {
                 {/* Dashboard & Profile */}
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/myprofile" element={<MyProfile />} />
+                <Route path="/user/:userId" element={<UserProfile />} />
 
                 {/* Family & Members */}
                 <Route path="/my-family" element={<MyFamily />} />

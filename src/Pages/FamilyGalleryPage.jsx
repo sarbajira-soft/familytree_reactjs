@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import GalleryViewerModal from '../Components/GalleryViewerModal';
 import { FiSearch, FiPlusCircle } from 'react-icons/fi';
@@ -130,6 +131,7 @@ const GalleryCollage = ({ photos = [], onOpenAlbum }) => {
 const FamilyGalleryPage = () => {
   const { userInfo, userLoading } = useUser(); // Get user info from context
   const [token, setToken] = useState(null); // State to store the token
+  const navigate = useNavigate();
 
   const [activeFeed, setActiveFeed] = useState('public'); // Changed to 'public' as default
   const [isGalleryModalOpen, setIsGalleryModalOpen] = useState(false);
@@ -192,6 +194,7 @@ const FamilyGalleryPage = () => {
         title: gallery.galleryTitle,
         description: gallery.galleryDescription,
         author: gallery.user?.name || 'Unknown',
+        authorId: gallery.user?.userId || gallery.createdBy || null,
         privacy: gallery.privacy,
         photosCount: gallery.galleryAlbums.length,
         likes: gallery.likeCount,
@@ -222,21 +225,30 @@ const FamilyGalleryPage = () => {
 
   const filteredAlbums = galleryAlbums; // No need to filter here, API should return filtered results
 
- const collagePhotos = useMemo(() => {
-   if (!filteredAlbums.length) return [];
+  const goToUserProfile = (targetUserId) => {
+    if (!targetUserId) return;
+    const myId = userInfo?.userId;
+    if (myId && Number(targetUserId) === Number(myId)) {
+      navigate('/myprofile');
+    } else {
+      navigate(`/user/${targetUserId}`);
+    }
+  };
 
-   return filteredAlbums
-     .filter((a) => a && a.coverPhoto) // prevents undefined
-     .map((album) => ({
-       id: album.id,
-       url:
-         album.coverPhoto || "https://picsum.photos/seed/default_album/400/300",
-       caption: album.title,
-       albumTitle: album.title,
-       albumId: album.id,
-     }));
- }, [filteredAlbums]);
+  const collagePhotos = useMemo(() => {
+    if (!filteredAlbums.length) return [];
 
+    return filteredAlbums
+      .filter((a) => a && a.coverPhoto) // prevents undefined
+      .map((album) => ({
+        id: album.id,
+        url:
+          album.coverPhoto || "https://picsum.photos/seed/default_album/400/300",
+        caption: album.title,
+        albumTitle: album.title,
+        albumId: album.id,
+      }));
+  }, [filteredAlbums]);
 
   const openGalleryModal = (album) => {
     setSelectedAlbum(album);
@@ -419,10 +431,17 @@ const FamilyGalleryPage = () => {
                       </h3>
                       <p className="text-sm text-gray-600 mb-3">
                         by{" "}
-                        <span className="font-medium text-primary-700">
+                        <span
+                          className="font-medium text-primary-700 cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            goToUserProfile(album.authorId);
+                          }}
+                        >
                           {album.author}
                         </span>
                       </p>
+
                       <div className="flex items-center gap-2 text-sm text-gray-500">
                         {album.privacy === "private" ? ( // Changed 'family' to 'private' to match API
                           <span
