@@ -276,6 +276,8 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isCreateAlbumModalOpen, setIsCreateAlbumModalOpen] = useState(false);
   const [isCreatePostModalOpen, setIsCreatePostModalOpen] = useState(false);
+  const [isScheduleOptionsOpen, setIsScheduleOptionsOpen] = useState(false);
+  const [isEventCalendarModalOpen, setIsEventCalendarModalOpen] = useState(false);
   const { userInfo } = useUser();
   const navigate = useNavigate();
   const token = getToken();
@@ -355,7 +357,7 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
     if (!dashboardData?.gallery) return [];
     const rawGallery = dashboardData.gallery;
     const list = Array.isArray(rawGallery?.data) ? rawGallery.data : rawGallery;
-    return Array.isArray(list) ? list.slice(0, 6) : [];
+    return Array.isArray(list) ? list.slice(0, 3) : [];
   }, [dashboardData]);
   
    const formatAlbumForModal = (album) => {
@@ -603,7 +605,7 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
 
           {/* Schedule Event */}
           <button
-            onClick={() => setIsCreateEventModalOpen(true)}
+            onClick={() => setIsScheduleOptionsOpen(true)}
             className="flex items-center justify-center gap-1 sm:gap-2 
                bg-primary-700 text-white rounded-md sm:rounded-lg 
                px-1 sm:px-3 py-2 sm:py-3 text-xs sm:text-sm 
@@ -673,9 +675,6 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
                 </div>
               </div>
             )}
-
-            {/* Mini event calendar under photos */}
-            <MiniEventCalendar events={upcomingEventsPreview} />
 
             {/* Upcoming event cards under calendar */}
             {upcomingEventsPreview.length > 0 && (
@@ -839,6 +838,65 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
         </div>
 
         {/* Modals */}
+        {isScheduleOptionsOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+            <div className="bg-white rounded-xl shadow-lg w-full max-w-sm p-5">
+              <h2 className="text-lg font-semibold text-gray-900">Schedule Event</h2>
+              <p className="mt-1 text-sm text-gray-600">
+                Choose how you want to manage your events.
+              </p>
+              <div className="mt-4 space-y-3">
+                <button
+                  onClick={() => {
+                    setIsScheduleOptionsOpen(false);
+                    setIsCreateEventModalOpen(true);
+                  }}
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-primary-700 text-white text-sm font-semibold hover:bg-primary-800 transition-colors"
+                >
+                  <span>Create new event</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setIsScheduleOptionsOpen(false);
+                    setIsEventCalendarModalOpen(true);
+                  }}
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-primary-700 text-white text-sm font-semibold hover:bg-primary-800 transition-colors"
+                >
+                  <span>View event calendar</span>
+                </button>
+              </div>
+              <button
+                onClick={() => setIsScheduleOptionsOpen(false)}
+                className="mt-4 bg-white w-full text-center text-sm font-medium text-gray-500 hover:text-gray-700"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {isEventCalendarModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+            <div className="bg-white rounded-xl shadow-lg w-full max-w-2xl max-h-[90vh] flex flex-col">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                <h2 className="text-base sm:text-lg font-semibold text-gray-900">
+                  Event Calendar
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setIsEventCalendarModalOpen(false)}
+                  className="bg-unset text-gray-500 hover:text-gray-700 text-xl leading-none px-2"
+                >
+                  &times;
+                </button>
+              </div>
+              <div className="p-3 sm:p-4 overflow-y-auto">
+                <MiniEventCalendar events={upcomingEventsPreview} />
+              </div>
+            </div>
+          </div>
+        )}
+
         <CreateEventModal
           isOpen={isCreateEventModalOpen}
           onClose={() => setIsCreateEventModalOpen(false)}

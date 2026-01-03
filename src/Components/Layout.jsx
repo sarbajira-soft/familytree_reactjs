@@ -112,13 +112,11 @@ const Layout = ({ noScroll = false }) => {
           ref={sidebarRef}
           onMouseLeave={() => setSidebarCollapsed(true)}
           onMouseEnter={() => setSidebarCollapsed(false)}
-          className={`flex flex-col bg-white shadow-md border-r border-gray-100 transition-all duration-300 ${
-            sidebarCollapsed ? "w-20" : "w-72"
-          }`}
+          className="relative h-full flex-shrink-0"
         >
-          {/* Sidebar Header */}
-          <div className="flex items-center justify-center px-4 py-3 border-b border-gray-100">
-            <div className="flex items-center gap-3">
+          {/* Collapsed rail (takes layout width) */}
+          <div className="flex flex-col bg-white shadow-md border-r border-gray-100 w-20 h-full">
+            <div className="flex items-center justify-center px-4 py-3 border-b border-gray-100">
               <div className="w-10 h-10">
                 <img
                   src="/assets/logo-green-light.png"
@@ -126,18 +124,42 @@ const Layout = ({ noScroll = false }) => {
                   className="w-full h-full object-cover rounded-full"
                 />
               </div>
-              {!sidebarCollapsed && (
-                <h2 className="text-2xl font-bold text-primary-700">Familyss</h2>
-              )}
             </div>
+
+            <Sidebar
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+              collapsed
+            />
           </div>
 
-          {/* Sidebar Content */}
-          <Sidebar
-            activeTab={activeTab}
-            setActiveTab={setActiveTab}
-            collapsed={sidebarCollapsed}
-          />
+          {/* Expanded overlay sidebar (does not affect layout width, sits above header) */}
+          <div
+            className={`fixed inset-y-0 left-0 z-[70] transform transition-transform duration-300 ${
+              sidebarCollapsed ? "-translate-x-full" : "translate-x-0"
+            }`}
+          >
+            <div className="flex flex-col bg-white shadow-2xl border-r border-gray-100 h-full w-72">
+              <div className="flex items-center justify-center px-4 py-3 border-b border-gray-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10">
+                    <img
+                      src="/assets/logo-green-light.png"
+                      alt="Familyss Logo"
+                      className="w-full h-full object-cover rounded-full"
+                    />
+                  </div>
+                  <h2 className="text-2xl font-bold text-primary-700">Familyss</h2>
+                </div>
+              </div>
+
+              <Sidebar
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                collapsed={false}
+              />
+            </div>
+          </div>
         </div>
       )}
 
