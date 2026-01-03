@@ -523,7 +523,7 @@ const PostPage = () => {
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto px-0 sm:px-4 py-2 sm:py-6">
+    <div className="w-full max-w-4xl mx-auto px-0 sm:px-4  sm:py-6">
       {/* Header */}
       <div className="flex justify-between items-center mb-4 sm:mb-6 px-2 sm:px-0">
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Feed</h1>
@@ -555,34 +555,6 @@ const PostPage = () => {
               </button>
             )}
           </div>
-
-          {/* Search */}
-          {/* {showSearchInput ? (
-            <input
-              type="text"
-              autoFocus
-              placeholder="Search..."
-              value={searchCaption}
-              onChange={(e) => {
-                const val = e.target.value;
-                setSearchCaption(val);
-                clearTimeout(searchTimeoutRef.current);
-                searchTimeoutRef.current = setTimeout(
-                  () => fetchPosts(val),
-                  400
-                );
-              }}
-              onBlur={() => !searchCaption && setShowSearchInput(false)}
-              className="w-32 sm:w-40 px-3 py-1.5 rounded-full border border-gray-300 text-sm focus:ring-2 focus:ring-blue-400"
-            />
-          ) : (
-            <button
-              onClick={() => setShowSearchInput(true)}
-              className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-blue-100 hover:text-blue-600 transition-all"
-            >
-              <FiSearch size={18} />
-            </button>
-          )} */}
         </div>
       </div>
 
