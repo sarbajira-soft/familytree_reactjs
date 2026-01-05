@@ -5,19 +5,62 @@ import ProductCard from './ProductCard';
 import ProductDetail from './ProductDetail';
 import { getVariantPriceAmount } from '../utils/helpers';
 import { ArrowLeft } from 'lucide-react';
+import * as productService from '../services/productService';
 
-const ProductList = () => {
-  const { products, fetchProducts, loading, error, addToCart } = useRetail();
+const ProductList = ({ initialProductId }) => {
+  const { products, fetchProducts, loading, error, addToCart, token } = useRetail();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('featured');
   const [collectionFilter, setCollectionFilter] = useState('all');
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [initialSelectionDone, setInitialSelectionDone] = useState(false);
+  const [initialDetailLoading, setInitialDetailLoading] = useState(false);
 
   useEffect(() => {
     fetchProducts();
   }, [fetchProducts]);
+
+  useEffect(() => {
+    if (!initialProductId || initialSelectionDone) return;
+
+    let cancelled = false;
+
+    const loadProduct = async () => {
+      try {
+        setInitialDetailLoading(true);
+        const product = await productService.fetchProductById(initialProductId, token || null);
+        if (!cancelled && product) {
+          setSelectedProduct(product);
+          setDetailOpen(true);
+          setInitialSelectionDone(true);
+          setInitialDetailLoading(false);
+          return;
+        }
+      } catch (err) {
+        // If direct fetch fails, fall back to any already-loaded products list
+        if (!cancelled && Array.isArray(products) && products.length > 0) {
+          const match = products.find((p) => p.id === initialProductId);
+          if (match) {
+            setSelectedProduct(match);
+            setDetailOpen(true);
+            setInitialSelectionDone(true);
+          }
+        }
+      } finally {
+        if (!cancelled) {
+          setInitialDetailLoading(false);
+        }
+      }
+    };
+
+    loadProduct();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [initialProductId, token, products, initialSelectionDone]);
 
   const collections = useMemo(() => {
     const set = new Set();

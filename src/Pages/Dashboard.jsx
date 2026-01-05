@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useUser } from "../Contexts/UserContext";
 import CreateEventModal from "../Components/CreateEventModal";
 import ProfileFormModal from "../Components/ProfileFormModal";
@@ -21,6 +21,9 @@ import { useQuery } from "@tanstack/react-query";
 import PostPage from "./PostPage";
 import DashboardShimmer from "./DashboardShimmer";
 import GalleryViewerModal from "../Components/GalleryViewerModal";
+import DashboardGiftProductModal from "../Components/DashboardGiftProductModal";
+import { fetchProducts as fetchMedusaProducts } from "../Retail/services/productService";
+import { getProductThumbnail } from "../Retail/utils/helpers";
 
 const getLocalDateKey = (dateValue) => {
   if (!dateValue) return "";
@@ -278,6 +281,11 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
   const [isCreatePostModalOpen, setIsCreatePostModalOpen] = useState(false);
   const [isScheduleOptionsOpen, setIsScheduleOptionsOpen] = useState(false);
   const [isEventCalendarModalOpen, setIsEventCalendarModalOpen] = useState(false);
+  const [openGiftEventId, setOpenGiftEventId] = useState(null);
+  const [giftSuggestions, setGiftSuggestions] = useState([]);
+  const [medusaProducts, setMedusaProducts] = useState([]);
+  const [isGiftDetailModalOpen, setIsGiftDetailModalOpen] = useState(false);
+  const [selectedGiftProductId, setSelectedGiftProductId] = useState(null);
   const { userInfo } = useUser();
   const navigate = useNavigate();
   const token = getToken();
@@ -353,6 +361,8 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
     return Array.isArray(list) ? list : [];
   }, [dashboardData]);
 
+  const productSuggestionsPool = medusaProducts;
+
   const galleryPreview = useMemo(() => {
     if (!dashboardData?.gallery) return [];
     const rawGallery = dashboardData.gallery;
@@ -394,6 +404,31 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
      setSelectedAlbum(formattedAlbum);
      setIsGalleryModalOpen(true);
    };
+
+  const handleProductSuggestionClick = (product) => {
+    if (!product || !product.id) {
+      return;
+    }
+    setSelectedGiftProductId(product.id);
+    setIsGiftDetailModalOpen(true);
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      try {
+        const products = await fetchMedusaProducts();
+        if (isMounted && Array.isArray(products)) {
+          setMedusaProducts(products);
+        }
+      } catch (err) {
+        console.error("Failed to load gift products for suggestions", err);
+      }
+    })();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const getEventCardStyle = (eventType) => {
     switch (eventType) {
@@ -788,13 +823,65 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
                             </div>
 
                             <button
-                              onClick={() => navigate("/gifts-memories")}
+                              onClick={() => {
+                                if (!productSuggestionsPool.length) {
+                                  navigate("/gifts-memories");
+                                  return;
+                                }
+                                const shuffled = [...productSuggestionsPool].sort(
+                                  () => Math.random() - 0.5
+                                );
+                                setGiftSuggestions(shuffled.slice(0, 3));
+                                setOpenGiftEventId((prev) =>
+                                  prev === (event.id || index)
+                                    ? null
+                                    : event.id || index
+                                );
+                              }}
                               className="ml-3 inline-flex bg-white items-center gap-1 text-[11px] font-semibold text-secondary-600 hover:text-secondary-800 whitespace-nowrap"
                             >
                               <FiGift className="text-[13px]" />
                               <span>Send Gift</span>
                             </button>
                           </div>
+
+                          {openGiftEventId === (event.id || index) &&
+                            giftSuggestions.length > 0 && (
+                              <div className="mt-2 flex items-center justify-between gap-2">
+                                <div className="flex flex-1 gap-1.5">
+                                  {giftSuggestions.map((product) => {
+                                    const image = getProductThumbnail(product);
+                                    return (
+                                      <button
+                                        key={product.id}
+                                        type="button"
+                                        onClick={() =>
+                                          handleProductSuggestionClick(product)
+                                        }
+                                        className="relative flex-1 overflow-hidden rounded-md bg-gray-100 aspect-square group"
+                                      >
+                                        <img
+                                          src={image}
+                                          alt={product.title || product.description || "Gift"}
+                                          className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                          onError={(e) => {
+                                            e.target.src = "https://placehold.co/80x80?text=Gift";
+                                          }}
+                                        />
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => navigate("/gifts-memories")}
+                                  className="flex items-center justify-center w-7 h-7 rounded-full bg-secondary-500 text-white hover:bg-secondary-600 flex-shrink-0"
+                                  aria-label="More gifts"
+                                >
+                                  <FiChevronRight size={14} />
+                                </button>
+                              </div>
+                            )}
                         </div>
                       </div>
                     );
@@ -912,6 +999,14 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
         <CreatePostModal
           isOpen={isCreatePostModalOpen}
           onClose={() => setIsCreatePostModalOpen(false)}
+        />
+        <DashboardGiftProductModal
+          isOpen={isGiftDetailModalOpen}
+          productId={selectedGiftProductId}
+          onClose={() => {
+            setIsGiftDetailModalOpen(false);
+            setSelectedGiftProductId(null);
+          }}
         />
         {/* Gallery Viewer Modal */}
         {selectedAlbum && (
