@@ -41,6 +41,8 @@ export function getProductDefaultVariant(product) {
 export function getVariantPriceAmount(variant) {
   if (!variant) return 0;
 
+  console.log("variant -----",variant);
+
   const calculated = variant.calculated_price || variant.calculatedPrice;
   if (calculated) {
     if (typeof calculated.calculated_amount === 'number') return calculated.calculated_amount;

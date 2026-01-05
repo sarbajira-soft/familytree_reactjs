@@ -5,7 +5,14 @@ import BuyConfirmationModal from '../Components/BuyConfirmationModal';
 import { FiEye, FiShoppingCart, FiGift, FiChevronRight, FiHeart, FiStar, FiFilter, FiLoader, FiPackage, FiTrendingUp, FiMinus, FiPlus } from 'react-icons/fi';
 import { useUser } from '../Contexts/UserContext';
 import RetailMain from '../Retail/index'
+import { useLocation } from 'react-router-dom';
+
 const GiftListingPage = () => {
+    const location = useLocation();
+    const searchParams = new URLSearchParams(location.search);
+    const highlightedProductId = searchParams.get('productId');
+    const initialTab = searchParams.get('tab') || 'products';
+
     const [gifts, setGifts] = useState([]);
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -259,7 +266,7 @@ const GiftListingPage = () => {
 
     return (
         <>
-            <RetailMain/>
+            <RetailMain initialProductId={highlightedProductId} initialTab={initialTab} />
         </>
     );
 };  

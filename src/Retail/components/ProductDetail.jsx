@@ -66,6 +66,7 @@ const ProductDetail = ({ product, isOpen, onClose, onAddToCart, mode = 'modal' }
   if (mode === 'modal' && !isOpen) return null;
 
   const priceAmount = getVariantPriceAmount(currentVariant);
+  console.log("priceAmount -----",priceAmount);
   const images = Array.isArray(product.images) && product.images.length > 0 ? product.images : [];
   const fullImageUrl = (img) => {
     if (!img) return 'https://placehold.co/600x400?text=No+Image';

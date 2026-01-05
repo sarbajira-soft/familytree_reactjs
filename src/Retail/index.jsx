@@ -6,15 +6,15 @@ import Cart from './components/Cart';
 import Orders from './components/Orders';
 import Profile from './components/Profile';
 
-const RetailMain = () => {
-  const [activeTab, setActiveTab] = useState('products');
+const RetailMain = ({ initialProductId, initialTab = 'products' }) => {
+  const [activeTab, setActiveTab] = useState(initialTab);
 
   return (
     <RetailProvider>
       <div className="flex min-h-screen flex-col bg-gray-50">
         <Header activeTab={activeTab} setActiveTab={setActiveTab} />
         <main className="container mx-auto flex-1 px-4 py-4">
-          {activeTab === 'products' && <ProductList />}
+          {activeTab === 'products' && <ProductList initialProductId={initialProductId} />}
           {activeTab === 'cart' && (
             <Cart
               onContinueShopping={() => {

@@ -503,7 +503,7 @@ const OrderDetailsModal = ({ open, orderId, onClose }) => {
                                 const productId = item.product_id || item.product?.id;
                                 if (!productId) return;
                                 onClose();
-                                navigate(`/products/${productId}`);
+                                navigate(`/gifts-memories?productId=${productId}`);
                               }}
                               className="mt-1 bg-white inline-flex items-center text-[11px] font-medium text-blue-600 hover:underline"
                             >
