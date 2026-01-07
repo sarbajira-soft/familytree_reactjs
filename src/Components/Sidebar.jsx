@@ -23,6 +23,7 @@ const Sidebar = ({
   setActiveTab,
   activeTab,
   collapsed,
+  variant,
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -222,14 +223,18 @@ const Sidebar = ({
 
   return (
     <div
-      className={`flex flex-col h-full bg-white border-gray-100 shadow-xl sidebar-content transition-all  duration-200 ${
-        collapsed ? "w-20" : "w-74"
-      }`}
+      className={`flex flex-col bg-white border-gray-100 shadow-xl sidebar-content transition-all duration-200 ${
+        variant === "dropdown"
+          ? "w-full"
+          : collapsed
+            ? "w-20"
+            : "w-74"
+      } ${variant === "dropdown" ? "max-h-[70vh]" : "h-full"}`}
     >
       {/* Removed Logo and Heading */}
       <div
         className={`${
-          isMobile ? "pt-0" : "pt-6"
+          isMobile || variant === "dropdown" ? "pt-0" : "pt-6"
         } flex-1 overflow-y-auto py-5 px-4 custom-scrollbar scroll-smooth`}
       >
         <nav className="space-y-1.5">

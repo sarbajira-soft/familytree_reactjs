@@ -12,6 +12,7 @@ import {
   FiGlobe,
   FiClock,
   FiSmile,
+  FiChevronDown,
 } from "react-icons/fi";
 import { FaRegHeart, FaHeart, FaCommentDots } from "react-icons/fa";
 import { MdPublic, MdPeople } from "react-icons/md";
@@ -45,8 +46,11 @@ const PostPage = () => {
   const [replyingToCommentId, setReplyingToCommentId] = useState(null);
   const [replyText, setReplyText] = useState({});
   const [activeEmojiPostId, setActiveEmojiPostId] = useState(null);
+  const [feedMenuOpen, setFeedMenuOpen] = useState(false);
   const commentInputRefs = useRef({});
   const emojiPickerRef = useRef(null);
+  const feedMenuRef = useRef(null);
+  const feedMenuButtonRef = useRef(null);
   const navigate = useNavigate();
 
   const goToUserProfile = (targetUserId) => {
@@ -93,6 +97,24 @@ const PostPage = () => {
       document.removeEventListener("mousedown", handleClickOutsideEmoji);
     };
   }, [activeEmojiPostId]);
+
+  useEffect(() => {
+    const handleClickOutsideFeedMenu = (event) => {
+      if (
+        feedMenuRef.current &&
+        !feedMenuRef.current.contains(event.target) &&
+        feedMenuButtonRef.current &&
+        !feedMenuButtonRef.current.contains(event.target)
+      ) {
+        setFeedMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("click", handleClickOutsideFeedMenu);
+    return () => {
+      document.removeEventListener("click", handleClickOutsideFeedMenu);
+    };
+  }, []);
 
   const fetchPosts = async (captionSearch = "") => {
     setLoadingFeed(true);
@@ -507,68 +529,6 @@ const PostPage = () => {
 
   return (
     <div className="w-full max-w-4xl mx-auto px-0 sm:px-4 py-2 sm:py-6">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-4 sm:mb-6 px-2 sm:px-0">
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Feed</h1>
-
-        <div className="flex items-center gap-3">
-          {/* Feed Switch */}
-          <div className="bg-gray-100 border border-gray-200 rounded-full flex p-1 gap-1">
-            <button
-              onClick={() => setActiveFeed("public")}
-              className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all ${
-                activeFeed === "public"
-                  ? "bg-blue-600 text-white shadow-sm"
-                  : "text-gray-700 bg-white hover:text-blue-600 hover:bg-blue-50"
-              }`}
-            >
-              <MdPublic size={16} /> Public
-            </button>
-
-            {userInfo?.familyCode && (
-              <button
-                onClick={() => setActiveFeed("family")}
-                className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium transition-all ${
-                  activeFeed === "family"
-                    ? "bg-blue-600 text-white shadow-sm"
-                    : "text-gray-700 bg-white hover:text-blue-600 hover:bg-blue-50"
-                }`}
-              >
-                <MdPeople size={16} /> Family
-              </button>
-            )}
-          </div>
-
-          {/* Search */}
-          {showSearchInput ? (
-            <input
-              type="text"
-              autoFocus
-              placeholder="Search..."
-              value={searchCaption}
-              onChange={(e) => {
-                const val = e.target.value;
-                setSearchCaption(val);
-                clearTimeout(searchTimeoutRef.current);
-                searchTimeoutRef.current = setTimeout(
-                  () => fetchPosts(val),
-                  400
-                );
-              }}
-              onBlur={() => !searchCaption && setShowSearchInput(false)}
-              className="w-32 sm:w-40 px-3 py-1.5 rounded-full border border-gray-300 text-sm focus:ring-2 focus:ring-blue-400"
-            />
-          ) : (
-            <button
-              onClick={() => setShowSearchInput(true)}
-              className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-blue-100 hover:text-blue-600 transition-all"
-            >
-              <FiSearch size={18} />
-            </button>
-          )}
-        </div>
-      </div>
-
       {/* Post Creator */}
       {user && (
         <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-3 sm:p-4 flex items-center gap-3 mb-4 sm:mb-6 hover:shadow-md transition-all">
@@ -577,23 +537,88 @@ const PostPage = () => {
             alt="User"
             className="w-9 h-9 sm:w-10 sm:h-10 rounded-full border border-blue-200 object-cover"
           />
+
           <button
             onClick={() => setIsCreateModalOpen(true)}
             className="flex-1 bg-gray-100 text-gray-600 rounded-full py-2 px-4 text-left text-sm hover:bg-blue-50 hover:text-blue-600 transition-all"
           >
-            What's on your mind, {user.name.split("_")[0]}?
+            What&apos;s on your mind, {user.name.split("_")[0]}?
           </button>
-          <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="p-2 sm:p-2.5 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 transition-all"
-          >
-            <FiImage size={18} />
-          </button>
+
+          <div className="relative flex items-center gap-2">
+            <button
+              ref={feedMenuButtonRef}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!userInfo?.familyCode) return;
+                setFeedMenuOpen((prev) => !prev);
+              }}
+              className={`bg-unset flex items-center gap-1.5 px-3 py-2 rounded-full text-xs sm:text-sm font-medium border transition-all ${
+                activeFeed === "family"
+                  ? "bg-blue-600 text-white border-blue-600"
+                  : "bg-orange-500 text-white border-orange-500"
+              } ${userInfo?.familyCode ? "cursor-pointer" : "cursor-default"}`}
+              title="Choose feed"
+            >
+              {activeFeed === "family" ? (
+                <MdPeople size={16} />
+              ) : (
+                <MdPublic size={16} />
+              )}
+              <span className="hidden sm:inline">
+                {activeFeed === "family" ? "Family" : "Public"}
+              </span>
+              {userInfo?.familyCode && <FiChevronDown size={14} />}
+            </button>
+
+            {feedMenuOpen && userInfo?.familyCode && (
+              <div
+                ref={feedMenuRef}
+                className="absolute right-0 top-11 w-44 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden z-50"
+              >
+                <button
+                  onClick={() => {
+                    setActiveFeed("public");
+                    setFeedMenuOpen(false);
+                  }}
+                  className={`bg-unset w-full flex items-center gap-2 px-4 py-2.5 text-sm text-left hover:bg-gray-50 ${
+                    activeFeed === "public"
+                      ? "text-gray-900 font-medium"
+                      : "text-gray-700"
+                  }`}
+                >
+                  <MdPublic size={16} />
+                  <span>Public</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setActiveFeed("family");
+                    setFeedMenuOpen(false);
+                  }}
+                  className={`bg-unset w-full flex items-center gap-2 px-4 py-2.5 text-sm text-left hover:bg-gray-50 ${
+                    activeFeed === "family"
+                      ? "text-gray-900 font-medium"
+                      : "text-gray-700"
+                  }`}
+                >
+                  <MdPeople size={16} />
+                  <span>Family</span>
+                </button>
+              </div>
+            )}
+
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="p-2 sm:p-2.5 rounded-full bg-blue-100 text-blue-600 hover:bg-blue-200 transition-all"
+            >
+              <FiImage size={18} />
+            </button>
+          </div>
         </div>
       )}
 
-      {/* Feed */}
-      {
+    {/* Feed */}
+    {
       loadingFeed ? (
         <div className="space-y-5 animate-pulse">
           <PostsShimmer/>

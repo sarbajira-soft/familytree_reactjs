@@ -548,7 +548,7 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
 
   return (
     <>
-      <div className="max-w-7xl mx-auto px-3 sm:px-5 py-6 pt-3 space-y-7">
+      <div className="max-w-7xl mx-auto px-3 sm:px-5 py-4 pt-2 space-y-5">
         {/* Header */}
         {/* <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center">
           <div>
@@ -608,60 +608,43 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
           ))}
         </div> */}
 
-        {/* Quick Actions */}
-        <div className="grid grid-cols-3 gap-2 sm:gap-4">
-          {/* Upload Photo */}
-          <button
-            onClick={() => setIsCreateAlbumModalOpen(true)}
-            className="flex items-center justify-center gap-1 sm:gap-2 
-               bg-primary-700 text-white rounded-md sm:rounded-lg 
-               px-1 sm:px-3 py-2 sm:py-3 text-xs sm:text-sm 
-               hover:bg-primary-800 hover:-translate-y-1 hover:shadow-md 
-               transition-all duration-300"
-          >
-            <FiImage className="text-base sm:text-lg" />
-            <span className="hidden sm:inline">Upload Photo</span>
-            <span className="sm:hidden">Photo</span>
-          </button>
-
-          {/* Send Gift */}
-          <button
-            onClick={() => navigate("/gifts-memories")}
-            className="flex items-center justify-center gap-1 sm:gap-2 
-               bg-secondary-500 text-white rounded-md sm:rounded-lg 
-               px-1 sm:px-3 py-2 sm:py-3 text-xs sm:text-sm 
-               hover:bg-secondary-600 hover:-translate-y-1 hover:shadow-md 
-               transition-all duration-300"
-          >
-            <FiGift className="text-base sm:text-lg" />
-            <span className="hidden sm:inline">Send Gift</span>
-            <span className="sm:hidden">Gift</span>
-          </button>
-
-          {/* Schedule Event */}
-          <button
-            onClick={() => setIsScheduleOptionsOpen(true)}
-            className="flex items-center justify-center gap-1 sm:gap-2 
-               bg-primary-700 text-white rounded-md sm:rounded-lg 
-               px-1 sm:px-3 py-2 sm:py-3 text-xs sm:text-sm 
-               hover:bg-primary-800 hover:-translate-y-1 hover:shadow-md 
-               transition-all duration-300"
-          >
-            <FiCalendar className="text-base sm:text-lg" />
-            <span className="hidden sm:inline">Schedule Event</span>
-            <span className="sm:hidden">Event</span>
-          </button>
-        </div>
-
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6">
-          <div className="lg:col-span-8 space-y-4">
+          <div className="lg:col-span-8 space-y-3">
             {/* Posts Section */}
-            <div className="bg-white rounded-xl shadow-md p-4 sm:p-6 border border-gray-100">
+            <div className="bg-white rounded-xl shadow-md p-2 sm:p-3 border border-gray-100">
               <PostPage />
             </div>
           </div>
 
           <div className="space-y-4 lg:col-span-4">
+            <div className="bg-white rounded-xl shadow-sm p-3 border border-gray-100">
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  onClick={() => setIsCreateAlbumModalOpen(true)}
+                  className="flex flex-col items-center justify-center gap-1 bg-primary-700 text-white rounded-lg px-2 py-2 text-[11px] font-semibold hover:bg-primary-800 transition-colors"
+                >
+                  <FiImage className="text-base" />
+                  <span>Photo</span>
+                </button>
+
+                <button
+                  onClick={() => navigate("/gifts-memories")}
+                  className="flex flex-col items-center justify-center gap-1 bg-secondary-500 text-white rounded-lg px-2 py-2 text-[11px] font-semibold hover:bg-secondary-600 transition-colors"
+                >
+                  <FiGift className="text-base" />
+                  <span>Gift</span>
+                </button>
+
+                <button
+                  onClick={() => setIsScheduleOptionsOpen(true)}
+                  className="flex flex-col items-center justify-center gap-1 bg-primary-700 text-white rounded-lg px-2 py-2 text-[11px] font-semibold hover:bg-primary-800 transition-colors"
+                >
+                  <FiCalendar className="text-base" />
+                  <span>Event</span>
+                </button>
+              </div>
+            </div>
+
             {/* Recent Photos at top */}
             {galleryPreview.length > 0 && (
               <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
@@ -669,7 +652,8 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
                   <p className="text-sm font-semibold text-gray-800">
                     Recent Photos
                   </p>
-                  <button
+                
+  <button
                     onClick={() => navigate("/family-gallery")}
                     className="text-xs font-semibold bg-white text-primary-700 hover:text-primary-900"
                   >
