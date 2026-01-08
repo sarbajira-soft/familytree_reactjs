@@ -10,8 +10,10 @@ import {
   FiShield,
   FiTruck,
   FiUser,
+  FiGift,
 } from 'react-icons/fi';
 import { useRetail } from '../context/RetailContext';
+import { useGiftEvent } from '../../Contexts/GiftEventContext';
 import { formatAmount, getErrorMessage } from '../utils/helpers';
 import { MEDUSA_BASE_URL, MEDUSA_PUBLISHABLE_KEY } from '../utils/constants';
 import * as cartService from '../services/cartService';
@@ -63,6 +65,8 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
     startOnlinePayment,
   } = useRetail();
 
+  const { selectedGiftEvent } = useGiftEvent();
+
   const [shippingAddress, setShippingAddress] = useState(emptyAddress);
   const [billingAddress, setBillingAddress] = useState(emptyAddress);
   const [sameAsShipping, setSameAsShipping] = useState(true);
@@ -76,8 +80,134 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
   const [addressesUpdated, setAddressesUpdated] = useState(false);
   const [waitingForPayment, setWaitingForPayment] = useState(false);
   const [completedOrder, setCompletedOrder] = useState(null);
+  const [showGiftAddressConfirm, setShowGiftAddressConfirm] = useState(false);
+  const [giftAddressSuggestion, setGiftAddressSuggestion] = useState(null);
+  const [giftAddressLoading, setGiftAddressLoading] = useState(false);
 
   const savedAddresses = Array.isArray(user?.addresses) ? user.addresses : [];
+
+  useEffect(() => {
+    if (!selectedGiftEvent) {
+      setGiftAddressSuggestion(null);
+      return;
+    }
+
+    const recipientUserId =
+      selectedGiftEvent.memberDetails?.userId ||
+      selectedGiftEvent.createdBy ||
+      selectedGiftEvent.userId;
+
+    if (!recipientUserId) {
+      setGiftAddressSuggestion(null);
+      return;
+    }
+
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+    if (!API_BASE_URL) {
+      return;
+    }
+
+    const appToken = localStorage.getItem('access_token');
+    if (!appToken) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadGiftAddress = async () => {
+      try {
+        setGiftAddressLoading(true);
+
+        const res = await axios.get(
+          `${API_BASE_URL}/user/gift-address/${recipientUserId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${appToken}`,
+            },
+          },
+        );
+
+        if (cancelled) return;
+
+        const addr = res.data?.data;
+        if (!addr || !addr.address) {
+          setGiftAddressSuggestion(null);
+          return;
+        }
+
+        const rawAddress = addr.address || '';
+        let addressLine1 = rawAddress;
+        let city = '';
+        let province = '';
+        let postalCode = '';
+
+        if (rawAddress) {
+          const lines = rawAddress
+            .split(/\r?\n/)
+            .map((l) => l.trim())
+            .filter(Boolean);
+
+          const firstLine = lines[0] || '';
+          const restLines = lines.slice(1).join(', ');
+          let segments = restLines
+            ? restLines.split(',').map((s) => s.trim()).filter(Boolean)
+            : [];
+
+          if (!segments.length && firstLine.includes(',')) {
+            const parts = firstLine
+              .split(',')
+              .map((s) => s.trim())
+              .filter(Boolean);
+            addressLine1 = parts.shift() || '';
+            segments = parts;
+          } else {
+            addressLine1 = firstLine || rawAddress;
+          }
+
+          if (segments.length) {
+            const last = segments[segments.length - 1];
+            if (/\d/.test(last)) {
+              postalCode = last;
+              const locationParts = segments.slice(0, -1);
+              if (locationParts.length) {
+                city = locationParts[0];
+                province = locationParts.slice(1).join(', ');
+              }
+            } else {
+              city = segments[0];
+              province = segments.slice(1).join(', ');
+            }
+          }
+        }
+
+        const giftAddress = {
+          first_name: addr.firstName || '',
+          last_name: addr.lastName || '',
+          address_1: addressLine1 || rawAddress,
+          city,
+          province,
+          postal_code: postalCode,
+          country_code: 'in',
+          phone: addr.contactNumber || '',
+        };
+
+        setGiftAddressSuggestion(giftAddress);
+      } catch (err) {
+        console.error('Failed to load gifting address', err);
+        setGiftAddressSuggestion(null);
+      } finally {
+        if (!cancelled) {
+          setGiftAddressLoading(false);
+        }
+      }
+    };
+
+    loadGiftAddress();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedGiftEvent]);
 
   useEffect(() => {
     // No automatic shipping option fetch on mount; we now fetch after
@@ -131,6 +261,13 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
   const handleChange = (setter) => (e) => {
     const { name, value } = e.target;
     setter((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleClearShipping = () => {
+    setShippingAddress(emptyAddress);
+    if (sameAsShipping) {
+      setBillingAddress(emptyAddress);
+    }
   };
 
   const applyAddressToShipping = (addr) => {
@@ -519,6 +656,35 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
     };
   })();
 
+  if (selectedGiftEvent && giftAddressLoading) {
+    return (
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {onBack && (
+              <button
+                type="button"
+                onClick={onBack}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-gray-600 hover:border-blue-400 hover:text-blue-600"
+              >
+                <FiArrowLeft />
+              </button>
+            )}
+            <div>
+              <h2 className="text-base font-semibold text-gray-900">Checkout</h2>
+              <p className="text-xs text-gray-500">Provide shipping and billing details to complete your order.</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-center py-10 text-xs text-gray-600">
+          <FiLoader className="mr-2 animate-spin" />
+          Loading gifting address...
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="space-y-4">
       <div className="flex items-center justify-between">
@@ -527,7 +693,7 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
             <button
               type="button"
               onClick={onBack}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-gray-600 hover:border-blue-400 hover:text-blue-600"
+              className="bg-white inline-flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-gray-600 hover:border-blue-400 hover:text-blue-600"
             >
               <FiArrowLeft />
             </button>
@@ -538,6 +704,48 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
           </div>
         </div>
       </div>
+
+      {selectedGiftEvent && user && giftAddressSuggestion && (
+        <div className="rounded-2xl border border-purple-100 bg-purple-50 px-3 py-2 text-[11px] text-gray-800 flex items-start gap-2">
+          <div className="mt-0.5 text-purple-500">
+            <FiGift size={14} />
+          </div>
+          <div className="flex-1">
+            <p className="text-xs font-semibold text-purple-700 mb-1">
+              You are sending a gift for:
+            </p>
+            <p className="text-[11px] font-semibold text-gray-900">
+              {selectedGiftEvent.eventTitle || 'Family Event'}
+            </p>
+            <p className="text-[11px] text-gray-600">
+              {selectedGiftEvent.eventDate}
+              {selectedGiftEvent.eventTime ? ` • ${selectedGiftEvent.eventTime}` : ''}
+            </p>
+            {selectedGiftEvent.memberDetails?.firstName && (
+              <p className="text-[11px] text-gray-600 mt-0.5">
+                For {selectedGiftEvent.memberDetails.firstName}
+                {selectedGiftEvent.memberDetails.lastName ? ` ${selectedGiftEvent.memberDetails.lastName}` : ''}
+              </p>
+            )}
+            <p className="mt-1 text-[11px] text-gray-600">
+              Shipping to: {giftAddressSuggestion.address_1}
+              {giftAddressSuggestion.city || giftAddressSuggestion.province
+                ? `, ${[giftAddressSuggestion.city, giftAddressSuggestion.province]
+                    .filter(Boolean)
+                    .join(', ')}`
+                : ''}
+              {giftAddressSuggestion.postal_code ? ` - ${giftAddressSuggestion.postal_code}` : ''}. Phone: {giftAddressSuggestion.phone}
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowGiftAddressConfirm(true)}
+              className="mt-1 inline-flex items-center gap-1 rounded-full border border-purple-300 bg-white px-3 py-1 text-[11px] font-semibold text-purple-700 hover:bg-purple-50"
+            >
+              Review address for this event
+            </button>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
@@ -555,9 +763,19 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
 
       <div className="grid gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,1.1fr)]">
         <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-2 border-b border-gray-100 pb-2 text-sm font-semibold text-gray-900">
-            <FiMapPin className="text-blue-500" />
-            Shipping address
+          <div className="flex items-center justify-between border-b border-gray-100 pb-2 text-sm font-semibold text-gray-900">
+            <div className="flex items-center gap-2">
+              <FiMapPin className="text-blue-500" />
+              Shipping address
+            </div>
+            <button
+              type="button"
+              onClick={handleClearShipping}
+              disabled={disabled}
+              className=" bg-white text-[11px] font-medium text-gray-500 hover:text-red-600 hover:underline"
+            >
+              Clear
+            </button>
           </div>
 
           {savedAddresses.length > 0 && (
@@ -1003,6 +1221,87 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
           </div>
         </aside>
       </div>
+
+      {showGiftAddressConfirm && selectedGiftEvent && user && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-xl">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-100 text-purple-600">
+                <FiGift size={16} />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Confirm gift details</p>
+                <p className="text-[11px] text-gray-500">Please confirm the event and address before placing your order.</p>
+              </div>
+            </div>
+
+            <div className="mt-2 space-y-2 text-[11px] text-gray-700">
+              <div className="rounded-lg bg-gray-50 px-3 py-2">
+                <p className="text-[11px] font-semibold text-gray-900 mb-0.5">
+                  Event
+                </p>
+                <p>{selectedGiftEvent.eventTitle || 'Family Event'}</p>
+                <p className="text-gray-600">
+                  {selectedGiftEvent.eventDate}
+                  {selectedGiftEvent.eventTime ? ` • ${selectedGiftEvent.eventTime}` : ''}
+                </p>
+              </div>
+
+              <div className="rounded-lg bg-gray-50 px-3 py-2">
+                <p className="text-[11px] font-semibold text-gray-900 mb-0.5">Recipient</p>
+                <p>
+                  {selectedGiftEvent.memberDetails?.firstName || user.first_name || user.firstName || 'Family member'}
+                  {selectedGiftEvent.memberDetails?.lastName
+                    ? ` ${selectedGiftEvent.memberDetails.lastName}`
+                    : ''}
+                </p>
+              </div>
+
+              <div className="rounded-lg bg-gray-50 px-3 py-2">
+                <p className="text-[11px] font-semibold text-gray-900 mb-0.5">Address</p>
+                <p>
+                  {(giftAddressSuggestion?.first_name || shippingAddress.first_name)}{' '}
+                  {(giftAddressSuggestion?.last_name || shippingAddress.last_name)}
+                </p>
+                <p>{giftAddressSuggestion?.address_1 || shippingAddress.address_1}</p>
+                <p>
+                  {[giftAddressSuggestion?.city || shippingAddress.city,
+                    giftAddressSuggestion?.province || shippingAddress.province,
+                    giftAddressSuggestion?.postal_code || shippingAddress.postal_code]
+                    .filter(Boolean)
+                    .join(', ')}
+                </p>
+                <p>Phone: {giftAddressSuggestion?.phone || shippingAddress.phone}</p>
+              </div>
+            </div>
+
+            <div className="mt-3 flex gap-2 justify-end text-[11px]">
+              <button
+                type="button"
+                onClick={() => setShowGiftAddressConfirm(false)}
+                className="inline-flex items-center justify-center rounded-full border border-gray-200 bg-white px-3 py-1 font-semibold text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (giftAddressSuggestion) {
+                    applyAddressToShipping(giftAddressSuggestion);
+                    if (sameAsShipping) {
+                      applyAddressToBilling(giftAddressSuggestion);
+                    }
+                  }
+                  setShowGiftAddressConfirm(false);
+                }}
+                className="inline-flex items-center justify-center rounded-full bg-purple-600 px-3 py-1 font-semibold text-white hover:bg-purple-700"
+              >
+                Looks good
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {completedOrder && (
         <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/50 px-4">
