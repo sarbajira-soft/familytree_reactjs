@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useUser } from "../Contexts/UserContext";
+import { useGiftEvent } from "../Contexts/GiftEventContext";
 import CreateEventModal from "../Components/CreateEventModal";
 import ProfileFormModal from "../Components/ProfileFormModal";
 import CreateAlbumModal from "../Components/CreateAlbumModal";
@@ -287,6 +288,7 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
   const [isGiftDetailModalOpen, setIsGiftDetailModalOpen] = useState(false);
   const [selectedGiftProductId, setSelectedGiftProductId] = useState(null);
   const { userInfo } = useUser();
+  const { setSelectedGiftEvent } = useGiftEvent();
   const navigate = useNavigate();
   const token = getToken();
     const [isGalleryModalOpen, setIsGalleryModalOpen] = useState(false);
@@ -808,10 +810,22 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
 
                             <button
                               onClick={() => {
+                                setSelectedGiftEvent({
+                                  eventId: event.id || null,
+                                  eventTitle: title,
+                                  eventType: event.eventType || "custom",
+                                  eventDate: dateValue || null,
+                                  eventTime: timeValue || null,
+                                  location: event.location || null,
+                                  memberDetails: event.memberDetails || null,
+                                  createdBy: event.createdBy || null,
+                                });
+
                                 if (!productSuggestionsPool.length) {
-                                  navigate("/gifts-memories");
+                                  navigate("/gifts-memories?tab=cart");
                                   return;
                                 }
+
                                 const shuffled = [...productSuggestionsPool].sort(
                                   () => Math.random() - 0.5
                                 );

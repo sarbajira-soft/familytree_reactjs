@@ -275,14 +275,20 @@ const Layout = ({ noScroll = false }) => {
               )}
 
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8">
+                <div className="w-12 h-12">
                   <img
-                    src="/assets/logo-green-light.png"
+                    src="/assets/family-logo.png"
                     alt="Familyss Logo"
-                    className="w-full h-full object-cover rounded-full"
+                    className="w-full h-full object-cover"
                   />
                 </div>
-                <h2 className="font-semibold text-lg text-primary-700">Familyss</h2>
+                {/* <h2 className="font-semibold text-lg text-primary-700">Familyss</h2> */}
+  <img
+  src="/assets/familyss.png"
+  alt="Familyss"
+  className="h-16 w-auto"
+/>
+
               </div>
             </div>
 

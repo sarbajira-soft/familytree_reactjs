@@ -11,6 +11,7 @@ import { queryClient } from "./utils/queryClient";
 import { UserProvider } from "./Contexts/UserContext";
 import { LanguageProvider, useLanguage } from "./Contexts/LanguageContext";
 import { FamilyTreeProvider } from "./Contexts/FamilyTreeContext";
+import { GiftEventProvider } from "./Contexts/GiftEventContext";
 
 import PrivateRoute, { RoleBasedRoute } from "./Routes/PrivateRoute";
 import GuestRoute from "./Routes/GuestRoute";
@@ -180,7 +181,9 @@ function App() {
                 element={
                   <PrivateRoute>
                     <LanguageProvider>
-                      <Layout />
+                      <GiftEventProvider>
+                        <Layout />
+                      </GiftEventProvider>
                     </LanguageProvider>
                   </PrivateRoute>
                 }
