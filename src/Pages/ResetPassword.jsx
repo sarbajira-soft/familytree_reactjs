@@ -18,6 +18,19 @@ const ResetPassword = () => {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  const validatePassword = (password) => {
+    const minLength = password.length >= 8;
+    const hasUpperCase = /[A-Z]/.test(password);
+    const hasSpecialChar = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password);
+
+    return {
+      isValid: minLength && hasUpperCase && hasSpecialChar,
+      minLength,
+      hasUpperCase,
+      hasSpecialChar,
+    };
+  };
+
 
   useEffect(() => {
     if (!location.state?.email) {
@@ -66,13 +79,21 @@ const ResetPassword = () => {
       return;
     }
 
+    const passwordValidation = validatePassword(newPassword);
+    if (!passwordValidation.isValid) {
+      setError(
+        'Password must be at least 8 characters and include 1 uppercase letter and 1 special character'
+      );
+      return;
+    }
+
     setIsLoading(true);
 
     try {
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/user/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username:email, otp, newPassword: newPassword, confirmPassword:newPassword }),
+        body: JSON.stringify({ username: email, otp, newPassword: newPassword, confirmPassword: confirmPassword }),
       });
 
       const data = await response.json();
@@ -166,9 +187,10 @@ const ResetPassword = () => {
     onChange={(e) => setNewPassword(e.target.value)}
     className="w-full px-4 py-3 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
     placeholder="Enter new password"
+    autoComplete="new-password"
   />
   <span
-    className="absolute top-[38px] right-3 cursor-pointer text-gray-500"
+    className="absolute top-[38px] right-3 cursor-pointer text-gray-600 hover:text-gray-800"
     onClick={() => setShowNewPassword((prev) => !prev)}
   >
     {showNewPassword ? (
@@ -186,19 +208,40 @@ const ResetPassword = () => {
   </span>
 </div>
 
+          {newPassword && (
+            <div className="text-xs text-gray-600">
+              Password must be at least 8 characters and include 1 uppercase letter and 1 special character.
+            </div>
+          )}
 
-          <div>
+          <div className="relative">
             <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
               Confirm Password
             </label>
             <input
               id="confirmPassword"
-              type="password"
+              type={showConfirmPassword ? 'text' : 'password'}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+              className="w-full px-4 py-3 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
               placeholder="Re-enter new password"
+              autoComplete="new-password"
             />
+            <span
+              className="absolute top-[38px] right-3 cursor-pointer text-gray-600 hover:text-gray-800"
+              onClick={() => setShowConfirmPassword((prev) => !prev)}
+            >
+              {showConfirmPassword ? (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-5.523 0-10-4.477-10-10 0-1.304.248-2.55.7-3.688M9.172 9.172A3 3 0 0115.828 15.828M16.24 16.24L3.76 3.76" />
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+              )}
+            </span>
           </div>
 
           <button

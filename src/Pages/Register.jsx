@@ -29,6 +29,14 @@ const Register = () => {
   const apiErrorRef = useRef(null);
   const [showTermsModal, setShowTermsModal] = useState(false);
 
+  const NAME_MIN_LENGTH = 2;
+  const NAME_MAX_LENGTH = 30;
+
+  const sanitizeNameInput = (value) => {
+    const sanitized = value.replace(/[^A-Za-z\s]/g, "");
+    return sanitized.slice(0, NAME_MAX_LENGTH);
+  };
+
   // Password validation function
   const validatePassword = (password) => {
     const minLength = password.length >= 8;
@@ -48,9 +56,30 @@ const Register = () => {
   const validate = () => {
     const newErrors = {};
 
-    if (!formData.firstName.trim())
+    const firstNameTrimmed = formData.firstName.trim();
+    const lastNameTrimmed = formData.lastName.trim();
+
+    if (!firstNameTrimmed) {
       newErrors.firstName = "First name is required";
-    if (!formData.lastName.trim()) newErrors.lastName = "Last name is required";
+    } else if (
+      firstNameTrimmed.length < NAME_MIN_LENGTH ||
+      firstNameTrimmed.length > NAME_MAX_LENGTH
+    ) {
+      newErrors.firstName = `First name must be between ${NAME_MIN_LENGTH} and ${NAME_MAX_LENGTH} characters`;
+    } else if (!/^[A-Za-z]+(\s[A-Za-z]+)*$/.test(firstNameTrimmed)) {
+      newErrors.firstName = "First name can contain letters only";
+    }
+
+    if (!lastNameTrimmed) {
+      newErrors.lastName = "Last name is required";
+    } else if (
+      lastNameTrimmed.length < NAME_MIN_LENGTH ||
+      lastNameTrimmed.length > NAME_MAX_LENGTH
+    ) {
+      newErrors.lastName = `Last name must be between ${NAME_MIN_LENGTH} and ${NAME_MAX_LENGTH} characters`;
+    } else if (!/^[A-Za-z]+(\s[A-Za-z]+)*$/.test(lastNameTrimmed)) {
+      newErrors.lastName = "Last name can contain letters only";
+    }
 
     // Email validation
     if (!formData.email.trim()) {
@@ -240,13 +269,18 @@ const Register = () => {
                 ref={firstNameRef}
                 type="text"
                 value={formData.firstName}
-                onChange={(e) => handleChange("firstName", e.target.value)}
+                onChange={(e) =>
+                  handleChange("firstName", sanitizeNameInput(e.target.value))
+                }
                 className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 ${
                   errors.firstName
                     ? "border-red-500 focus:ring-red-300"
                     : "border-gray-300 focus:ring-[#1976d2]"
                 }`}
                 placeholder="Enter first name"
+                maxLength={NAME_MAX_LENGTH}
+                autoCapitalize="words"
+                style={{ textTransform: "capitalize" }}
               />
               {errors.firstName && (
                 <p className="text-red-500 text-xs mt-1">{errors.firstName}</p>
@@ -263,13 +297,18 @@ const Register = () => {
                 id="lastName"
                 type="text"
                 value={formData.lastName}
-                onChange={(e) => handleChange("lastName", e.target.value)}
+                onChange={(e) =>
+                  handleChange("lastName", sanitizeNameInput(e.target.value))
+                }
                 className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 ${
                   errors.lastName
                     ? "border-red-500 focus:ring-red-300"
                     : "border-gray-300 focus:ring-[#1976d2]"
                 }`}
                 placeholder="Enter last name"
+                maxLength={NAME_MAX_LENGTH}
+                autoCapitalize="words"
+                style={{ textTransform: "capitalize" }}
               />
               {errors.lastName && (
                 <p className="text-red-500 text-xs mt-1">{errors.lastName}</p>
@@ -364,10 +403,11 @@ const Register = () => {
                   : "border-gray-300 focus:ring-[#1976d2]"
               }`}
               placeholder="Enter password"
+              autoComplete="new-password"
             />
             <span
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute top-9 right-3 cursor-pointer text-gray-500"
+              className="absolute top-9 right-3 cursor-pointer text-gray-600 hover:text-gray-800"
             >
               {showPassword ? (
                 <svg
@@ -471,16 +511,27 @@ const Register = () => {
               type={showConfirmPassword ? "text" : "password"}
               value={formData.confirmPassword}
               onChange={(e) => handleChange("confirmPassword", e.target.value)}
+              onPaste={(e) => {
+                e.preventDefault();
+                setErrors((prev) => ({
+                  ...prev,
+                  confirmPassword: "Pasting into Confirm Password is not allowed",
+                }));
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+              }}
               className={`w-full px-4 py-3 pr-10 border rounded-lg focus:outline-none focus:ring-2 ${
                 errors.confirmPassword
                   ? "border-red-500 focus:ring-red-300"
                   : "border-gray-300 focus:ring-[#1976d2]"
               }`}
               placeholder="Confirm password"
+              autoComplete="new-password"
             />
             <span
               onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              className="absolute top-9 right-3 cursor-pointer text-gray-500"
+              className="absolute top-9 right-3 cursor-pointer text-gray-600 hover:text-gray-800"
             >
               {showConfirmPassword ? (
                 <svg
