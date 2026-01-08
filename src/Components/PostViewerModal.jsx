@@ -279,9 +279,15 @@ const PostViewerModal = ({
             </button>
 
             <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
-              {/* IMAGE - left */}
+              {/* MEDIA - left */}
               <div className="md:w-1/2 bg-black flex items-center justify-center p-0 md:p-5 h-[40vh] md:h-auto relative overflow-hidden">
-                {post.url || post.fullImageUrl ? (
+                {post.postVideo ? (
+                  <video
+                    src={post.postVideo}
+                    className="max-h-full max-w-full object-contain rounded-2xl shadow"
+                    controls
+                  />
+                ) : post.url || post.fullImageUrl ? (
                   <img
                     src={post.url || post.fullImageUrl}
                     alt="Post"
@@ -290,7 +296,7 @@ const PostViewerModal = ({
                   />
                 ) : (
                   <div className="text-gray-200 text-lg italic text-center w-full">
-                    No image available.
+                    No media available.
                   </div>
                 )}
               </div>

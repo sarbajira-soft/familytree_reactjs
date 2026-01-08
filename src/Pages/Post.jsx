@@ -148,6 +148,7 @@ const PostPage = () => {
               time: new Date(p.createdAt).toLocaleString(),
               caption: p.caption,
               fullImageUrl: p.postImage,
+              postVideo: p.postVideo,
               likes: p.likeCount,
               comments: p.commentCount,
               liked: p.isLiked,
@@ -655,26 +656,39 @@ const PostPage = () => {
                 </span>
               </div>
 
-              {/* Image */}
-              {post.fullImageUrl && (
+              {/* Media */}
+              {post.postVideo ? (
                 <div
-                  className="relative w-full bg-black cursor-pointer group overflow-hidden"
-                  onClick={() => handleViewPost(post)}
+                  className="relative w-full bg-black group overflow-hidden"
                 >
-                  <img
-                    src={post.fullImageUrl}
-                    alt="Post"
+                  <video
+                    src={post.postVideo}
                     className="w-full h-auto max-h-[700px] object-contain transition-transform duration-500"
-                    loading="lazy"
+                    controls
+                    onClick={(e) => e.stopPropagation()}
                   />
-
-                  {/* ❤️ Like animation overlay */}
-                  {likedPostId === post.id && showHeartAnimation && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-transparent animate-heart-pop">
-                      <FaHeart className="text-pink-700 text-7xl drop-shadow-lg" />
-                    </div>
-                  )}
                 </div>
+              ) : (
+                post.fullImageUrl && (
+                  <div
+                    className="relative w-full bg-black cursor-pointer group overflow-hidden"
+                    onClick={() => handleViewPost(post)}
+                  >
+                    <img
+                      src={post.fullImageUrl}
+                      alt="Post"
+                      className="w-full h-auto max-h-[700px] object-contain transition-transform duration-500"
+                      loading="lazy"
+                    />
+
+                    {/* ❤️ Like animation overlay */}
+                    {likedPostId === post.id && showHeartAnimation && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-transparent animate-heart-pop">
+                        <FaHeart className="text-pink-700 text-7xl drop-shadow-lg" />
+                      </div>
+                    )}
+                  </div>
+                )
               )}
 
               {/* Caption */}

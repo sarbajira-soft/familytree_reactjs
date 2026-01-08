@@ -155,6 +155,7 @@ const PostsAndFeedsPage = () => {
             caption: post.caption,
             fullImageUrl: post.postImage,
             url: post.postImage,
+            postVideo: post.postVideo,
             likes: post.likeCount,
             comments: post.commentCount,
             liked: post.isLiked,
@@ -419,12 +420,23 @@ const PostsAndFeedsPage = () => {
                                         <p className="text-gray-800 text-base leading-relaxed">{post.caption}</p>
                                     </div>
 
-                                    {/* Post Image */}
-                                    {post.fullImageUrl && (
+                                    {/* Post Media */}
+                                    {post.postVideo ? (
+                                      <div className="w-full h-80 bg-gray-100 flex items-center justify-center overflow-hidden mt-3 mb-2">
+                                        <video
+                                          src={post.postVideo}
+                                          className="w-full h-full object-cover"
+                                          controls
+                                        />
+                                      </div>
+                                    ) : (
+                                      post.fullImageUrl && (
                                         <div className="w-full h-80 bg-gray-100 flex items-center justify-center overflow-hidden mt-3 mb-2">
-                                            <img src={post.fullImageUrl} alt="Post media" className="w-full h-full object-cover" />
+                                          <img src={post.fullImageUrl} alt="Post media" className="w-full h-full object-cover" />
                                         </div>
+                                      )
                                     )}
+                                    
 
                                     {/* Post Footer - Likes, Comments, Share */}
                                     <div className="px-4 pt-3 border-t border-gray-100">

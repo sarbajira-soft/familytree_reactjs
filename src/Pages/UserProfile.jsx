@@ -127,9 +127,10 @@ const UserProfile = () => {
 
       return list.map((post) => ({
         id: post.id,
-        type: "image",
+        type: post.postVideo ? "video" : "image",
         url: post.postImage,
         fullImageUrl: post.postImage,
+        postVideo: post.postVideo,
         caption: post.caption,
         likes: post.likeCount,
         isLiked: post.isLiked,
@@ -347,7 +348,14 @@ const UserProfile = () => {
                           onClick={() => handleViewPost(post)}
                         >
                           <div className="relative w-full h-64 overflow-hidden">
-                            {post.fullImageUrl ? (
+                            {post.postVideo ? (
+                              <video
+                                src={post.postVideo}
+                                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                                controls
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            ) : post.fullImageUrl ? (
                               <img
                                 src={post.fullImageUrl}
                                 alt="Post image"
@@ -355,7 +363,7 @@ const UserProfile = () => {
                               />
                             ) : (
                               <div className="text-white text-center text-lg italic">
-                                No image available for this post.
+                                No media available for this post.
                               </div>
                             )}
                           </div>
