@@ -375,7 +375,7 @@ const EventsPage = () => {
   return (
     <>
       <div className="min-h-screen bg-gray-50 pb-16">
-        <div className="max-w-7xl mx-auto px-4 py-8 md:px-6 lg:px-8 space-y-10">
+        <div className="max-w-7xl mx-auto px-4 py-8 md:px-6 lg:px-8 space-y-5">
           {/* Header Section */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
             {/* Left Block */}
@@ -385,16 +385,16 @@ const EventsPage = () => {
                   <FiCalendar size={22} className="text-white" />
                 </div>
                 <h1 className="text-2xl sm:text-4xl font-extrabold text-[#1976D2]">
-                  Family Events
+                   Events
                 </h1>
               </div>
 
-              <p className="text-gray-600 mt-2 text-sm sm:text-lg">
+              <p className="text-gray-600 mt-1 text-sm sm:text-lg">
                 Create, manage and celebrate memorable moments
               </p>
 
               {/* Legend */}
-              <div className="flex items-center gap-4 mt-3 text-xs sm:text-sm">
+              {/* <div className="flex items-center gap-4 mt-3 text-xs sm:text-sm">
                 <div className="flex items-center gap-1">
                   <div className="w-2.5 h-2.5 bg-pink-500 rounded-full"></div>
                   <span>Birthdays</span>
@@ -407,7 +407,7 @@ const EventsPage = () => {
                   <div className="w-2.5 h-2.5 bg-[#1976D2] rounded-full"></div>
                   <span>Custom Events</span>
                 </div>
-              </div>
+              </div> */}
             </div>
 
             {/* Right Button */}
@@ -423,7 +423,7 @@ const EventsPage = () => {
           </div>
 
           {/* Filter Tabs – Responsive (Mobile vs Desktop) */}
-          <div className="flex justify-center w-full mt-2">
+          <div className="flex justify-center w-full mt-1">
             {/* Container */}
             <div className="bg-white rounded-2xl shadow-md p-2 border border-gray-200 w-full">
               {/* Desktop View (Old UI) */}
@@ -520,7 +520,31 @@ const EventsPage = () => {
 
           {/* Events Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {displayedEvents.length > 0 ? (
+            {eventsLoading ? (
+              Array.from({ length: 4 }).map((_, idx) => (
+                <div
+                  key={idx}
+                  className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden animate-pulse"
+                >
+                  <div className="h-40 bg-gray-200" />
+                  <div className="p-3 space-y-3">
+                    <div className="h-4 bg-gray-200 rounded w-3/4" />
+                    <div className="h-3 bg-gray-100 rounded w-full" />
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 bg-gray-200 rounded flex-shrink-0" />
+                        <div className="h-3 bg-gray-200 rounded w-1/2" />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 bg-gray-200 rounded flex-shrink-0" />
+                        <div className="h-3 bg-gray-200 rounded w-2/3" />
+                      </div>
+                    </div>
+                    <div className="h-3 bg-gray-100 rounded w-full" />
+                  </div>
+                </div>
+              ))
+            ) : displayedEvents.length > 0 ? (
               displayedEvents.map((event) => {
                 const eventStyle = getEventTypeStyle(event.eventType);
                 const EventIcon = eventStyle.icon;

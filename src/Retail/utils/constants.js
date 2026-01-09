@@ -1,13 +1,27 @@
-export const MEDUSA_BASE_URL = 'http://localhost:9000';
+const {
+  VITE_MEDUSA_BASE_URL,
+  VITE_MEDUSA_PUBLISHABLE_KEY,
+  VITE_MEDUSA_TOKEN_KEY,
+  VITE_MEDUSA_CART_ID_KEY,
+  VITE_DEFAULT_CURRENCY_CODE,
+  VITE_DEFAULT_LOCALE,
+  VITE_DEFAULT_TAX_RATE,
+} = import.meta.env;
 
-export const MEDUSA_PUBLISHABLE_KEY = 'pk_d6c426b8403ff692eb7bca7f01f6842ab6cfa533efd6e57f23a5eb033b7e41c5';
+export const MEDUSA_BASE_URL = VITE_MEDUSA_BASE_URL;
 
-export const MEDUSA_TOKEN_KEY = 'medusa_retail_token';
-export const MEDUSA_CART_ID_KEY = 'medusa_retail_cart_id';
+export const MEDUSA_PUBLISHABLE_KEY =
+  VITE_MEDUSA_PUBLISHABLE_KEY ;
 
-export const DEFAULT_CURRENCY_CODE = 'inr';
-export const DEFAULT_LOCALE = 'en-IN';
-export const DEFAULT_TAX_RATE = 0.13;
+export const MEDUSA_TOKEN_KEY = VITE_MEDUSA_TOKEN_KEY ;
+export const MEDUSA_CART_ID_KEY = VITE_MEDUSA_CART_ID_KEY ;
+
+export const DEFAULT_CURRENCY_CODE = VITE_DEFAULT_CURRENCY_CODE ;
+export const DEFAULT_LOCALE = VITE_DEFAULT_LOCALE;
+export const DEFAULT_TAX_RATE =
+  typeof VITE_DEFAULT_TAX_RATE !== 'undefined'
+    ? Number(VITE_DEFAULT_TAX_RATE)
+    : 0.13;
 
 export function buildBaseHeaders(token) {
   const headers = {
