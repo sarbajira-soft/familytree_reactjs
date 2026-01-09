@@ -282,8 +282,7 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
   const [isCreatePostModalOpen, setIsCreatePostModalOpen] = useState(false);
   const [isScheduleOptionsOpen, setIsScheduleOptionsOpen] = useState(false);
   const [isEventCalendarModalOpen, setIsEventCalendarModalOpen] = useState(false);
-  const [openGiftEventId, setOpenGiftEventId] = useState(null);
-  const [giftSuggestions, setGiftSuggestions] = useState([]);
+  const [giftSuggestionsByEvent, setGiftSuggestionsByEvent] = useState({});
   const [medusaProducts, setMedusaProducts] = useState([]);
   const [isGiftDetailModalOpen, setIsGiftDetailModalOpen] = useState(false);
   const [selectedGiftProductId, setSelectedGiftProductId] = useState(null);
@@ -310,7 +309,7 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
           fetch(`${apiBaseUrl}/family/member/${userInfo.familyCode}/stats`, {
             headers,
           }),
-          fetch(`${apiBaseUrl}/event/upcoming`, { headers }),
+          fetch(`${apiBaseUrl}/event/upcoming/all`, { headers }),
           fetch(
             `${apiBaseUrl}/gallery/by-options?privacy=public`,
             { headers }
@@ -431,6 +430,31 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
       isMounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!upcomingEventsPreview.length) return;
+    if (!productSuggestionsPool.length) return;
+
+    setGiftSuggestionsByEvent((prev) => {
+      const next = { ...prev };
+      let changed = false;
+
+      upcomingEventsPreview.forEach((event, index) => {
+        const key = event.id || index;
+        const existing = next[key];
+
+        if (!Array.isArray(existing) || existing.length === 0) {
+          const shuffled = [...productSuggestionsPool].sort(
+            () => Math.random() - 0.5
+          );
+          next[key] = shuffled.slice(0, 3);
+          changed = true;
+        }
+      });
+
+      return changed ? next : prev;
+    });
+  }, [upcomingEventsPreview, productSuggestionsPool]);
 
   const getEventCardStyle = (eventType) => {
     switch (eventType) {
@@ -819,22 +843,13 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
                                   location: event.location || null,
                                   memberDetails: event.memberDetails || null,
                                   createdBy: event.createdBy || null,
+                                  userId:
+                                    (event.memberDetails &&
+                                      event.memberDetails.userId) ||
+                                    event.createdBy ||
+                                    null,
                                 });
-
-                                if (!productSuggestionsPool.length) {
-                                  navigate("/gifts-memories?tab=cart");
-                                  return;
-                                }
-
-                                const shuffled = [...productSuggestionsPool].sort(
-                                  () => Math.random() - 0.5
-                                );
-                                setGiftSuggestions(shuffled.slice(0, 3));
-                                setOpenGiftEventId((prev) =>
-                                  prev === (event.id || index)
-                                    ? null
-                                    : event.id || index
-                                );
+                                navigate("/gifts-memories");
                               }}
                               className="ml-3 inline-flex bg-white items-center gap-1 text-[11px] font-semibold text-secondary-600 hover:text-secondary-800 whitespace-nowrap"
                             >
@@ -843,19 +858,34 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
                             </button>
                           </div>
 
-                          {openGiftEventId === (event.id || index) &&
-                            giftSuggestions.length > 0 && (
+                          {giftSuggestionsByEvent[event.id || index] &&
+                            giftSuggestionsByEvent[event.id || index].length > 0 && (
                               <div className="mt-2 flex items-center justify-between gap-2">
                                 <div className="flex flex-1 gap-1.5">
-                                  {giftSuggestions.map((product) => {
+                                  {giftSuggestionsByEvent[event.id || index].map((product) => {
                                     const image = getProductThumbnail(product);
                                     return (
                                       <button
                                         key={product.id}
                                         type="button"
-                                        onClick={() =>
-                                          handleProductSuggestionClick(product)
-                                        }
+                                        onClick={() => {
+                                          setSelectedGiftEvent({
+                                            eventId: event.id || null,
+                                            eventTitle: title,
+                                            eventType: event.eventType || "custom",
+                                            eventDate: dateValue || null,
+                                            eventTime: timeValue || null,
+                                            location: event.location || null,
+                                            memberDetails: event.memberDetails || null,
+                                            createdBy: event.createdBy || null,
+                                            userId:
+                                              (event.memberDetails &&
+                                                event.memberDetails.userId) ||
+                                              event.createdBy ||
+                                              null,
+                                          });
+                                          handleProductSuggestionClick(product);
+                                        }}
                                         className="relative flex-1 overflow-hidden rounded-md bg-gray-100 aspect-square group"
                                       >
                                         <img
@@ -872,7 +902,24 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
                                 </div>
                                 <button
                                   type="button"
-                                  onClick={() => navigate("/gifts-memories")}
+                                  onClick={() => {
+                                    setSelectedGiftEvent({
+                                      eventId: event.id || null,
+                                      eventTitle: title,
+                                      eventType: event.eventType || "custom",
+                                      eventDate: dateValue || null,
+                                      eventTime: timeValue || null,
+                                      location: event.location || null,
+                                      memberDetails: event.memberDetails || null,
+                                      createdBy: event.createdBy || null,
+                                      userId:
+                                        (event.memberDetails &&
+                                          event.memberDetails.userId) ||
+                                        event.createdBy ||
+                                        null,
+                                    });
+                                    navigate("/gifts-memories");
+                                  }}
                                   className="flex items-center justify-center w-7 h-7 rounded-full bg-secondary-500 text-white hover:bg-secondary-600 flex-shrink-0"
                                   aria-label="More gifts"
                                 >

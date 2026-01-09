@@ -92,7 +92,7 @@ const ProductCard = ({ product, onViewDetails, onAddToCart }) => {
       onKeyDown={handleCardKeyDown}
       className="group flex flex-col overflow-hidden rounded-lg bg-white text-left shadow-md outline-none ring-0 transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-blue-500"
     >
-      <div className="relative aspect-[2/3] w-full overflow-hidden bg-gray-100">
+      <div className="relative aspect-square w-full overflow-hidden bg-gray-100">
         <img
           src={image}
           alt={product.title}
