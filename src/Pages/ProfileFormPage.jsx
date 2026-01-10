@@ -45,10 +45,12 @@ const ProfileFormPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedImageFile, setSelectedImageFile] = useState(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState('');
+  const [removeProfile, setRemoveProfile] = useState(false);
   const [errors, setErrors] = useState({});
   const [apiError, setApiError] = useState('');
   const firstErrorRef = useRef(null);
   const errorRef = useRef(null);
+  const profileFileInputRef = useRef(null);
 
   // New states for member validation and data fetching
   const [isValidatingMember, setIsValidatingMember] = useState(true);
@@ -199,6 +201,8 @@ const ProfileFormPage = () => {
   const validate = () => {
     const newErrors = {};
 
+    const textNameRegex = /^[A-Za-z][A-Za-z ]*$/;
+
     // Basic validation
     if (!formData.email.trim()) {
       newErrors.email = 'Email is required';
@@ -226,6 +230,26 @@ const ProfileFormPage = () => {
       if (!formData.spouseName.trim()) newErrors.spouseName = 'Spouse name is required for married individuals';
     }
 
+    if (String(formData.fatherName || '').trim() && !textNameRegex.test(String(formData.fatherName || '').trim())) {
+      newErrors.fatherName = "Father's name can contain only letters and spaces";
+    }
+
+    if (String(formData.motherName || '').trim() && !textNameRegex.test(String(formData.motherName || '').trim())) {
+      newErrors.motherName = "Mother's name can contain only letters and spaces";
+    }
+
+    if (String(formData.caste || '').trim() && !textNameRegex.test(String(formData.caste || '').trim())) {
+      newErrors.caste = "Caste can contain only letters and spaces";
+    }
+
+    if (String(formData.kuladevata || '').trim() && !textNameRegex.test(String(formData.kuladevata || '').trim())) {
+      newErrors.kuladevata = "Kuladevata can contain only letters and spaces";
+    }
+
+    if (String(formData.region || '').trim() && !textNameRegex.test(String(formData.region || '').trim())) {
+      newErrors.region = "Region can contain only letters and spaces";
+    }
+
     setErrors(newErrors);
     if (Object.keys(newErrors).length > 0) {
       const firstErrorFieldName = Object.keys(newErrors)[0];
@@ -240,9 +264,22 @@ const ProfileFormPage = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+
+    const restrictedNameFields = new Set([
+      'fatherName',
+      'motherName',
+      'caste',
+      'kuladevata',
+      'region',
+    ]);
+
+    const sanitizedValue = restrictedNameFields.has(name)
+      ? String(value || '').replace(/[^A-Za-z ]/g, '')
+      : (value || '');
+
     setFormData(prevData => ({
       ...prevData,
-      [name]: value || ''
+      [name]: sanitizedValue
     }));
 
     // Clear errors for this field
@@ -348,6 +385,8 @@ const ProfileFormPage = () => {
 
     if (selectedImageFile instanceof File) {
       formDataToSend.append('profile', selectedImageFile);
+    } else if (removeProfile) {
+      formDataToSend.append('removeProfile', 'true');
     }
 
     try {
@@ -464,12 +503,104 @@ const ProfileFormPage = () => {
       }
 
       setSelectedImageFile(file);
+      setRemoveProfile(false);
 
       const reader = new FileReader();
       reader.onload = (event) => {
         setImagePreviewUrl(event.target.result);
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveProfilePicture = async (options = {}) => {
+    const { skipConfirm = false } = options;
+    const currentUrl = String(imagePreviewUrl || formData.profileImageUrl || '').trim();
+    const hasProfilePhoto = Boolean(currentUrl) && !/\/assets\/user\.png$/i.test(currentUrl);
+
+    if (!hasProfilePhoto) {
+      Swal.fire({
+        icon: 'info',
+        title: 'No photo',
+        text: 'No profile picture to remove.',
+        timer: 1500,
+        showConfirmButton: false,
+      });
+      return;
+    }
+
+    if (!skipConfirm) {
+      const result = await Swal.fire({
+        title: 'Remove profile picture?',
+        text: 'Your profile picture will be removed.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#dc2626',
+        cancelButtonColor: '#6b7280',
+        confirmButtonText: 'Remove',
+        cancelButtonText: 'Cancel',
+      });
+
+      if (!result.isConfirmed) return;
+    }
+
+    setSelectedImageFile(null);
+    setImagePreviewUrl('');
+    setFormData((prev) => ({
+      ...prev,
+      profileImageUrl: '',
+    }));
+    setRemoveProfile(true);
+
+    if (profileFileInputRef.current) {
+      profileFileInputRef.current.value = '';
+    }
+  };
+
+  const handleProfilePhotoActionSheet = async () => {
+    const currentUrl = String(imagePreviewUrl || formData.profileImageUrl || '').trim();
+    const hasProfilePhoto = Boolean(currentUrl) && !/\/assets\/user\.png$/i.test(currentUrl);
+
+    const result = await Swal.fire({
+      title: 'Change Profile Photo',
+      showCancelButton: true,
+      showDenyButton: true,
+      confirmButtonText: 'Upload Photo',
+      denyButtonText: 'Remove Photo',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#2563eb',
+      denyButtonColor: '#dc2626',
+      cancelButtonColor: '#6b7280',
+      reverseButtons: false,
+      didOpen: () => {
+        const cancelBtn = Swal.getCancelButton();
+        const confirmBtn = Swal.getConfirmButton();
+        const denyBtn = Swal.getDenyButton();
+
+        if (cancelBtn) cancelBtn.style.order = '1';
+        if (confirmBtn) confirmBtn.style.order = '2';
+        if (denyBtn) denyBtn.style.order = '3';
+      },
+    });
+
+    if (result.isConfirmed) {
+      profileFileInputRef.current?.click?.();
+      return;
+    }
+
+    if (result.isDenied) {
+      if (!hasProfilePhoto) {
+        Swal.fire({
+          icon: 'info',
+          title: 'No photo',
+          text: 'No profile picture to remove.',
+          timer: 1500,
+          showConfirmButton: false,
+        });
+        return;
+      }
+
+      await handleRemoveProfilePicture({ skipConfirm: true });
     }
   };
 
@@ -510,7 +641,7 @@ const ProfileFormPage = () => {
                 isLinkUsed ? 'text-orange-600' : 'text-red-600'
               }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 {isLinkUsed ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
                 ) : (
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                 )}
@@ -653,7 +784,12 @@ const ProfileFormPage = () => {
               <h3 className="text-lg sm:text-xl font-bold text-gray-800">Profile Picture</h3>
             </div>
             <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
-              <div className="relative group">
+              <button
+                type="button"
+                onClick={handleProfilePhotoActionSheet}
+                className="relative group focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-50 rounded-xl sm:rounded-2xl"
+                title="Change profile photo"
+              >
                 <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-xl sm:rounded-2xl border-2 border-gray-200 overflow-hidden shadow-lg flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
                   {imagePreviewUrl || formData.profileImageUrl ? (
                     <img
@@ -667,10 +803,7 @@ const ProfileFormPage = () => {
                     </svg>
                   )}
                 </div>
-                <label
-                  htmlFor="profile"
-                  className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent rounded-xl sm:rounded-2xl opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center cursor-pointer"
-                >
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent rounded-xl sm:rounded-2xl opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center cursor-pointer">
                   <div className="text-center">
                     <svg className="w-6 h-6 text-white mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
@@ -678,8 +811,8 @@ const ProfileFormPage = () => {
                     </svg>
                     <span className="text-white text-xs font-medium">Change Photo</span>
                   </div>
-                </label>
-              </div>
+                </div>
+              </button>
               <div className="flex-1 w-full">
                 <label htmlFor="profile" className={labelClassName}>
                   Upload New Image
@@ -690,6 +823,7 @@ const ProfileFormPage = () => {
                   type="file"
                   accept="image/jpeg,image/jpg,image/png,image/gif"
                   onChange={handleImageChange}
+                  ref={profileFileInputRef}
                   className="w-full text-sm text-gray-500
                     file:mr-4 file:py-2 file:px-4
                     file:rounded-md file:border-0

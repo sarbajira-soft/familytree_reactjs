@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Swal from "sweetalert2";
 import {
   FiEdit3,
@@ -27,6 +27,8 @@ const ProfilePage = () => {
   const [user, setUser] = useState(null);
   const { userInfo, userLoading, refetchUser } = useUser();
   const queryClient = useQueryClient();
+
+  const profileFileInputRef = useRef(null);
 
   const [showPosts, setShowPosts] = useState(true);
   const [isCreatePostModalOpen, setIsCreatePostModalOpen] = useState(false);
@@ -119,6 +121,196 @@ const ProfilePage = () => {
 
     setUser(userObj);
   }, [userInfo]);
+
+  const handleChangePhotoClick = () => {
+    if (profileFileInputRef.current) {
+      profileFileInputRef.current.click();
+    }
+  };
+
+  const handleProfilePhotoClick = async () => {
+    const profileUrl = (userInfo?.profileUrl || userInfo?.profile || "").trim();
+    const hasProfilePhoto = Boolean(profileUrl) && !/\/assets\/user\.png$/i.test(profileUrl);
+
+    const result = await Swal.fire({
+      title: "Change Profile Photo",
+      showCancelButton: true,
+      showDenyButton: true,
+      confirmButtonText: "Upload Photo",
+      denyButtonText: "Remove Photo",
+      cancelButtonText: "Cancel",
+      confirmButtonColor: "#2563eb",
+      denyButtonColor: "#dc2626",
+      cancelButtonColor: "#6b7280",
+      reverseButtons: false,
+      didOpen: () => {
+        const cancelBtn = Swal.getCancelButton();
+        const confirmBtn = Swal.getConfirmButton();
+        const denyBtn = Swal.getDenyButton();
+
+        if (cancelBtn) cancelBtn.style.order = "1";
+        if (confirmBtn) confirmBtn.style.order = "2";
+        if (denyBtn) denyBtn.style.order = "3";
+      },
+    });
+
+    if (result.isConfirmed) {
+      handleChangePhotoClick();
+      return;
+    }
+
+    if (result.isDenied) {
+      await handleRemovePhotoClick({ skipConfirm: true });
+    }
+  };
+
+  const handleProfilePhotoSelected = async (e) => {
+    const file = e?.target?.files?.[0];
+    if (!file) return;
+
+    try {
+      const storedToken = token || localStorage.getItem("access_token");
+      if (!storedToken) {
+        throw new Error("Not authenticated");
+      }
+
+      const userId = userInfo?.userId || userInfo?.id;
+      if (!userId) {
+        throw new Error("User ID not found");
+      }
+
+      const formData = new FormData();
+      formData.append("profile", file);
+
+      const familyCode =
+        userInfo?.familyCode || userInfo?.raw?.familyMember?.familyCode || "";
+      if (familyCode) {
+        formData.append("familyCode", familyCode);
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL}/user/profile/update/${userId}`,
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${storedToken}`,
+          },
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(errText || "Failed to update profile picture");
+      }
+
+      await refetchUser();
+
+      Swal.fire({
+        icon: "success",
+        title: "Updated",
+        text: "Profile picture updated successfully.",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: error?.message || "Failed to update profile picture",
+        confirmButtonColor: "#d33",
+      });
+    } finally {
+      if (e?.target) {
+        e.target.value = "";
+      }
+    }
+  };
+
+  const handleRemovePhotoClick = async (options = {}) => {
+    const { skipConfirm = false } = options;
+    const profileUrl = (userInfo?.profileUrl || userInfo?.profile || "").trim();
+    const hasProfilePhoto = Boolean(profileUrl) && !/\/assets\/user\.png$/i.test(profileUrl);
+    if (!hasProfilePhoto) {
+      Swal.fire({
+        icon: "info",
+        title: "No photo",
+        text: "No profile picture to remove.",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+      return;
+    }
+
+    if (!skipConfirm) {
+      const result = await Swal.fire({
+        title: "Remove profile picture?",
+        text: "Your profile picture will be removed.",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#d33",
+        cancelButtonColor: "#3085d6",
+        confirmButtonText: "Remove",
+        cancelButtonText: "Cancel",
+      });
+
+      if (!result.isConfirmed) return;
+    }
+
+    try {
+      const storedToken = token || localStorage.getItem("access_token");
+      if (!storedToken) {
+        throw new Error("Not authenticated");
+      }
+
+      const userId = userInfo?.userId || userInfo?.id;
+      if (!userId) {
+        throw new Error("User ID not found");
+      }
+
+      const formData = new FormData();
+      formData.append("removeProfile", "true");
+
+      const familyCode =
+        userInfo?.familyCode || userInfo?.raw?.familyMember?.familyCode || "";
+      if (familyCode) {
+        formData.append("familyCode", familyCode);
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL}/user/profile/update/${userId}`,
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${storedToken}`,
+          },
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(errText || "Failed to remove profile picture");
+      }
+
+      await refetchUser();
+
+      Swal.fire({
+        icon: "success",
+        title: "Removed",
+        text: "Profile picture removed successfully.",
+        timer: 1500,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: error?.message || "Failed to remove profile picture",
+        confirmButtonColor: "#d33",
+      });
+    }
+  };
 
   // Use React Query for posts with caching
   const { data: userPosts = [], isLoading: loadingPosts } = useQuery({
@@ -571,11 +763,28 @@ const ProfilePage = () => {
           user && (
             <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8 flex flex-col md:flex-row items-center gap-8 border border-gray-100">
               <div className="flex-shrink-0">
-                <img
-                  src={user.profileImage}
-                  alt="Profile"
-                  className="w-32 h-32 md:w-40 md:h-40 rounded-full object-cover border-4 border-primary-400 shadow-lg"
-                />
+                <div className="flex flex-col items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleProfilePhotoClick}
+                    className="rounded-full focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-opacity-75"
+                    title="Change profile photo"
+                  >
+                    <img
+                      src={user.profileImage}
+                      alt="Profile"
+                      className="w-32 h-32 md:w-40 md:h-40 rounded-full object-cover border-4 border-primary-400 shadow-lg cursor-pointer"
+                    />
+                  </button>
+
+                  <input
+                    ref={profileFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleProfilePhotoSelected}
+                    className="hidden"
+                  />
+                </div>
               </div>
               <div className="flex-grow text-center md:text-left">
                 <div className="flex flex-col md:flex-row items-center md:justify-between mb-3 gap-2">

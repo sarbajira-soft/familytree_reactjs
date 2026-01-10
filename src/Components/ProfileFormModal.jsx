@@ -5,6 +5,7 @@ import { useUser } from '../Contexts/UserContext';
 
 const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode = 'add', memberData = {} }) => {
   const mobileRef = useRef(null);
+  const profileFileInputRef = useRef(null);
   const { userInfo, userLoading } = useUser();
   
   // Define initial form data structure
@@ -22,6 +23,7 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
     lastName: '',
     profileImageUrl: '',
     profileImageFile: null,
+    removeProfile: false,
     gender: '',
     dob: '',
     
@@ -60,6 +62,17 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
   const [formData, setFormData] = useState(initialFormData);
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordField, setShowPasswordField] = useState(false);
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
+  const [otpValue, setOtpValue] = useState('');
+  const [newPasswordValue, setNewPasswordValue] = useState('');
+  const [confirmPasswordValue, setConfirmPasswordValue] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [otpSending, setOtpSending] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [passwordUpdating, setPasswordUpdating] = useState(false);
+  const [passwordChangeError, setPasswordChangeError] = useState('');
+  const [passwordChangeSuccess, setPasswordChangeSuccess] = useState('');
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -328,11 +341,19 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
   const validate = () => {
     const newErrors = {};
 
+    const textNameRegex = /^[A-Za-z][A-Za-z ]*$/;
+
     // Account Information Validation
     if (!formData.email.trim()) {
       newErrors.email = 'Email is required';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = 'Invalid email address';
+    }
+
+    if (!String(formData.mobile || '').trim()) {
+      newErrors.mobile = 'Mobile number is required';
+    } else if (!/^\d{6,14}$/.test(String(formData.mobile || '').trim())) {
+      newErrors.mobile = 'Invalid mobile number';
     }
 
     if (mode === 'add' && !formData.password.trim()) {
@@ -343,7 +364,7 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
     if (!formData.firstName.trim()) newErrors.firstName = 'First name is required';
     if (!formData.lastName.trim()) newErrors.lastName = 'Last name is required';
     if (!formData.gender) newErrors.gender = 'Gender is required';
-    
+
     if (!formData.dob.trim()) {
       newErrors.dob = 'Date of birth is required';
     } else {
@@ -362,6 +383,26 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
       if (!formData.spouseName.trim()) newErrors.spouseName = 'Spouse name is required for married individuals';
     }
 
+    if (String(formData.fatherName || '').trim() && !textNameRegex.test(String(formData.fatherName || '').trim())) {
+      newErrors.fatherName = "Father's name can contain only letters and spaces";
+    }
+
+    if (String(formData.motherName || '').trim() && !textNameRegex.test(String(formData.motherName || '').trim())) {
+      newErrors.motherName = "Mother's name can contain only letters and spaces";
+    }
+
+    if (String(formData.caste || '').trim() && !textNameRegex.test(String(formData.caste || '').trim())) {
+      newErrors.caste = "Caste can contain only letters and spaces";
+    }
+
+    if (String(formData.kuladevata || '').trim() && !textNameRegex.test(String(formData.kuladevata || '').trim())) {
+      newErrors.kuladevata = "Kuladevata can contain only letters and spaces";
+    }
+
+    if (String(formData.region || '').trim() && !textNameRegex.test(String(formData.region || '').trim())) {
+      newErrors.region = "Region can contain only letters and spaces";
+    }
+
     setErrors(newErrors);
     if (Object.keys(newErrors).length > 0) {
       const firstErrorFieldName = Object.keys(newErrors)[0];
@@ -376,9 +417,22 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+
+    const restrictedNameFields = new Set([
+      'fatherName',
+      'motherName',
+      'caste',
+      'kuladevata',
+      'region',
+    ]);
+
+    const sanitizedValue = restrictedNameFields.has(name)
+      ? String(value || '').replace(/[^A-Za-z ]/g, '')
+      : (value || '');
+
     setFormData((prevData) => ({
       ...prevData,
-      [name]: value || '', // Ensure value is never undefined
+      [name]: sanitizedValue, // Ensure value is never undefined
     }));
 
     setErrors((prev) => {
@@ -420,13 +474,199 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
         ...prevData,
         profileImageFile: file,
         profileImageUrl: URL.createObjectURL(file),
+        removeProfile: false,
       }));
     } else {
       setFormData((prevData) => ({
         ...prevData,
         profileImageFile: null,
         profileImageUrl: memberData.profileImage || '',
+        removeProfile: false,
       }));
+    }
+  };
+
+  const handleRemoveProfilePicture = async (options = {}) => {
+    const { skipConfirm = false } = options;
+
+    if (!skipConfirm) {
+      const result = await Swal.fire({
+        title: 'Remove profile picture?',
+        text: 'Your profile picture will be removed.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Remove',
+        cancelButtonText: 'Cancel',
+      });
+
+      if (!result.isConfirmed) return;
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      profileImageFile: null,
+      profileImageUrl: '',
+      removeProfile: true,
+    }));
+  };
+
+  const handleProfilePhotoActionSheet = async () => {
+    const currentUrl = String(
+      formData.profileImageUrl || formData.profileUrl || formData.profileImageUrl || ''
+    ).trim();
+    const hasProfilePhoto = Boolean(currentUrl) && !/\/assets\/user\.png$/i.test(currentUrl);
+
+    const result = await Swal.fire({
+      title: 'Change Profile Photo',
+      showCancelButton: true,
+      showDenyButton: true,
+      confirmButtonText: 'Upload Photo',
+      denyButtonText: 'Remove Photo',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#2563eb',
+      denyButtonColor: '#dc2626',
+      cancelButtonColor: '#6b7280',
+      reverseButtons: false,
+      didOpen: () => {
+        const cancelBtn = Swal.getCancelButton();
+        const confirmBtn = Swal.getConfirmButton();
+        const denyBtn = Swal.getDenyButton();
+
+        if (cancelBtn) cancelBtn.style.order = '1';
+        if (confirmBtn) confirmBtn.style.order = '2';
+        if (denyBtn) denyBtn.style.order = '3';
+      },
+    });
+
+    if (result.isConfirmed) {
+      profileFileInputRef.current?.click?.();
+      return;
+    }
+
+    if (result.isDenied) {
+      if (!hasProfilePhoto) {
+        Swal.fire({
+          icon: 'info',
+          title: 'No photo',
+          text: 'No profile picture to remove.',
+          timer: 1500,
+          showConfirmButton: false,
+        });
+        return;
+      }
+
+      await handleRemoveProfilePicture({ skipConfirm: true });
+    }
+  };
+
+  const getPasswordResetUsername = () => {
+    const usernameFromEmail = String(userInfo?.email || formData.email || '').trim();
+    const usernameFromMobile = String(formData.mobile || '').trim();
+    return usernameFromEmail || usernameFromMobile;
+  };
+
+  const handleTogglePasswordChange = () => {
+    setShowPasswordChange((prev) => !prev);
+    setPasswordChangeError('');
+    setPasswordChangeSuccess('');
+  };
+
+  const handleSendOtp = async () => {
+    const baseUrl = import.meta.env.VITE_API_BASE_URL;
+    const username = getPasswordResetUsername();
+
+    setPasswordChangeError('');
+    setPasswordChangeSuccess('');
+
+    if (!username) {
+      setPasswordChangeError('Email or mobile number is required to change password.');
+      return;
+    }
+
+    try {
+      setOtpSending(true);
+      const sendRes = await fetch(`${baseUrl}/user/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username }),
+      });
+
+      if (!sendRes.ok) {
+        const errorData = await sendRes.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to send OTP. Please try again.');
+      }
+
+      setOtpSent(true);
+      setPasswordChangeSuccess('OTP sent successfully.');
+    } catch (e) {
+      setPasswordChangeError(e?.message || 'Failed to send OTP. Please try again.');
+    } finally {
+      setOtpSending(false);
+    }
+  };
+
+  const handleUpdatePassword = async () => {
+    const baseUrl = import.meta.env.VITE_API_BASE_URL;
+    const username = getPasswordResetUsername();
+
+    setPasswordChangeError('');
+    setPasswordChangeSuccess('');
+
+    const otp = String(otpValue || '').trim();
+    const newPassword = String(newPasswordValue || '');
+    const confirmPassword = String(confirmPasswordValue || '');
+
+    if (!username) {
+      setPasswordChangeError('Email or mobile number is required to change password.');
+      return;
+    }
+
+    if (!otp || !newPassword || !confirmPassword) {
+      setPasswordChangeError('All fields are required.');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordChangeError('Passwords do not match.');
+      return;
+    }
+
+    const strong =
+      newPassword.length >= 8 &&
+      /[A-Z]/.test(newPassword) &&
+      /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(newPassword);
+    if (!strong) {
+      setPasswordChangeError(
+        'Password must be at least 8 characters and include 1 uppercase letter and 1 special character.'
+      );
+      return;
+    }
+
+    try {
+      setPasswordUpdating(true);
+      const resetRes = await fetch(`${baseUrl}/user/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, otp, newPassword, confirmPassword }),
+      });
+
+      if (!resetRes.ok) {
+        const errorData = await resetRes.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to reset password. Please try again.');
+      }
+
+      setPasswordChangeSuccess('Your password has been updated successfully.');
+      setOtpValue('');
+      setNewPasswordValue('');
+      setConfirmPasswordValue('');
+      setOtpSent(false);
+      setShowPasswordChange(false);
+    } catch (e) {
+      setPasswordChangeError(e?.message || 'Failed to reset password. Please try again.');
+    } finally {
+      setPasswordUpdating(false);
     }
   };
 
@@ -473,7 +713,6 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
       'email',
       'mobile',
       'countryCode',
-      'password',
       'role',
       'status',
     ];
@@ -503,8 +742,8 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
 
     if (formData.profileImageFile instanceof File) {
       formDataToSend.append('profile', formData.profileImageFile);
-    } else {
-      formDataToSend.delete('profile');
+    } else if (formData.removeProfile) {
+      formDataToSend.append('removeProfile', 'true');
     }
     
     let apiUrl = '';
@@ -692,8 +931,9 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
 
   if (!isOpen) return null;
 
-  const title = mode === 'add' ? 'Add New Family Member' : (mode === 'edit-profile' ? 'Edit Your Profile' : 'Edit Family Member Profile');
+  const title = mode === 'add' ? 'Add New Family Member' : (mode === 'edit-profile' ? 'Edit Profile' : 'Edit Family Member Profile');
   const submitButtonText = isLoading ? 'Processing...' : (mode === 'add' ? 'Add Member' : 'Save');
+  const lockEmailAndMobile = mode === 'edit-profile';
 
   const inputClassName = (fieldName) => `w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-1 text-sm font-inter text-gray-800 placeholder-gray-400 ${
     errors[fieldName] ? 'border-red-500 focus:ring-red-300' : 'border-gray-300 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)]'
@@ -745,7 +985,12 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
             <div className={sectionClassName}>
               <h3 className="text-lg font-semibold text-gray-800 mb-4">Profile Picture</h3>
               <div className="flex flex-col sm:flex-row items-center gap-6">
-                <div className="relative group">
+                <button
+                  type="button"
+                  onClick={handleProfilePhotoActionSheet}
+                  className="relative group focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-opacity-50 rounded-lg"
+                  title="Change profile photo"
+                >
                   <div className="w-32 h-32 rounded-lg border-2 border-gray-200 overflow-hidden shadow-sm flex items-center justify-center bg-gray-100">
                     {formData.profileImageUrl || formData.profileUrl ? (
                       <img
@@ -763,7 +1008,7 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
                   <div className="absolute inset-0 bg-black bg-opacity-30 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                     <span className="text-white text-sm font-medium">Change Photo</span>
                   </div>
-                </div>
+                </button>
                 <div className="flex-1 w-full">
                   <label htmlFor="profile" className={labelClassName}>
                     Upload New Image
@@ -774,6 +1019,7 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
                     type="file"
                     accept="image/*"
                     onChange={handleFileChange}
+                    ref={profileFileInputRef}
                     className="w-full text-sm text-gray-500
                       file:mr-4 file:py-2 file:px-4
                       file:rounded-md file:border-0
@@ -801,8 +1047,10 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
                     type="email"
                     value={formData.email || ''} // FIXED: Ensure never undefined
                     onChange={handleChange}
-                    className={inputClassName('email')}
+                    disabled={lockEmailAndMobile}
+                    className={`${inputClassName('email')} ${lockEmailAndMobile ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                     placeholder="your@email.com"
+                    maxLength={255}
                   />
                   {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
                 </div>
@@ -817,11 +1065,13 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
                     country={'in'}
                     value={getFullMobile(formData.countryCode || '+91', formData.mobile || '')}
                     onChange={(value, data) => handleMobileChange(value, data, 'mobile')}
+                    disabled={lockEmailAndMobile}
                     inputProps={{
                       name: 'mobile',
                       required: true,
                       id: 'mobile',
                       ref: mobileRef,
+                      disabled: lockEmailAndMobile,
                     }}
                     containerStyle={{ width: '100%' }}
                     inputStyle={{
@@ -831,12 +1081,13 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
                       paddingLeft: '48px',
                       border: `1px solid ${errors.mobile ? '#ef4444' : '#d1d5db'}`,
                       borderRadius: '8px',
+                      backgroundColor: lockEmailAndMobile ? '#f3f4f6' : 'white',
                     }}
                     buttonStyle={{
                       border: `1px solid ${errors.mobile ? '#ef4444' : '#d1d5db'}`,
                       borderRight: 'none',
                       borderRadius: '8px 0 0 8px',
-                      backgroundColor: 'white',
+                      backgroundColor: lockEmailAndMobile ? '#f3f4f6' : 'white',
                     }}
                   />
                   {errors.mobile && <p className="text-red-500 text-xs mt-1">{errors.mobile}</p>}
@@ -894,6 +1145,7 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
                       onChange={handleChange}
                       className={inputClassName('password') + ' pr-10'}
                       placeholder="••••••••"
+                      maxLength={255}
                     />
                     <button
                       type="button"
@@ -918,11 +1170,131 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
                   <div className="flex items-end">
                     <button
                       type="button"
-                      onClick={() => setShowPasswordField(true)}
+                      onClick={handleTogglePasswordChange}
                       className="bg-unset text-sm text-[var(--color-primary)] hover:underline"
                     >
                       Change Password
                     </button>
+                  </div>
+                )}
+
+                {mode !== 'add' && !showPasswordField && showPasswordChange && (
+                  <div className="md:col-span-2">
+                    {passwordChangeError ? (
+                      <div className="mb-3 p-3 text-sm text-red-700 bg-red-100 rounded border border-red-300">
+                        {passwordChangeError}
+                      </div>
+                    ) : null}
+                    {passwordChangeSuccess ? (
+                      <div className="mb-3 p-3 text-sm text-green-700 bg-green-100 rounded border border-green-300">
+                        {passwordChangeSuccess}
+                      </div>
+                    ) : null}
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label htmlFor="passwordOtp" className={labelClassName}>
+                          OTP
+                        </label>
+                        <input
+                          id="passwordOtp"
+                          name="passwordOtp"
+                          type="text"
+                          value={otpValue}
+                          onChange={(e) => setOtpValue(e.target.value)}
+                          className={inputClassName('passwordOtp')}
+                          placeholder="123456"
+                          maxLength={12}
+                        />
+                        <button
+                          type="button"
+                          onClick={handleSendOtp}
+                          disabled={otpSending}
+                          className="mt-2 px-3 py-2 rounded-lg text-sm font-medium bg-[var(--color-primary)] text-white disabled:opacity-60"
+                        >
+                          {otpSending ? 'Sending...' : otpSent ? 'Resend OTP' : 'Send OTP'}
+                        </button>
+                      </div>
+
+                      <div>
+                        <label htmlFor="newPasswordInline" className={labelClassName}>
+                          New Password
+                        </label>
+                        <div className="relative">
+                          <input
+                            id="newPasswordInline"
+                            name="newPasswordInline"
+                            type={showNewPassword ? 'text' : 'password'}
+                            value={newPasswordValue}
+                            onChange={(e) => setNewPasswordValue(e.target.value)}
+                            className={inputClassName('newPasswordInline') + ' pr-10'}
+                            placeholder="New password"
+                            maxLength={255}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowNewPassword((v) => !v)}
+                            className="bg-unset text-primary absolute right-3 top-[10px] hover:text-gray-700"
+                          >
+                            {showNewPassword ? (
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M13.875 18.825A10.05 10.05 0 0112 19c-5 0-9.27-3.11-11-7.5a11.05 11.05 0 013.304-4.348M3 3l18 18M16.24 16.24A5 5 0 017.76 7.76" />
+                              </svg>
+                            ) : (
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M1.5 12S5.5 5.5 12 5.5 22.5 12 22.5 12s-4 6.5-10.5 6.5S1.5 12 1.5 12z" />
+                                <circle cx="12" cy="12" r="3" />
+                              </svg>
+                            )}
+                          </button>
+                        </div>
+                        <div className="mt-1 text-xs text-gray-500">
+                          Password must be at least 8 characters and include 1 uppercase letter and 1 special character.
+                        </div>
+                      </div>
+
+                      <div>
+                        <label htmlFor="confirmPasswordInline" className={labelClassName}>
+                          Confirm Password
+                        </label>
+                        <div className="relative">
+                          <input
+                            id="confirmPasswordInline"
+                            name="confirmPasswordInline"
+                            type={showConfirmPassword ? 'text' : 'password'}
+                            value={confirmPasswordValue}
+                            onChange={(e) => setConfirmPasswordValue(e.target.value)}
+                            className={inputClassName('confirmPasswordInline') + ' pr-10'}
+                            placeholder="Confirm password"
+                            maxLength={255}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowConfirmPassword((v) => !v)}
+                            className="bg-unset text-primary absolute right-3 top-[10px] hover:text-gray-700"
+                          >
+                            {showConfirmPassword ? (
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M13.875 18.825A10.05 10.05 0 0112 19c-5 0-9.27-3.11-11-7.5a11.05 11.05 0 013.304-4.348M3 3l18 18M16.24 16.24A5 5 0 017.76 7.76" />
+                              </svg>
+                            ) : (
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M1.5 12S5.5 5.5 12 5.5 22.5 12 22.5 12s-4 6.5-10.5 6.5S1.5 12 1.5 12z" />
+                                <circle cx="12" cy="12" r="3" />
+                              </svg>
+                            )}
+                          </button>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleUpdatePassword}
+                          disabled={passwordUpdating}
+                          className="mt-2 px-3 py-2 rounded-lg text-sm font-medium bg-green-600 text-white disabled:opacity-60"
+                        >
+                          {passwordUpdating ? 'Updating...' : 'Update Password'}
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -945,6 +1317,7 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
                     onChange={handleChange}
                     className={inputClassName('firstName')}
                     placeholder="First name"
+                    maxLength={60}
                   />
                   {errors.firstName && <p className="text-red-500 text-xs mt-1">{errors.firstName}</p>}
                 </div>
@@ -960,6 +1333,7 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
                     onChange={handleChange}
                     className={inputClassName('lastName')}
                     placeholder="Last name"
+                    maxLength={60}
                   />
                   {errors.lastName && <p className="text-red-500 text-xs mt-1">{errors.lastName}</p>}
                 </div>
@@ -1070,6 +1444,7 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
                     className={inputClassName('address')}
                     placeholder="Full address"
                     rows="2"
+                    maxLength={500}
                   />
                 </div>
               </div>
@@ -1127,6 +1502,7 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
                         onChange={handleChange}
                         className={inputClassName('spouseName')}
                         placeholder="Spouse's full name"
+                        maxLength={80}
                       />
                       {errors.spouseName && <p className="text-red-500 text-xs mt-1">{errors.spouseName}</p>}
                     </div>
@@ -1179,6 +1555,7 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
                                 }}
                                 className={inputClassName('childrenNames')}
                                 placeholder={`Child ${index + 1} name`}
+                                maxLength={80}
                               />
                             </div>
                           ))}
@@ -1200,7 +1577,9 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
                     onChange={handleChange}
                     className={inputClassName('fatherName')}
                     placeholder="Father's name"
+                    maxLength={80}
                   />
+                  {errors.fatherName && <p className="text-red-500 text-xs mt-1">{errors.fatherName}</p>}
                 </div>
                 <div>
                   <label htmlFor="motherName" className={labelClassName}>
@@ -1214,7 +1593,9 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
                     onChange={handleChange}
                     className={inputClassName('motherName')}
                     placeholder="Mother's name"
+                    maxLength={80}
                   />
+                  {errors.motherName && <p className="text-red-500 text-xs mt-1">{errors.motherName}</p>}
                 </div>
                 <div>
                   <label htmlFor="familyCode" className={labelClassName}>
@@ -1228,6 +1609,7 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
                     onChange={handleChange}
                     className={inputClassName('familyCode')}
                     placeholder="FAM000123"
+                    maxLength={50}
                   />
                 </div>
               </div>
@@ -1300,7 +1682,9 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
                     onChange={handleChange}
                     className={inputClassName('caste')}
                     placeholder="Enter caste"
+                    maxLength={80}
                   />
+                  {errors.caste && <p className="text-red-500 text-xs mt-1">{errors.caste}</p>}
                 </div>
 
                 {/* Gothram Dropdown */}
@@ -1340,7 +1724,9 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
                     onChange={handleChange}
                     className={inputClassName('kuladevata')}
                     placeholder="Family deity"
+                    maxLength={80}
                   />
+                  {errors.kuladevata && <p className="text-red-500 text-xs mt-1">{errors.kuladevata}</p>}
                 </div>
                 <div>
                   <label htmlFor="region" className={labelClassName}>
@@ -1354,7 +1740,9 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
                     onChange={handleChange}
                     className={inputClassName('region')}
                     placeholder="e.g., South Tamil Nadu"
+                    maxLength={80}
                   />
+                  {errors.region && <p className="text-red-500 text-xs mt-1">{errors.region}</p>}
                 </div>
               </div>
             </div>
@@ -1375,6 +1763,7 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
                     className={inputClassName('bio')}
                     placeholder="Tell us about yourself..."
                     rows="3"
+                    maxLength={1000}
                   />
                 </div>
                 <div>
@@ -1389,6 +1778,7 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
                     className={inputClassName('hobbies')}
                     placeholder="e.g., Reading, Traveling"
                     rows="2"
+                    maxLength={500}
                   />
                 </div>
                 <div>
@@ -1403,6 +1793,7 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
                     className={inputClassName('favoriteFoods')}
                     placeholder="e.g., Dosa, Biryani"
                     rows="2"
+                    maxLength={500}
                   />
                 </div>
                 <div>
@@ -1417,6 +1808,7 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
                     className={inputClassName('likes')}
                     placeholder="Things you like"
                     rows="2"
+                    maxLength={500}
                   />
                 </div>
                 <div>
@@ -1431,6 +1823,7 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
                     className={inputClassName('dislikes')}
                     placeholder="Things you dislike"
                     rows="2"
+                    maxLength={500}
                   />
                 </div>
               </div>

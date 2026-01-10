@@ -455,7 +455,7 @@ const Layout = ({ noScroll = false }) => {
                       onClick={openAddMemberModal}
                       className="block w-full bg-white text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                     >
-                      Settings
+                      Edit Profile
                     </button>
                     <div className="border-t border-gray-200"></div>
                     <button
