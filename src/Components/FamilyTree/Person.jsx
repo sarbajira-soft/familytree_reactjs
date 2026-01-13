@@ -128,6 +128,7 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
     const { code } = useParams(); // Get current family code from URL
     const navigate = useNavigate();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const effectiveViewOnly = viewOnly || typeof onClick !== 'function';
     const isAdmin = !!(userInfo && (userInfo.role === 2 || userInfo.role === 3));
     const canShare = !!person.memberId;
     const canShowAdminMenu = isAdmin && !!person.memberId;
@@ -678,11 +679,11 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
             transition: "box-shadow 0.18s, border 0.18s, background 0.18s",
             overflow: "visible",
           }}
-          onClick={viewOnly ? undefined : handleCardClick}
+          onClick={effectiveViewOnly ? undefined : handleCardClick}
           data-person-id={person.id}
         >
           {/* Family Tree Navigation Icon (simple approach using person.familyCode) */}
-          {!viewOnly && hasAssociatedTree && (
+          {!effectiveViewOnly && hasAssociatedTree && (
             <div className="absolute top-1 left-1 flex flex-col items-center z-10">
               <button
                 className="w-6 h-6 bg-gradient-to-br from-cyan-50 to-sky-50 hover:from-cyan-100 hover:to-sky-100 text-sky-700 rounded-full flex items-center justify-center shadow-md transition-all duration-200 border-2 border-cyan-400"
@@ -700,7 +701,7 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
             </div>
           )}
           {/* Radial Menu Button - Top Right Corner (hide in viewOnly mode) */}
-          {!viewOnly && (
+          {!effectiveViewOnly && (
             <div
               className="absolute flex flex-col items-center space-y-1 z-30"
               style={{
@@ -821,7 +822,7 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
                   }}
                 />
               </div>
-              {isNew && !viewOnly && (
+              {isNew && !effectiveViewOnly && (
                 <span
                   className="absolute -bottom-1 -right-1 bg-gradient-to-br from-cyan-500 to-sky-600 text-white rounded-full w-5 h-5 flex items-center justify-center font-bold text-xs shadow-lg"
                   style={{ boxShadow: "0 4px 14px rgba(6, 182, 212, 0.45)" }}
@@ -829,7 +830,7 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
                   +
                 </span>
               )}
-              {isSelected && !isNew && !viewOnly && !isHighlighted && (
+              {isSelected && !isNew && !effectiveViewOnly && !isHighlighted && (
                 <span
                   className="absolute -bottom-1 -right-1 bg-gradient-to-br from-pink-500 to-fuchsia-600 text-white rounded-full w-5 h-5 flex items-center justify-center font-bold text-xs shadow-lg"
                   style={{ boxShadow: "0 4px 14px rgba(236, 72, 153, 0.45)" }}

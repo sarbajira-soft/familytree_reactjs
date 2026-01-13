@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import AuthLogo from '../Components/AuthLogo';
+import { setAuthData, getUserIdFromToken } from '../utils/auth';
+import { useUser } from '../Contexts/UserContext';
 
 const VerifyOtp = () => {
   const navigate = useNavigate();
+  const { refetchUser } = useUser();
   const location = useLocation();
   const params = new URLSearchParams(location.search);
   const familyCode = params.get('familyCode');
@@ -82,8 +85,23 @@ const VerifyOtp = () => {
       }
 
       const data = await response.json();
-      
-      localStorage.setItem('access_token', data.accessToken);
+
+      const tokenUserId = getUserIdFromToken(data.accessToken);
+      const minimalUser = {
+        userId: tokenUserId,
+        email: email || '',
+        mobile: mobile || '',
+      };
+
+      // IMPORTANT: use setAuthData so we refresh session expiry and userInfo
+      // (otherwise an old sessionExpiry can instantly clear the new token)
+      const stayLoggedIn = localStorage.getItem('stayLoggedIn') === 'true';
+      setAuthData(data.accessToken, minimalUser, stayLoggedIn);
+
+      // Ensure the UserContext is populated before navigating to a PrivateRoute
+      // (otherwise PrivateRoute sees token but userInfo=null and redirects to /login)
+      await refetchUser();
+
       if (familyCode) {
         navigate(`/on-boarding?familyCode=${familyCode}`);
       } else {

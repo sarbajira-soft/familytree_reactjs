@@ -63,9 +63,12 @@ const OnBoarding = () => {
     fatherName: '',
     motherName: '',
     motherTongue: 0,
+    motherTongueOther: '',
     religionId: 0,
+    religionOther: '',
     caste: '',
     gothram: 0,
+    gothramOther: '',
     kuladevata: '',
     hobbies: '',
     likes: '',
@@ -107,13 +110,18 @@ const OnBoarding = () => {
     
     let processedValue = value;
     
-    if (type === 'number' || ['childrenCount', 'motherTongue', 'religionId', 'gothram'].includes(name)) {
+    if (['motherTongue', 'religionId', 'gothram'].includes(name) && value === 'other') {
+      processedValue = 'other';
+    } else if (type === 'number' || ['childrenCount', 'motherTongue', 'religionId', 'gothram'].includes(name)) {
       processedValue = value === '' ? 0 : parseInt(value, 10);
     }
     
     setFormData(prev => ({
       ...prev,
       [name]: processedValue,
+      ...(name === 'motherTongue' && processedValue !== 'other' && { motherTongueOther: '' }),
+      ...(name === 'religionId' && processedValue !== 'other' && { religionOther: '' }),
+      ...(name === 'gothram' && processedValue !== 'other' && { gothramOther: '' }),
       ...(name === 'dob' && { age: calculateAge(value) }) // Update age when DOB changes
     }));
   
@@ -183,6 +191,20 @@ const OnBoarding = () => {
       }
       if (!formData.motherTongue || formData.motherTongue === 0) {
         newErrors.motherTongue = 'Mother tongue is required';
+      } else if (formData.motherTongue === 'other' && !String(formData.motherTongueOther || '').trim()) {
+        newErrors.motherTongueOther = 'Please enter mother tongue';
+      }
+
+      if (!formData.religionId || formData.religionId === 0) {
+        newErrors.religionId = 'Religion is required';
+      } else if (formData.religionId === 'other' && !String(formData.religionOther || '').trim()) {
+        newErrors.religionOther = 'Please enter religion';
+      }
+
+      if (!formData.gothram || formData.gothram === 0) {
+        newErrors.gothram = 'Gothram is required';
+      } else if (formData.gothram === 'other' && !String(formData.gothramOther || '').trim()) {
+        newErrors.gothramOther = 'Please enter gothram';
       }
     }
 
@@ -218,7 +240,12 @@ const OnBoarding = () => {
 
     // Family section mandatory fields
     if (!formData.fatherName.trim() || !formData.motherName.trim() || 
-        !formData.motherTongue || formData.motherTongue === 0) {
+        !formData.motherTongue || formData.motherTongue === 0 ||
+        !formData.religionId || formData.religionId === 0 ||
+        !formData.gothram || formData.gothram === 0 ||
+        (formData.motherTongue === 'other' && !String(formData.motherTongueOther || '').trim()) ||
+        (formData.religionId === 'other' && !String(formData.religionOther || '').trim()) ||
+        (formData.gothram === 'other' && !String(formData.gothramOther || '').trim())) {
       return false;
     }
 
@@ -226,7 +253,6 @@ const OnBoarding = () => {
     if (!formData.contactNumber.trim() || !formData.address.trim()) {
       return false;
     }
-
     return true;
   };
 
@@ -271,6 +297,9 @@ const OnBoarding = () => {
         if (
           formData[key] !== undefined &&
           formData[key] !== null &&
+          key !== 'motherTongueOther' &&
+          key !== 'religionOther' &&
+          key !== 'gothramOther' &&
           key !== 'childrenNames' &&
           !key.startsWith('childName') &&
           key !== 'profile'
@@ -289,11 +318,25 @@ const OnBoarding = () => {
 
       // Append parsed numbers
       formDataToSend.set('childrenCount', parseInt(formData.childrenCount) || '0');
-      formDataToSend.set('languageId', parseInt(formData.motherTongue) || '');
-      formDataToSend.set('religionId', parseInt(formData.religionId) || '');
+      if (formData.motherTongue === 'other') {
+        formDataToSend.set('languageId', '');
+        formDataToSend.set('otherLanguage', String(formData.motherTongueOther || '').trim());
+      } else {
+        formDataToSend.set('languageId', parseInt(formData.motherTongue) || '');
+      }
+
+      if (formData.religionId === 'other') {
+        formDataToSend.set('religionId', '');
+        formDataToSend.set('otherReligion', String(formData.religionOther || '').trim());
+      } else {
+        formDataToSend.set('religionId', parseInt(formData.religionId) || '');
+      }
       
       // Only add gothramId if it has a valid value
-      if (formData.gothram && parseInt(formData.gothram) > 0) {
+      if (formData.gothram === 'other') {
+        formDataToSend.set('gothramId', '');
+        formDataToSend.set('otherGothram', String(formData.gothramOther || '').trim());
+      } else if (formData.gothram && parseInt(formData.gothram) > 0) {
         formDataToSend.set('gothramId', parseInt(formData.gothram));
       }
 
@@ -324,10 +367,6 @@ const OnBoarding = () => {
       formDataToSend.delete('childrenCount');
       formDataToSend.delete('profileUrl');
 
-      // const payload = Object.fromEntries(
-      //   Object.entries(formDataToSend).filter(([_, value]) => value !== '')
-      // );
-      
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/user/profile/update/${userId}`, {
         method: 'PUT',
         headers: {
@@ -382,9 +421,9 @@ const OnBoarding = () => {
         const data = await Promise.all(responses.map(res => res.json()));
 
         setDropdownData({
-          languages: data[0].filter(item => item.status === 1),
-          religions: data[1].filter(item => item.status === 1),
-          gothrams: data[2].filter(item => item.status === 1),
+          languages: data[0].data || data[0],
+          religions: data[1].data || data[1],
+          gothrams: data[2].data || data[2],
           loading: false,
           error: null
         });
@@ -456,9 +495,12 @@ const OnBoarding = () => {
             fatherName: userProfile.fatherName || '',
             motherName: userProfile.motherName || '',
             motherTongue: userProfile.languageId ? parseInt(userProfile.languageId) : 0,
+            motherTongueOther: userProfile.otherLanguage || '',
             religionId: userProfile.religionId ? parseInt(userProfile.religionId) : 0,
+            religionOther: userProfile.otherReligion || '',
             caste: userProfile.caste || '',
             gothram: userProfile.gothramId ? parseInt(userProfile.gothramId) : 0,
+            gothramOther: userProfile.otherGothram || '',
             kuladevata: userProfile.kuladevata || '',
             hobbies: userProfile.hobbies || '',
             likes: userProfile.likes || '',
@@ -624,8 +666,26 @@ const OnBoarding = () => {
                     {language.name}
                   </option>
                 ))}
+                <option value="other">Others</option>
               </select>
               {errors.motherTongue && <p className="text-red-500 text-xs mt-1">{errors.motherTongue}</p>}
+              {formData.motherTongue === 'other' && (
+                <div className="mt-2">
+                  <input
+                    type="text"
+                    name="motherTongueOther"
+                    value={formData.motherTongueOther || ''}
+                    onChange={handleChange}
+                    placeholder="Enter mother tongue"
+                    className={`w-full px-4 py-2.5 border rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 ${
+                      errors.motherTongueOther
+                        ? 'border-red-500 focus:ring-red-300'
+                        : 'border-gray-300 focus:ring-[var(--color-primary)]'
+                    }`}
+                  />
+                  {errors.motherTongueOther && <p className="text-red-500 text-xs mt-1">{errors.motherTongueOther}</p>}
+                </div>
+              )}
             </div>
 
             <div>
@@ -643,7 +703,26 @@ const OnBoarding = () => {
                     {religion.name}
                   </option>
                 ))}
+                <option value="other">Others</option>
               </select>
+              {errors.religionId && <p className="text-red-500 text-xs mt-1">{errors.religionId}</p>}
+              {formData.religionId === 'other' && (
+                <div className="mt-2">
+                  <input
+                    type="text"
+                    name="religionOther"
+                    value={formData.religionOther || ''}
+                    onChange={handleChange}
+                    placeholder="Enter religion"
+                    className={`w-full px-4 py-2.5 border rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 ${
+                      errors.religionOther
+                        ? 'border-red-500 focus:ring-red-300'
+                        : 'border-gray-300 focus:ring-[var(--color-primary)]'
+                    }`}
+                  />
+                  {errors.religionOther && <p className="text-red-500 text-xs mt-1">{errors.religionOther}</p>}
+                </div>
+              )}
             </div>
 
               <div>
@@ -673,7 +752,26 @@ const OnBoarding = () => {
                     {gothram.name}
                   </option>
                 ))}
+                <option value="other">Others</option>
               </select>
+              {errors.gothram && <p className="text-red-500 text-xs mt-1">{errors.gothram}</p>}
+              {formData.gothram === 'other' && (
+                <div className="mt-2">
+                  <input
+                    type="text"
+                    name="gothramOther"
+                    value={formData.gothramOther || ''}
+                    onChange={handleChange}
+                    placeholder="Enter gothram"
+                    className={`w-full px-4 py-2.5 border rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 ${
+                      errors.gothramOther
+                        ? 'border-red-500 focus:ring-red-300'
+                        : 'border-gray-300 focus:ring-[var(--color-primary)]'
+                    }`}
+                  />
+                  {errors.gothramOther && <p className="text-red-500 text-xs mt-1">{errors.gothramOther}</p>}
+                </div>
+              )}
             </div>
 
               <div className="md:col-span-2">

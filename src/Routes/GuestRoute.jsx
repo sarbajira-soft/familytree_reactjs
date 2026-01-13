@@ -6,7 +6,7 @@ import { getToken } from '../utils/auth';
 
 const GuestRoute = ({ children }) => {
   const token = getToken();
-  const { userLoading } = useUser();
+  const { userInfo, userLoading } = useUser();
 
   // If no token, allow access to guest routes
   if (!token) {
@@ -18,8 +18,14 @@ const GuestRoute = ({ children }) => {
     return <LoadingSpinner fullScreen={true} text="Loading..." />;
   }
 
-  // If user is authenticated and context is loaded, redirect to profile
-  return <Navigate to="/myprofile" replace />;
+  // Only redirect when we have both a token and resolved userInfo.
+  // If token exists but userInfo is missing, allow the guest route to render.
+  // (Prevents infinite redirect loops between PrivateRoute -> "/" and GuestRoute -> "/myprofile")
+  if (userInfo) {
+    return <Navigate to="/myprofile" replace />;
+  }
+
+  return children;
 };
 
 export default GuestRoute;

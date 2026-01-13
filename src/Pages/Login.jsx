@@ -8,7 +8,7 @@ import * as retailAuthService from '../Retail/services/authService';
 
 const Login = () => {
   const navigate = useNavigate();
-  const { refetchUser } = useUser();
+  const { userInfo, userLoading, refetchUser } = useUser();
   const usernameRef = useRef(null);
   const passwordRef = useRef(null);
 
@@ -45,12 +45,14 @@ const Login = () => {
     });
   };
 
-  // Redirect if already logged in
+  // Redirect only when auth state is fully resolved.
+  // Avoid token-only redirects here because they can cause redirect loops
+  // (token exists but userInfo is not loaded/valid yet).
   useEffect(() => {
-    if (isAuthenticated()) {
-      navigate('/dashboard');
+    if (!userLoading && userInfo && isAuthenticated()) {
+      navigate('/dashboard', { replace: true });
     }
-  }, [navigate]);
+  }, [navigate, userInfo, userLoading]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

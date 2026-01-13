@@ -1,11 +1,16 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { FiClock } from 'react-icons/fi';
+import { useUser } from '../Contexts/UserContext';
+import RelationshipCalculator from '../utils/relationshipCalculator';
 
 const Modal = ({ children, onClose }) => (
-  <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
-    <div className="bg-white rounded-2xl p-8 max-w-3xl w-full shadow-2xl relative max-h-[90vh] flex flex-col">
-      <button className="absolute top-2 right-2 text-gray-400 text-2xl z-10" onClick={onClose}>&times;</button>
-      {children}
+  <div className="fixed inset-0 bg-black bg-opacity-40 z-50 p-4 overflow-y-auto">
+    <div className="min-h-full flex items-start justify-center">
+      <div className="bg-white rounded-2xl p-8 max-w-3xl w-full shadow-2xl relative max-h-[calc(100vh-2rem)] overflow-y-auto flex flex-col">
+        <button className="absolute top-2 right-2 text-gray-400 text-2xl z-10" onClick={onClose}>&times;</button>
+        {children}
+      </div>
     </div>
   </div>
 );
@@ -14,20 +19,215 @@ const SuggestionApproving = () => {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [familyCode, setFamilyCode] = useState(null);
-  const [userInfo] = useState(() => JSON.parse(localStorage.getItem('userInfo')));
+  const { userInfo: ctxUserInfo } = useUser();
   const accessToken = localStorage.getItem('access_token');
-  const [viewProfile, setViewProfile] = useState(null); // user profile object
+  const navigate = useNavigate();
+
+  const DEFAULT_AVATAR = '/assets/user.png';
+
+  const normalizeImageUrl = (value) => {
+    const v = (value || '').toString().trim();
+    if (!v) return DEFAULT_AVATAR;
+    if (/^(https?:)?\/\//i.test(v) || v.startsWith('data:') || v.startsWith('/')) return v;
+    const base = (import.meta.env.VITE_API_BASE_URL || '').toString().replace(/\/$/, '');
+    if (!base) return DEFAULT_AVATAR;
+    return `${base}/${v.replace(/^\//, '')}`;
+  };
+
+  const RELATION_LABELS = {
+    SELF: { en: 'Self', ta: 'தான்' },
+    F: { en: 'Father', ta: 'தந்தை' },
+    M: { en: 'Mother', ta: 'தாய்' },
+    S: { en: 'Son', ta: 'மகன்' },
+    D: { en: 'Daughter', ta: 'மகள்' },
+    H: { en: 'Husband', ta: 'கணவர்' },
+    W: { en: 'Wife', ta: 'மனைவி' },
+    B: { en: 'Brother', ta: 'சகோதரன்' },
+    Z: { en: 'Sister', ta: 'சகோதரி' },
+    UNKNOWN: { en: 'Unknown', ta: 'தெரியவில்லை' },
+    UNRELATED: { en: 'Unrelated', ta: 'உறவில்லை' },
+  };
+
   const [replaceModal, setReplaceModal] = useState({ open: false, request: null });
   const [familyMembers, setFamilyMembers] = useState([]);
   const [selectedMemberId, setSelectedMemberId] = useState(null);
   const [replaceLoading, setReplaceLoading] = useState(false);
+  const [addNewMemberLoading, setAddNewMemberLoading] = useState(false);
   const [search, setSearch] = useState('');
+
   const [viewMember, setViewMember] = useState(null); // for member details in replace modal
   const [showConfirm, setShowConfirm] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [showRejectConfirm, setShowRejectConfirm] = useState(false);
   const [requestToReject, setRequestToReject] = useState(null);
-  const [addNewMemberLoading, setAddNewMemberLoading] = useState(false);
+  const [familyTreePeople, setFamilyTreePeople] = useState(null);
+  const [relationToAdmin, setRelationToAdmin] = useState(null);
+  const [relationLoading, setRelationLoading] = useState(false);
+
+  const safeParseUserInfo = () => {
+    try {
+      return JSON.parse(localStorage.getItem('userInfo'));
+    } catch (_) {
+      return null;
+    }
+  };
+
+  const effectiveUserInfo = ctxUserInfo || safeParseUserInfo();
+  const effectiveUserId = effectiveUserInfo?.id || effectiveUserInfo?.userId || null;
+
+  const computeAge = (dobValue, fallbackAge) => {
+    if (fallbackAge !== null && fallbackAge !== undefined && fallbackAge !== '') {
+      const n = Number(fallbackAge);
+      return Number.isFinite(n) ? n : null;
+    }
+    if (!dobValue) return null;
+    const dob = new Date(dobValue);
+    if (Number.isNaN(dob.getTime())) return null;
+    const today = new Date();
+    let age = today.getFullYear() - dob.getFullYear();
+    const m = today.getMonth() - dob.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
+    return age;
+  };
+
+  const getDisplayName = (user, profile) => {
+    const fullName = (user?.fullName || '').toString().trim();
+    if (fullName && !/\bnull\b|\bundefined\b/i.test(fullName)) {
+      return fullName.replace(/\bnull\b|\bundefined\b/gi, '').replace(/\s+/g, ' ').trim();
+    }
+    const first = (profile?.firstName || '').toString().trim();
+    const last = (profile?.lastName || '').toString().trim();
+    const n = `${first} ${last}`.trim();
+    return n || 'Member';
+  };
+
+  const getRelationEnTa = (rel) => {
+    if (!rel) return null;
+    const code = (rel.relationshipCode || '').toString().trim();
+    const desc = (rel.description || '').toString().trim();
+
+    const byCode = code && RELATION_LABELS[code] ? RELATION_LABELS[code] : null;
+    if (byCode) return { code, ...byCode };
+
+    const key = desc.toLowerCase();
+    const descMap = {
+      self: 'SELF',
+      father: 'F',
+      mother: 'M',
+      son: 'S',
+      daughter: 'D',
+      husband: 'H',
+      wife: 'W',
+      brother: 'B',
+      sister: 'Z',
+      unknown: 'UNKNOWN',
+      unrelated: 'UNRELATED',
+      'no connection found': 'UNRELATED',
+    };
+
+    const mappedCode = descMap[key];
+    if (mappedCode && RELATION_LABELS[mappedCode]) {
+      return { code: mappedCode, ...RELATION_LABELS[mappedCode] };
+    }
+
+    return {
+      code: code || 'UNKNOWN',
+      en: desc || code || RELATION_LABELS.UNKNOWN.en,
+      ta: RELATION_LABELS.UNKNOWN.ta,
+    };
+  };
+
+  useEffect(() => {
+    if (!replaceModal.open || !familyCode || !accessToken) {
+      setFamilyTreePeople(null);
+      setRelationToAdmin(null);
+      return;
+    }
+
+    let cancelled = false;
+    const loadTree = async () => {
+      try {
+        const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/family/tree/${familyCode}`, {
+          headers: {
+            accept: 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(json?.message || 'Failed to load family tree');
+        }
+        const people = json?.people || json?.data?.people || json?.data || [];
+        if (!cancelled) {
+          setFamilyTreePeople(Array.isArray(people) ? people : []);
+        }
+      } catch (err) {
+        console.error('Failed to load family tree for relationship:', err);
+        if (!cancelled) {
+          setFamilyTreePeople(null);
+        }
+      }
+    };
+
+    loadTree();
+    return () => {
+      cancelled = true;
+    };
+  }, [replaceModal.open, familyCode, accessToken]);
+
+  useEffect(() => {
+    const computeRelationToAdmin = async () => {
+      if (!replaceModal.open || !selectedMemberId || !effectiveUserId) {
+        setRelationToAdmin(null);
+        return;
+      }
+      if (!Array.isArray(familyTreePeople) || familyTreePeople.length === 0) {
+        setRelationToAdmin(null);
+        return;
+      }
+
+      const adminPerson = familyTreePeople.find((p) => Number(p?.memberId) === Number(effectiveUserId));
+      const selectedPerson = familyTreePeople.find((p) => Number(p?.memberId) === Number(selectedMemberId));
+
+      if (!adminPerson?.id || !selectedPerson?.id) {
+        setRelationToAdmin(null);
+        return;
+      }
+
+      try {
+        setRelationLoading(true);
+
+        const peopleMap = new Map();
+        for (const p of familyTreePeople) {
+          const pid = p?.id;
+          if (pid === null || pid === undefined) continue;
+          const idStr = String(pid);
+          peopleMap.set(idStr, {
+            ...p,
+            id: idStr,
+            parents: Array.isArray(p.parents) ? p.parents.map((x) => String(x)) : [],
+            children: Array.isArray(p.children) ? p.children.map((x) => String(x)) : [],
+            spouses: Array.isArray(p.spouses) ? p.spouses.map((x) => String(x)) : [],
+            siblings: Array.isArray(p.siblings) ? p.siblings.map((x) => String(x)) : [],
+            gender: (p.gender || 'unknown').toString().toLowerCase(),
+          });
+        }
+
+        const tree = { people: peopleMap };
+        const calculator = new RelationshipCalculator(tree);
+        const rel = calculator.calculateRelationship(String(adminPerson.id), String(selectedPerson.id));
+
+        setRelationToAdmin(getRelationEnTa(rel));
+      } catch (err) {
+        console.error('Failed to compute relationship:', err);
+        setRelationToAdmin(null);
+      } finally {
+        setRelationLoading(false);
+      }
+    };
+
+    computeRelationToAdmin();
+  }, [replaceModal.open, selectedMemberId, effectiveUserId, familyTreePeople]);
 
   const markNotificationAsRead = async (notificationId, status = null) => {
     try {
@@ -35,7 +235,7 @@ const SuggestionApproving = () => {
       if (status) {
         url.searchParams.append('status', status);
       }
-      
+
       await fetch(url.toString(), {
         method: 'POST',
         headers: {
@@ -48,68 +248,90 @@ const SuggestionApproving = () => {
   };
 
   useEffect(() => {
-    if (!userInfo?.id) return;
+    if (!effectiveUserId || !accessToken) {
+      setRequests([]);
+      setFamilyCode(null);
+      setLoading(false);
+      return;
+    }
     const fetchFamilyCodeAndRequests = async () => {
       setLoading(true);
-      // 1. Fetch user profile to get familyCode
-      const userRes = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/user/profile/${userInfo.id}`,
-        {
-          headers: {
-            accept: 'application/json',
-            Authorization: `Bearer ${accessToken}`,
-          },
-        }
-      );
-      const userData = await userRes.json();
-      const code = userData.data?.userProfile?.familyCode;
-      setFamilyCode(code);
-
-      if (!code) {
-        setRequests([]);
-        setLoading(false);
-        return;
-      }
-
-      // 2. Fetch join requests for this familyCode
-      const res = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/notifications/${code}/join-requests`,
-        {
-          headers: {
-            accept: 'application/json',
-            Authorization: `Bearer ${accessToken}`,
-          },
-        }
-      );
-      const data = await res.json();
-      // Filter to only show pending requests
-      const pendingRequests = (data.data || []).filter(req => req.status === 'pending');
-      // 3. For each pending request, fetch the user profile
-      const requestsWithUser = await Promise.all(
-        pendingRequests.map(async (req) => {
-          let user = null;
-          if (req.triggeredBy) {
-            const userRes = await fetch(
-              `${import.meta.env.VITE_API_BASE_URL}/user/profile/${req.triggeredBy}`,
-              {
-                headers: {
-                  accept: 'application/json',
-                  Authorization: `Bearer ${accessToken}`,
-                },
-              }
-            );
-            const userData = await userRes.json();
-            user = userData.data?.userProfile || null;
+      try {
+        const userRes = await fetch(
+          `${import.meta.env.VITE_API_BASE_URL}/user/profile/${effectiveUserId}`,
+          {
+            headers: {
+              accept: 'application/json',
+              Authorization: `Bearer ${accessToken}`,
+            },
           }
-          return { ...req, user };
-        })
-      );
-      setRequests(requestsWithUser);
-      setLoading(false);
+        );
+
+        const userData = await userRes.json().catch(() => ({}));
+        if (!userRes.ok) {
+          throw new Error(userData?.message || 'Failed to load your profile');
+        }
+
+        const code = userData.data?.userProfile?.familyCode;
+        setFamilyCode(code || null);
+
+        if (!code) {
+          setRequests([]);
+          return;
+        }
+
+        const res = await fetch(
+          `${import.meta.env.VITE_API_BASE_URL}/notifications/${code}/join-requests`,
+          {
+            headers: {
+              accept: 'application/json',
+              Authorization: `Bearer ${accessToken}`,
+            },
+          }
+        );
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data?.message || 'Failed to load join requests');
+        }
+
+        const pendingRequests = (data.data || []).filter((req) => req.status === 'pending');
+
+        const requestsWithUser = await Promise.all(
+          pendingRequests.map(async (req) => {
+            let user = null;
+            if (req.triggeredBy) {
+              try {
+                const requesterRes = await fetch(
+                  `${import.meta.env.VITE_API_BASE_URL}/user/profile/${req.triggeredBy}`,
+                  {
+                    headers: {
+                      accept: 'application/json',
+                      Authorization: `Bearer ${accessToken}`,
+                    },
+                  }
+                );
+                const requesterData = await requesterRes.json().catch(() => ({}));
+                user = requesterRes.ok ? requesterData.data?.userProfile || null : null;
+              } catch (_) {
+                user = null;
+              }
+            }
+            return { ...req, user };
+          })
+        );
+
+        setRequests(requestsWithUser);
+      } catch (err) {
+        console.error('Failed to load join requests:', err);
+        setRequests([]);
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchFamilyCodeAndRequests();
-  }, [userInfo?.id]);
+  }, [effectiveUserId, accessToken]);
 
   const handleApproveReplace = async () => {
     if (!familyCode || !replaceModal.request || !selectedMemberId) return;
@@ -153,7 +375,7 @@ const SuggestionApproving = () => {
           }),
         }
       );
-      
+
       if (response.ok) {
         // Mark the notification as read with accepted status
         await markNotificationAsRead(replaceModal.request.id, 'accepted');
@@ -179,6 +401,7 @@ const SuggestionApproving = () => {
     if (!familyCode) return;
     setReplaceModal({ open: true, request });
     setSelectedMemberId(null);
+    setViewMember(null);
     // Fetch family members (approved only)
     const res = await fetch(
       `${import.meta.env.VITE_API_BASE_URL}/family/member/${familyCode}`,
@@ -193,12 +416,29 @@ const SuggestionApproving = () => {
     setFamilyMembers(data.data || []);
   };
 
-  const filteredMembers = familyMembers.filter(member => {
+  const filteredMembers = familyMembers.filter((member) => {
     const user = member.user || {};
     const profile = user.userProfile || {};
-    return (
-      (profile.firstName + ' ' + (profile.lastName || '')).toLowerCase().includes(search.toLowerCase())
-    );
+    const memberUserId = user.id;
+    const requesterUserId = replaceModal?.request?.triggeredBy;
+
+    const isNonAppUser =
+      typeof user.isAppUser === 'boolean'
+        ? user.isAppUser === false
+        : (!user.email && !user.mobile);
+
+    if (!isNonAppUser) {
+      return false;
+    }
+
+    if (memberUserId && effectiveUserId && Number(memberUserId) === Number(effectiveUserId)) {
+      return false;
+    }
+    if (memberUserId && requesterUserId && Number(memberUserId) === Number(requesterUserId)) {
+      return false;
+    }
+
+    return (profile.firstName + ' ' + (profile.lastName || '')).toLowerCase().includes(search.toLowerCase());
   });
 
   return (
@@ -218,9 +458,12 @@ const SuggestionApproving = () => {
             {requests.map((req) => (
               <div key={req.id} className="flex items-center bg-white rounded-lg shadow p-4">
                 <img
-                  src={req.user?.profile || '/public/assets/user.png'}
+                  src={normalizeImageUrl(req.user?.profile)}
                   alt={req.user?.firstName || 'User'}
                   className="w-12 h-12 rounded-full object-cover border mr-4"
+                  onError={(e) => {
+                    e.currentTarget.src = DEFAULT_AVATAR;
+                  }}
                 />
                 <div className="flex-1">
                   <div className="font-semibold text-lg">
@@ -234,11 +477,12 @@ const SuggestionApproving = () => {
                 <button
                   className="ml-auto bg-blue-500 text-white px-4 py-2 rounded mr-2"
                   onClick={async () => {
-                    // Fetch full profile and show modal
-                    const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/user/profile/${req.triggeredBy}`,
-                      { headers: { Authorization: `Bearer ${accessToken}` } });
-                    const data = await res.json();
-                    setViewProfile(data.data.userProfile);
+                    const userId = req?.triggeredBy;
+                    if (!userId) {
+                      window.alert('User id not found for this request.');
+                      return;
+                    }
+                    navigate(`/user/${userId}`);
                   }}
                 >
                   View Profile
@@ -254,7 +498,14 @@ const SuggestionApproving = () => {
                 </button>
                 <button
                   className="bg-green-500 text-white px-4 py-2 rounded"
-                  onClick={() => openReplaceModal(req)}
+                  disabled={Number(req?.triggeredBy) === Number(effectiveUserId)}
+                  onClick={() => {
+                    if (Number(req?.triggeredBy) === Number(effectiveUserId)) {
+                      window.alert('This join request is from your own account. You cannot replace your own account holder profile.');
+                      return;
+                    }
+                    openReplaceModal(req);
+                  }}
                 >
                   Accept & Replace
                 </button>
@@ -263,109 +514,185 @@ const SuggestionApproving = () => {
           </div>
         )}
       </div>
-      {/* View Profile Modal */}
-      {viewProfile && (
-        <Modal onClose={() => setViewProfile(null)}>
-          <div className="overflow-y-auto max-h-full">
-            <h2 className="text-xl font-bold mb-2">{viewProfile.firstName} {viewProfile.lastName}</h2>
-            <img
-              src={viewProfile.profile || '/public/assets/user.png'}
-              alt="Profile"
-              className="w-24 h-24 rounded-full object-cover border mx-auto mb-4"
-            />
-            <div className="text-sm text-gray-700 mb-1"><b>DOB:</b> {viewProfile.dob}</div>
-            <div className="text-sm text-gray-700 mb-1"><b>Gender:</b> {viewProfile.gender}</div>
-            <div className="text-sm text-gray-700 mb-1"><b>Address:</b> {viewProfile.address}</div>
-            <div className="text-sm text-gray-700 mb-1"><b>Bio:</b> {viewProfile.bio}</div>
-            <div className="text-sm text-gray-700 mb-1"><b>FatherName:</b> {viewProfile.fatherName}</div>
-            <div className="text-sm text-gray-700 mb-1"><b>MotherName:</b> {viewProfile.motherName}</div>
-            <div className="text-sm text-gray-700 mb-1"><b>SpouseName:</b> {viewProfile.spouseName}</div>
-            <button className="mt-4 bg-primary-500 text-white px-6 py-2 rounded" onClick={() => setViewProfile(null)}>Close</button>
-          </div>
-        </Modal>
-      )}
       {/* Approve & Replace Modal */}
       {replaceModal.open && (
         <Modal onClose={() => { setReplaceModal({ open: false, request: null }); setViewMember(null); }}>
-          <div className="flex flex-col h-full">
-            {/* Header - Fixed */}
-            <div className="flex-shrink-0 mb-4">
-              <h2 className="text-xl font-bold mb-4">Select a member to replace</h2>
-              <input
-                type="text"
-                placeholder="Search by name..."
-                className="w-full px-3 py-2 border rounded"
-                value={search}
-                onChange={e => { setSearch(e.target.value); setViewMember(null); }}
-              />
-              <p className="text-sm text-gray-500 mt-2">
-                Click on a member to select for replacement, or click "Add as New Member" to add without replacing anyone.
-                {selectedMemberId && " Click on the selected member again to deselect."}
-              </p>
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900">Replace a non-app member</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Choose a non-app member to replace, or add the requester as a new member.
+                  {selectedMemberId && ' Click the selected member again to deselect.'}
+                </p>
+              </div>
+              <div className="w-full sm:w-72">
+                <input
+                  type="text"
+                  placeholder="Search by name..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400"
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setViewMember(null);
+                    setSelectedMemberId(null);
+                  }}
+                />
+              </div>
             </div>
 
-            {/* Scrollable Members Grid */}
-            <div className="flex-1 overflow-y-auto mb-4" style={{ maxHeight: '300px' }}>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 p-2">
-                {filteredMembers.map(member => {
-                  const user = member.user || {};
-                  const profile = user.userProfile || {};
-                  return (
-                    <div
-                      key={member.id}
-                      className={`p-2 border rounded flex flex-col items-center cursor-pointer ${selectedMemberId === user.id ? 'border-primary-500 bg-primary-50' : ''}`}
-                      onClick={() => {
-                        // Toggle selection - if already selected, deselect it
-                        if (selectedMemberId === user.id) {
+            <div className="flex flex-col md:flex-row gap-4 min-h-0">
+              <div className="flex-1 min-h-0">
+                <div className="border border-gray-200 rounded-xl p-3 bg-white">
+                  <div className="text-sm font-medium text-gray-700 mb-3">Select member</div>
+
+                  {filteredMembers.length === 0 ? (
+                    <div className="text-sm text-gray-500 py-10 text-center">
+                      No non-app members found.
+                    </div>
+                  ) : (
+                    <div className="max-h-[45vh] overflow-y-auto pr-1">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                        {filteredMembers.map((member) => {
+                          const user = member.user || {};
+                          const profile = user.userProfile || {};
+                          const isSelected = Number(selectedMemberId) === Number(user.id);
+                          const displayName = getDisplayName(user, profile);
+
+                          return (
+                            <button
+                              type="button"
+                              key={member.id}
+                              className={`group text-left p-3 rounded-xl border transition-all ${
+                                isSelected
+                                  ? 'border-primary-500 bg-primary-50'
+                                  : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
+                              }`}
+                              onClick={() => {
+                                if (isSelected) {
+                                  setSelectedMemberId(null);
+                                  setViewMember(null);
+                                } else {
+                                  setSelectedMemberId(user.id);
+                                  setViewMember({ user, profile });
+                                }
+                              }}
+                            >
+                              <div className="flex flex-col items-center gap-2">
+                                <img
+                                  src={normalizeImageUrl(user.profileImage)}
+                                  alt={profile.firstName || 'Member'}
+                                  className="w-14 h-14 rounded-full object-cover border"
+                                  onError={(e) => {
+                                    e.currentTarget.src = DEFAULT_AVATAR;
+                                  }}
+                                />
+                                <div className="w-full text-center">
+                                  <div className="font-medium text-sm text-gray-900 truncate">{displayName}</div>
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="w-full md:w-80 flex-shrink-0">
+                <div className="border border-gray-200 rounded-xl p-4 bg-gray-50 h-full flex flex-col">
+                  <div className="text-sm font-medium text-gray-700">Selected member</div>
+
+                  {viewMember && selectedMemberId === viewMember.user.id ? (
+                    <div className="mt-3">
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={normalizeImageUrl(viewMember.user.profileImage)}
+                          alt={viewMember.profile.firstName || 'Member'}
+                          className="w-12 h-12 rounded-full object-cover border"
+                          onError={(e) => {
+                            e.currentTarget.src = DEFAULT_AVATAR;
+                          }}
+                        />
+                        <div className="min-w-0">
+                          <div className="font-semibold text-gray-900 truncate">
+                            {getDisplayName(viewMember.user, viewMember.profile)}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 space-y-2 text-sm text-gray-700">
+                        <div className="flex justify-between gap-2">
+                          <span className="text-gray-500">Name</span>
+                          <span className="text-right">
+                            {getDisplayName(viewMember.user, viewMember.profile)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between gap-2">
+                          <span className="text-gray-500">Age</span>
+                          <span className="text-right">
+                            {(() => {
+                              const a = computeAge(viewMember.profile.dob, viewMember.profile.age);
+                              return a === null ? '—' : a;
+                            })()}
+                          </span>
+                        </div>
+                        <div className="flex justify-between gap-2">
+                          <span className="text-gray-500">Gender</span>
+                          <span className="text-right">{viewMember.profile.gender || '—'}</span>
+                        </div>
+                        <div className="flex justify-between gap-2">
+                          <span className="text-gray-500">Relation to you</span>
+                          <span className="text-right">
+                            {relationLoading
+                              ? 'Loading…'
+                              : relationToAdmin
+                                ? `${relationToAdmin.en} / ${relationToAdmin.ta}`
+                                : '—'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        className="mt-4 text-sm text-primary-700 hover:text-primary-800 underline bg-white"
+                        onClick={() => {
                           setSelectedMemberId(null);
                           setViewMember(null);
-                        } else {
-                          setSelectedMemberId(user.id);
-                          setViewMember({ user, profile });
-                        }
-                      }}
-                    >
-                      <img
-                        src={user.profileImage || '/public/assets/user.png'}
-                        alt={profile.firstName}
-                        className="w-20 h-20 rounded-full object-cover border mb-2"
-                      />
-                      <div className="font-semibold text-center text-sm">{profile.firstName} {profile.lastName}</div>
+                        }}
+                      >
+                        Clear selection
+                      </button>
                     </div>
-                  );
-                })}
-              </div>
-            </div>
+                  ) : (
+                    <div className="mt-3 text-sm text-gray-500">
+                      Select a member from the list to view details.
+                    </div>
+                  )}
 
-            {/* Selected Member Details - Fixed */}
-            {viewMember && selectedMemberId === viewMember.user.id && (
-              <div className="flex-shrink-0 p-4 border rounded bg-gray-50 mb-4">
-                <div className="font-bold mb-1">Selected Member Details</div>
-                <div><b>Name:</b> {viewMember.profile.firstName} {viewMember.profile.lastName}</div>
-                <div><b>Email:</b> {viewMember.user.email}</div>
-                <div><b>DOB:</b> {viewMember.profile.dob}</div>
-                <div><b>Gender:</b> {viewMember.profile.gender}</div>
-                <div><b>Address:</b> {viewMember.profile.address}</div>
-                <button className="mt-2 text-primary-600 underline" onClick={() => setViewMember(null)}>Close</button>
+                  <div className="mt-auto pt-4">
+                    <div className="flex flex-col gap-2">
+                      <button
+                        type="button"
+                        className="w-full bg-blue-600 text-white px-4 py-2.5 rounded-lg disabled:opacity-50"
+                        disabled={selectedMemberId || addNewMemberLoading}
+                        onClick={handleAddAsNewMember}
+                      >
+                        {addNewMemberLoading ? 'Adding...' : 'Add as New Member'}
+                      </button>
+                      <button
+                        type="button"
+                        className="w-full bg-green-600 text-white px-4 py-2.5 rounded-lg disabled:opacity-50"
+                        disabled={!selectedMemberId || replaceLoading}
+                        onClick={() => setShowConfirm(true)}
+                      >
+                        {replaceLoading ? 'Approving...' : 'Approve & Replace'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
-            )}
-
-            {/* Footer Buttons - Fixed */}
-            <div className="flex-shrink-0 flex gap-3">
-              <button
-                className="bg-blue-600 text-white px-6 py-2 rounded disabled:opacity-50"
-                disabled={selectedMemberId || addNewMemberLoading}
-                onClick={handleAddAsNewMember}
-              >
-                {addNewMemberLoading ? 'Adding...' : 'Add as New Member'}
-              </button>
-              <button
-                className="bg-green-600 text-white px-6 py-2 rounded disabled:opacity-50"
-                disabled={!selectedMemberId || replaceLoading}
-                onClick={() => setShowConfirm(true)}
-              >
-                {replaceLoading ? 'Approving...' : 'Approve & Replace'}
-              </button>
             </div>
           </div>
 
@@ -379,6 +706,13 @@ const SuggestionApproving = () => {
                 <button
                   className="bg-green-600 text-white px-6 py-2 rounded mr-2"
                   onClick={async () => {
+                    if (
+                      (selectedMemberId && effectiveUserId && Number(selectedMemberId) === Number(effectiveUserId)) ||
+                      (selectedMemberId && replaceModal?.request?.triggeredBy && Number(selectedMemberId) === Number(replaceModal.request.triggeredBy))
+                    ) {
+                      window.alert('Invalid replacement target selected. Please choose another member.');
+                      return;
+                    }
                     setReplaceLoading(true);
                     await fetch(
                       `${import.meta.env.VITE_API_BASE_URL}/user/merge`,

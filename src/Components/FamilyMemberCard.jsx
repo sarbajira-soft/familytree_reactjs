@@ -115,6 +115,57 @@ const FamilyMemberCard = ({ familyCode, token, onEditMember, onViewMember, curre
     }
   };
 
+  const handleDeleteMember = async (memberId, familyCode, e) => {
+    if (e?.stopPropagation) e.stopPropagation();
+
+    const confirm = await Swal.fire({
+      icon: 'warning',
+      title: 'Delete Member?',
+      text: 'This will remove the member from this family.',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, Delete',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#e53e3e',
+    });
+
+    if (!confirm.isConfirmed) return;
+
+    try {
+      const res = await fetch(
+        `${BASE_URL}/family/member/delete/${memberId}/${familyCode}`,
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      const json = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        const msg = json?.message || 'Failed to delete member';
+        throw new Error(msg);
+      }
+
+      await Swal.fire({
+        icon: 'success',
+        title: 'Member Deleted',
+        text: json?.message || 'Family member removed successfully.',
+      });
+
+      fetchMembers();
+    } catch (err) {
+      console.error('Error deleting member:', err);
+      await Swal.fire({
+        icon: 'error',
+        title: 'Delete Failed',
+        text: err?.message || 'Unable to delete this member. Please try again.',
+      });
+    }
+  };
+
   const handleEditMember = async (userId, e) => {
     e.stopPropagation();
     
@@ -333,29 +384,18 @@ const FamilyMemberCard = ({ familyCode, token, onEditMember, onViewMember, curre
                 )
               )}
 
-              <button
-                onClick={(e) => handleEditMember(member.userId, e)}
-                disabled={editLoadingStates[member.userId]}
-                className={`p-2 rounded-full transition-all duration-200 tooltip ${
-                  editLoadingStates[member.userId]
-                    ? 'bg-primary-100 text-primary-700 cursor-not-allowed'
-                    : 'bg-gray-100 text-gray-600 hover:bg-primary-100 hover:text-primary-700'
-                }`}
-                title="Edit Member"
-              >
-                {editLoadingStates[member.userId] ? (
-                  <FiLoader size={18} className="animate-spin" />
-                ) : (
-                  <FiEdit2 size={18} />
-                )}
-              </button>
-              <button
-                onClick={(e) => handleDeleteMember(member.memberId, familyCode, e)}
-                className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-red-100 hover:text-red-700 transition-colors tooltip"
-                title="Delete Member"
-              >
-                <FiTrash2 size={18} />
-              </button>
+              {currentUser?.userId !== member.userId && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteMember(member.memberId, familyCode, e);
+                  }}
+                  className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-red-100 hover:text-red-700 transition-colors tooltip"
+                  title="Delete Member"
+                >
+                  <FiTrash2 size={18} />
+                </button>
+              )}
               {/* View button with loading state */}
               <button
                 onClick={(e) => handleViewMember(member.userId, e)}

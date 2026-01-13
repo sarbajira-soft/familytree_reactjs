@@ -28,9 +28,31 @@ const CreateFamilyModal = ({ isOpen, onClose, token, onFamilyCreated, mode = "cr
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+
+        const nameTrimmed = (familyName || '').trim();
+        const bioTrimmed = (familyBio || '').trim();
+
+        if (!nameTrimmed) {
+          await Swal.fire({
+            icon: 'warning',
+            title: 'Invalid Family Name',
+            text: 'Family Name cannot be empty.',
+          });
+          return;
+        }
+
+        if (!bioTrimmed) {
+          await Swal.fire({
+            icon: 'warning',
+            title: 'Invalid Family Bio',
+            text: 'Family Bio cannot be empty.',
+          });
+          return;
+        }
+
         const formData = new FormData();
-        formData.append('familyName', familyName);
-        formData.append('familyBio', familyBio);
+        formData.append('familyName', nameTrimmed);
+        formData.append('familyBio', bioTrimmed);
         formData.append('familyCode', familyCode);
         if (familyPhoto) formData.append('familyPhoto', familyPhoto);
 

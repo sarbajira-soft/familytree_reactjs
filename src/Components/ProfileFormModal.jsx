@@ -42,9 +42,12 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
     
     // Cultural Information
     religionId: '',
+    religionOther: '',
     languageId: '',
+    languageOther: '',
     caste: '',
     gothramId: '',
+    gothramOther: '',
     kuladevata: '',
     region: '',
     
@@ -162,6 +165,22 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
           const safeString = (value) => value ? String(value) : '';
           const safeNumber = (value) => value ? Number(value) : 0;
 
+          const religionOther = safeString(
+            sourceDataRaw.otherReligion ||
+            sourceDataRaw.raw?.userProfile?.otherReligion ||
+            ''
+          );
+          const languageOther = safeString(
+            sourceDataRaw.otherLanguage ||
+            sourceDataRaw.raw?.userProfile?.otherLanguage ||
+            ''
+          );
+          const gothramOther = safeString(
+            sourceDataRaw.otherGothram ||
+            sourceDataRaw.raw?.userProfile?.otherGothram ||
+            ''
+          );
+
           const newFormData = {
             ...initialFormData,
             ...sourceDataRaw,
@@ -198,24 +217,27 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
             countryCode,
             status: safeString(sourceDataRaw.status || '1'),
             role: safeString(sourceDataRaw.role || '1'),
-            religionId: safeString(
-              sourceDataRaw.religionId || 
-              sourceDataRaw.raw?.userProfile?.religionId || 
-              ''
-            ),
-            languageId: safeString(
-              sourceDataRaw.languageId ||
-              sourceDataRaw.motherTongue ||
-              sourceDataRaw.raw?.userProfile?.languageId ||
-              ''
-            ),
-            gothramId: safeString(
-              sourceDataRaw.gothramId ||
-              sourceDataRaw.gothram ||
-              sourceDataRaw.raw?.userProfile?.gothramId ||
-              sourceDataRaw.raw?.gothramId ||
-              ''
-            ),
+            religionId:
+              safeString(sourceDataRaw.religionId || sourceDataRaw.raw?.userProfile?.religionId || '') ||
+              (religionOther ? 'other' : ''),
+            religionOther,
+            languageId:
+              safeString(
+                sourceDataRaw.languageId ||
+                sourceDataRaw.motherTongue ||
+                sourceDataRaw.raw?.userProfile?.languageId ||
+                ''
+              ) || (languageOther ? 'other' : ''),
+            languageOther,
+            gothramId:
+              safeString(
+                sourceDataRaw.gothramId ||
+                sourceDataRaw.gothram ||
+                sourceDataRaw.raw?.userProfile?.gothramId ||
+                sourceDataRaw.raw?.gothramId ||
+                ''
+              ) || (gothramOther ? 'other' : ''),
+            gothramOther,
             // Add age calculation here to prevent the loop
             age: sourceDataRaw.age ? String(sourceDataRaw.age) : '',
           };
@@ -403,6 +425,18 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
       newErrors.region = "Region can contain only letters and spaces";
     }
 
+    if (formData.religionId === 'other' && !String(formData.religionOther || '').trim()) {
+      newErrors.religionOther = 'Please enter religion';
+    }
+
+    if (formData.languageId === 'other' && !String(formData.languageOther || '').trim()) {
+      newErrors.languageOther = 'Please enter mother tongue';
+    }
+
+    if (formData.gothramId === 'other' && !String(formData.gothramOther || '').trim()) {
+      newErrors.gothramOther = 'Please enter gothram';
+    }
+
     setErrors(newErrors);
     if (Object.keys(newErrors).length > 0) {
       const firstErrorFieldName = Object.keys(newErrors)[0];
@@ -433,6 +467,9 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
     setFormData((prevData) => ({
       ...prevData,
       [name]: sanitizedValue, // Ensure value is never undefined
+      ...(name === 'religionId' && sanitizedValue !== 'other' && { religionOther: '' }),
+      ...(name === 'languageId' && sanitizedValue !== 'other' && { languageOther: '' }),
+      ...(name === 'gothramId' && sanitizedValue !== 'other' && { gothramOther: '' }),
     }));
 
     setErrors((prev) => {
@@ -698,8 +735,8 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
       'motherName',
       'religionId',
       'languageId',
-      'caste',
       'gothramId',
+      'caste',
       'kuladevata',
       'region',
       'hobbies',
@@ -727,7 +764,13 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
         if (
           ['religionId', 'languageId', 'gothramId', 'countryId', 'age', 'status', 'role'].includes(field)
         ) {
-          formDataToSend.append(field, parseInt(value));
+          if (value === 'other') {
+            return;
+          }
+          const n = parseInt(value);
+          if (!Number.isNaN(n)) {
+            formDataToSend.append(field, n);
+          }
         } else if (field === 'childrenNames' && Array.isArray(value)) {
           formDataToSend.append(field, JSON.stringify(value));
         } else {
@@ -735,6 +778,18 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
         }
       }
     });
+
+    if (formData.religionId === 'other') {
+      formDataToSend.append('otherReligion', String(formData.religionOther || '').trim());
+    }
+
+    if (formData.languageId === 'other') {
+      formDataToSend.append('otherLanguage', String(formData.languageOther || '').trim());
+    }
+
+    if (formData.gothramId === 'other') {
+      formDataToSend.append('otherGothram', String(formData.gothramOther || '').trim());
+    }
     
     if (!formDataToSend.has('familyCode') && userInfo?.familyCode) {
       formDataToSend.append('familyCode', userInfo.familyCode);
@@ -1638,12 +1693,27 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
                         {religion.name}
                       </option>
                     ))}
+                    <option value="other">Others</option>
                   </select>
                   {dropdownData.loading && (
                     <p className="text-xs text-gray-500 mt-1">Loading religions...</p>
                   )}
+                  {formData.religionId === 'other' && (
+                    <div className="mt-2">
+                      <input
+                        name="religionOther"
+                        type="text"
+                        value={formData.religionOther || ''}
+                        onChange={handleChange}
+                        className={inputClassName('religionOther')}
+                        placeholder="Enter religion"
+                        maxLength={80}
+                      />
+                      {errors.religionOther && <p className="text-red-500 text-xs mt-1">{errors.religionOther}</p>}
+                    </div>
+                  )}
                 </div>
-
+                
                 {/* Language Dropdown */}
                 <div>
                   <label htmlFor="languageId" className={labelClassName}>
@@ -1663,12 +1733,27 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
                         {language.name}
                       </option>
                     ))}
+                    <option value="other">Others</option>
                   </select>
                   {dropdownData.loading && (
                     <p className="text-xs text-gray-500 mt-1">Loading languages...</p>
                   )}
+                  {formData.languageId === 'other' && (
+                    <div className="mt-2">
+                      <input
+                        name="languageOther"
+                        type="text"
+                        value={formData.languageOther || ''}
+                        onChange={handleChange}
+                        className={inputClassName('languageOther')}
+                        placeholder="Enter mother tongue"
+                        maxLength={80}
+                      />
+                      {errors.languageOther && <p className="text-red-500 text-xs mt-1">{errors.languageOther}</p>}
+                    </div>
+                  )}
                 </div>
-
+                
                 {/* Caste Input */}
                 <div>
                   <label htmlFor="caste" className={labelClassName}>
@@ -1686,7 +1771,7 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
                   />
                   {errors.caste && <p className="text-red-500 text-xs mt-1">{errors.caste}</p>}
                 </div>
-
+                
                 {/* Gothram Dropdown */}
                 <div>
                   <label htmlFor="gothramId" className={labelClassName}>
@@ -1706,12 +1791,27 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
                         {gothram.name}
                       </option>
                     ))}
+                    <option value="other">Others</option>
                   </select>
                   {dropdownData.loading && (
                     <p className="text-xs text-gray-500 mt-1">Loading gothrams...</p>
                   )}
+                  {formData.gothramId === 'other' && (
+                    <div className="mt-2">
+                      <input
+                        name="gothramOther"
+                        type="text"
+                        value={formData.gothramOther || ''}
+                        onChange={handleChange}
+                        className={inputClassName('gothramOther')}
+                        placeholder="Enter gothram"
+                        maxLength={80}
+                      />
+                      {errors.gothramOther && <p className="text-red-500 text-xs mt-1">{errors.gothramOther}</p>}
+                    </div>
+                  )}
                 </div>
-
+                
                 <div>
                   <label htmlFor="kuladevata" className={labelClassName}>
                     Kuladevata

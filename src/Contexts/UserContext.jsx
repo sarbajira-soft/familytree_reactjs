@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect, useContext, useCallback, useMemo } from 'react';
 import { 
   getToken, 
+  getUserIdFromToken,
   getUserInfo, 
   setAuthData, 
   clearAuthData, 
@@ -77,8 +78,38 @@ export const UserProvider = ({ children }) => {
         termsVersion,
         termsAcceptedAt,
       } = jsonData.data || {};
-      
-      if (!userProfile) throw new Error('No user profile returned');
+
+      if (!userProfile) {
+        const tokenUserId = getUserIdFromToken(token);
+        const minimalUser = {
+          userId: tokenUserId,
+          email: email || jsonData?.currentUser?.email || '',
+          countryCode: countryCode || jsonData?.currentUser?.countryCode || '',
+          mobile: mobile || jsonData?.currentUser?.mobile || '',
+          status: status || jsonData?.currentUser?.status || 0,
+          role: role || jsonData?.currentUser?.role || 0,
+          isAppUser:
+            typeof isAppUser === 'boolean'
+              ? isAppUser
+              : !!jsonData?.currentUser?.isAppUser,
+          hasAcceptedTerms:
+            typeof hasAcceptedTerms === 'boolean'
+              ? hasAcceptedTerms
+              : !!jsonData?.currentUser?.hasAcceptedTerms,
+          termsVersion: termsVersion || 'v1.0.0',
+          termsAcceptedAt: termsAcceptedAt || null,
+          raw: null,
+        };
+
+        setUserInfo(minimalUser);
+        try {
+          const stayLoggedIn = localStorage.getItem('stayLoggedIn') === 'true';
+          setAuthData(token, minimalUser, stayLoggedIn);
+        } catch (_) {
+          // ignore storage issues
+        }
+        return;
+      }
 
       let childrenArray = [];
 
@@ -154,10 +185,25 @@ export const UserProvider = ({ children }) => {
       
     } catch (err) {
       console.error('Error fetching user:', err);
-      // If we cannot load the user while a token exists, treat this as an
-      // invalid session and clear all auth state to avoid redirect loops
-      // between GuestRoute and PrivateRoute.
-      clearUserData();
+      // Only hard-logout on explicit 401 handling above.
+      // For other errors (network/server), keep the session so the user isn't
+      // unexpectedly logged out during onboarding.
+      try {
+        const existingUser = getUserInfo();
+        if (existingUser) {
+          setUserInfo(existingUser);
+        } else {
+          const tokenUserId = getUserIdFromToken(token);
+          setUserInfo({
+            userId: tokenUserId,
+            email: '',
+            mobile: '',
+            raw: null,
+          });
+        }
+      } catch (_) {
+        // keep current state
+      }
     } finally {
       setUserLoading(false);
     }

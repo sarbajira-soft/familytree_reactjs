@@ -10,9 +10,11 @@ const PrivateRoute = ({ children }) => {
   const { userInfo, userLoading } = useUser();
   const location = useLocation();
 
+  const fromPath = `${location.pathname}${location.search || ''}`;
+
   // If no token, redirect to login
   if (!token) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/login" state={{ from: fromPath }} replace />;
   }
 
   if (userLoading) {
@@ -21,7 +23,7 @@ const PrivateRoute = ({ children }) => {
   }
 
   if (!userInfo) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/login" state={{ from: fromPath }} replace />;
   }
 
   const isOnTermsPage = location.pathname === '/terms';
@@ -38,10 +40,13 @@ const PrivateRoute = ({ children }) => {
 const RoleBasedRoute = ({ children, allowedRoles = [], requireFamilyCode = false, requireApprovedStatus = false }) => {
   const token = getToken();
   const { userInfo, userLoading } = useUser();
+  const location = useLocation();
+
+  const fromPath = `${location.pathname}${location.search || ''}`;
 
   // If no token, redirect to login
   if (!token) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/login" state={{ from: fromPath }} replace />;
   }
 
   // If still loading user info, show loading spinner
@@ -51,7 +56,7 @@ const RoleBasedRoute = ({ children, allowedRoles = [], requireFamilyCode = false
 
   // If no user info, redirect to login
   if (!userInfo) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/login" state={{ from: fromPath }} replace />;
   }
 
   // Check role requirements

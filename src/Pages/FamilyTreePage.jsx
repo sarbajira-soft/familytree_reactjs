@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useUser } from "../Contexts/UserContext";
 import { FamilyTree } from "../utils/FamilyTree";
 import { autoArrange } from "../utils/TreeLayout";
@@ -107,6 +107,19 @@ const FamilyTreePage = () => {
 
   // Determine current family code used for this view
   const familyCodeToUse = code || (userInfo && userInfo.familyCode);
+
+  const isCurrentUserPlacedInTree = useMemo(() => {
+    if (!tree || !userInfo?.userId) return true;
+    try {
+      return Array.from(tree.people.values()).some(
+        (p) => Number(p?.memberId) === Number(userInfo.userId)
+      );
+    } catch (_) {
+      return true;
+    }
+  }, [tree, userInfo?.userId]);
+
+  const needsPlacementBanner = !canEdit && !isCurrentUserPlacedInTree;
 
   // Load accepted merge requests for this admin (primary family)
   const { data: mergeRequestsResponse, isLoading: mergeRequestsLoading } =
@@ -251,24 +264,16 @@ const FamilyTreePage = () => {
     }
   }, [userInfo, userLoading, navigate]);
 
-  // Show loading state while checking approval or if user is not approved
-  if (
+  const showAccessLoading =
     userLoading ||
     !userInfo ||
     userInfo.approveStatus !== "approved" ||
-    !userInfo.familyCode
-  ) {
-    return (
-      <>
-        <div className="flex items-center justify-center min-h-screen bg-gray-100">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading family tree...</p>
-          </div>
-        </div>
-      </>
-    );
-  }
+    !userInfo.familyCode;
+
+  const showFullScreenLoading = showAccessLoading || (!tree && treeLoading);
+
+  const showWaitForAdmin =
+    !showAccessLoading && !canEdit && (!tree || tree.people.size === 0);
 
   // Search handlers - memoized to prevent infinite re-renders
   const handleSearchResults = useCallback((results) => {
@@ -454,20 +459,25 @@ const FamilyTreePage = () => {
         data = null;
       }
       if (!data || !data.people || data.people.length === 0) {
-        // No data, create new tree with logged-in user as root
-        if (!userInfo) return; // Wait for userInfo to load
-        const newTree = new FamilyTree();
-        newTree.addPerson({
-          name: userInfo.name,
-          gender: userInfo.gender,
-          age: userInfo.age,
-          img: userInfo.profileUrl,
-          dob: userInfo.dob,
-          memberId: userInfo.userId, // Ensure root has userId
-        });
-        setTree(newTree);
-        updateStats(newTree);
-        arrangeTree(newTree);
+        // No saved tree yet
+        if (!canEdit) {
+          setTree(null);
+        } else {
+          // Admin can start a new tree with logged-in user as root
+          if (!userInfo) return; // Wait for userInfo to load
+          const newTree = new FamilyTree();
+          newTree.addPerson({
+            name: userInfo.name,
+            gender: userInfo.gender,
+            age: userInfo.age,
+            img: userInfo.profileUrl,
+            dob: userInfo.dob,
+            memberId: userInfo.userId, // Ensure root has userId
+          });
+          setTree(newTree);
+          updateStats(newTree);
+          arrangeTree(newTree);
+        }
       } else {
         // Data exists, build tree from data
         const newTree = new FamilyTree();
@@ -496,7 +506,7 @@ const FamilyTreePage = () => {
         });
         newTree.nextId =
           Math.max(...data.people.map((p) => parseInt(p.id))) + 1;
-        // Set rootId priority: focus param -> logged-in user's userId -> name match -> first person
+        // Set rootId priority: focus param -> logged-in user's userId (only if placed) -> family admin/creator -> top-most generation -> first person
         let rootPersonId = null;
         const focusStr = focusFromQuery;
         if (focusStr) {
@@ -552,26 +562,74 @@ const FamilyTreePage = () => {
             }
           }
         }
-        if (rootPersonId === null) {
+        const isViewerPlacedInThisTree = (() => {
+          try {
+            const userIdStr = String(userInfo.userId);
+            for (const [, personObj] of newTree.people.entries()) {
+              if (personObj.memberId && String(personObj.memberId) === userIdStr) {
+                return true;
+              }
+            }
+          } catch (_) {}
+          return false;
+        })();
+
+        if (rootPersonId === null && isViewerPlacedInThisTree) {
           const userIdStr = String(userInfo.userId);
           for (const [personId, personObj] of newTree.people.entries()) {
-            if (
-              personObj.memberId &&
-              String(personObj.memberId) === userIdStr
-            ) {
+            if (personObj.memberId && String(personObj.memberId) === userIdStr) {
               rootPersonId = personId;
               break;
             }
           }
         }
-        // Fallback: match by name if memberId is missing or not matched
-        if (rootPersonId === null) {
+
+        // Only attempt a name-based root match when the viewer is already placed in the tree.
+        if (rootPersonId === null && isViewerPlacedInThisTree) {
           for (const [personId, personObj] of newTree.people.entries()) {
             if (personObj.name && personObj.name === userInfo.name) {
               rootPersonId = personId;
               break;
             }
           }
+        }
+
+        // If viewer is not placed yet, start from the family creator/admin if possible.
+        if (rootPersonId === null && !isViewerPlacedInThisTree) {
+          try {
+            const familyRes = await fetch(
+              `${import.meta.env.VITE_API_BASE_URL}/family/code/${familyCodeToUse}`,
+              { headers: { accept: 'application/json' } }
+            );
+            const familyJson = await familyRes.json().catch(() => null);
+            const createdBy = familyJson?.createdBy ?? familyJson?.data?.createdBy;
+            if (createdBy) {
+              const createdByStr = String(createdBy);
+              for (const [personId, personObj] of newTree.people.entries()) {
+                if (personObj.memberId && String(personObj.memberId) === createdByStr) {
+                  rootPersonId = personId;
+                  break;
+                }
+              }
+            }
+          } catch (_) {
+            // ignore
+          }
+        }
+
+        // Fallback: top-most generation (smallest generation value)
+        if (rootPersonId === null) {
+          let bestId = null;
+          let bestGen = Infinity;
+          for (const [personId, personObj] of newTree.people.entries()) {
+            const g = Number(personObj?.generation);
+            if (!Number.isFinite(g)) continue;
+            if (g < bestGen) {
+              bestGen = g;
+              bestId = personId;
+            }
+          }
+          if (bestId !== null) rootPersonId = bestId;
         }
         // Final fallback: use the first person in the data
         if (rootPersonId !== null) {
@@ -1470,8 +1528,47 @@ const FamilyTreePage = () => {
     <FamilyTreeProvider language={language}>
       {/* All components that use useFamilyTreeLabels must be children here */}
       <>
-        {/* Main container for tree and controls */}
-        <div className="relative flex flex-col h-full w-full bg-gray-100 overflow-x-hidden">
+        {showFullScreenLoading ? (
+          <div className="flex items-center justify-center min-h-screen bg-gray-100">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Loading family tree...</p>
+            </div>
+          </div>
+        ) : showWaitForAdmin ? (
+          <div className="flex items-center justify-center min-h-screen bg-gray-100 px-4">
+            <div className="text-center max-w-xl bg-white rounded-xl shadow p-6">
+              <div className="text-lg font-semibold text-gray-900 mb-2">
+                Family tree is not created yet
+              </div>
+              <div className="text-gray-600">You have been added as a family member.</div>
+              <div className="text-gray-600">
+                Once the admin adds you in the correct position and saves the tree, you can view it here.
+              </div>
+              <div className="text-gray-600 mt-3">குடும்ப மரம் இன்னும் உருவாக்கப்படவில்லை.</div>
+              <div className="text-gray-600">
+                நிர்வாகி உங்களை சரியான இடத்தில் சேர்த்து சேமித்த பிறகு இங்கே காணலாம்.
+              </div>
+              <button
+                type="button"
+                className="mt-5 bg-blue-600 text-white px-4 py-2 rounded-lg"
+                onClick={() => window.location.reload()}
+              >
+                Refresh
+              </button>
+            </div>
+          </div>
+        ) : !tree ? (
+          <div className="flex items-center justify-center min-h-screen bg-gray-100">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Loading family tree...</p>
+            </div>
+          </div>
+        ) : (
+          <>
+          {/* Main container for tree and controls */}
+          <div className="relative flex flex-col h-full w-full bg-gray-100 overflow-x-hidden">
           {/* Navigation buttons when viewing another family's tree */}
 
           {/* Mobile Top Header - Edit Mode */}
@@ -1877,10 +1974,37 @@ const FamilyTreePage = () => {
               </div>
             </div>
           )}
+
+          {needsPlacementBanner && (
+            <>
+              <div className="sm:hidden fixed top-14 left-0 right-0 z-40 bg-amber-50 border-b border-amber-200 px-3 py-2">
+                <div className="text-xs font-semibold text-amber-900">
+                  You have joined this family, but the admin hasn’t placed you in the tree yet.
+                </div>
+                <div className="text-xs text-amber-900 mt-1">
+                  This family tree is currently shown from the family admin’s (birth family) perspective.
+                </div>
+              </div>
+
+              <div className="hidden sm:block w-full bg-amber-50 border-b border-amber-200">
+                <div className="w-full max-w-none 2xl:max-w-7xl mx-auto px-4 sm:px-6 py-3">
+                  <div className="text-sm font-semibold text-amber-900">
+                    You have joined this family, but the admin hasn’t placed you in the tree yet.
+                  </div>
+                  <div className="text-sm text-amber-900 mt-1">
+                    This family tree is currently shown from the family admin’s (birth family) perspective.
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
           {/* Tree visualization area */}
           <div
             ref={containerRef}
-            className="flex-1 w-full h-full min-h-0 min-w-0 overflow-auto touch-pan-x touch-pan-y pt-14 sm:pt-0"
+            className={`flex-1 w-full h-full min-h-0 min-w-0 overflow-auto touch-pan-x touch-pan-y ${
+              needsPlacementBanner ? "pt-28" : "pt-14"
+            } sm:pt-0`}
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
@@ -1967,6 +2091,7 @@ const FamilyTreePage = () => {
                       currentFamilyId={
                         userInfo?.familyId || userInfo?.familyCode
                       } // <-- Pass familyId or familyCode
+                      viewOnly={!canEdit}
                     />
                   ))}
             </div>
@@ -2059,6 +2184,8 @@ const FamilyTreePage = () => {
               </div>
             </div>
           </div>
+        )}
+          </>
         )}
       </>
     </FamilyTreeProvider>
