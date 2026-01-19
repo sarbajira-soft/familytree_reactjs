@@ -27,6 +27,12 @@ const CreatePostModal = ({
 }) => {
   const { userInfo } = useUser();
 
+  const getDefaultPrivacy = () => {
+    const hasFamily = Boolean(currentUser?.familyCode || userInfo?.familyCode);
+    const isApproved = userInfo?.approveStatus === "approved";
+    return hasFamily && isApproved ? "family" : "public";
+  };
+
   // State for form fields
   const [content, setContent] = useState("");
   const [imageFile, setImageFile] = useState(null);
@@ -41,7 +47,7 @@ const CreatePostModal = ({
   const [trimmedVideoFile, setTrimmedVideoFile] = useState(null);
   const [isTrimming, setIsTrimming] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [privacy, setPrivacy] = useState("public");
+  const [privacy, setPrivacy] = useState(getDefaultPrivacy());
   const [familyCode, setFamilyCode] = useState("");
 
   // UI/logic states
@@ -88,7 +94,7 @@ const CreatePostModal = ({
         setUploadProgress(0);
       } else {
         setContent("");
-        setPrivacy("public");
+        setPrivacy(getDefaultPrivacy());
         setFamilyCode(currentUser?.familyCode || userInfo?.familyCode || "");
         setImageFile(null);
         setImagePreview(null);
@@ -109,6 +115,15 @@ const CreatePostModal = ({
       setIsTrimming(false);
     }
   }, [isOpen, mode, postData, currentUser, userInfo]);
+
+  useEffect(() => {
+    const hasFamilyCode = Boolean(currentUser?.familyCode || userInfo?.familyCode);
+    const isApproved = userInfo?.approveStatus === "approved";
+    const canUsePrivate = hasFamilyCode && isApproved;
+    if (!canUsePrivate && privacy === "family") {
+      setPrivacy("public");
+    }
+  }, [currentUser?.familyCode, userInfo?.familyCode, userInfo?.approveStatus, privacy]);
 
   // Close modal on click outside
   useEffect(() => {
@@ -619,7 +634,9 @@ const CreatePostModal = ({
     const formData = new FormData();
     formData.append("caption", content.trim());
     formData.append("privacy", privacy === "family" ? "private" : privacy);
-    formData.append("status", "1");if (privacy === "family") {
+    formData.append("status", "1");
+
+    if (privacy === "family") {
       formData.append("familyCode", familyCode);
     }
 
@@ -691,38 +708,6 @@ const CreatePostModal = ({
     }
   };
 
-  const handleClose = () => {
-    resetForm();
-    onClose();
-  };
-
-  const resetForm = () => {
-    setContent("");
-    setImageFile(null);
-    setImagePreview(null);
-    setCurrentPostImageUrl(null);
-    if (videoPreview) {
-      try {
-        URL.revokeObjectURL(videoPreview);
-      } catch (e) {}
-    }
-    setVideoFile(null);
-    setTrimmedVideoFile(null);
-    setVideoPreview(null);
-    setCurrentPostVideoUrl(null);
-    setVideoDurationSec(null);
-    setTrimStartSec(0);
-    setTrimEndSec(0);
-    setUploadProgress(0);
-    setPrivacy("public");
-    setFamilyCode(currentUser?.familyCode || userInfo?.familyCode || "");
-    setIsLoading(false);
-    setShowEmojiPicker(false);
-    setShowPrivacyDropdown(false);
-    setMessage("");
-    setShowSuccess(false);
-  };
-
   const triggerFileInput = () => {
     fileInputRef.current.click();
     setShowEmojiPicker(false);
@@ -749,7 +734,7 @@ const CreatePostModal = ({
   const PrivacyOptions = {
     family: {
       icon: <FaUserFriends className="mr-2 h-4 w-4" />,
-      label: "Private",
+      label: "Family",
       color: "text-blue-600",
     },
     public: {

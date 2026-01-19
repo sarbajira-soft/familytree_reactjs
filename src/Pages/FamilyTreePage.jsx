@@ -741,6 +741,13 @@ const FamilyTreePage = () => {
     const person = tree.people.get(personId);
     if (!person) return;
 
+    const canEditSelectedPersonDetails = !(
+      person?.isAppUser &&
+      person?.memberId &&
+      userInfo?.userId &&
+      Number(person.memberId) !== Number(userInfo.userId)
+    );
+
     // Set selected person for relationship display
     setSelectedPersonId(personId);
 
@@ -783,12 +790,14 @@ const FamilyTreePage = () => {
         icon: icons["Add Sibling"],
       });
     }
-    items.push({
-      label: "Edit",
-      action: () =>
-        setModal({ isOpen: true, action: { type: "edit", person } }),
-      icon: icons["Edit"],
-    });
+    if (canEditSelectedPersonDetails) {
+      items.push({
+        label: "Edit",
+        action: () =>
+          setModal({ isOpen: true, action: { type: "edit", person } }),
+        icon: icons["Edit"],
+      });
+    }
     if (person.id !== tree?.rootId) {
       items.push({
         label: "Delete",
@@ -845,7 +854,11 @@ const FamilyTreePage = () => {
           name: persons[0].name,
           gender: persons[0].gender,
           age: persons[0].age,
-          img: persons[0].img,
+          img: persons[0].img !== undefined ? persons[0].img : existingPerson.img,
+          imgPreview:
+            persons[0].imgPreview !== undefined
+              ? persons[0].imgPreview
+              : existingPerson.imgPreview,
           lifeStatus: persons[0].lifeStatus || "living",
           memberId: persons[0].memberId || persons[0].userId || null,
         };
@@ -1006,7 +1019,24 @@ const FamilyTreePage = () => {
       const personToDelete = newTree.people.get(personId);
       if (!personToDelete) return;
 
-      personToDelete.isDeleted = true;
+      const relatives = new Set([
+        ...personToDelete.parents,
+        ...personToDelete.children,
+        ...personToDelete.spouses,
+        ...personToDelete.siblings,
+      ]);
+
+      relatives.forEach((relId) => {
+        const relative = newTree.people.get(relId);
+        if (relative) {
+          relative.parents.delete(personId);
+          relative.children.delete(personId);
+          relative.spouses.delete(personId);
+          relative.siblings.delete(personId);
+        }
+      });
+
+      newTree.people.delete(personId);
 
       setTree(newTree);
       updateStats(newTree);
@@ -1288,7 +1318,6 @@ const FamilyTreePage = () => {
         formData.append(`person_${index}_gender`, person.gender);
         formData.append(`person_${index}_age`, person.age);
         formData.append(`person_${index}_generation`, person.generation);
-        formData.append(`person_${index}_isDeleted`, person.isDeleted ? '1' : '0');
         formData.append(
           `person_${index}_lifeStatus`,
           person.lifeStatus || "living"

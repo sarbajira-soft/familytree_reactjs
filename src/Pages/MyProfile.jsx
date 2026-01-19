@@ -643,13 +643,14 @@ const ProfilePage = () => {
     });
   };
 
-  const handleEditAlbum = async (e, albumId, userId) => {
+  const handleEditAlbum = async (e, albumId) => {
     e.stopPropagation();
     try {
+      const viewerUserId = userInfo?.userId;
       const response = await fetch(
         `${
           import.meta.env.VITE_API_BASE_URL
-        }/gallery/${albumId}?userId=${userId}`,
+        }/gallery/${albumId}?userId=${viewerUserId}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -1083,7 +1084,7 @@ const ProfilePage = () => {
                     >
                       <button
                         onClick={(e) =>
-                          handleEditAlbum(e, gallery.id, gallery.createdBy)
+                          handleEditAlbum(e, gallery.id)
                         }
                         className="bg-white p-1.5 rounded-full shadow-md text-gray-700 hover:text-primary-600 hover:bg-gray-100 transition-colors"
                         title="Edit Gallery"

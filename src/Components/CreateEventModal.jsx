@@ -35,6 +35,20 @@ const CreateEventModal = ({
 
   const { userInfo } = useUser();
 
+  const getImageKey = (file) => `${file?.name || ""}-${file?.size || 0}-${file?.lastModified || 0}`;
+
+  useEffect(() => {
+    setImagePreviews((prev) => {
+      prev.forEach((url) => {
+        try {
+          URL.revokeObjectURL(url);
+        } catch (e) {
+        }
+      });
+      return images.map((file) => URL.createObjectURL(file));
+    });
+  }, [images]);
+
   useEffect(() => {
     console.log("User Info in CreateEventModal:", userInfo);
     // console.log('🔗 API Base URL:', apiBaseUrl);
@@ -50,7 +64,6 @@ const CreateEventModal = ({
       setLocation("");
       setDescription("");
       setImages([]);
-      setImagePreviews([]);
       setShowSuccess(false);
     }
   }, [isOpen]);
@@ -128,15 +141,133 @@ const CreateEventModal = ({
 
   if (!isOpen) return null;
 
+  const getFriendlyError = (status, rawText) => {
+    const text = String(rawText || "");
+    const lower = text.toLowerCase();
+
+    const normalizeValidationMessages = (messages) => {
+      const arr = Array.isArray(messages) ? messages : [messages];
+      const mapped = arr
+        .map((m) => String(m || "").trim())
+        .filter(Boolean)
+        .map((m) => {
+          if (m === "eventTitle should not be empty") return "Event title is required.";
+          if (m === "eventDate should not be empty") return "Event date is required.";
+          if (m === "eventDate must be a valid ISO 8601 date string") return "Event date is invalid. Please choose a valid date.";
+          return m;
+        });
+      return mapped.join(" ");
+    };
+
+    const tryParseBackendJson = () => {
+      try {
+        return JSON.parse(text);
+      } catch (e) {
+        return null;
+      }
+    };
+
+    const parsed = tryParseBackendJson();
+    if (parsed && parsed.message) {
+      return normalizeValidationMessages(parsed.message);
+    }
+
+    if (status === 401) {
+      return "Your session has expired. Please sign in again.";
+    }
+    if (status === 403) {
+      if (lower.includes("blocked")) return "You are blocked from this family.";
+      return "You do not have permission to perform this action.";
+    }
+    if (status === 413 || lower.includes("file too large") || lower.includes("payload too large")) {
+      return "Image is too large. Please upload images up to 5MB.";
+    }
+    if (lower.includes("only image") || lower.includes("image files") || lower.includes("mimetype")) {
+      return "Only image files (jpeg, jpg, png, gif, webp) are allowed.";
+    }
+
+    const normalized = text.replace(/\s+/g, " ").trim();
+    return normalized || "Unable to create the event. Please try again.";
+  };
+
   const handleImageChange = (e) => {
-    const files = Array.from(e.target.files);
-    setImages(files);
-    setImagePreviews(files.map((file) => URL.createObjectURL(file)));
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    setImages((prev) => {
+      const merged = [...(prev || []), ...files];
+      const seen = new Set();
+      const unique = [];
+      for (const f of merged) {
+        const key = getImageKey(f);
+        if (!seen.has(key)) {
+          seen.add(key);
+          unique.push(f);
+        }
+      }
+      return unique;
+    });
+
+    e.target.value = null;
+  };
+
+  const handleRemoveImage = (index) => {
+    setImages((prev) => (prev || []).filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
+
+    if (!title || !title.trim()) {
+      Swal.fire({
+        icon: "warning",
+        title: "Missing title",
+        text: "Event title is required.",
+      });
+      setIsLoading(false);
+      return;
+    }
+
+    if (!date || !String(date).trim()) {
+      Swal.fire({
+        icon: "warning",
+        title: "Missing date",
+        text: "Event date is required.",
+      });
+      setIsLoading(false);
+      return;
+    }
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date))) {
+      Swal.fire({
+        icon: "warning",
+        title: "Invalid date",
+        text: "Please choose a valid date.",
+      });
+      setIsLoading(false);
+      return;
+    }
+
+    if (!time || !String(time).trim()) {
+      Swal.fire({
+        icon: "warning",
+        title: "Missing time",
+        text: "Event time is required.",
+      });
+      setIsLoading(false);
+      return;
+    }
+
+    if (time && String(time).trim() && !/^\d{2}:\d{2}(:\d{2})?$/.test(String(time).trim())) {
+      Swal.fire({
+        icon: "warning",
+        title: "Invalid time",
+        text: "Please choose a valid time.",
+      });
+      setIsLoading(false);
+      return;
+    }
 
     if (!userInfo?.userId || !userInfo?.familyCode) {
       Swal.fire({
@@ -154,10 +285,16 @@ const CreateEventModal = ({
       const formData = new FormData();
       formData.append("userId", userInfo?.userId);
       formData.append("eventTitle", title);
-      formData.append("eventDescription", description);
+      if (description && String(description).trim()) {
+        formData.append("eventDescription", String(description).trim());
+      }
       formData.append("eventDate", date);
-      formData.append("eventTime", time);
-      formData.append("location", location);
+      if (time && String(time).trim()) {
+        formData.append("eventTime", String(time).trim());
+      }
+      if (location && String(location).trim()) {
+        formData.append("location", String(location).trim());
+      }
       formData.append("familyCode", userInfo?.familyCode);
 
       images.forEach((img) => {
@@ -175,12 +312,11 @@ const CreateEventModal = ({
       });
 
       if (!response.ok) {
-        const errText = await response.text();
-        console.error("❌ Create event API error:", errText);
+        const errText = await response.text().catch(() => "");
         Swal.fire({
           icon: "error",
-          title: "Create Event Error",
-          text: `${response.status} - ${errText}`,
+          title: "Create Event Failed",
+          text: getFriendlyError(response.status, errText),
         });
         setIsLoading(false);
         return;
@@ -195,7 +331,7 @@ const CreateEventModal = ({
       Swal.fire({
         icon: "error",
         title: "Something went wrong",
-        text: err.message,
+        text: err?.message || "Unable to create the event. Please try again.",
       });
     } finally {
       setIsLoading(false);
@@ -229,7 +365,6 @@ const CreateEventModal = ({
                   setLocation("");
                   setDescription("");
                   setImages([]);
-                  setImagePreviews([]);
                   onClose();
                 }}
               >
@@ -371,7 +506,15 @@ const CreateEventModal = ({
                           alt={`Preview ${idx + 1}`}
                           className="w-full h-24 object-cover rounded-xl border-2 border-gray-200"
                         />
-                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center">
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveImage(idx)}
+                          className="absolute top-2 right-2 z-10 bg-black/60 hover:bg-black/70 text-white rounded-full p-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                          aria-label={`Remove image ${idx + 1}`}
+                        >
+                          <FiX size={14} />
+                        </button>
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center pointer-events-none">
                           <span className="text-white text-xs font-medium">
                             Image {idx + 1}
                           </span>

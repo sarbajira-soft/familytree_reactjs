@@ -507,6 +507,25 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
+      const allowedImageTypes = new Set([
+        'image/jpeg',
+        'image/jpg',
+        'image/png',
+        'image/gif',
+        'image/webp',
+      ]);
+
+      if (!allowedImageTypes.has(String(file.type || '').toLowerCase())) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Invalid file',
+          text: 'Only image files (jpeg, jpg, png, gif, webp) are allowed.',
+          confirmButtonColor: '#3f982c',
+        });
+        e.target.value = '';
+        return;
+      }
+
       setFormData((prevData) => ({
         ...prevData,
         profileImageFile: file,
@@ -988,7 +1007,7 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
 
   const title = mode === 'add' ? 'Add New Family Member' : (mode === 'edit-profile' ? 'Edit Profile' : 'Edit Family Member Profile');
   const submitButtonText = isLoading ? 'Processing...' : (mode === 'add' ? 'Add Member' : 'Save');
-  const lockEmailAndMobile = mode === 'edit-profile';
+  const lockEmailAndMobile = mode === 'edit-profile' || mode === 'edit-member';
 
   const inputClassName = (fieldName) => `w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-1 text-sm font-inter text-gray-800 placeholder-gray-400 ${
     errors[fieldName] ? 'border-red-500 focus:ring-red-300' : 'border-gray-300 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)]'

@@ -5,9 +5,15 @@ import { useUser } from '../Contexts/UserContext';
 
 const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authToken, mode = 'create', albumData = null }) => {
     const { userInfo } = useUser();
+
+    const getDefaultPrivacy = () => {
+        const hasFamily = Boolean(currentUser?.familyCode || userInfo?.familyCode);
+        const isApproved = userInfo?.approveStatus === 'approved';
+        return hasFamily && isApproved ? 'family' : 'public';
+    };
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
-    const [privacy, setPrivacy] = useState('family');
+    const [privacy, setPrivacy] = useState(getDefaultPrivacy());
     const [familyCode, setFamilyCode] = useState('');
 
     // For new file uploads
@@ -50,12 +56,8 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
             } else {
                 resetForm();
                 setFamilyCode(currentUser?.familyCode || userInfo?.familyCode || '');
-                
-                if (userInfo?.approveStatus === 'approved') {
-                    setPrivacy('family');
-                } else {
-                    setPrivacy('public');
-                }
+
+                setPrivacy(getDefaultPrivacy());
             }
         }
     }, [isOpen, mode, albumData, currentUser, userInfo]);
@@ -63,7 +65,7 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
     const resetForm = () => {
         setTitle('');
         setDescription('');
-        setPrivacy('family');
+        setPrivacy(getDefaultPrivacy());
         setFamilyCode('');
         setCoverPhotoFile(null);
         setGalleryPhotoFiles([]);
@@ -143,7 +145,7 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
             Swal.fire({
                 icon: 'warning',
                 title: 'Missing Family Code',
-                text: 'Family code is required for private albums. Please ensure you are part of a family.',
+                text: 'Family code is required for family-only albums. Please ensure you are part of a family.',
                 confirmButtonColor: '#d33',
             });
             return;
@@ -309,7 +311,7 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
                                             onChange={(e) => setPrivacy(e.target.value)}
                                             disabled={isSubmitting}
                                         />
-                                        <span className={`ml-2 text-gray-700 ${isSubmitting ? 'opacity-50' : ''}`}>Private</span>
+                                        <span className={`ml-2 text-gray-700 ${isSubmitting ? 'opacity-50' : ''}`}>Family</span>
                                     </label>
                                     <label className="inline-flex items-center">
                                         <input

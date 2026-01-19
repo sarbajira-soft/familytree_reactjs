@@ -203,6 +203,8 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
     useEffect(() => {
         if (isOpen) {
             generateForms();
+            setImageData({});
+            setImagePreview({});
             setSelectedMemberId(null);
             setShowManualEntry(false);
             setParentSelections({ father: { selectedMemberId: null, showManualEntry: true }, mother: { selectedMemberId: null, showManualEntry: true } });
@@ -229,6 +231,13 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
             setActiveTabs(initialTabs);
         }
     }, [isOpen, count, action]);
+
+    useEffect(() => {
+        if (isOpen && action?.type === 'edit') {
+            setImageData({});
+            setImagePreview({});
+        }
+    }, [isOpen, action?.type, action?.person?.id]);
 
     const generateForms = () => {
         const newForms = [];
@@ -422,7 +431,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                 Swal.fire({ icon: 'warning', title: 'Missing details', text: 'Please fill in at least one parent\'s details.' });
                 return;
             }
-            // 🔒 Confirmation when marking a person as "Remembering"
+            // Confirmation when marking a person as "Remembering"
             const rememberingCount = parentPersons.filter(p => p.lifeStatus === 'remembering').length;
             if (rememberingCount > 0) {
                 const { isConfirmed } = await Swal.fire({
@@ -480,13 +489,16 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                         gender = formData.get(`gender_0`);
                     }
                     // --- FIX: Add id and memberId for edit ---
+                    const hasNewImage = Boolean(imageData[form.index]);
                     const personObj = {
                         name: name.trim(),
                         gender: gender || 'male',
                         age: formData.get(`age_${form.index}`),
                         generation,
-                        img: imageData[form.index] || '', // File object or empty string
-                        imgPreview: imagePreview[form.index] || '',
+                        ...(hasNewImage ? { img: imageData[form.index] } : {}),
+                        ...(hasNewImage && imagePreview[form.index]
+                          ? { imgPreview: imagePreview[form.index] }
+                          : {}),
                         lifeStatus: formData.get(`lifeStatus_${form.index}`) || 'living',
                         birthOrder: parseInt(formData.get(`birthOrder_${form.index}`)) || 1,
                     };
@@ -969,15 +981,42 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                                 name={`img_data_${form.index}`}
                                                 value={imageData[form.index] || ''}
                                             />
+                                            {imagePreview[form.index] && (
+                                              <div
+                                                style={{
+                                                  marginTop: 12,
+                                                  width: 72,
+                                                  height: 72,
+                                                  borderRadius: 16,
+                                                  overflow: 'hidden',
+                                                  border: '2px solid rgba(102, 126, 234, 0.25)',
+                                                  background: 'rgba(102, 126, 234, 0.05)',
+                                                }}
+                                              >
+                                                <img
+                                                  src={imagePreview[form.index]}
+                                                  alt="Profile preview"
+                                                  style={{
+                                                    width: '100%',
+                                                    height: '100%',
+                                                    objectFit: 'cover',
+                                                  }}
+                                                  onError={(e) => {
+                                                    e.target.src =
+                                                      'https://cdn-icons-png.flaticon.com/512/149/149071.png';
+                                                  }}
+                                                />
+                                              </div>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
                             )}
                         </div>
                     );})}
-
-                    {/* For other types: spouse, child, sibling, etc. */}
-                    {action.type !== 'parents' && forms.map((form) => {
+                    
+                      {/* For other types: spouse, child, sibling, etc. */}
+                      {action.type !== 'parents' && forms.map((form) => {
                         const eligible = getEligibleMembersWithAll(form);
                         // Default tab is 'new' (Add New)
                         const tab = activeTabs[form.index] || 'new';
@@ -1755,86 +1794,127 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                       name={`img_data_${form.index}`}
                                       value={imageData[form.index] || ""}
                                     />
+                                    {(imagePreview[form.index] ||
+                                      (action.type === 'edit' &&
+                                        action.person?.img &&
+                                        form.type === 'edit')) && (
+                                      <div
+                                        style={{
+                                          marginTop: 12,
+                                          width: 72,
+                                          height: 72,
+                                          borderRadius: 16,
+                                          overflow: 'hidden',
+                                          border:
+                                            '2px solid rgba(102, 126, 234, 0.25)',
+                                          background:
+                                            'rgba(102, 126, 234, 0.05)',
+                                        }}
+                                      >
+                                        <img
+                                          src={
+                                            imagePreview[form.index] ||
+                                            (action.type === 'edit' &&
+                                            form.type === 'edit'
+                                              ? action.person?.imgPreview ||
+                                                (typeof action.person?.img === 'string'
+                                                  ? action.person?.img
+                                                  : '')
+                                              : '')
+                                          }
+                                          alt="Profile preview"
+                                          style={{
+                                            width: '100%',
+                                            height: '100%',
+                                            objectFit: 'cover',
+                                          }}
+                                          onError={(e) => {
+                                            e.target.src =
+                                              'https://cdn-icons-png.flaticon.com/512/149/149071.png';
+                                          }}
+                                        />
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               </div>
                             )}
                           </div>
                         );})}
-
-                    {/* Modal Footer */}
-                    <div className="modal-buttons-upgraded" style={{ 
-                        display: 'flex', 
-                        justifyContent: 'flex-end', 
-                        gap: 16, 
-                        padding: '24px 0 24px 0', 
-                        background: 'transparent', 
-                        position: 'sticky', 
-                        bottom: 0, 
-                        zIndex: 2,
-                        borderTop: '1px solid rgba(0, 0, 0, 0.08)',
-                        marginTop: 16
-                    }}>
-                        <button 
-                            type="button" 
-                            className="btn-cancel-upgraded" 
-                            style={{ 
-                                background: 'rgba(0, 0, 0, 0.05)', 
-                                color: '#666', 
-                                borderRadius: 12, 
-                                padding: '12px 24px', 
-                                fontWeight: 600, 
-                                border: 'none', 
-                                fontSize: 14,
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 8,
-                                transition: 'all 0.3s ease',
-                                cursor: 'pointer'
-                            }} 
-                            onClick={onClose}
-                            onMouseEnter={(e) => {
-                                e.target.style.background = 'rgba(0, 0, 0, 0.1)';
-                                e.target.style.color = '#333';
-                            }}
-                            onMouseLeave={(e) => {
-                                e.target.style.background = 'rgba(0, 0, 0, 0.05)';
-                                e.target.style.color = '#666';
-                            }}
-                        >
-                            <ArrowLeft size={16} />
-                            Cancel
-                        </button>
-                        <button 
-                            type="submit" 
-                            className="btn-success-upgraded" 
-                            style={{ 
-                                background: SECONDARY_COLOR, 
-                                color: '#fff', 
-                                borderRadius: 12, 
-                                padding: '12px 28px', 
-                                fontWeight: 700, 
-                                border: 'none', 
-                                fontSize: 14,
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 8,
-                                transition: 'all 0.3s ease',
-                                cursor: 'pointer',
-                                boxShadow: `0 4px 15px ${SECONDARY_COLOR}33`
-                            }}
-                            onMouseEnter={(e) => {
-                                e.target.style.transform = 'translateY(-2px)';
-                                e.target.style.boxShadow = `0 6px 20px ${SECONDARY_COLOR}44`;
-                            }}
-                            onMouseLeave={(e) => {
-                                e.target.style.transform = 'translateY(0)';
-                                e.target.style.boxShadow = `0 4px 15px ${SECONDARY_COLOR}33`;
-                            }}
-                        >
-                            <Save size={16} />
-                            {action.type === 'edit' ? 'Save Changes' : 'Add'}
-                        </button>
+                    <div className="modal-footer-upgraded">
+                        <div className="modal-buttons-upgraded" style={{ 
+                            display: 'flex', 
+                            justifyContent: 'flex-end', 
+                            gap: 16, 
+                            padding: '24px 0 24px 0', 
+                            background: 'transparent', 
+                            position: 'sticky', 
+                            bottom: 0, 
+                            zIndex: 2,
+                            borderTop: '1px solid rgba(0, 0, 0, 0.08)',
+                            marginTop: 16
+                        }}>
+                            <button 
+                                type="button" 
+                                className="btn-cancel-upgraded" 
+                                style={{ 
+                                    background: 'rgba(0, 0, 0, 0.05)', 
+                                    color: '#666', 
+                                    borderRadius: 12, 
+                                    padding: '12px 24px', 
+                                    fontWeight: 600, 
+                                    border: 'none', 
+                                    fontSize: 14,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 8,
+                                    transition: 'all 0.3s ease',
+                                    cursor: 'pointer'
+                                }} 
+                                onClick={onClose}
+                                onMouseEnter={(e) => {
+                                    e.target.style.background = 'rgba(0, 0, 0, 0.1)';
+                                    e.target.style.color = '#333';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.target.style.background = 'rgba(0, 0, 0, 0.05)';
+                                    e.target.style.color = '#666';
+                                }}
+                            >
+                                <ArrowLeft size={16} />
+                                Cancel
+                            </button>
+                            <button 
+                                type="submit" 
+                                className="btn-success-upgraded" 
+                                style={{ 
+                                    background: SECONDARY_COLOR, 
+                                    color: '#fff', 
+                                    borderRadius: 12, 
+                                    padding: '12px 28px', 
+                                    fontWeight: 700, 
+                                    border: 'none', 
+                                    fontSize: 14,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 8,
+                                    transition: 'all 0.3s ease',
+                                    cursor: 'pointer',
+                                    boxShadow: `0 4px 15px ${SECONDARY_COLOR}33`
+                                }}
+                                onMouseEnter={(e) => {
+                                    e.target.style.transform = 'translateY(-2px)';
+                                    e.target.style.boxShadow = `0 6px 20px ${SECONDARY_COLOR}44`;
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.target.style.transform = 'translateY(0)';
+                                    e.target.style.boxShadow = `0 4px 15px ${SECONDARY_COLOR}33`;
+                                }}
+                            >
+                                <Save size={16} />
+                                {action.type === 'edit' ? 'Save Changes' : 'Add'}
+                            </button>
+                        </div>
                     </div>
                 </form>
 

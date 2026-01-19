@@ -2,8 +2,11 @@ import React, { useState } from 'react';
 import { Link, Mail, Copy, Share2, Check, UserPlus, X } from 'lucide-react';
 
 const InviteFamilyMemberModal = ({ onClose, familyCode }) => {
-  const baseUrl = import.meta.env.VITE_BASE_URL || window.location.origin;
-  const inviteLink = `${baseUrl}/register?familyCode=${familyCode}`;
+  const rawBaseUrl = import.meta.env.VITE_BASE_URL || window.location.origin;
+  const baseUrl = /^https?:\/\//i.test(rawBaseUrl)
+    ? rawBaseUrl
+    : `https://${rawBaseUrl}`;
+  const inviteLink = `${baseUrl.replace(/\/$/, '')}/register?familyCode=${familyCode}`;
   // const [isCopied, setIsCopied] = useState(false);
   // const [email, setEmail] = useState('');
   // const [emailSent, setEmailSent] = useState(false);

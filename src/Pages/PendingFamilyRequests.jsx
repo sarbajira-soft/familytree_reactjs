@@ -7,8 +7,11 @@ import { useUser } from '../Contexts/UserContext';
 
 // ✅ WhatsApp Share Modal
 const WhatsAppShareModal = ({ onClose, familyCode, member }) => {
-  const baseUrl = 'www.familyss.com';
-  const inviteLink = `${baseUrl}/edit-profile?familyCode=${familyCode}&memberId=${member?.memberId}`;
+  const rawBaseUrl = import.meta.env.VITE_BASE_URL || window.location.origin;
+  const baseUrl = /^https?:\/\//i.test(rawBaseUrl)
+    ? rawBaseUrl
+    : `https://${rawBaseUrl}`;
+  const inviteLink = `${baseUrl.replace(/\/$/, '')}/edit-profile?familyCode=${familyCode}&memberId=${member?.memberId}`;
 
   const handleWhatsAppShare = () => {
     const message = `Hi ${member?.name}, join our family tree! Use this link: ${inviteLink}`;
