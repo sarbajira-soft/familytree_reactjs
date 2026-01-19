@@ -27,6 +27,14 @@ export default class RelationshipCalculator {
     this.people = tree.people;
   }
 
+  normalizeGender(gender) {
+    if (!gender) return '';
+    const g = String(gender).toLowerCase().trim();
+    if (g === 'male' || g === 'm' || g === 'man') return 'male';
+    if (g === 'female' || g === 'f' || g === 'woman') return 'female';
+    return '';
+  }
+
   /**
    * Calculate relationship between two people using universal path-based approach
    * @param {string} person1Id - ID of the first person
@@ -200,24 +208,33 @@ export default class RelationshipCalculator {
       const step = path[i];
       const targetPerson = this.people.get(step.to);
       if (!targetPerson) continue;
+
+      const targetGender = this.normalizeGender(targetPerson.gender);
+      const fromPerson = this.people.get(step.from);
+      const fromGender = fromPerson ? this.normalizeGender(fromPerson.gender) : '';
       
       switch (step.type) {
         case 'parent':
-          code += (targetPerson.gender && targetPerson.gender.toLowerCase() === 'male') ? 'F' : 'M';
+          code += targetGender === 'male' ? 'F' : 'M';
           break;
           
         case 'child':
-          code += (targetPerson.gender && targetPerson.gender.toLowerCase() === 'male') ? 'S' : 'D';
+          code += targetGender === 'male' ? 'S' : 'D';
           break;
           
         case 'spouse':
-          code += (targetPerson.gender && targetPerson.gender.toLowerCase() === 'male') ? 'H' : 'W';
+          if (fromGender === 'male') {
+            code += 'W';
+          } else if (fromGender === 'female') {
+            code += 'H';
+          } else {
+            code += targetGender === 'male' ? 'H' : 'W';
+          }
           break;
           
         case 'sibling':
-          const fromPerson = this.people.get(step.from);
           const elderYounger = this.determineElderYoungerForSiblings(fromPerson, targetPerson, path, i);
-          if (targetPerson.gender && targetPerson.gender.toLowerCase() === 'male') {
+          if (targetGender === 'male') {
             code += elderYounger === 'elder' ? 'B+' : 'B-';
           } else {
             code += elderYounger === 'elder' ? 'Z+' : 'Z-';

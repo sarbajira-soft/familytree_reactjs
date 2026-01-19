@@ -21,6 +21,7 @@ const FamilyMemberCard = ({ familyCode, token, onEditMember, onViewMember, curre
   const [loading, setLoading] = useState(true);
   const [viewLoadingStates, setViewLoadingStates] = useState({});
   const [editLoadingStates, setEditLoadingStates] = useState({});
+  const [deletedMemberIds, setDeletedMemberIds] = useState(() => new Set());
 
   const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -155,7 +156,20 @@ const FamilyMemberCard = ({ familyCode, token, onEditMember, onViewMember, curre
         text: json?.message || 'Family member removed successfully.',
       });
 
-      fetchMembers();
+      setDeletedMemberIds((prev) => {
+        const next = new Set(prev);
+        next.add(memberId);
+        return next;
+      });
+
+      setTimeout(() => {
+        setFamilyMembers((prev) => prev.filter((m) => m.memberId !== memberId));
+        setDeletedMemberIds((prev) => {
+          const next = new Set(prev);
+          next.delete(memberId);
+          return next;
+        });
+      }, 600);
     } catch (err) {
       console.error('Error deleting member:', err);
       await Swal.fire({
@@ -275,7 +289,7 @@ const FamilyMemberCard = ({ familyCode, token, onEditMember, onViewMember, curre
     <div
       onClick={() => {
         // Only allow viewing if user has Admin (role 2) or Superadmin (role 3) role
-        if (currentUser?.role === 2 || currentUser?.role === 3) {
+        if (!deletedMemberIds.has(member.memberId) && (currentUser?.role === 2 || currentUser?.role === 3)) {
           handleViewMember(member.userId, { stopPropagation: () => {} });
         }
       }}
@@ -283,7 +297,7 @@ const FamilyMemberCard = ({ familyCode, token, onEditMember, onViewMember, curre
         (currentUser?.role === 2 || currentUser?.role === 3) 
           ? 'hover:shadow-lg cursor-pointer' 
           : 'cursor-default'
-      }`}
+      } ${deletedMemberIds.has(member.memberId) ? 'opacity-20 grayscale pointer-events-none' : ''}`}
     >
       <div className="flex items-start p-5 pb-0">
         <div className="relative flex-shrink-0 w-24 h-24 rounded-full overflow-hidden border-3 border-primary-200 shadow-lg">
@@ -357,6 +371,7 @@ const FamilyMemberCard = ({ familyCode, token, onEditMember, onViewMember, curre
               {/* Share profile invite link */}
               <button
                 onClick={(e) => handleShareInvite(member, e)}
+                disabled={deletedMemberIds.has(member.memberId)}
                 className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-blue-100 hover:text-blue-700 transition-colors tooltip"
                 title="Share profile invite link"
               >
@@ -390,6 +405,7 @@ const FamilyMemberCard = ({ familyCode, token, onEditMember, onViewMember, curre
                     e.stopPropagation();
                     handleDeleteMember(member.memberId, familyCode, e);
                   }}
+                  disabled={deletedMemberIds.has(member.memberId)}
                   className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-red-100 hover:text-red-700 transition-colors tooltip"
                   title="Delete Member"
                 >
@@ -399,7 +415,7 @@ const FamilyMemberCard = ({ familyCode, token, onEditMember, onViewMember, curre
               {/* View button with loading state */}
               <button
                 onClick={(e) => handleViewMember(member.userId, e)}
-                disabled={viewLoadingStates[member.userId]}
+                disabled={deletedMemberIds.has(member.memberId) || viewLoadingStates[member.userId]}
                 className={`p-2 rounded-full transition-all duration-200 tooltip ${
                   viewLoadingStates[member.userId]
                     ? 'bg-primary-100 text-primary-700 cursor-not-allowed'

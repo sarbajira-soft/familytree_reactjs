@@ -135,7 +135,9 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
     const currentFamilyCode = code || userInfo?.familyCode || person.familyCode || '';
     const isSelf = !!(person.memberId && userInfo?.userId && person.memberId === userInfo.userId);
     const isBlocked = !!person.isBlocked;
-    const canShowBlockAction = canShowAdminMenu && !isSelf;
+    const isDeleted = !!person?.isDeleted;
+    const canShowBlockAction = canShowAdminMenu && !isSelf && !isRoot;
+    const canShowMoreActionsButton = canShowAdminMenu && canShowBlockAction;
     const menuRef = useRef(null);
 
     // Get source relationship from URL parameters
@@ -230,27 +232,29 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
         if (sourceRel) {
             return `A${sourceRel}+${relationshipCode}`;
         }
-        
-        // Fallback: use logged-in user's gender to determine H/W prefix
-        const loggedInUserGender = userInfo?.gender?.toLowerCase();
-        let genderPrefix = '';
-        
-        if (loggedInUserGender === 'male' || loggedInUserGender === 'husband') {
-            genderPrefix = 'H';
-        } else if (loggedInUserGender === 'female' || loggedInUserGender === 'wife') {
-            genderPrefix = 'W';
-        } else {
-            // If gender is unknown, try to determine from relationship code first character
-            const firstChar = relationshipCode.charAt(0);
-            genderPrefix = firstChar !== 'U' ? firstChar : 'H'; // Default to H if unknown
-        }
-        
-        return `A${genderPrefix}+${relationshipCode}`;
-    }, [relationshipCode, isViewingBirthFamily, urlSourceRelationship, sourceRelationship, userInfo?.gender]);
+
+        return relationshipCode;
+    }, [relationshipCode, isViewingBirthFamily, urlSourceRelationship, sourceRelationship]);
 
     // Use context to get label - use displayRelationshipCode for translation consistency
     const { getLabel, refreshLabels } = useFamilyTreeLabels();
-    const relationshipText = displayRelationshipCode ? getLabel(displayRelationshipCode) : '';
+    const relationshipText = useMemo(() => {
+        if (!displayRelationshipCode) return '';
+
+        const primaryText = getLabel(displayRelationshipCode);
+
+        // If the prefixed association key has no label, getLabel falls back to the key itself.
+        // In that case, fall back to the base relationshipCode label.
+        if (
+            !isViewingBirthFamily &&
+            relationshipCode &&
+            primaryText === displayRelationshipCode
+        ) {
+            return getLabel(relationshipCode);
+        }
+
+        return primaryText;
+    }, [displayRelationshipCode, getLabel, isViewingBirthFamily, relationshipCode]);
 
     // Inline edit state for relationship label
     const [isEditingLabel, setIsEditingLabel] = useState(false);
@@ -535,54 +539,29 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
         // All validations passed - proceed with navigation
         console.log(` Navigation allowed: ${person.name} (${personFamilyCode}) → Current: ${code} → User: ${userInfo?.familyCode}`);
         
-        // Determine focus and source based on relationship type
-        let focusUserId = person.memberId || person.userId;
+        // Determine focus and source based on relationship type.
+        // Focus must be the clicked person (the one whose family tree is opened).
+        const focusUserId = person.memberId || person.userId;
+        const focusName = person?.name ? String(person.name).trim() : '';
         let sourceCode = null;
-        
-        // Check if relationship ends with H or W (spouse relationship like Z+H, B+W)
+
         if (relationshipCode && (relationshipCode.endsWith('H') || relationshipCode.endsWith('W'))) {
-            // For Z+H (Elder Sister's Husband):
-            // - Focus should be on Z+ (Elder Sister), not on the husband
-            // - Source should be Z+ (the spouse's relationship)
-            
-            // Find the spouse in the tree (the person who has this clicked person as spouse)
-            let spouseFound = null;
-            if (tree && tree.people) {
-                for (const [personId, p] of tree.people.entries()) {
-                    // Check if this person has the clicked person as their spouse
-                    const spouses = p.spouses instanceof Set 
-                        ? Array.from(p.spouses)
-                        : Array.isArray(p.spouses) 
-                        ? p.spouses 
-                        : [];
-                    
-                    if (spouses.includes(person.id)) {
-                        spouseFound = p;
-                        break;
-                    }
-                }
-            }
-            
-            if (spouseFound) {
-                // Focus on the spouse (Z+ instead of Z+H)
-                focusUserId = spouseFound.memberId || spouseFound.userId;
-                // Source is the spouse's relationship (Z+ from Z+H)
-                sourceCode = relationshipCode.slice(0, -1);
-                console.log(` Spouse relationship: ${relationshipCode} → Focus on spouse: ${spouseFound.name} (${focusUserId}), source: ${sourceCode}`);
-            } else {
-                // Fallback if spouse not found
-                sourceCode = relationshipCode.slice(0, -1);
-                console.log(` Spouse not found in tree for ${relationshipCode}, using clicked person as focus`);
-            }
+            // For single-letter spouse codes (H/W), slice would produce an empty string.
+            // In that case, keep the code itself so association prefixing works (A{source}+...).
+            sourceCode = relationshipCode.length > 1 ? relationshipCode.slice(0, -1) : relationshipCode;
         } else if (relationshipCode) {
-            // For direct relationships (Z+, B+, W, H, etc.), use inverse
             sourceCode = getInverseRelationship(relationshipCode);
-            console.log(` Direct relationship: ${relationshipCode} → Focus: ${person.name}, inverse source: ${sourceCode}`);
         }
-        
-        const queryParams = {
-            focus: focusUserId ? String(focusUserId) : ''
-        };
+
+        const queryParams = {};
+
+        if (focusUserId) {
+            queryParams.focus = String(focusUserId);
+        }
+
+        if (focusName) {
+            queryParams.focusName = focusName;
+        }
         
         if (sourceCode) {
             queryParams.source = sourceCode;
@@ -607,6 +586,9 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
           left: `${person.x - width / 2}px`,
           top: `${person.y - height / 2}px`,
           zIndex: 10,
+          opacity: isDeleted ? 0.15 : 1,
+          filter: isDeleted ? 'grayscale(100%)' : undefined,
+          pointerEvents: isDeleted ? 'none' : 'auto',
         }}
       >
         {/* Main Person Card */}
@@ -683,7 +665,7 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
           data-person-id={person.id}
         >
           {/* Family Tree Navigation Icon (simple approach using person.familyCode) */}
-          {!effectiveViewOnly && hasAssociatedTree && (
+          {hasAssociatedTree && (
             <div className="absolute top-1 left-1 flex flex-col items-center z-10">
               <button
                 className="w-6 h-6 bg-gradient-to-br from-cyan-50 to-sky-50 hover:from-cyan-100 hover:to-sky-100 text-sky-700 rounded-full flex items-center justify-center shadow-md transition-all duration-200 border-2 border-cyan-400"
@@ -709,7 +691,7 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
                 right: memberCount > 50 ? "2px" : "8px",
               }}
             >
-              {canShowAdminMenu && (
+              {canShowMoreActionsButton && (
                 <div className="relative">
                   <button
                     onClick={handleMenuToggle}

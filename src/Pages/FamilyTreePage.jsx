@@ -119,7 +119,10 @@ const FamilyTreePage = () => {
     }
   }, [tree, userInfo?.userId]);
 
-  const needsPlacementBanner = !canEdit && !isCurrentUserPlacedInTree;
+  // Only show the "joined but not placed" banner for the user's own active family.
+  // When viewing spouse/associated families via /family-tree/:code, the viewer may not be a member
+  // and should NOT be treated as a joined-but-not-placed member.
+  const needsPlacementBanner = isOwnTree && !canEdit && !isCurrentUserPlacedInTree;
 
   // Load accepted merge requests for this admin (primary family)
   const { data: mergeRequestsResponse, isLoading: mergeRequestsLoading } =
@@ -1003,24 +1006,7 @@ const FamilyTreePage = () => {
       const personToDelete = newTree.people.get(personId);
       if (!personToDelete) return;
 
-      const relatives = new Set([
-        ...personToDelete.parents,
-        ...personToDelete.children,
-        ...personToDelete.spouses,
-        ...personToDelete.siblings,
-      ]);
-
-      relatives.forEach((relId) => {
-        const relative = newTree.people.get(relId);
-        if (relative) {
-          relative.parents.delete(personId);
-          relative.children.delete(personId);
-          relative.spouses.delete(personId);
-          relative.siblings.delete(personId);
-        }
-      });
-
-      newTree.people.delete(personId);
+      personToDelete.isDeleted = true;
 
       setTree(newTree);
       updateStats(newTree);
@@ -1302,6 +1288,7 @@ const FamilyTreePage = () => {
         formData.append(`person_${index}_gender`, person.gender);
         formData.append(`person_${index}_age`, person.age);
         formData.append(`person_${index}_generation`, person.generation);
+        formData.append(`person_${index}_isDeleted`, person.isDeleted ? '1' : '0');
         formData.append(
           `person_${index}_lifeStatus`,
           person.lifeStatus || "living"
