@@ -155,7 +155,7 @@ const GalleryViewerModal = ({
   };
 
   // Fetch comments
-  const fetchComments = async () => {
+  async function fetchComments() {
     try {
       const res = await fetch(
         `${import.meta.env.VITE_API_BASE_URL}/gallery/${album.id}/comments`,
@@ -171,7 +171,7 @@ const GalleryViewerModal = ({
     } catch (err) {
       console.error("Fetching comments failed", err);
     }
-  };
+  }
 
   // Post comment
   const handlePostComment = async () => {

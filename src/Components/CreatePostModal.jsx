@@ -70,6 +70,14 @@ const CreatePostModal = ({
   const emojiPickerRef = useRef(null);
   const ffmpegRef = useRef(new FFmpeg());
 
+  function handleClose() {
+    setShowEmojiPicker(false);
+    setShowPrivacyDropdown(false);
+    setMessage("");
+    setShowSuccess(false);
+    onClose?.();
+  }
+
   // Initialize form fields when modal opens
   useEffect(() => {
     if (isOpen) {
