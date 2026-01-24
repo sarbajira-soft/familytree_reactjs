@@ -215,17 +215,20 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
   }, [cart && cart.id]);
 
   useEffect(() => {
+    // Load shipping options only after addresses are saved AND a payment method is chosen.
     if (!addressesUpdated || !paymentMethod) {
       return;
     }
 
     let cancelled = false;
 
+    const mode = paymentMethod || undefined;
+
     const loadShippingOptions = async () => {
       setShippingLoading(true);
       setError(null);
       try {
-        const fetched = await getShippingOptionsForCart(paymentMethod);
+        const fetched = await getShippingOptionsForCart(mode);
         if (cancelled) return;
         setShippingOptions(fetched);
         if (fetched && fetched.length > 0) {

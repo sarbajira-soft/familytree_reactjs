@@ -268,14 +268,14 @@ const Layout = ({ noScroll = false }) => {
                     setNotificationOpen(false);
                     setFamilyMenuOpen(false);
                   }}
-                  className="p-3 rounded-2xl bg-primary-600 text-white shadow-sm hover:bg-primary-700"
+                  className="p-2 rounded-xl bg-primary-600 text-white shadow-sm hover:bg-primary-700"
                 >
-                  <FiMenu size={20} />
+                  <FiMenu size={18} />
                 </button>
               )}
 
-              <div className="flex items-center gap-2">
-                <div className="w-12 h-12">
+              <div className={`flex items-center ${isMobile ? "gap-1.5" : "gap-2"}`}>
+                <div className={isMobile ? "w-9 h-9" : "w-12 h-12"}>
                   <img
                     src="/assets/family-logo.png"
                     alt="Familyss Logo"
@@ -283,11 +283,11 @@ const Layout = ({ noScroll = false }) => {
                   />
                 </div>
                 {/* <h2 className="font-semibold text-lg text-primary-700">Familyss</h2> */}
-  <img
-  src="/assets/familyss.png"
-  alt="Familyss"
-  className="h-16 w-auto"
-/>
+                <img
+                  src="/assets/familyss.png"
+                  alt="Familyss"
+                  className={isMobile ? "h-10 w-auto" : "h-16 w-auto"}
+                />
 
               </div>
             </div>
@@ -479,7 +479,7 @@ const Layout = ({ noScroll = false }) => {
             />
             <div
               ref={sidebarRef}
-              className="fixed top-16 left-4 z-50 w-80 max-w-[90vw] bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden"
+              className="fixed top-16 bottom-0 left-0 z-50 bg-white shadow-2xl border-r border-gray-200 overflow-hidden"
             >
               <Sidebar
                 activeTab={activeTab}
@@ -487,7 +487,7 @@ const Layout = ({ noScroll = false }) => {
                 isMobile
                 onCloseMobile={() => setSidebarOpen(false)}
                 collapsed={false}
-                variant="dropdown"
+                variant="sidebar"
               />
             </div>
           </>
@@ -497,7 +497,7 @@ const Layout = ({ noScroll = false }) => {
         <div
           className={`flex-1 ${
             noScroll ? "overflow-hidden" : "overflow-y-auto"
-          } p-1 md:p-2 bg-gray-50`}
+          } pt-0 px-1 pb-1 md:px-2 md:pb-2 bg-gray-50`}
         >
           <Outlet />
         </div>
