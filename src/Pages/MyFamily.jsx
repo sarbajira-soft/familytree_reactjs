@@ -218,7 +218,7 @@ const FamilyHubPage = () => {
 
   return (
     <>
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 dark:from-slate-950 dark:to-slate-900">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
           {/* Condition 1: No family code - show NoFamilyView */}
           {!userInfo?.familyCode ? (
@@ -256,8 +256,8 @@ const FamilyHubPage = () => {
             /* Fallback: Loading state for approved users */
             <div className="flex flex-col items-center justify-center py-20">
               <FiLoader className="text-6xl text-primary-600 animate-spin mb-4" />
-              <h2 className="text-2xl font-semibold text-gray-700 mb-2">Loading Family Data...</h2>
-              <p className="text-gray-500">Please wait while we fetch your family information.</p>
+              <h2 className="text-2xl font-semibold text-gray-700 dark:text-slate-200 mb-2">Loading Family Data...</h2>
+              <p className="text-gray-500 dark:text-slate-400">Please wait while we fetch your family information.</p>
             </div>
           )}
         </div>

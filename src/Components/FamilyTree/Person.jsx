@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import RelationshipCalculator from '../../utils/relationshipCalculator';
 import { useFamilyTreeLabels } from '../../Contexts/FamilyTreeContext';
 import { useUser } from '../../Contexts/UserContext';
+import { useTheme } from '../../Contexts/ThemeContext';
 import { FiEye, FiShare2, FiMoreVertical, FiUserX, FiUserCheck } from 'react-icons/fi';
 import Swal from 'sweetalert2';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -122,6 +123,8 @@ const getGenderLabel = (person, tree, currentUserId) => {
 };
 
 const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSelected, isHighlighted, isSearchResult, currentUserId, currentFamilyId, viewOnly, sourceRelationship }) => {
+    const { theme } = useTheme();
+    const isDark = theme === 'dark';
     // Dynamic sizing based on tree size
     const memberCount = tree ? tree.people.size : 0;
     const { userInfo } = useUser();
@@ -562,6 +565,30 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
     const cardOpacity = isLargeTree ? 0.95 : 1;
     const shadowIntensity = isLargeTree ? 0.05 : 0.08;
 
+    const cardBackground = useMemo(() => {
+        if (!isDark) {
+            return isRoot
+                ? "linear-gradient(135deg, #fef2f2 0%, #ffe4e6 50%, #fce7f3 100%)"
+                : isNew
+                ? "linear-gradient(135deg, #f0f9ff 0%, #dbeafe 50%, #e0f2fe 100%)"
+                : person.gender === "male"
+                ? "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)"
+                : person.gender === "female"
+                ? "linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)"
+                : "linear-gradient(135deg, #f8fafc 0%, #e0f2fe 100%)";
+        }
+
+        return isRoot
+            ? "linear-gradient(135deg, rgb(2 6 23) 0%, rgb(15 23 42) 45%, rgb(30 41 59) 100%)"
+            : isNew
+            ? "linear-gradient(135deg, rgb(2 6 23) 0%, rgba(14, 165, 233, 0.12) 55%, rgb(15 23 42) 100%)"
+            : person.gender === "male"
+            ? "linear-gradient(135deg, rgb(2 6 23) 0%, rgba(14, 165, 233, 0.14) 100%)"
+            : person.gender === "female"
+            ? "linear-gradient(135deg, rgb(2 6 23) 0%, rgba(244, 114, 182, 0.14) 100%)"
+            : "linear-gradient(135deg, rgb(2 6 23) 0%, rgb(15 23 42) 100%)";
+    }, [isDark, isRoot, isNew, person.gender]);
+
     return (
       <div
         id={`person-${person.id}`}
@@ -599,15 +626,7 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
               person.lifeStatus === "remembering"
                 ? 0.8 * cardOpacity
                 : cardOpacity,
-            background: isRoot
-              ? "linear-gradient(135deg, #fef2f2 0%, #ffe4e6 50%, #fce7f3 100%)" // premium rose gradient for root
-              : isNew
-              ? "linear-gradient(135deg, #f0f9ff 0%, #dbeafe 50%, #e0f2fe 100%)" // premium sky gradient for new
-              : person.gender === "male"
-              ? "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)" // premium blue gradient for males
-              : person.gender === "female"
-              ? "linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)" // premium rose gradient for females
-              : "linear-gradient(135deg, #f8fafc 0%, #e0f2fe 100%)", // premium light gradient for others
+            background: cardBackground,
             border: isHighlighted
               ? "3px solid #ec4899" // vibrant pink border for highlighted
               : isSearchResult
@@ -653,7 +672,7 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
           {hasAssociatedTree && (
             <div className="absolute top-1 left-1 flex flex-col items-center z-10">
               <button
-                className="w-6 h-6 bg-gradient-to-br from-cyan-50 to-sky-50 hover:from-cyan-100 hover:to-sky-100 text-sky-700 rounded-full flex items-center justify-center shadow-md transition-all duration-200 border-2 border-cyan-400"
+                className="w-6 h-6 bg-gradient-to-br from-cyan-50 to-sky-50 hover:from-cyan-100 hover:to-sky-100 text-sky-700 rounded-full flex items-center justify-center shadow-md transition-all duration-200 border-2 border-cyan-400 dark:from-slate-900 dark:to-slate-800 dark:hover:from-slate-800 dark:hover:to-slate-700 dark:text-slate-100 dark:border-slate-600"
                 onClick={handleViewPersonBirthFamily}
                 title={`Go to ${person.name}'s Family Tree`}
                 style={{
@@ -680,17 +699,17 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
                 <div className="relative">
                   <button
                     onClick={handleMenuToggle}
-                    className="w-5 h-5 md:w-6 md:h-6 bg-white/90 hover:bg-white text-gray-700 hover:text-gray-900 rounded-full flex items-center justify-center shadow-md border border-gray-200"
+                    className="w-5 h-5 md:w-6 md:h-6 bg-white/90 hover:bg-white text-gray-700 hover:text-gray-900 rounded-full flex items-center justify-center shadow-md border border-gray-200 dark:bg-slate-900/90 dark:hover:bg-slate-900 dark:text-slate-200 dark:hover:text-slate-100 dark:border-slate-700"
                     title="More actions"
                   >
                     <FiMoreVertical size={14} />
                   </button>
                   {isMenuOpen && (
-                    <div ref={menuRef} className="absolute right-0 mt-1 w-40 bg-white rounded-md shadow-lg border border-gray-200 z-20">
+                    <div ref={menuRef} className="absolute right-0 mt-1 w-40 bg-white rounded-md shadow-lg border border-gray-200 z-20 dark:bg-slate-900 dark:border-slate-700">
                       {canShowBlockAction && (
                         <button
                           onClick={(e) => handleToggleBlock(e, !isBlocked)}
-                          className="w-full px-3 py-2 text-left text-sm text-gray-700 bg-white flex items-center space-x-2"
+                          className="w-full px-3 py-2 text-left text-sm text-gray-700 bg-white flex items-center space-x-2 dark:bg-slate-900 dark:text-slate-200"
                         >
                           {isBlocked ? (
                             <>
@@ -715,7 +734,7 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
               {canShare && (
                 <button
                   onClick={handleShareClick}
-                  className="w-5 h-5 md:w-6 md:h-6 bg-white/90 hover:bg-white text-sky-600 hover:text-sky-700 rounded-full flex items-center justify-center shadow-md border border-cyan-300"
+                  className="w-5 h-5 md:w-6 md:h-6 bg-white/90 hover:bg-white text-sky-600 hover:text-sky-700 rounded-full flex items-center justify-center shadow-md border border-cyan-300 dark:bg-slate-900/90 dark:hover:bg-slate-900 dark:text-sky-300 dark:hover:text-sky-200 dark:border-slate-700"
                   title="Share profile link"
                 >
                   <FiShare2 size={14} />
@@ -750,7 +769,7 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
                 </span>
               )}
               <div
-                className="rounded-full overflow-hidden bg-white border-4 shadow-lg"
+                className="rounded-full overflow-hidden bg-white border-4 shadow-lg dark:bg-slate-900"
                 style={{
                   width: `${profileSize}px`,
                   height: `${profileSize}px`,
@@ -822,7 +841,7 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
             style={{ paddingTop: `${profileSize * 0.7}px` }}
           >
             {person.lifeStatus === "remembering" && (
-              <div className="text-center mb-1 px-2 py-0.5 bg-red-50 text-red-700 text-xs font-semibold rounded">
+              <div className="text-center mb-1 px-2 py-0.5 bg-red-50 text-red-700 text-xs font-semibold rounded dark:bg-red-900/30 dark:text-red-200">
                 In Memory
               </div>
             )}
@@ -855,7 +874,7 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
             {/* Name - Clean, No Background - AFTER Age/Gender */}
             <div className="text-center px-2 mb-1">
               <h3
-                className="font-black text-gray-900 leading-tight"
+                className="font-black text-gray-900 leading-tight dark:text-slate-100"
                 style={{
                   fontSize: `${fontSizeName}px`,
                   lineHeight: "1.2",
@@ -889,8 +908,8 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
                         <div
                             className={`text-center py-1 px-2 rounded-lg font-bold transition-all duration-200 border-2 shadow-sm ${
                                 isViewingBirthFamily
-                                    ? 'bg-gradient-to-r from-cyan-50 to-sky-50 text-sky-700 border-cyan-400'
-                                    : 'bg-gradient-to-r from-pink-50 to-fuchsia-50 text-pink-700 border-pink-400'
+                                    ? 'bg-gradient-to-r from-cyan-50 to-sky-50 text-sky-700 border-cyan-400 dark:from-slate-900 dark:to-slate-800 dark:text-slate-100 dark:border-slate-600'
+                                    : 'bg-gradient-to-r from-pink-50 to-fuchsia-50 text-pink-700 border-pink-400 dark:from-slate-900 dark:to-slate-800 dark:text-slate-100 dark:border-slate-600'
                             } ${!viewOnly ? 'cursor-pointer hover:from-cyan-100 hover:to-sky-100 hover:shadow-md' : ''}`}
                             style={{
                                 fontSize: `${fontSizeRelationship}px`,
@@ -912,7 +931,7 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
                         </div>
                         {displayRelationshipCode && (
                             <div
-                                className="text-center mt-1 text-gray-600 font-semibold"
+                                className="text-center mt-1 text-gray-600 font-semibold dark:text-slate-300"
                                 style={{ fontSize: `${Math.max(9, fontSizeRelationship - 3)}px` }}
                             >
                                 {displayRelationshipCode}

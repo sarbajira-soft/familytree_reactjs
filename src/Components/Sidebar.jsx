@@ -223,7 +223,7 @@ const Sidebar = ({
 
   return (
     <div
-      className={`flex flex-col bg-white border-gray-100 shadow-xl sidebar-content transition-all duration-200 ${
+      className={`flex flex-col bg-white border-gray-100 shadow-xl sidebar-content transition-all duration-200 dark:bg-slate-900 dark:border-slate-800 ${
         variant === "dropdown"
           ? "w-full"
           : collapsed
@@ -247,7 +247,7 @@ const Sidebar = ({
                       ${
                         isLinkActive(item)
                           ? "text-primary-700 bg-primary-50 font-semibold"
-                          : "text-gray-700 hover:text-primary-600 hover:bg-gray-50"
+                          : "text-gray-700 hover:text-primary-600 hover:bg-gray-50 dark:text-slate-200 dark:hover:bg-slate-800"
                       }`}
                     onClick={() => handleItemClick(item)}
                   >
@@ -255,7 +255,7 @@ const Sidebar = ({
                       className={`mr-4 text-xl ${
                         isLinkActive(item)
                           ? "text-primary-500"
-                          : "text-gray-500"
+                          : "text-gray-500 dark:text-slate-400"
                       }`}
                     >
                       {item.icon}
@@ -282,7 +282,7 @@ const Sidebar = ({
                             ${
                               isChildActive(child)
                                 ? "text-primary-600 bg-primary-50 font-medium"
-                                : "text-gray-600 hover:text-primary-500 hover:bg-gray-100"
+                                : "text-gray-600 hover:text-primary-500 hover:bg-gray-100 dark:text-slate-300 dark:hover:bg-slate-800"
                             }`}
                           onClick={() => handleItemClick(child)}
                         >
@@ -290,7 +290,7 @@ const Sidebar = ({
                             className={`mr-3 ${
                               isChildActive(child)
                                 ? "text-primary-400"
-                                : "text-gray-400"
+                                : "text-gray-400 dark:text-slate-400"
                             }`}
                           >
                             {child.icon}
@@ -307,7 +307,7 @@ const Sidebar = ({
                     ${
                       isLinkActive(item)
                         ? "text-primary-700 bg-primary-50 font-semibold"
-                        : "text-gray-700 hover:text-primary-600 hover:bg-gray-50"
+                        : "text-gray-700 hover:text-primary-600 hover:bg-gray-50 dark:text-slate-200 dark:hover:bg-slate-800"
                     }`}
                   onClick={() => handleItemClick(item)}
                 >

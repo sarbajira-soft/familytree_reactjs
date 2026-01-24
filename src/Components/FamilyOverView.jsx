@@ -53,26 +53,26 @@ const FamilyOverView = ({ familyCode, token }) => {
 
   return (
     <div className="space-y-8 mt-10 mb-10">
-      <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-        <h2 className="text-xl font-bold text-gray-800 mb-6">Family Overview</h2>
+      <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm p-6 border border-gray-100 dark:border-slate-800">
+        <h2 className="text-xl font-bold text-gray-800 dark:text-slate-100 mb-6">Family Overview</h2>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-blue-50 p-4 rounded-lg text-center">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          <div className="bg-blue-50 dark:bg-slate-800 p-4 rounded-lg text-center border border-transparent dark:border-slate-700">
             <FaUserFriends className="mx-auto text-blue-500 text-3xl mb-2" />
-            <p className="text-sm text-gray-600">Total Members</p>
-            <p className="text-2xl font-bold text-gray-900">{totalMembers}</p>
+            <p className="text-sm text-gray-600 dark:text-slate-300">Total Members</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-slate-100">{totalMembers}</p>
           </div>
 
-          <div className="bg-blue-50 p-4 rounded-lg text-center">
+          <div className="bg-blue-50 dark:bg-slate-800 p-4 rounded-lg text-center border border-transparent dark:border-slate-700">
             <FaMale className="mx-auto text-blue-500 text-3xl mb-2" />
-            <p className="text-sm text-gray-600">Male Members</p>
-            <p className="text-2xl font-bold text-gray-900">{males}</p>
+            <p className="text-sm text-gray-600 dark:text-slate-300">Male Members</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-slate-100">{males}</p>
           </div>
 
-          <div className="bg-pink-50 p-4 rounded-lg text-center">
+          <div className="bg-pink-50 dark:bg-slate-800 p-4 rounded-lg text-center border border-transparent dark:border-slate-700">
             <FaFemale className="mx-auto text-pink-500 text-3xl mb-2" />
-            <p className="text-sm text-gray-600">Female Members</p>
-            <p className="text-2xl font-bold text-gray-900">{females}</p>
+            <p className="text-sm text-gray-600 dark:text-slate-300">Female Members</p>
+            <p className="text-2xl font-bold text-gray-900 dark:text-slate-100">{females}</p>
           </div>
 
           {/* <div className="bg-purple-50 p-4 rounded-lg text-center">

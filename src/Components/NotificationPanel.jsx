@@ -343,17 +343,17 @@ const NotificationPanel = ({ open, onClose, onNotificationCountUpdate , isConnec
         className="absolute inset-0 bg-black bg-opacity-50 transition-opacity"
         onClick={onClose}
       />
-      <div className="absolute right-0 top-0 h-full w-full max-w-md transform overflow-hidden bg-white shadow-xl transition-transform duration-300 ease-in-out">
+      <div className="absolute right-0 top-0 h-full w-full max-w-md transform overflow-hidden bg-white shadow-xl transition-transform duration-300 ease-in-out dark:bg-slate-900">
         <div className="flex h-full flex-col">
           {/* Header */}
-          <div className="border-b border-gray-200 bg-white px-4 py-3">
+          <div className="border-b border-gray-200 bg-white px-4 py-3 dark:bg-slate-900 dark:border-slate-800">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-medium text-gray-900">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-slate-100">
                 Notifications
               </h3>
               <button
                 onClick={onClose}
-                className="rounded-full p-1 bg-white text-gray-400 hover:bg-gray-100 hover:text-gray-500"
+                className="rounded-full p-1 bg-white text-gray-400 hover:bg-gray-100 hover:text-gray-500 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100"
               >
                 <FiX className="h-5 w-5" />
               </button>
@@ -409,15 +409,15 @@ const NotificationPanel = ({ open, onClose, onNotificationCountUpdate , isConnec
               </div>
             ) : filteredNotifications.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center p-6 text-center">
-                <FiBell className="mb-2 h-10 w-10 text-gray-400" />
-                <h4 className="text-lg font-medium text-gray-900">
+                <FiBell className="mb-2 h-10 w-10 text-gray-400 dark:text-slate-400" />
+                <h4 className="text-lg font-medium text-gray-900 dark:text-slate-100">
                   {activeTab === "requests"
                     ? "No association requests"
                     : activeTab === "other"
                     ? "No other notifications"
                     : "No notifications"}
                 </h4>
-                <p className="mt-1 text-sm text-gray-500">
+                <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
                   {activeTab === "requests"
                     ? "No pending family association requests."
                     : activeTab === "other"
@@ -433,8 +433,8 @@ const NotificationPanel = ({ open, onClose, onNotificationCountUpdate , isConnec
                 {(associationGroups.today.length > 0 ||
                   otherGroups.today.length > 0) && (
                   <>
-                    <div className="bg-gray-50 px-4 py-2 sticky top-0 z-10">
-                      <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                    <div className="bg-gray-50 px-4 py-2 sticky top-0 z-10 dark:bg-slate-800">
+                      <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wide dark:text-slate-300">
                         Today
                       </h4>
                     </div>
@@ -457,7 +457,7 @@ const NotificationPanel = ({ open, onClose, onNotificationCountUpdate , isConnec
                       return (
                         <div
                           key={notification.id}
-                          className="border-b border-gray-200"
+                          className="border-b border-gray-200 dark:border-slate-800"
                         >
                           <AssociationRequestItem
                             request={{
@@ -492,8 +492,8 @@ const NotificationPanel = ({ open, onClose, onNotificationCountUpdate , isConnec
                     {otherGroups.today.map((notification) => (
                       <div
                         key={notification.id}
-                        className={`relative px-4 py-3 hover:bg-gray-50 border-b border-gray-200 ${
-                          !notification.read ? "bg-blue-50" : ""
+                        className={`relative px-4 py-3 hover:bg-gray-50 border-b border-gray-200 dark:hover:bg-slate-800 dark:border-slate-800 ${
+                          !notification.read ? "bg-blue-50 dark:bg-slate-800" : ""
                         }`}
                         onClick={() =>
                           !notification.read && markAsRead(notification.id)
@@ -512,23 +512,23 @@ const NotificationPanel = ({ open, onClose, onNotificationCountUpdate , isConnec
                           </div>
                           <div className="ml-3 flex-1">
                             <div className="flex items-center justify-between">
-                              <p className="text-sm font-medium text-gray-900">
+                              <p className="text-sm font-medium text-gray-900 dark:text-slate-100">
                                 {notification.title ||
                                   getNotificationType(notification.type)}
                               </p>
-                              <p className="text-xs text-gray-500">
+                              <p className="text-xs text-gray-500 dark:text-slate-400">
                                 {new Date(notification.time).toLocaleTimeString(
                                   [],
                                   { hour: "2-digit", minute: "2-digit" }
                                 )}
                               </p>
                             </div>
-                            <p className="mt-1 text-sm text-gray-600">
+                            <p className="mt-1 text-sm text-gray-600 dark:text-slate-300">
                               {notification.message}
                             </p>
                             {!notification.read && (
                               <div className="mt-1">
-                                <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
+                                <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
                                   New
                                 </span>
                               </div>
@@ -544,8 +544,8 @@ const NotificationPanel = ({ open, onClose, onNotificationCountUpdate , isConnec
                 {(associationGroups.last7Days.length > 0 ||
                   otherGroups.last7Days.length > 0) && (
                   <>
-                    <div className="bg-gray-50 px-4 py-2 sticky top-0 z-10">
-                      <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                    <div className="bg-gray-50 px-4 py-2 sticky top-0 z-10 dark:bg-slate-800">
+                      <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wide dark:text-slate-300">
                         Last 7 Days
                       </h4>
                     </div>
@@ -568,7 +568,7 @@ const NotificationPanel = ({ open, onClose, onNotificationCountUpdate , isConnec
                       return (
                         <div
                           key={notification.id}
-                          className="border-b border-gray-200"
+                          className="border-b border-gray-200 dark:border-slate-800"
                         >
                           <AssociationRequestItem
                             request={{
@@ -603,8 +603,8 @@ const NotificationPanel = ({ open, onClose, onNotificationCountUpdate , isConnec
                     {otherGroups.last7Days.map((notification) => (
                       <div
                         key={notification.id}
-                        className={`relative px-4 py-3 hover:bg-gray-50 border-b border-gray-200 ${
-                          !notification.read ? "bg-blue-50" : ""
+                        className={`relative px-4 py-3 hover:bg-gray-50 border-b border-gray-200 dark:hover:bg-slate-800 dark:border-slate-800 ${
+                          !notification.read ? "bg-blue-50 dark:bg-slate-800" : ""
                         }`}
                         onClick={() =>
                           !notification.read && markAsRead(notification.id)
@@ -623,23 +623,23 @@ const NotificationPanel = ({ open, onClose, onNotificationCountUpdate , isConnec
                           </div>
                           <div className="ml-3 flex-1">
                             <div className="flex items-center justify-between">
-                              <p className="text-sm font-medium text-gray-900">
+                              <p className="text-sm font-medium text-gray-900 dark:text-slate-100">
                                 {notification.title ||
                                   getNotificationType(notification.type)}
                               </p>
-                              <p className="text-xs text-gray-500">
+                              <p className="text-xs text-gray-500 dark:text-slate-400">
                                 {new Date(notification.time).toLocaleDateString(
                                   [],
                                   { month: "short", day: "numeric" }
                                 )}
                               </p>
                             </div>
-                            <p className="mt-1 text-sm text-gray-600">
+                            <p className="mt-1 text-sm text-gray-600 dark:text-slate-300">
                               {notification.message}
                             </p>
                             {!notification.read && (
                               <div className="mt-1">
-                                <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
+                                <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
                                   New
                                 </span>
                               </div>
@@ -655,8 +655,8 @@ const NotificationPanel = ({ open, onClose, onNotificationCountUpdate , isConnec
                 {(associationGroups.last30Days.length > 0 ||
                   otherGroups.last30Days.length > 0) && (
                   <>
-                    <div className="bg-gray-50 px-4 py-2 sticky top-0 z-10">
-                      <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                    <div className="bg-gray-50 px-4 py-2 sticky top-0 z-10 dark:bg-slate-800">
+                      <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wide dark:text-slate-300">
                         Last 30 Days
                       </h4>
                     </div>
@@ -679,7 +679,7 @@ const NotificationPanel = ({ open, onClose, onNotificationCountUpdate , isConnec
                       return (
                         <div
                           key={notification.id}
-                          className="border-b border-gray-200"
+                          className="border-b border-gray-200 dark:border-slate-800"
                         >
                           <AssociationRequestItem
                             request={{
@@ -714,8 +714,8 @@ const NotificationPanel = ({ open, onClose, onNotificationCountUpdate , isConnec
                     {otherGroups.last30Days.map((notification) => (
                       <div
                         key={notification.id}
-                        className={`relative px-4 py-3 hover:bg-gray-50 border-b border-gray-200 ${
-                          !notification.read ? "bg-blue-50" : ""
+                        className={`relative px-4 py-3 hover:bg-gray-50 border-b border-gray-200 dark:hover:bg-slate-800 dark:border-slate-800 ${
+                          !notification.read ? "bg-blue-50 dark:bg-slate-800" : ""
                         }`}
                         onClick={() =>
                           !notification.read && markAsRead(notification.id)
@@ -734,23 +734,23 @@ const NotificationPanel = ({ open, onClose, onNotificationCountUpdate , isConnec
                           </div>
                           <div className="ml-3 flex-1">
                             <div className="flex items-center justify-between">
-                              <p className="text-sm font-medium text-gray-900">
+                              <p className="text-sm font-medium text-gray-900 dark:text-slate-100">
                                 {notification.title ||
                                   getNotificationType(notification.type)}
                               </p>
-                              <p className="text-xs text-gray-500">
+                              <p className="text-xs text-gray-500 dark:text-slate-400">
                                 {new Date(notification.time).toLocaleDateString(
                                   [],
                                   { month: "short", day: "numeric" }
                                 )}
                               </p>
                             </div>
-                            <p className="mt-1 text-sm text-gray-600">
+                            <p className="mt-1 text-sm text-gray-600 dark:text-slate-300">
                               {notification.message}
                             </p>
                             {!notification.read && (
                               <div className="mt-1">
-                                <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
+                                <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/40 dark:text-blue-200">
                                   New
                                 </span>
                               </div>
@@ -766,7 +766,7 @@ const NotificationPanel = ({ open, onClose, onNotificationCountUpdate , isConnec
           </div>
 
           {/* Footer */}
-          <div className="border-t border-gray-200 p-4 text-center">
+          <div className="border-t border-gray-200 p-4 text-center dark:border-slate-800">
             <button
               onClick={() => fetchNotifications(true)}
               style={{

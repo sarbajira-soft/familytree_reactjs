@@ -12,6 +12,7 @@ import { UserProvider } from "./Contexts/UserContext";
 import { LanguageProvider, useLanguage } from "./Contexts/LanguageContext";
 import { FamilyTreeProvider } from "./Contexts/FamilyTreeContext";
 import { GiftEventProvider } from "./Contexts/GiftEventContext";
+import { ThemeProvider } from "./Contexts/ThemeContext";
 
 import PrivateRoute, { RoleBasedRoute } from "./Routes/PrivateRoute";
 import GuestRoute from "./Routes/GuestRoute";
@@ -95,10 +96,11 @@ const AdminRoute = ({ children }) => {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <UserProvider>
-        <Router>
-          <Suspense fallback={<LoadingFallback />}>
-            <Routes>
+      <ThemeProvider>
+        <UserProvider>
+          <Router>
+            <Suspense fallback={<LoadingFallback />}>
+              <Routes>
               {/* ---------------- Guest-only Routes ---------------- */}
               <Route
                 path="/"
@@ -270,10 +272,11 @@ function App() {
 
               {/* ---------------- Catch-all Redirect ---------------- */}
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
-            </Routes>
-          </Suspense>
-        </Router>
-      </UserProvider>
+              </Routes>
+            </Suspense>
+          </Router>
+        </UserProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

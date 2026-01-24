@@ -349,7 +349,7 @@ const EventsPage = () => {
   if (!userInfo?.familyCode) {
     return (
       <>
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex items-center justify-center px-4">
           <NoFamilyView
             onCreateFamily={handleCreateFamily}
             onJoinFamily={handleJoinFamily}
@@ -362,7 +362,7 @@ const EventsPage = () => {
   if (userInfo?.familyCode && userInfo?.approveStatus !== "approved") {
     return (
       <>
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex items-center justify-center px-4">
           <PendingApprovalView
             familyCode={userInfo.familyCode}
             onJoinFamily={handleJoinFamily}
@@ -374,7 +374,7 @@ const EventsPage = () => {
 
   return (
     <>
-      <div className="min-h-screen bg-gray-50 pb-16">
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-950 pb-16">
         <div className="max-w-7xl mx-auto px-4 py-8 md:px-6 lg:px-8 space-y-5">
           {/* Header Section */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
@@ -389,7 +389,7 @@ const EventsPage = () => {
                 </h1>
               </div>
 
-              <p className="text-gray-600 mt-1 text-sm sm:text-lg">
+              <p className="text-gray-600 dark:text-slate-300 mt-1 text-sm sm:text-lg">
                 Create, manage and celebrate memorable moments
               </p>
 
@@ -425,7 +425,7 @@ const EventsPage = () => {
           {/* Filter Tabs – Responsive (Mobile vs Desktop) */}
           <div className="flex justify-center w-full mt-1">
             {/* Container */}
-            <div className="bg-white rounded-2xl shadow-md p-2 border border-gray-200 w-full">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-md p-2 border border-gray-200 dark:border-slate-800 w-full">
               {/* Desktop View (Old UI) */}
               <div className="hidden md:flex items-center justify-center gap-4">
                 {/* Upcoming */}
@@ -524,23 +524,23 @@ const EventsPage = () => {
               Array.from({ length: 4 }).map((_, idx) => (
                 <div
                   key={idx}
-                  className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden animate-pulse"
+                  className="bg-white dark:bg-slate-900 rounded-2xl shadow-lg border border-gray-100 dark:border-slate-800 overflow-hidden animate-pulse"
                 >
-                  <div className="h-40 bg-gray-200" />
+                  <div className="h-40 bg-gray-200 dark:bg-slate-800" />
                   <div className="p-3 space-y-3">
-                    <div className="h-4 bg-gray-200 rounded w-3/4" />
-                    <div className="h-3 bg-gray-100 rounded w-full" />
+                    <div className="h-4 bg-gray-200 dark:bg-slate-800 rounded w-3/4" />
+                    <div className="h-3 bg-gray-100 dark:bg-slate-800 rounded w-full" />
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 bg-gray-200 rounded flex-shrink-0" />
-                        <div className="h-3 bg-gray-200 rounded w-1/2" />
+                        <div className="w-6 h-6 bg-gray-200 dark:bg-slate-800 rounded flex-shrink-0" />
+                        <div className="h-3 bg-gray-200 dark:bg-slate-800 rounded w-1/2" />
                       </div>
                       <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 bg-gray-200 rounded flex-shrink-0" />
-                        <div className="h-3 bg-gray-200 rounded w-2/3" />
+                        <div className="w-6 h-6 bg-gray-200 dark:bg-slate-800 rounded flex-shrink-0" />
+                        <div className="h-3 bg-gray-200 dark:bg-slate-800 rounded w-2/3" />
                       </div>
                     </div>
-                    <div className="h-3 bg-gray-100 rounded w-full" />
+                    <div className="h-3 bg-gray-100 dark:bg-slate-800 rounded w-full" />
                   </div>
                 </div>
               ))
@@ -552,9 +552,9 @@ const EventsPage = () => {
                 return (
                   <div
                     key={event.id}
-                    className={`group bg-white rounded-2xl shadow-lg transition-all duration-300 border ${
+                    className={`group bg-white dark:bg-slate-900 rounded-2xl shadow-lg transition-all duration-300 border ${
                       eventStyle.borderColor
-                    } overflow-hidden ${
+                    } dark:border-slate-800 overflow-hidden ${
                       event.eventType === "custom"
                         ? "cursor-pointer hover:shadow-xl transform hover:scale-105"
                         : "cursor-default"
@@ -613,13 +613,13 @@ const EventsPage = () => {
                       </div>
 
                       {event.eventType === "birthday" && event.age && (
-                        <div className="absolute bottom-3 right-3 bg-white/90 text-pink-600 px-2 py-1 rounded-full text-xs font-bold">
+                        <div className="absolute bottom-3 right-3 bg-white/90 text-pink-600 px-2 py-1 rounded-full text-xs font-bold dark:bg-slate-900/90 dark:text-pink-200">
                           {event.age} years
                         </div>
                       )}
                       {event.eventType === "anniversary" &&
                         event.yearsOfMarriage && (
-                          <div className="absolute bottom-3 right-3 bg-white/90 text-red-600 px-2 py-1 rounded-full text-xs font-bold">
+                          <div className="absolute bottom-3 right-3 bg-white/90 text-red-600 px-2 py-1 rounded-full text-xs font-bold dark:bg-slate-900/90 dark:text-red-200">
                             {event.yearsOfMarriage} years
                           </div>
                         )}
@@ -628,26 +628,26 @@ const EventsPage = () => {
                     {/* Event Content */}
                     <div className="p-3 space-y-2">
                       <h3
-                        className={`text-base font-bold text-gray-900 line-clamp-2 group-hover:${eventStyle.textColor} transition-colors duration-300`}
+                        className={`text-base font-bold text-gray-900 dark:text-slate-100 line-clamp-2 group-hover:${eventStyle.textColor} transition-colors duration-300`}
                       >
                         {event.title}
                       </h3>
 
                       {event.message && (
-                        <p className="text-xs text-gray-600 italic bg-gray-50 p-2 rounded-lg line-clamp-2">
+                        <p className="text-xs text-gray-600 dark:text-slate-300 italic bg-gray-50 dark:bg-slate-800 p-2 rounded-lg line-clamp-2">
                           "{event.message}"
                         </p>
                       )}
 
                       <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-gray-700">
+                        <div className="flex items-center gap-2 text-gray-700 dark:text-slate-200">
                           <div
                             className={`w-6 h-6 ${eventStyle.bgColor} rounded flex items-center justify-center flex-shrink-0`}
                           >
                             <FiCalendar size={14} className="text-white" />
                           </div>
                           <div>
-                            <p className="text-xs text-gray-500">Date & Time</p>
+                            <p className="text-xs text-gray-500 dark:text-slate-400">Date & Time</p>
                             <p className="text-sm font-semibold">
                               {event.date} {event.time && `• ${event.time}`}
                             </p>
@@ -655,7 +655,7 @@ const EventsPage = () => {
                         </div>
 
                         {event.location && (
-                          <div className="flex items-center gap-2 text-gray-700">
+                          <div className="flex items-center gap-2 text-gray-700 dark:text-slate-200">
                             <div
                               className={`w-6 h-6 ${eventStyle.bgColor} rounded flex items-center justify-center flex-shrink-0`}
                             >
@@ -669,13 +669,13 @@ const EventsPage = () => {
                       </div>
 
                       {event.description && (
-                        <p className="text-gray-600 text-xs leading-relaxed line-clamp-2">
+                        <p className="text-gray-600 dark:text-slate-300 text-xs leading-relaxed line-clamp-2">
                           {event.description}
                         </p>
                       )}
 
-                      <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                        <div className="flex items-center gap-4 text-sm text-gray-600">
+                      <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-slate-800">
+                        <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-slate-300">
                           {event.attendeesCount && (
                             <div className="flex items-center gap-2">
                               <FiUsers size={14} />
@@ -703,7 +703,7 @@ const EventsPage = () => {
                                   onClick={(e) =>
                                     handleDeleteEventFromCard(event, e)
                                   }
-                                  className="bg-unset p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200"
+                                  className="bg-unset p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-all duration-200"
                                   title="Delete Event"
                                 >
                                   <FiTrash2 size={14} />

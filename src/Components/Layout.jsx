@@ -15,10 +15,13 @@ import {
   FiPackage,
   FiLink,
   FiClock,
+  FiMoon,
+  FiSun,
 } from "react-icons/fi";
 import { RiUser3Line } from "react-icons/ri";
 import { RiGitMergeLine } from "react-icons/ri";
 import { useUser } from "../Contexts/UserContext";
+import { useTheme } from "../Contexts/ThemeContext";
 import { MEDUSA_TOKEN_KEY, MEDUSA_CART_ID_KEY } from "../Retail/utils/constants";
 import ProfileFormModal from "./ProfileFormModal";
 import NotificationPanel from "./NotificationPanel";
@@ -57,6 +60,7 @@ const Layout = ({ noScroll = false }) => {
   const profileRef = useRef(null);
 
   const { userInfo, userLoading, logout } = useUser();
+  const { theme, toggleTheme } = useTheme();
   const { isConnected, unreadCount, refetchUnreadCount, notifications } =
     useNotificationSocket(userInfo);
 
@@ -251,10 +255,10 @@ const Layout = ({ noScroll = false }) => {
   }
 
   return (
-    <div className="h-screen bg-gray-50 text-gray-800">
+    <div className="h-screen bg-gray-50 text-gray-800 dark:bg-slate-950 dark:text-slate-100">
       <main className="h-full flex flex-col overflow-hidden">
         {/* Header */}
-        <header className="bg-white border-b border-gray-100 px-4 lg:px-6 sticky top-0 z-50 shadow-md">
+        <header className="bg-white border-b border-gray-100 px-4 lg:px-6 sticky top-0 z-50 shadow-md dark:bg-slate-900 dark:border-slate-800">
           <div className="flex items-center justify-between h-16">
             {/* Left Section */}
             <div className="flex items-center gap-2">
@@ -379,6 +383,17 @@ const Layout = ({ noScroll = false }) => {
 
             {/* Right Section */}
             <div className="flex items-center space-x-4">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleTheme();
+                }}
+                className="p-2 bg-unset rounded-2xl text-gray-700 hover:bg-gray-100 dark:text-slate-200 dark:hover:bg-slate-800"
+                title={theme === "dark" ? "Switch to Light" : "Switch to Dark"}
+              >
+                {theme === "dark" ? <FiSun size={18} /> : <FiMoon size={18} />}
+              </button>
+
               {/* Notifications */}
               <div className="relative">
                 <button
@@ -386,7 +401,7 @@ const Layout = ({ noScroll = false }) => {
                     e.stopPropagation();
                     setNotificationOpen(!notificationOpen);
                   }}
-                  className="p-1 bg-unset text-primary-600 relative rounded-3xl hover:bg-gray-100"
+                  className="p-1 bg-unset text-primary-600 relative rounded-3xl hover:bg-gray-100 dark:hover:bg-slate-800"
                 >
                   <FiBell size={20} />
                   {unreadCount > 0 && (
@@ -395,7 +410,7 @@ const Layout = ({ noScroll = false }) => {
                     </span>
                   )}
                   {isConnected && (
-                    <span className="absolute bottom-0 right-0 w-2 h-2 bg-green-500 rounded-full border border-white"></span>
+                    <span className="absolute bottom-0 right-0 w-2 h-2 bg-green-500 rounded-full border border-white dark:border-slate-900"></span>
                   )}
                 </button>
               </div>
@@ -407,7 +422,7 @@ const Layout = ({ noScroll = false }) => {
                     e.stopPropagation();
                     setProfileOpen(!profileOpen);
                   }}
-                  className="bg-unset flex items-center space-x-2 p-1 rounded-lg hover:bg-gray-100"
+                  className="bg-unset flex items-center space-x-2 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800"
                 >
                   {userInfo?.profileUrl ? (
                     <img
@@ -432,35 +447,35 @@ const Layout = ({ noScroll = false }) => {
 
                 {profileOpen && (
                   <div
-                    className="fixed md:absolute right-4 mt-2 w-48 bg-white rounded-lg shadow-lg py-1 z-50 border border-gray-200"
+                    className="fixed md:absolute right-4 mt-2 w-48 bg-white rounded-lg shadow-lg py-1 z-50 border border-gray-200 dark:bg-slate-800 dark:border-slate-700"
                     style={{ top: "4rem" }}
                   >
-                    <div className="px-4 py-2  text-sm text-gray-800 border-b border-gray-100">
+                    <div className="px-4 py-2  text-sm text-gray-800 border-b border-gray-100 dark:text-slate-100 dark:border-slate-700">
                       <p className="font-semibold">
                         {userInfo?.firstName} {userInfo?.lastName}
                       </p>
                       {userInfo?.familyCode && (
-                        <p className="text-gray-500 text-xs">
+                        <p className="text-gray-500 text-xs dark:text-slate-300">
                           Family Code: {userInfo.familyCode}
                         </p>
                       )}
                     </div>
                     <button
                       onClick={() => navigate("/myprofile")}
-                      className="block w-full bg-white text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      className="block w-full bg-white text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                     >
                       My Profile
                     </button>
                     <button
                       onClick={openAddMemberModal}
-                      className="block w-full bg-white text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      className="block w-full bg-white text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                     >
                       Edit Profile
                     </button>
-                    <div className="border-t border-gray-200"></div>
+                    <div className="border-t border-gray-200 dark:border-slate-700"></div>
                     <button
                       onClick={handleLogout}
-                      className="block w-full bg-white text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      className="block w-full bg-white text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                     >
                       Sign Out
                     </button>
@@ -479,7 +494,7 @@ const Layout = ({ noScroll = false }) => {
             />
             <div
               ref={sidebarRef}
-              className="fixed top-16 left-4 z-50 w-80 max-w-[90vw] bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden"
+              className="fixed top-16 left-4 z-50 w-80 max-w-[90vw] bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden dark:bg-slate-900 dark:border-slate-800"
             >
               <Sidebar
                 activeTab={activeTab}
@@ -497,7 +512,7 @@ const Layout = ({ noScroll = false }) => {
         <div
           className={`flex-1 ${
             noScroll ? "overflow-hidden" : "overflow-y-auto"
-          } p-1 md:p-2 bg-gray-50`}
+          } p-1 md:p-2 bg-gray-50 dark:bg-slate-950`}
         >
           <Outlet />
         </div>

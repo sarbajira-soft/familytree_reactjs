@@ -1545,24 +1545,24 @@ const FamilyTreePage = () => {
       {/* All components that use useFamilyTreeLabels must be children here */}
       <>
         {showFullScreenLoading ? (
-          <div className="flex items-center justify-center min-h-screen bg-gray-100">
+          <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-slate-950">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-gray-600">Loading family tree...</p>
+              <p className="text-gray-600 dark:text-slate-300">Loading family tree...</p>
             </div>
           </div>
         ) : showWaitForAdmin ? (
-          <div className="flex items-center justify-center min-h-screen bg-gray-100 px-4">
-            <div className="text-center max-w-xl bg-white rounded-xl shadow p-6">
-              <div className="text-lg font-semibold text-gray-900 mb-2">
+          <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-slate-950 px-4">
+            <div className="text-center max-w-xl bg-white dark:bg-slate-900 rounded-xl shadow p-6 border border-gray-200 dark:border-slate-800">
+              <div className="text-lg font-semibold text-gray-900 dark:text-slate-100 mb-2">
                 Family tree is not created yet
               </div>
-              <div className="text-gray-600">You have been added as a family member.</div>
-              <div className="text-gray-600">
+              <div className="text-gray-600 dark:text-slate-300">You have been added as a family member.</div>
+              <div className="text-gray-600 dark:text-slate-300">
                 Once the admin adds you in the correct position and saves the tree, you can view it here.
               </div>
-              <div className="text-gray-600 mt-3">குடும்ப மரம் இன்னும் உருவாக்கப்படவில்லை.</div>
-              <div className="text-gray-600">
+              <div className="text-gray-600 dark:text-slate-300 mt-3">குடும்ப மரம் இன்னும் உருவாக்கப்படவில்லை.</div>
+              <div className="text-gray-600 dark:text-slate-300">
                 நிர்வாகி உங்களை சரியான இடத்தில் சேர்த்து சேமித்த பிறகு இங்கே காணலாம்.
               </div>
               <button
@@ -1575,22 +1575,22 @@ const FamilyTreePage = () => {
             </div>
           </div>
         ) : !tree ? (
-          <div className="flex items-center justify-center min-h-screen bg-gray-100">
+          <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-slate-950">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-gray-600">Loading family tree...</p>
+              <p className="text-gray-600 dark:text-slate-300">Loading family tree...</p>
             </div>
           </div>
         ) : (
           <>
           {/* Main container for tree and controls */}
-          <div className="relative flex flex-col h-full w-full bg-gray-100 overflow-x-hidden">
+          <div className="relative flex flex-col h-full w-full bg-gray-100 dark:bg-slate-950 overflow-x-hidden">
           {/* Navigation buttons when viewing another family's tree */}
 
           {/* Mobile Top Header - Edit Mode */}
           {canEdit && (
             <>
-              <div className="sm:hidden fixed top-16 left-0 right-0 bg-white border-b border-gray-200 shadow-sm z-50 px-3 py-2">
+              <div className="sm:hidden fixed top-16 left-0 right-0 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 shadow-sm z-50 px-3 py-2">
                 <div className="flex items-center justify-between gap-2">
                   {/* <button className="w-10 h-10 bg-green-600 text-white rounded-lg flex items-center justify-center active:scale-95 transition-transform">
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1617,16 +1617,16 @@ const FamilyTreePage = () => {
               <div className="sm:hidden fixed bottom-[88px] left-3 z-50 flex flex-col gap-2">
                 <button
                   onClick={zoomIn}
-                  className="w-11 h-11 bg-white text-gray-700 rounded-full shadow-lg border border-gray-200 flex items-center justify-center active:scale-95 transition-transform"
+                  className="w-11 h-11 bg-white dark:bg-slate-900 text-gray-700 dark:text-slate-200 rounded-full shadow-lg border border-gray-200 dark:border-slate-700 flex items-center justify-center active:scale-95 transition-transform"
                 >
                   <FaPlus className="text-sm" />
                 </button>
-                <div className="w-11 h-11 bg-white text-gray-700 rounded-full shadow-lg border border-gray-200 flex items-center justify-center text-[10px] font-bold">
+                <div className="w-11 h-11 bg-white dark:bg-slate-900 text-gray-700 dark:text-slate-200 rounded-full shadow-lg border border-gray-200 dark:border-slate-700 flex items-center justify-center text-[10px] font-bold">
                   {Math.round(zoom * 100)}%
                 </div>
                 <button
                   onClick={zoomOut}
-                  className="w-11 h-11 bg-white text-gray-700 rounded-full shadow-lg border border-gray-200 flex items-center justify-center active:scale-95 transition-transform"
+                  className="w-11 h-11 bg-white dark:bg-slate-900 text-gray-700 dark:text-slate-200 rounded-full shadow-lg border border-gray-200 dark:border-slate-700 flex items-center justify-center active:scale-95 transition-transform"
                 >
                   <FaMinus className="text-sm" />
                 </button>
@@ -1693,7 +1693,7 @@ const FamilyTreePage = () => {
 
           {/* Desktop Header */}
           {canEdit && (
-            <div className="hidden sm:flex w-full bg-white border-b-2 border-gray-100 shadow-sm z-40">
+            <div className="hidden sm:flex w-full bg-white dark:bg-slate-900 border-b-2 border-gray-100 dark:border-slate-800 shadow-sm z-40">
               <div className="w-full max-w-none 2xl:max-w-7xl mx-auto px-4 sm:px-6 py-2.5 sm:py-3">
                 <div className="flex items-center justify-between gap-3 lg:gap-5">
                   {/* LEFT: back + stats (compact, responsive labels) */}
@@ -1719,45 +1719,45 @@ const FamilyTreePage = () => {
 
                     <div className="flex items-center gap-3 text-xs md:text-sm">
                       {/* Total */}
-                      <span className="text-gray-700">
+                      <span className="text-gray-700 dark:text-slate-200">
                         <span className="font-medium">
                           <span className="hidden md:inline">Total</span>
                           <span className="inline md:hidden">T</span>:
                         </span>{" "}
-                        <span className="font-bold text-gray-900">
+                        <span className="font-bold text-gray-900 dark:text-slate-100">
                           {stats.total}
                         </span>
                       </span>
 
                       {/* Male */}
-                      <span className="text-gray-700">
+                      <span className="text-gray-700 dark:text-slate-200">
                         <span className="font-medium">
                           <span className="hidden md:inline">Male</span>
                           <span className="inline md:hidden">M</span>:
                         </span>{" "}
-                        <span className="font-bold text-gray-900">
+                        <span className="font-bold text-gray-900 dark:text-slate-100">
                           {stats.male}
                         </span>
                       </span>
 
                       {/* Female */}
-                      <span className="text-gray-700">
+                      <span className="text-gray-700 dark:text-slate-200">
                         <span className="font-medium">
                           <span className="hidden md:inline">Female</span>
                           <span className="inline md:hidden">F</span>:
                         </span>{" "}
-                        <span className="font-bold text-gray-900">
+                        <span className="font-bold text-gray-900 dark:text-slate-100">
                           {stats.female}
                         </span>
                       </span>
 
                       {/* Generations */}
-                      <span className="text-gray-700">
+                      <span className="text-gray-700 dark:text-slate-200">
                         <span className="font-medium">
                           <span className="hidden md:inline">Generations</span>
                           <span className="inline md:hidden">G</span>:
                         </span>{" "}
-                        <span className="font-bold text-gray-900">
+                        <span className="font-bold text-gray-900 dark:text-slate-100">
                           {stats.generations}
                         </span>
                       </span>
@@ -1783,7 +1783,7 @@ const FamilyTreePage = () => {
                     <div className="flex items-center gap-1.5 flex-shrink-0">
                       {/* New Tree */}
                       <button
-                        className="flex items-center gap-1 px-2.5 py-2 bg-white border-2 border-green-600 text-green-600 rounded-lg hover:bg-green-50 text-xs font-semibold active:scale-95 transition-all duration-200 shadow-sm"
+                        className="flex items-center gap-1 px-2.5 py-2 bg-white border-2 border-green-600 text-green-600 rounded-lg hover:bg-green-50 text-xs font-semibold active:scale-95 transition-all duration-200 shadow-sm dark:bg-slate-900 dark:hover:bg-slate-800"
                         onClick={resetTree}
                       >
                         <FaPlus className="text-xs" />
@@ -1864,7 +1864,7 @@ const FamilyTreePage = () => {
           {!canEdit && (
             <>
               {/* Compact Top Bar */}
-              <div className="sm:hidden fixed top-0 left-0 right-0 bg-white border-b border-gray-200 shadow-sm z-50 px-3 py-2">
+              <div className="sm:hidden fixed top-0 left-0 right-0 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 shadow-sm z-50 px-3 py-2">
                 <div className="flex items-center justify-between gap-2">
                   {/* Left: Menu Icon (placeholder - you can add menu functionality) */}
                   <button className="w-10 h-10 bg-green-600 text-white rounded-lg flex items-center justify-center active:scale-95 transition-transform">
@@ -1905,16 +1905,16 @@ const FamilyTreePage = () => {
               <div className="sm:hidden fixed bottom-[88px] left-3 z-50 flex flex-col gap-2">
                 <button
                   onClick={zoomIn}
-                  className="w-11 h-11 bg-white text-gray-700 rounded-full shadow-lg border border-gray-200 flex items-center justify-center active:scale-95 transition-transform"
+                  className="w-11 h-11 bg-white dark:bg-slate-900 text-gray-700 dark:text-slate-200 rounded-full shadow-lg border border-gray-200 dark:border-slate-700 flex items-center justify-center active:scale-95 transition-transform"
                 >
                   <FaPlus className="text-sm" />
                 </button>
-                <div className="w-11 h-11 bg-white text-gray-700 rounded-full shadow-lg border border-gray-200 flex items-center justify-center text-[10px] font-bold">
+                <div className="w-11 h-11 bg-white dark:bg-slate-900 text-gray-700 dark:text-slate-200 rounded-full shadow-lg border border-gray-200 dark:border-slate-700 flex items-center justify-center text-[10px] font-bold">
                   {Math.round(zoom * 100)}%
                 </div>
                 <button
                   onClick={zoomOut}
-                  className="w-11 h-11 bg-white text-gray-700 rounded-full shadow-lg border border-gray-200 flex items-center justify-center active:scale-95 transition-transform"
+                  className="w-11 h-11 bg-white dark:bg-slate-900 text-gray-700 dark:text-slate-200 rounded-full shadow-lg border border-gray-200 dark:border-slate-700 flex items-center justify-center active:scale-95 transition-transform"
                 >
                   <FaMinus className="text-sm" />
                 </button>
@@ -1924,14 +1924,14 @@ const FamilyTreePage = () => {
 
           {/* Desktop Header - Non Edit */}
           {!canEdit && (
-            <div className="hidden sm:flex w-full bg-white border-b-2 border-gray-100 shadow-sm z-40">
+            <div className="hidden sm:flex w-full bg-white dark:bg-slate-900 border-b-2 border-gray-100 dark:border-slate-800 shadow-sm z-40">
               <div className="w-full max-w-none 2xl:max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
                 <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-3 lg:gap-6">
                   <div className="flex items-center justify-center lg:justify-start gap-3 xl:gap-6 flex-wrap">
                     {code && code !== userInfo.familyCode && (
                       <div className="flex items-center gap-2 pr-3 border-r border-gray-300">
                         <button
-                          className="inline-flex items-center justify-center w-9 h-9 bg-gray-100 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-200 hover:border-gray-400 active:scale-95 transition-all duration-200 shadow-sm"
+                          className="inline-flex items-center justify-center w-9 h-9 bg-gray-100 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-200 hover:border-gray-400 active:scale-95 transition-all duration-200 shadow-sm dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700"
                           onClick={() => navigate(-1)}
                           title="Back"
                         >
@@ -1948,27 +1948,27 @@ const FamilyTreePage = () => {
                     )}
 
                     <div className="flex items-center gap-6 text-sm">
-                      <span className="text-gray-700">
+                      <span className="text-gray-700 dark:text-slate-200">
                         <span className="font-medium">Total:</span>{" "}
-                        <span className="font-bold text-gray-900">
+                        <span className="font-bold text-gray-900 dark:text-slate-100">
                           {stats.total}
                         </span>
                       </span>
-                      <span className="text-gray-700">
+                      <span className="text-gray-700 dark:text-slate-200">
                         <span className="font-medium">Male:</span>{" "}
-                        <span className="font-bold text-gray-900">
+                        <span className="font-bold text-gray-900 dark:text-slate-100">
                           {stats.male}
                         </span>
                       </span>
-                      <span className="text-gray-700">
+                      <span className="text-gray-700 dark:text-slate-200">
                         <span className="font-medium">Female:</span>{" "}
-                        <span className="font-bold text-gray-900">
+                        <span className="font-bold text-gray-900 dark:text-slate-100">
                           {stats.female}
                         </span>
                       </span>
-                      <span className="text-gray-700">
+                      <span className="text-gray-700 dark:text-slate-200">
                         <span className="font-medium">Generations:</span>{" "}
-                        <span className="font-bold text-gray-900">
+                        <span className="font-bold text-gray-900 dark:text-slate-100">
                           {stats.generations}
                         </span>
                       </span>
@@ -1993,21 +1993,21 @@ const FamilyTreePage = () => {
 
           {needsPlacementBanner && (
             <>
-              <div className="sm:hidden fixed top-14 left-0 right-0 z-40 bg-amber-50 border-b border-amber-200 px-3 py-2">
-                <div className="text-xs font-semibold text-amber-900">
+              <div className="sm:hidden fixed top-14 left-0 right-0 z-40 bg-amber-50 border-b border-amber-200 px-3 py-2 dark:bg-amber-900/20 dark:border-amber-800">
+                <div className="text-xs font-semibold text-amber-900 dark:text-amber-100">
                   You have joined this family, but the admin hasn’t placed you in the tree yet.
                 </div>
-                <div className="text-xs text-amber-900 mt-1">
+                <div className="text-xs text-amber-900 dark:text-amber-100 mt-1">
                   This family tree is currently shown from the family admin’s (birth family) perspective.
                 </div>
               </div>
 
-              <div className="hidden sm:block w-full bg-amber-50 border-b border-amber-200">
+              <div className="hidden sm:block w-full bg-amber-50 border-b border-amber-200 dark:bg-amber-900/20 dark:border-amber-800">
                 <div className="w-full max-w-none 2xl:max-w-7xl mx-auto px-4 sm:px-6 py-3">
-                  <div className="text-sm font-semibold text-amber-900">
+                  <div className="text-sm font-semibold text-amber-900 dark:text-amber-100">
                     You have joined this family, but the admin hasn’t placed you in the tree yet.
                   </div>
-                  <div className="text-sm text-amber-900 mt-1">
+                  <div className="text-sm text-amber-900 dark:text-amber-100 mt-1">
                     This family tree is currently shown from the family admin’s (birth family) perspective.
                   </div>
                 </div>

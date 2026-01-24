@@ -11,7 +11,7 @@ const RetailMain = ({ initialProductId, initialTab = 'products' }) => {
 
   return (
     <RetailProvider>
-      <div className="flex min-h-screen flex-col bg-gray-50">
+      <div className="flex min-h-screen flex-col bg-gray-50 dark:bg-slate-950">
         <Header activeTab={activeTab} setActiveTab={setActiveTab} />
         <main className="container mx-auto flex-1 px-4 py-4">
           {activeTab === 'products' && <ProductList initialProductId={initialProductId} />}
