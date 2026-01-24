@@ -478,29 +478,26 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
         return spouses.length > 0;
     };
 
-    // Show icon only for people with different birth family than current view (with enhanced validation)
-    const hasSpouseFamilyNavigation = () => {
-        // Check if person has a birth family code
-        if (!person.familyCode) return false;
-        
-        // Don't show icon if we're already viewing this person's birth family
-        if (code === person.familyCode) return false;
-        
-        // Don't show icon if this person's family is the logged-in user's own family
-        if (userInfo?.familyCode && person.familyCode === userInfo.familyCode) return false;
-        
-        // Show icon for anyone with a different birth family than current view
-        return true;
+    const getNavigationTargetFamilyCode = () => {
+        const currentViewFamilyCode = code || userInfo?.familyCode || '';
+        const personBirthFamilyCode = person.primaryFamilyCode || person.familyCode || '';
+
+        // Prefer explicit birth family if it differs from the currently viewed family tree
+        if (personBirthFamilyCode && personBirthFamilyCode !== currentViewFamilyCode) {
+            return personBirthFamilyCode;
+        }
+
+        return null;
     };
 
-    const hasAssociatedTree = hasSpouseFamilyNavigation();
+    const navigationTargetFamilyCode = getNavigationTargetFamilyCode();
+    const hasAssociatedTree = !!navigationTargetFamilyCode;
 
     // Enhanced handler with comprehensive family code validation
     const handleViewPersonBirthFamily = (e) => {
         e.stopPropagation();
         
-        // Get person's family code
-        const personFamilyCode = person.familyCode;
+        const personFamilyCode = navigationTargetFamilyCode;
         
         // Validation 1: Check if person has a family code
         if (!personFamilyCode) {
@@ -519,18 +516,6 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
                 icon: 'info',
                 title: 'Already Viewing',
                 text: `You are already viewing ${person.name}'s family tree.`,
-                confirmButtonColor: '#3f982c',
-            });
-            return;
-        }
-        
-        // Validation 3: Check if trying to navigate to logged-in user's own family
-        if (userInfo?.familyCode && personFamilyCode === userInfo.familyCode) {
-            console.log(` Navigation blocked: ${person.name}'s family (${personFamilyCode}) is user's own family (${userInfo.familyCode})`);
-            Swal.fire({
-                icon: 'info',
-                title: 'Your Own Family Tree',
-                text: `This is your own family tree. Use the home button to navigate to your family.`,
                 confirmButtonColor: '#3f982c',
             });
             return;
@@ -925,6 +910,14 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
                             {relationshipText}
                             {!viewOnly && ' ✏️'}
                         </div>
+                        {displayRelationshipCode && (
+                            <div
+                                className="text-center mt-1 text-gray-600 font-semibold"
+                                style={{ fontSize: `${Math.max(9, fontSizeRelationship - 3)}px` }}
+                            >
+                                {displayRelationshipCode}
+                            </div>
+                        )}
                     </div>
                 )}
 
