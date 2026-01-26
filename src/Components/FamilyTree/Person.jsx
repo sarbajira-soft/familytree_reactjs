@@ -760,6 +760,12 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
             style={{ top: `-${profileSize / 3}px` }}
           >
             <div className="relative">
+              {isRoot && (
+                <>
+                  <span aria-hidden className="ft-beat-ring ft-beat-ring--a" />
+                  <span aria-hidden className="ft-beat-ring ft-beat-ring--b" />
+                </>
+              )}
               {person.lifeStatus === "remembering" && (
                 <span
                   className="absolute -top-1 -left-1 bg-red-600 text-white text-[10px] font-semibold px-[6px] py-[1px] rounded-sm rotate-[-12deg] shadow-lg select-none z-30"
@@ -769,7 +775,7 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
                 </span>
               )}
               <div
-                className="rounded-full overflow-hidden bg-white border-4 shadow-lg dark:bg-slate-900"
+                className="relative z-20 rounded-full overflow-hidden bg-white border-4 shadow-lg dark:bg-slate-900"
                 style={{
                   width: `${profileSize}px`,
                   height: `${profileSize}px`,

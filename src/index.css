@@ -218,6 +218,62 @@
   }
 }
 
+@keyframes ftBeatRipple {
+  0% {
+    transform: translate(-50%, -50%) scale(0.88);
+    opacity: 0.9;
+    filter: blur(0px);
+  }
+  55% {
+    opacity: 0.35;
+    filter: blur(0.35px);
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.55);
+    opacity: 0;
+    filter: blur(0.8px);
+  }
+}
+
+.ft-beat-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: calc(100% + 28px);
+  height: calc(100% + 28px);
+  border-radius: 9999px;
+  pointer-events: none;
+  z-index: 0;
+  transform: translate(-50%, -50%);
+  background: transparent;
+  --ft-ring: rgba(34, 211, 238, 0.82);
+  --ft-ring-glow: rgba(34, 211, 238, 0.42);
+  border: 2px solid var(--ft-ring);
+  box-shadow:
+    0 0 0 3px rgba(255, 255, 255, 0.06),
+    0 0 16px var(--ft-ring-glow),
+    0 0 34px var(--ft-ring-glow);
+  animation: ftBeatRipple 4s ease-out infinite;
+}
+
+.ft-beat-ring--a {
+  animation-delay: 0s;
+}
+
+.ft-beat-ring--b {
+  animation-delay: 2s;
+  opacity: 0.68;
+  --ft-ring: rgba(236, 72, 153, 0.82);
+  --ft-ring-glow: rgba(236, 72, 153, 0.4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ft-beat-ring {
+    animation: none;
+    opacity: 0.55;
+  }
+}
+
 @keyframes modalHeaderGradient {
   0% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
