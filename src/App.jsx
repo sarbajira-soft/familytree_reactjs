@@ -9,7 +9,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./utils/queryClient";
 
 import { UserProvider } from "./Contexts/UserContext";
-import { LanguageProvider, useLanguage } from "./Contexts/LanguageContext";
+import { LanguageProvider } from "./Contexts/LanguageContext";
 import { FamilyTreeProvider } from "./Contexts/FamilyTreeContext";
 import { GiftEventProvider } from "./Contexts/GiftEventContext";
 import { ThemeProvider } from "./Contexts/ThemeContext";
@@ -37,9 +37,6 @@ const FamilyTreeHierarchical = lazy(() =>
 const PendingFamilyRequests = lazy(() =>
   import("./Pages/PendingFamilyRequests")
 );
-const MergeFamilyPage = lazy(() => import("./Pages/MergeFamilyPage"));
-const MergeFamilyDetailPage = lazy(() => import("./Pages/MergeFamilyDetailPage"));
-const MergeFamilyPreviewTreePage = lazy(() => import("./Pages/MergeFamilyPreviewTreePage"));
 // const PostsAndFeedsPage = lazy(() => import("./Pages/PostsAndFeedsPage"));
 const FamilyGalleryPage = lazy(() => import("./Pages/FamilyGalleryPage"));
 const GiftListingPage = lazy(() => import("./Pages/GiftListingPage"));
@@ -61,25 +58,6 @@ const LoadingFallback = () => (
     </div>
   </div>
 );
-
-// ---------------- FamilyTree Providers with Language ----------------
-const MergeFamilyDetailWithProvider = () => {
-  const { language } = useLanguage();
-  return (
-    <FamilyTreeProvider language={language}>
-      <MergeFamilyDetailPage />
-    </FamilyTreeProvider>
-  );
-};
-
-const MergeFamilyPreviewTreeWithProvider = () => {
-  const { language } = useLanguage();
-  return (
-    <FamilyTreeProvider language={language}>
-      <MergeFamilyPreviewTreePage />
-    </FamilyTreeProvider>
-  );
-};
 
 // ---------------- Admin Route ----------------
 const AdminRoute = ({ children }) => {
@@ -235,15 +213,6 @@ function App() {
                 <Route
                   path="/pending-approvals"
                   element={<PendingFamilyRequests />}
-                />
-                <Route path="/merge-family" element={<MergeFamilyPage />} />
-                <Route
-                  path="/merge-family/:id"
-                  element={<MergeFamilyDetailWithProvider />}
-                />
-                <Route
-                  path="/merge-family/:id/preview-tree"
-                  element={<MergeFamilyPreviewTreeWithProvider />}
                 />
                 {/* <Route
                   path="/posts-and-feeds"

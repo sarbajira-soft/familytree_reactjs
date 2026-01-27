@@ -17,8 +17,6 @@ import Swal from "sweetalert2";
 import { FaPlus, FaSave, FaArrowLeft, FaHome, FaMinus } from "react-icons/fa";
 import { useNavigate, useParams } from "react-router-dom";
 import { FamilyTreeProvider } from "../Contexts/FamilyTreeContext";
-import { useMergeRequests } from "../hooks/useApi";
-import { executeMerge as executeMergeApi } from "../utils/familyMergeApi";
 
 // Utility for authenticated fetch with logout on 401 or error
 const authFetch = async (url, options = {}) => {
@@ -123,78 +121,6 @@ const FamilyTreePage = () => {
   // When viewing spouse/associated families via /family-tree/:code, the viewer may not be a member
   // and should NOT be treated as a joined-but-not-placed member.
   const needsPlacementBanner = isOwnTree && !canEdit && !isCurrentUserPlacedInTree;
-
-  // Load accepted merge requests for this admin (primary family)
-  const { data: mergeRequestsResponse, isLoading: mergeRequestsLoading } =
-    useMergeRequests("accepted", !!canEdit);
-
-  const mergeRequests = Array.isArray(mergeRequestsResponse?.data)
-    ? mergeRequestsResponse.data
-    : [];
-
-  // Find the latest accepted merge request for the current family as primary
-  let pendingMerge = null;
-  if (familyCodeToUse && mergeRequests.length > 0) {
-    pendingMerge =
-      mergeRequests
-        .filter(
-          (req) =>
-            req.primaryFamilyCode === familyCodeToUse &&
-            (req.primaryStatus === "accepted" || req.status === "accepted")
-        )
-        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0] ||
-      null;
-  }
-
-  const hasPendingMerge = !!pendingMerge;
-
-  const handleExecuteMergeFromTree = useCallback(async () => {
-    if (!pendingMerge || !pendingMerge.id) {
-      await Swal.fire({
-        icon: "info",
-        title: "No Pending Merge",
-        text: "There is no accepted merge request to execute for this family.",
-      });
-      return;
-    }
-
-    const requestId = pendingMerge.id;
-    const primaryCode =
-      pendingMerge.primaryFamilyCode || familyCodeToUse || userInfo?.familyCode;
-
-    const confirmResult = await Swal.fire({
-      icon: "warning",
-      title: "Execute Merge?",
-      text: "This will apply the final merged tree to the primary family and cannot be easily undone.",
-      showCancelButton: true,
-      confirmButtonText: "Yes, execute",
-      cancelButtonText: "Cancel",
-      confirmButtonColor: "#dc2626",
-    });
-
-    if (!confirmResult.isConfirmed) return;
-
-    try {
-      await executeMergeApi(requestId);
-      await Swal.fire({
-        icon: "success",
-        title: "Merge Executed",
-        text: "Family merge executed successfully.",
-      });
-
-      if (primaryCode) {
-        navigate(`/family-tree/${primaryCode}`);
-      } else {
-        navigate("/family-tree");
-      }
-    } catch (err) {
-      await Swal.fire({
-        icon: "error",
-        title: "Execution Failed",
-        text: err?.message || "Failed to execute merge.",
-      });
-    }
-  }, [pendingMerge, familyCodeToUse, userInfo?.familyCode, navigate]);
 
   // Zoom helper functions
   const zoomIn = () => setZoom((prev) => Math.min(2, prev + 0.1));
@@ -1641,22 +1567,6 @@ const FamilyTreePage = () => {
                   <FaPlus className="text-lg" />
                 </button>
                 <button
-                  onClick={() => navigate("/merge-family")}
-                  className="w-12 h-12 bg-purple-600 text-white rounded-full shadow-lg flex items-center justify-center active:scale-95 transition-transform"
-                  title="Merge Family Tree"
-                >
-                  <span className="text-[10px] font-semibold">Merge</span>
-                </button>
-                {hasPendingMerge && (
-                  <button
-                    onClick={handleExecuteMergeFromTree}
-                    className="w-12 h-12 bg-red-600 text-white rounded-full shadow-lg flex items-center justify-center active:scale-95 transition-transform"
-                    title="Execute Pending Merge"
-                  >
-                    <span className="text-[9px] font-semibold">Execute</span>
-                  </button>
-                )}
-                <button
                   onClick={saveTreeToApi}
                   disabled={saveStatus === "loading"}
                   className="w-12 h-12 bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center active:scale-95 transition-transform disabled:opacity-60"
@@ -1792,35 +1702,6 @@ const FamilyTreePage = () => {
                           <span className="inline md:hidden">New</span>
                         </span>
                       </button>
-
-                      {/* Merge + Execute */}
-                      <div className="flex items-center gap-1">
-                        <button
-                          className="flex items-center gap-1 px-2.5 py-2 bg-purple-600 border-2 border-purple-600 text-white rounded-lg hover:bg-purple-700 text-xs font-semibold active:scale-95 transition-all duration-200 shadow-sm"
-                          onClick={() => navigate("/merge-family")}
-                        >
-                          <span className="whitespace-nowrap">
-                            <span className="hidden md:inline">
-                              Merge Family
-                            </span>
-                            <span className="inline md:hidden">Merge</span>
-                          </span>
-                        </button>
-
-                        {hasPendingMerge && (
-                          <button
-                            className="flex items-center gap-1 px-2 py-1.5 bg-red-600 border-2 border-red-600 text-white rounded-lg hover:bg-red-700 text-[11px] font-semibold active:scale-95 transition-all duration-200 shadow-sm"
-                            onClick={handleExecuteMergeFromTree}
-                          >
-                            <span className="whitespace-nowrap">
-                              <span className="hidden md:inline">
-                                Execute Merge
-                              </span>
-                              <span className="inline md:hidden">Exec</span>
-                            </span>
-                          </button>
-                        )}
-                      </div>
 
                       {/* Save */}
                       <button
