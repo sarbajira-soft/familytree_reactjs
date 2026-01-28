@@ -29,17 +29,17 @@ const CartItem = ({ item, onIncrease, onDecrease, onRemove, onViewDetails, isUpd
         />
       </button>
 
-      <div className="flex flex-1 flex-col gap-1">
+      <div className="flex flex-1 flex-col gap-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
+          <div className="min-w-0 max-w-full">
             <p
-              className="truncate text-sm font-semibold text-gray-900 cursor-pointer hover:text-blue-600"
+              className="line-clamp-2 break-words text-sm font-semibold text-gray-900 cursor-pointer hover:text-blue-600"
               onClick={onViewDetails}
             >
               {item.title}
             </p>
             {item.variant?.title && (
-              <p className="truncate text-xs text-gray-500">{item.variant.title}</p>
+              <p className="line-clamp-1 break-words text-xs text-gray-500">{item.variant.title}</p>
             )}
           </div>
           <button

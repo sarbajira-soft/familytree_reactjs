@@ -558,9 +558,23 @@ const PostPage = () => {
 
           <button
             onClick={() => setIsCreateModalOpen(true)}
-            className="flex-1 bg-gray-100 text-gray-600 rounded-full py-2 px-4 text-left text-sm hover:bg-blue-50 hover:text-blue-600 transition-all"
+             className="
+              flex-1 min-w-0
+              bg-gray-100 text-gray-600 rounded-full
+              py-2 px-3 sm:px-4
+              text-xs sm:text-sm
+              text-left truncate
+              hover:bg-blue-50 hover:text-blue-600
+              transition-all
+            "
           >
-            What&apos;s on your mind, {user.name.split("_")[0]}?
+           
+             <span className="block sm:hidden">
+              Share something…
+            </span>
+            <span className="hidden sm:block">
+              What&apos;s on your mind, {user.name.split("_")[0]}?
+            </span>
           </button>
 
           <div className="relative flex items-center gap-2">

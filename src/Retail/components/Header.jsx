@@ -1,23 +1,40 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  FiShoppingBag,
   FiShoppingCart,
   FiPackage,
   FiList,
   FiUser,
-  FiLogOut,
+  FiSearch,
 } from 'react-icons/fi';
 import { useRetail } from '../context/RetailContext';
 import { useUser } from '../../Contexts/UserContext';
 import { formatAmount } from '../utils/helpers';
 
-const Header = ({ activeTab, setActiveTab }) => {
+const Header = ({
+  activeTab,
+  setActiveTab,
+  productSearchTerm,
+  setProductSearchTerm,
+  onProductsTabClick,
+  showProductSearch,
+}) => {
   const navigate = useNavigate();
   const { logout: appLogout } = useUser();
   const { cart, cartCount, user, logout } = useRetail();
 
   const [showMiniCart, setShowMiniCart] = useState(false);
+
+  const handleProductsClick = () => {
+    if (onProductsTabClick) {
+      onProductsTabClick();
+    } else {
+      setActiveTab('products');
+    }
+  };
+
+  const shouldShowSearch =
+    typeof showProductSearch === 'boolean' ? showProductSearch : activeTab === 'products';
 
   const handleLogout = () => {
     logout();
@@ -96,19 +113,25 @@ const Header = ({ activeTab, setActiveTab }) => {
   return (
     <header className="sticky top-0 z-30 border-b border-gray-200 bg-white/90 backdrop-blur dark:bg-slate-900/90 dark:border-slate-800">
       <div className="container mx-auto px-4 py-3 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-md">
-            <FiShoppingBag />
-          </div>
-          <div>
-            <h1 className="text-base font-semibold text-gray-900 dark:text-slate-100">FamilyTree Store</h1>
-          </div>
+        <div className="flex-1 max-w-xs">
+          {shouldShowSearch && (
+            <div className="relative w-full">
+              <FiSearch className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="search"
+                value={productSearchTerm || ''}
+                onChange={(e) => setProductSearchTerm && setProductSearchTerm(e.target.value)}
+                placeholder="Search products..."
+                className="w-full rounded-full border border-gray-200 bg-white py-1.5 pl-8 pr-3 text-xs text-gray-900 shadow-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+              />
+            </div>
+          )}
         </div>
 
         <nav className="hidden md:flex items-center gap-1 text-sm font-medium">
           <button
             type="button"
-            onClick={() => setActiveTab('products')}
+            onClick={handleProductsClick}
             className={`inline-flex  items-center bg-white dark:bg-slate-900 gap-1 rounded-full px-3 py-1.5 transition-colors ${
               activeTab === 'products'
                 ? 'bg-orange-50 text-orange-600'
@@ -154,11 +177,11 @@ const Header = ({ activeTab, setActiveTab }) => {
                 : 'text-gray-600 hover:bg-gray-100 dark:text-slate-300 dark:hover:bg-slate-800'
             }`}
           >
-            <FiUser className="text-sm" /> Profile
+            <FiUser className="text-sm" /> Addresses
           </button>
         </nav>
 
-        <div className="flex items-center gap-3 relative">
+        <div className="hidden md:flex items-center gap-3 relative">
           <div
             className="relative"
             onMouseEnter={() => setShowMiniCart(true)}
@@ -178,32 +201,6 @@ const Header = ({ activeTab, setActiveTab }) => {
             </button>
             {renderMiniCart()}
           </div>
-
-          <div className="relative">
-            {user ? (
-              <div className="flex items-center gap-2">
-                <div className="hidden sm:flex flex-col items-end">
-                  <span className="text-xs font-semibold text-gray-800 dark:text-slate-100 max-w-[10rem] truncate">
-                    {user.first_name || user.first_name === ''
-                      ? `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email
-                      : user.email}
-                  </span>
-                  <span className="text-[11px] text-gray-500 dark:text-slate-400">Signed in</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  className="inline-flex h-9 items-center justify-center rounded-full bg-gray-100 px-3 text-xs font-medium text-gray-700 hover:bg-gray-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-                >
-                  <FiLogOut className="mr-1" /> Logout
-                </button>
-              </div>
-            ) : (
-              <div className="hidden sm:flex flex-col items-end">
-                <span className="text-xs font-semibold text-gray-800 dark:text-slate-100">Guest</span>
-              </div>
-            )}
-          </div>
         </div>
       </div>
 
@@ -212,9 +209,9 @@ const Header = ({ activeTab, setActiveTab }) => {
           <nav className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setActiveTab('products')}
-              className={`inline-flex items-center gap-1 rounded-full px-2 py-1 ${
-                activeTab === 'products' ? 'bg-blue-100 text-blue-700' : 'text-gray-600'
+              onClick={handleProductsClick}
+              className={`inline-flex items-center bg-white gap-1 rounded-full px-2 py-1 ${
+                activeTab === 'products' ? 'bg-secondary-100 text-secondary-600' : 'text-gray-600'
               }`}
             >
               <FiList className="text-sm" /> Products
@@ -222,8 +219,8 @@ const Header = ({ activeTab, setActiveTab }) => {
             <button
               type="button"
               onClick={() => setActiveTab('cart')}
-              className={`inline-flex items-center gap-1 rounded-full px-2 py-1 ${
-                activeTab === 'cart' ? 'bg-orange-100 text-orange-700' : 'text-gray-600'
+              className={`inline-flex items-center bg-white gap-1 rounded-full px-2 py-1 ${
+                activeTab === 'cart' ? 'bg-secondary-100 text-secondary-600' : 'text-gray-600'
               }`}
             >
               <FiShoppingCart className="text-sm" /> Cart
@@ -236,8 +233,8 @@ const Header = ({ activeTab, setActiveTab }) => {
             <button
               type="button"
               onClick={() => setActiveTab('orders')}
-              className={`inline-flex items-center gap-1 rounded-full px-2 py-1 ${
-                activeTab === 'orders' ? 'bg-blue-100 text-blue-700' : 'text-gray-600'
+              className={`inline-flex items-center gap-1 bg-white rounded-full px-2 py-1 ${
+                activeTab === 'orders' ? 'bg-secondary-100 text-secondary-600' : 'text-gray-600'
               }`}
             >
               <FiPackage className="text-sm" /> Orders
@@ -245,20 +242,13 @@ const Header = ({ activeTab, setActiveTab }) => {
             <button
               type="button"
               onClick={() => setActiveTab('profile')}
-              className={`inline-flex items-center gap-1 rounded-full px-2 py-1 ${
-                activeTab === 'profile' ? 'bg-blue-100 text-blue-700' : 'text-gray-600'
+              className={`inline-flex items-center bg-white  gap-1 rounded-full px-2 py-1 ${
+                activeTab === 'profile' ? 'bg-secondary-100 text-secondary-600' : 'text-gray-600'
               }`}
             >
-              <FiUser className="text-sm" /> Profile
+              <FiUser className="text-sm" /> Address
             </button>
           </nav>
-
-          <div className="flex items-center gap-1 text-gray-500">
-            <FiUser className="text-sm" />
-            <span className="truncate max-w-[8rem]">
-              {user ? user.email : 'Guest'}
-            </span>
-          </div>
         </div>
       </div>
     </header>

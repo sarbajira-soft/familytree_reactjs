@@ -123,7 +123,7 @@ const ProductCard = ({ product, onViewDetails, onAddToCart }) => {
             </p>
           )
         )}
-        <div className="mt-1.5 flex items-center justify-between">
+        <div className="mt-1.5 flex flex-col items-start gap-1.5 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm font-bold text-blue-600">{formatAmount(priceAmount)}</p>
           <button
             type="button"
@@ -132,7 +132,7 @@ const ProductCard = ({ product, onViewDetails, onAddToCart }) => {
               e.stopPropagation();
               handleAddToCart();
             }}
-            className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-[11px] font-semibold shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed ${
+            className={`flex items-center justify-center gap-1 rounded-full px-3 py-1.5 text-[11px] font-semibold shadow-sm transition w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed ${
               inStock
                 ? 'bg-orange-500 text-white hover:bg-orange-600'
                 : 'bg-gray-100 text-gray-400 cursor-not-allowed'

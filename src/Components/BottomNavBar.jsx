@@ -31,7 +31,7 @@ const BottomNavBar = ({ activeTab, setActiveTab }) => {
       id: "familyTree",
       label: "Family",
       path: "/family-tree",
-      icon: <RiGitMergeLine size={19} />,
+      icon: <RiGitMergeLine size={20} />,
     },
     {
       id: "gifts",
