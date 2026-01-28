@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { FiAlertCircle, FiFilter, FiLoader, FiSearch } from 'react-icons/fi';
+import { FiAlertCircle, FiLoader } from 'react-icons/fi';
 import { useRetail } from '../context/RetailContext';
 import ProductCard from './ProductCard';
 import ProductDetail from './ProductDetail';
@@ -7,10 +7,9 @@ import { getVariantPriceAmount } from '../utils/helpers';
 import { ArrowLeft } from 'lucide-react';
 import * as productService from '../services/productService';
 
-const ProductList = ({ initialProductId }) => {
+const ProductList = ({ initialProductId, searchTerm, setSearchTerm, onDetailOpenChange }) => {
   const { products, fetchProducts, loading, error, addToCart, token } = useRetail();
 
-  const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('featured');
   const [collectionFilter, setCollectionFilter] = useState('all');
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -34,6 +33,7 @@ const ProductList = ({ initialProductId }) => {
         if (!cancelled && product) {
           setSelectedProduct(product);
           setDetailOpen(true);
+          onDetailOpenChange && onDetailOpenChange(true);
           setInitialSelectionDone(true);
           setInitialDetailLoading(false);
           return;
@@ -120,6 +120,7 @@ const ProductList = ({ initialProductId }) => {
   const handleViewDetails = (product) => {
     setSelectedProduct(product);
     setDetailOpen(true);
+    onDetailOpenChange && onDetailOpenChange(true);
   };
 
   const handleAddToCart = async (variantId, quantity) => {
@@ -130,63 +131,6 @@ const ProductList = ({ initialProductId }) => {
 
   return (
     <section aria-label="Products">
-      <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900">Browse products</h2>
-          <p className="text-xs text-gray-500">Search, filter, and sort Medusa products.</p>
-        </div>
-
-        <div className="flex flex-col gap-2 md:flex-row md:items-center">
-          <div className="relative w-full md:w-64">
-            <FiSearch className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="search"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search products..."
-              className="w-full rounded-full border border-gray-200 bg-white py-1.5 pl-8 pr-3 text-xs text-gray-900 shadow-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
-            />
-          </div>
-
-          <div className="flex gap-2 text-xs">
-            <div className="relative">
-              <FiFilter className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
-              <select
-                value={collectionFilter}
-                onChange={(e) => setCollectionFilter(e.target.value)}
-                className="w-32 appearance-none rounded-full border border-gray-200 bg-white py-1.5 pl-7 pr-6 text-[11px] text-gray-700 shadow-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
-              >
-                <option value="all">All collections</option>
-                {collections.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-              <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-500">
-                
-              </span>
-            </div>
-
-            <div className="relative">
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="w-32 appearance-none rounded-full border border-gray-200 bg-white py-1.5 pl-3 pr-6 text-[11px] text-gray-700 shadow-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
-              >
-                <option value="featured">Featured</option>
-                <option value="price-low">Price: Low to High</option>
-                <option value="price-high">Price: High to Low</option>
-                <option value="name">Name</option>
-                <option value="newest">Newest</option>
-              </select>
-              <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-500">
-                
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
 
       {error && !loading && (
         <div className="mb-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
@@ -203,7 +147,7 @@ const ProductList = ({ initialProductId }) => {
       )}
 
       {showSkeleton && !detailOpen && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {Array.from({ length: 8 }).map((_, idx) => (
             <div
               key={idx}
@@ -219,7 +163,7 @@ const ProductList = ({ initialProductId }) => {
       )}
 
       {!showSkeleton && filteredProducts.length > 0 && !detailOpen && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {filteredProducts.map((product) => (
             <ProductCard
               key={product.id}
@@ -238,6 +182,7 @@ const ProductList = ({ initialProductId }) => {
             onClick={() => {
               setDetailOpen(false);
               setSelectedProduct(null);
+              onDetailOpenChange && onDetailOpenChange(false);
             }}
             className="inline-flex bg-white items-center rounded-full border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:border-blue-400 hover:text-blue-700"
           >
@@ -251,6 +196,7 @@ const ProductList = ({ initialProductId }) => {
             onClose={() => {
               setDetailOpen(false);
               setSelectedProduct(null);
+              onDetailOpenChange && onDetailOpenChange(false);
             }}
             onAddToCart={handleAddToCart}
             mode="page"

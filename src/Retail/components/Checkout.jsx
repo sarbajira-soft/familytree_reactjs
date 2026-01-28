@@ -14,7 +14,7 @@ import {
 } from 'react-icons/fi';
 import { useRetail } from '../context/RetailContext';
 import { useGiftEvent } from '../../Contexts/GiftEventContext';
-import { formatAmount, getErrorMessage } from '../utils/helpers';
+import { formatAmount, getErrorMessage, calculateCartTotals } from '../utils/helpers';
 import { MEDUSA_BASE_URL, MEDUSA_PUBLISHABLE_KEY } from '../utils/constants';
 import * as cartService from '../services/cartService';
 
@@ -82,6 +82,8 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
   const [completedOrder, setCompletedOrder] = useState(null);
   const [showGiftAddressConfirm, setShowGiftAddressConfirm] = useState(false);
   const [giftAddressSuggestion, setGiftAddressSuggestion] = useState(null);
+
+  const displayTotals = completedOrder ? calculateCartTotals(completedOrder) : totals;
   const [giftAddressLoading, setGiftAddressLoading] = useState(false);
 
   const savedAddresses = Array.isArray(user?.addresses) ? user.addresses : [];
@@ -220,12 +222,13 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
     }
 
     let cancelled = false;
+    const mode = paymentMethod || undefined;
 
     const loadShippingOptions = async () => {
       setShippingLoading(true);
       setError(null);
       try {
-        const fetched = await getShippingOptionsForCart(paymentMethod);
+          const fetched = await getShippingOptionsForCart(mode);
         if (cancelled) return;
         setShippingOptions(fetched);
         if (fetched && fetched.length > 0) {
@@ -762,7 +765,10 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
       )}
 
       <div className="grid gap-4 md:grid-cols-[minmax(0,2fr)_minmax(0,1.1fr)]">
-        <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+        <form
+          onSubmit={handleSubmit}
+          className="order-2 md:order-1 space-y-4 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm"
+        >
           <div className="flex items-center justify-between border-b border-gray-100 pb-2 text-sm font-semibold text-gray-900">
             <div className="flex items-center gap-2">
               <FiMapPin className="text-blue-500" />
@@ -1187,27 +1193,27 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
           )}
         </form>
 
-        <aside className="flex flex-col gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+        <aside className="order-1 md:order-2 flex flex-col gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
           <h3 className="text-sm font-semibold text-gray-900">Order summary</h3>
           <div className="space-y-1 text-xs text-gray-600">
             <div className="flex items-center justify-between">
               <span>Items total</span>
-              <span className="font-medium text-gray-900">{formatAmount(totals.subtotal)}</span>
+              <span className="font-medium text-gray-900">{formatAmount(displayTotals.subtotal)}</span>
             </div>
             <div className="flex items-center justify-between">
               <span>GST (included)</span>
-              <span className="font-medium text-gray-900">{formatAmount(totals.tax)}</span>
+              <span className="font-medium text-gray-900">{formatAmount(displayTotals.tax)}</span>
             </div>
             <div className="flex items-center justify-between">
               <span>Shipping</span>
               <span className="font-medium text-gray-900">
-                {totals.shipping > 0 ? formatAmount(totals.shipping) : 'Calculated above'}
+                {displayTotals.shipping > 0 ? formatAmount(displayTotals.shipping) : 'Calculated above'}
               </span>
             </div>
             <div className="mt-1 border-t border-gray-100 pt-2 text-sm font-semibold text-gray-900">
               <div className="flex items-center justify-between">
                 <span>Total</span>
-                <span>{formatAmount(totals.total)}</span>
+                <span>{formatAmount(displayTotals.total)}</span>
               </div>
             </div>
           </div>

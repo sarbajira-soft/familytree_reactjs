@@ -378,8 +378,8 @@ const EventsPage = () => {
         <div className="max-w-7xl mx-auto px-4 py-8 md:px-6 lg:px-8 space-y-5">
           {/* Header Section */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-            {/* Left Block */}
-            <div className="flex flex-col w-full sm:w-auto">
+            {/* Left Block - hidden on mobile to keep header compact */}
+            <div className="hidden sm:flex sm:flex-col w-full sm:w-auto">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 sm:w-12 sm:h-12 bg-[#1976D2] rounded-lg flex items-center justify-center">
                   <FiCalendar size={22} className="text-white" />

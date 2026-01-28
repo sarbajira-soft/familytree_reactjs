@@ -549,30 +549,15 @@ export const RetailProvider = ({ children }) => {
       try {
         const cart = await ensureCart();
 
-        // Persist the user's chosen payment mode (cod/online) onto the cart
-        // context so that when the order is created, the backend can infer
-        // the correct Shiprocket payment_method.
-        if (paymentMode) {
-          const existingContext =
-            cart && cart.context && typeof cart.context === 'object'
-              ? cart.context
-              : {};
+        // If the cart doesn't yet have a shipping postal_code, Shiprocket
+        // can't calculate rates. This happens, for example, right after we
+        // create a fresh cart following a successful order. In that case,
+        // skip calling the backend rates endpoint to avoid spurious errors.
+        const shippingAddress =
+          (cart && (cart.shipping_address || cart.shippingAddress)) || null;
 
-          try {
-            await cartService.updateCart({
-              cartId: cart.id,
-              body: {
-                context: {
-                  ...existingContext,
-                  payment_type: paymentMode,
-                },
-              },
-              token: state.token || null,
-            });
-          } catch {
-            // Non-fatal: failing to persist context should not block
-            // fetching shipping options.
-          }
+        if (!shippingAddress || !shippingAddress.postal_code) {
+          return [];
         }
 
         const options = await cartService.getShippingOptions(
@@ -639,16 +624,60 @@ export const RetailProvider = ({ children }) => {
 
         // 3. Attach the selected shipping method directly, using dynamic
         // Shiprocket amount (if present) via the custom backend route.
-        const updatedWithShippingMethod = await cartService.addShippingMethod({
-          cartId: updatedWithBilling.id,
-          optionId: shippingMethodId,
-          data: shippingMeta || {},
-          token: state.token || null,
-        });
+        // To avoid double-charging shipping when restarting checkout we
+        // reuse an existing method only when BOTH:
+        //  - it uses the same shipping option id, and
+        //  - its Shiprocket amount (if any) matches the requested one.
+        const existingMethods = Array.isArray(updatedWithBilling.shipping_methods)
+          ? updatedWithBilling.shipping_methods
+          : Array.isArray(updatedWithBilling.shippingMethods)
+          ? updatedWithBilling.shippingMethods
+          : [];
+
+        const existingMethod = existingMethods[0] || null;
+
+        const existingOptionId =
+          existingMethod?.shipping_option_id ||
+          existingMethod?.shipping_option?.id ||
+          existingMethod?.shippingOption?.id ||
+          null;
+
+        const existingData =
+          (existingMethod && (existingMethod.data || existingMethod.metadata)) || {};
+
+        const existingShiprocketAmount =
+          typeof existingData.shiprocket_amount === 'number' &&
+          !Number.isNaN(existingData.shiprocket_amount)
+            ? existingData.shiprocket_amount
+            : null;
+
+        const requestedShiprocketAmount =
+          shippingMeta &&
+          typeof shippingMeta.shiprocket_amount === 'number' &&
+          !Number.isNaN(shippingMeta.shiprocket_amount)
+            ? shippingMeta.shiprocket_amount
+            : null;
+
+        const canReuseExisting =
+          existingOptionId &&
+          existingOptionId === shippingMethodId &&
+          (requestedShiprocketAmount == null ||
+            (existingShiprocketAmount != null &&
+              existingShiprocketAmount === requestedShiprocketAmount));
+
+        const cartWithShipping =
+          canReuseExisting
+            ? updatedWithBilling
+            : await cartService.addShippingMethod({
+                cartId: updatedWithBilling.id,
+                optionId: shippingMethodId,
+                data: shippingMeta || {},
+                token: state.token || null,
+              });
 
         // 4. Create payment collection for this cart
         const paymentCollection = await cartService.createPaymentCollection(
-          updatedWithShippingMethod.id,
+          cartWithShipping.id,
           state.token || null,
         );
 
@@ -660,7 +689,7 @@ export const RetailProvider = ({ children }) => {
         });
 
         // 6. Complete cart to create the order
-        const order = await cartService.completeCart(updatedWithShippingMethod.id, state.token || null);
+        const order = await cartService.completeCart(cartWithShipping.id, state.token || null);
 
         await fetchOrders();
 
@@ -701,17 +730,57 @@ export const RetailProvider = ({ children }) => {
           token: state.token || null,
         });
 
-        const updatedWithShippingMethod = await cartService.addShippingMethod({
-          cartId: updatedWithBilling.id,
-          optionId: shippingMethodId,
-          data: shippingMeta || {},
-          token: state.token || null,
-        });
+        const existingMethods = Array.isArray(updatedWithBilling.shipping_methods)
+          ? updatedWithBilling.shipping_methods
+          : Array.isArray(updatedWithBilling.shippingMethods)
+          ? updatedWithBilling.shippingMethods
+          : [];
 
-        setCartPersistent(updatedWithShippingMethod);
+        const existingMethod = existingMethods[0] || null;
+
+        const existingOptionId =
+          existingMethod?.shipping_option_id ||
+          existingMethod?.shipping_option?.id ||
+          existingMethod?.shippingOption?.id ||
+          null;
+
+        const existingData =
+          (existingMethod && (existingMethod.data || existingMethod.metadata)) || {};
+
+        const existingShiprocketAmount =
+          typeof existingData.shiprocket_amount === 'number' &&
+          !Number.isNaN(existingData.shiprocket_amount)
+            ? existingData.shiprocket_amount
+            : null;
+
+        const requestedShiprocketAmount =
+          shippingMeta &&
+          typeof shippingMeta.shiprocket_amount === 'number' &&
+          !Number.isNaN(shippingMeta.shiprocket_amount)
+            ? shippingMeta.shiprocket_amount
+            : null;
+
+        const canReuseExisting =
+          existingOptionId &&
+          existingOptionId === shippingMethodId &&
+          (requestedShiprocketAmount == null ||
+            (existingShiprocketAmount != null &&
+              existingShiprocketAmount === requestedShiprocketAmount));
+
+        const cartWithShipping =
+          canReuseExisting
+            ? updatedWithBilling
+            : await cartService.addShippingMethod({
+                cartId: updatedWithBilling.id,
+                optionId: shippingMethodId,
+                data: shippingMeta || {},
+                token: state.token || null,
+              });
+
+        setCartPersistent(cartWithShipping);
 
         const paymentCollection = await cartService.createPaymentCollection(
-          updatedWithShippingMethod.id,
+          cartWithShipping.id,
           state.token || null,
         );
 
@@ -733,7 +802,7 @@ export const RetailProvider = ({ children }) => {
         const primarySession = sessionsArray[0] || null;
 
         return {
-          cartId: updatedWithShippingMethod.id,
+          cartId: cartWithShipping.id,
           paymentCollectionId: collection.id,
           razorpaySession: primarySession?.data || {},
         };

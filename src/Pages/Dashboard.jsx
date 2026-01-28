@@ -576,71 +576,17 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
     <>
       <div className="max-w-7xl mx-auto px-3 sm:px-5 py-4 pt-2 space-y-5">
         {/* Header */}
-        {/* <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center">
-          <div>
-            <h1 className="text-md sm:text-2xl font-bold text-gray-900">
-              Your Family Hub
-            </h1>
-            <p className="text-gray-600 mt-1 text-sm sm:text-base">
-              Welcome, {userInfo?.firstName || "User"}{" "}
-              {userInfo?.lastName || ""}!
-            </p>
-          </div>
-        </div> */}
+       
 
-        {/* Cards Section */}
-        {/* <div className="hidden lg:grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-5">
-          {dashboardCards.map((card) => (
-            <div
-              key={card.name}
-              onClick={card.onClick}
-              className="relative bg-white rounded-xl border border-gray-200 shadow-sm 
-                 flex items-center p-1 sm:p-2 gap-3 cursor-pointer group 
-                 hover:shadow-md hover:scale-[1.02] transition-all duration-300"
-            >
-              <div
-                className="absolute inset-0 bg-primary-50 opacity-0 group-hover:opacity-100 
-                      transition-opacity rounded-xl"
-              ></div>
-
-              <div className="relative z-10 ml-5 flex items-center justify-center">
-                <div
-                  className="flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 
-                        rounded-lg bg-primary-700 text-white shadow-sm 
-                        group-hover:bg-secondary-500 transition-all duration-300"
-                >
-                  {card.icon}
-                </div>
-
-                <span
-                  className="absolute -top-1 -right-2 bg-secondary-500 text-white text-[10px] 
-                         rounded-full w-5 h-5 flex items-center justify-center 
-                         font-semibold shadow-sm group-hover:scale-110 
-                         transition-transform duration-300"
-                >
-                  {card.count}
-                </span>
-              </div>
-
-              <div className="flex flex-col ml-10 justify-center z-10">
-                <h3
-                  className="text-gray-800 font-semibold text-sm sm:text-base 
-                      group-hover:text-blue-600 transition-colors"
-                >
-                  {card.name}
-                </h3>
-              </div>
-            </div>
-          ))}
-        </div> */}
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6">
+         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 pb-8">
           <div className="lg:col-span-8 space-y-3">
             {/* Posts Section */}
             <div className="bg-white rounded-xl shadow-md p-2 sm:p-3 border border-gray-100">
               <PostPage />
             </div>
           </div>
+
+         <div className="hidden lg:block space-y-4 lg:col-span-4">
 
           <div className="space-y-4 lg:col-span-4">
             <div className="bg-white rounded-xl shadow-sm p-3 border border-gray-100">
@@ -967,6 +913,7 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
               </button>
             </div>
           </div>
+         </div>
         </div>
 
         {/* Modals */}
