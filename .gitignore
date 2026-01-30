@@ -12,3 +12,21 @@ yarn-error.log*
 coverage/
 *.local
 *.cache 
+
+# Capacitor
+.capacitor/
+
+# Android build outputs
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/captures/
+
+# Android Studio
+android/.idea/
+*.iml
+
+# Signing keys (important)
+*.jks
+*.keystore

@@ -255,7 +255,13 @@ const Layout = ({ noScroll = false }) => {
   }
 
   return (
-    <div className="h-screen bg-gray-50 text-gray-800 dark:bg-slate-950 dark:text-slate-100">
+    <div
+      className="h-screen bg-gray-50 text-gray-800 dark:bg-slate-950 dark:text-slate-100"
+      style={{
+        paddingTop:
+          "var(--safe-area-inset-top, env(safe-area-inset-top, 0px))",
+      }}
+    >
       <main className="h-full flex flex-col overflow-hidden">
         {/* Header */}
         <header className="bg-white border-b border-gray-100 px-4 lg:px-6 sticky top-0 z-50 shadow-md dark:bg-slate-900 dark:border-slate-800">

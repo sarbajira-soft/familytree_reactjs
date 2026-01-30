@@ -762,133 +762,146 @@ const ProfilePage = () => {
           </div>
         ) : (
           user && (
-            <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8 flex flex-col md:flex-row items-center gap-8 border border-gray-100">
-              <div className="flex-shrink-0">
-                <div className="flex flex-col items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={handleProfilePhotoClick}
-                    className="rounded-full focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-opacity-75"
-                    title="Change profile photo"
-                  >
-                    <img
-                      src={user.profileImage}
-                      alt="Profile"
-                      className="w-32 h-32 md:w-40 md:h-40 rounded-full object-cover border-4 border-primary-400 shadow-lg cursor-pointer"
-                    />
-                  </button>
+            <div className="bg-gradient-to-r from-primary-600 via-primary-500 to-primary-300 rounded-2xl shadow-xl p-[1px]">
+              <div className="relative rounded-2xl bg-white overflow-hidden">
+                <div className="h-20 md:h-24 bg-gradient-to-r from-primary-600 via-primary-500 to-primary-300" />
+                <div className="px-4 pb-4 md:px-8 md:pb-6">
+                  <div className="flex flex-col md:flex-row items-center md:items-start gap-4 md:gap-6 -mt-10 md:-mt-12">
+                    <div className="flex-shrink-0">
+                      <div className="flex flex-col items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={handleProfilePhotoClick}
+                          className="rounded-full focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-opacity-75"
+                          title="Change profile photo"
+                        >
+                          <img
+                            src={user.profileImage}
+                            alt="Profile"
+                            className="w-24 h-24 md:w-28 md:h-28 rounded-full object-cover border-4 border-white shadow-xl cursor-pointer"
+                          />
+                        </button>
 
-                  <input
-                    ref={profileFileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleProfilePhotoSelected}
-                    className="hidden"
-                  />
-                </div>
-              </div>
-              <div className="flex-grow text-center md:text-left">
-                <div className="flex flex-col md:flex-row items-center md:justify-between mb-3 gap-2">
-                  <div>
-                    <h1 className="text-3xl font-extrabold text-gray-900 leading-tight">
-                      {user.name}
-                    </h1>
-                    {user.familyCode && (
-                      <div className="flex items-center justify-center md:justify-start gap-2 mt-1">
-                        <span className="text-xs font-medium bg-gray-100 text-gray-600 px-2 py-1 rounded-md">
-                          Family Code: {user.familyCode}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <label className="flex items-center gap-2 text-sm text-gray-700 select-none">
-                      <FiSettings size={18} />
-                      <span className="font-medium">Private Account</span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          privacyMutation.mutate(!Boolean(userInfo?.isPrivate))
-                        }
-                        disabled={
-                          privacyMutation.isPending ||
-                          !token ||
-                          typeof userInfo?.isPrivate !== 'boolean'
-                        }
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-opacity-75 ${
-                          userInfo?.isPrivate ? 'bg-primary-600' : 'bg-gray-300'
-                        } ${
-                          privacyMutation.isPending || !token
-                            ? 'opacity-60 cursor-not-allowed'
-                            : 'cursor-pointer'
-                        }`}
-                        aria-pressed={Boolean(userInfo?.isPrivate)}
-                      >
-                        <span
-                          className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
-                            userInfo?.isPrivate
-                              ? 'translate-x-5'
-                              : 'translate-x-1'
-                          }`}
+                        <input
+                          ref={profileFileInputRef}
+                          type="file"
+                          accept="image/*"
+                          onChange={handleProfilePhotoSelected}
+                          className="hidden"
                         />
-                      </button>
-                    </label>
-
-                    <button
-                      onClick={handleEditProfileClick}
-                      className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-5 py-2.5 rounded-xl shadow-lg hover:bg-secondary-700 transition duration-300 flex items-center gap-2 font-medium text-sm md:text-base focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-opacity-75"
-                    >
-                      <FiEdit3 size={18} /> Edit Profile
-                    </button>
-                  </div>
-                </div>
-
-                <div className="text-gray-800 leading-relaxed text-sm md:text-base whitespace-pre-wrap">
-                  <p className={isBioExpanded ? "" : "line-clamp-2"}>
-                    {user.bio}
-                  </p>
-                  {user.bio.length > 100 && (
-                    <button
-                      onClick={toggleBioExpanded}
-                      className="inline-flex items-center gap-1 mt-2 px-3 py-1.5 bg-primary-600 text-white text-xs font-medium rounded-full shadow hover:bg-primary-700 transition"
-                    >
-                      {isBioExpanded ? "See Less" : "See More"}
-                    </button>
-                  )}
-                </div>
-
-                {(user.contactNumber || user.email) && (
-                  <div className="mt-4 pt-4 border-t border-gray-100">
-                    <div className="flex flex-col sm:flex-row gap-4">
-                      {user.contactNumber && (
-                        <div className="flex items-center gap-2 text-gray-700 text-sm">
-                          <Phone size={16} className="text-gray-500" />
-                          <span>{user.contactNumber}</span>
-                        </div>
-                      )}
-                      {user.email && (
-                        <div className="flex items-center gap-2 text-gray-700 text-sm">
-                          <Mail size={16} className="text-gray-500" />
-                          <span>{user.email}</span>
-                        </div>
-                      )}
+                      </div>
                     </div>
-                  </div>
-                )}
-                <div className="flex justify-center md:justify-start gap-8 mt-5 pt-4 border-t border-gray-100">
-                  <div className="text-center">
-                    <span className="block font-bold text-xl md:text-2xl text-gray-900">
-                      {user.postsCount}
-                    </span>
-                    <span className="block text-sm text-gray-500">Posts</span>
-                  </div>
-                  <div className="text-center">
-                    <span className="block font-bold text-xl md:text-2xl text-gray-900">
-                      {user.galleryCount}
-                    </span>
-                    <span className="block text-sm text-gray-500">
-                      Galleries
-                    </span>
+
+                    <div className="flex-grow w-full md:grid md:grid-cols-[minmax(0,1.7fr)_minmax(0,1.3fr)] md:gap-6 items-start">
+                      <div className="text-center md:text-left space-y-1 w-full">
+                        <h1 className="text-2xl md:text-3xl font-extrabold text-gray-900 leading-tight">
+                          {user.name}
+                        </h1>
+                        {user.familyCode && (
+                          <div className="flex items-center justify-center md:justify-start gap-2 mt-1">
+                            <span className="inline-flex items-center rounded-full bg-gray-50 px-3 py-1 text-[11px] font-medium text-gray-600 ring-1 ring-gray-200">
+                              Family Code: {user.familyCode}
+                            </span>
+                          </div>
+                        )}
+
+                        <div className="mt-1 text-xs leading-relaxed text-gray-700 md:text-sm whitespace-pre-wrap">
+                          <p className={isBioExpanded ? '' : 'line-clamp-2'}>
+                            {user.bio}
+                          </p>
+                          {user.bio.length > 100 && (
+                            <button
+                              onClick={toggleBioExpanded}
+                              className="mt-2 inline-flex items-center gap-1 rounded-full bg-primary-600 px-3 py-1 text-[11px] font-medium text-white shadow hover:bg-primary-700"
+                            >
+                              {isBioExpanded ? 'See less' : 'See more'}
+                            </button>
+                          )}
+                        </div>
+
+                        {(user.contactNumber || user.email) && (
+                          <div className="mt-2 flex flex-wrap items-center justify-center gap-3 text-xs text-gray-700 md:justify-start">
+                            {user.contactNumber && (
+                              <div className="flex items-center gap-2">
+                                <Phone size={16} className="text-gray-500" />
+                                <span>{user.contactNumber}</span>
+                              </div>
+                            )}
+                            {user.email && (
+                              <div className="flex items-center gap-2">
+                                <Mail size={16} className="text-gray-500" />
+                                <span>{user.email}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="mt-3 md:mt-0 flex flex-col items-center md:items-end gap-3 w-full">
+                        <div className="flex w-full flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-3">
+                          <label className="inline-flex items-center justify-between gap-2 rounded-full bg-gray-50 px-3 py-1.5 text-[11px] text-gray-700 sm:bg-transparent sm:px-0">
+                            <span className="flex items-center gap-1.5">
+                              <FiSettings size={16} className="text-gray-500" />
+                              <span className="font-medium">Private account</span>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                privacyMutation.mutate(!Boolean(userInfo?.isPrivate))
+                              }
+                              disabled={
+                                privacyMutation.isPending ||
+                                !token ||
+                                typeof userInfo?.isPrivate !== 'boolean'
+                              }
+                              className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-opacity-75 ${
+                                userInfo?.isPrivate ? 'bg-primary-600' : 'bg-gray-300'
+                              } ${
+                                privacyMutation.isPending || !token
+                                  ? 'opacity-60 cursor-not-allowed'
+                                  : 'cursor-pointer'
+                              }`}
+                              aria-pressed={Boolean(userInfo?.isPrivate)}
+                            >
+                              <span
+                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                  userInfo?.isPrivate
+                                    ? 'translate-x-5'
+                                    : 'translate-x-1'
+                                }`}
+                              />
+                            </button>
+                          </label>
+
+                          <button
+                            onClick={handleEditProfileClick}
+                            className="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-orange-500 to-orange-600 px-4 py-1.5 text-xs font-semibold text-white shadow-md hover:shadow-lg hover:brightness-105 focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-opacity-75 md:text-sm md:px-5 md:py-2"
+                          >
+                            <FiEdit3 size={16} />
+                            <span>Edit profile</span>
+                          </button>
+                        </div>
+
+                        <div className="flex justify-center gap-8 md:gap-10">
+                          <div className="text-center">
+                            <span className="block text-xl font-bold text-gray-900 md:text-2xl">
+                              {user.postsCount}
+                            </span>
+                            <span className="block text-xs font-medium uppercase tracking-wide text-gray-500">
+                              Posts
+                            </span>
+                          </div>
+                          <div className="text-center">
+                            <span className="block text-xl font-bold text-gray-900 md:text-2xl">
+                              {user.galleryCount}
+                            </span>
+                            <span className="block text-xs font-medium uppercase tracking-wide text-gray-500">
+                              Galleries
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
