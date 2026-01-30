@@ -54,7 +54,7 @@ const Orders = () => {
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-base font-semibold text-gray-900">Order history</h2>
-          <p className="text-xs text-gray-500">Track your past purchases and reorder items.</p>
+          <p className="hidden text-xs text-gray-500 md:block">Track your past purchases and reorder items.</p>
         </div>
 
         <div className="flex items-center gap-2 text-xs">

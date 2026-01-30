@@ -3,6 +3,32 @@ import PhoneInput from 'react-phone-input-2';
 import Swal from 'sweetalert2';
 import { useUser } from '../Contexts/UserContext';
 
+const INDIAN_RELIGIONS = [
+  'Hindu',
+  'Muslim',
+  'Christian',
+  'Sikh',
+  'Buddhist',
+  'Jain',
+  'Zoroastrian (Parsi)',
+];
+
+const INDIAN_LANGUAGES = [
+  'Tamil',
+  'Hindi',
+  'Telugu',
+  'Malayalam',
+  'Kannada',
+  'Marathi',
+  'Gujarati',
+  'Bengali',
+  'Punjabi',
+  'Urdu',
+  'Odia',
+  'Assamese',
+  'English',
+];
+
 const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode = 'add', memberData = {} }) => {
   const mobileRef = useRef(null);
   const profileFileInputRef = useRef(null);
@@ -29,6 +55,12 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
     
     // Contact Information
     address: '',
+    addressLine1: '',
+    addressLine2: '',
+    city: '',
+    state: '',
+    pincode: '',
+    country: 'India',
     
     // Family Information
     maritalStatus: '',
@@ -181,6 +213,12 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
             ''
           );
 
+          const addressString = sourceDataRaw.address || '';
+          const addressParts = addressString
+            ? addressString.split(',').map((p) => p.trim()).filter(Boolean)
+            : [];
+          const [addressLine1 = '', addressLine2 = '', city = '', state = '', pincode = '', country = ''] = addressParts;
+
           const newFormData = {
             ...initialFormData,
             ...sourceDataRaw,
@@ -192,7 +230,13 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
             firstName: sourceDataRaw.firstName || '',
             lastName: sourceDataRaw.lastName || '',
             gender: sourceDataRaw.gender || '',
-            address: sourceDataRaw.address || '',
+            address: addressString,
+            addressLine1,
+            addressLine2,
+            city,
+            state,
+            pincode,
+            country: country || 'India',
             maritalStatus: sourceDataRaw.maritalStatus || '',
             spouseName: sourceDataRaw.spouseName || '',
             fatherName: sourceDataRaw.fatherName || '',
@@ -307,9 +351,13 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
       const religions = responses[1]?.data || responses[1] || [];
       const gothrams = responses[2]?.data || responses[2] || [];
 
+      // Add fallback Indian religions and languages when API lists are empty
+      const fallbackLanguages = INDIAN_LANGUAGES.map((lang) => ({ id: lang, name: lang }));
+      const fallbackReligions = INDIAN_RELIGIONS.map((rel) => ({ id: rel, name: rel }));
+
       setDropdownData({
-        languages,
-        religions,
+        languages: languages.length > 0 ? languages : fallbackLanguages,
+        religions: religions.length > 0 ? religions : fallbackReligions,
         gothrams,
         loading: false,
         error: null
@@ -364,6 +412,11 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
     const newErrors = {};
 
     const textNameRegex = /^[A-Za-z][A-Za-z ]*$/;
+    const selectedRelFromApi = dropdownData.religions.find(
+      (r) => String(r.id) === String(formData.religionId)
+    );
+    const selectedReligionName = selectedRelFromApi?.name || String(formData.religionId || '');
+    const isHinduReligion = /hindu/i.test(selectedReligionName);
 
     // Account Information Validation
     if (!formData.email.trim()) {
@@ -417,7 +470,11 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
       newErrors.caste = "Caste can contain only letters and spaces";
     }
 
-    if (String(formData.kuladevata || '').trim() && !textNameRegex.test(String(formData.kuladevata || '').trim())) {
+    if (
+      isHinduReligion &&
+      String(formData.kuladevata || '').trim() &&
+      !textNameRegex.test(String(formData.kuladevata || '').trim())
+    ) {
       newErrors.kuladevata = "Kuladevata can contain only letters and spaces";
     }
 
@@ -433,7 +490,7 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
       newErrors.languageOther = 'Please enter mother tongue';
     }
 
-    if (formData.gothramId === 'other' && !String(formData.gothramOther || '').trim()) {
+    if (isHinduReligion && formData.gothramId === 'other' && !String(formData.gothramOther || '').trim()) {
       newErrors.gothramOther = 'Please enter gothram';
     }
 
@@ -763,7 +820,12 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
       'dislikes',
       'favoriteFoods',
       'countryId',
-      'address',
+      'addressLine1',
+      'addressLine2',
+      'city',
+      'state',
+      'pincode',
+      'country',
       'bio',
       'familyCode',
       'email',
@@ -774,6 +836,26 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
     ];
 
     const formDataToSend = new FormData();
+
+    // Build a single address string from structured fields (if present)
+    const addressPartsToSend = [
+      formData.addressLine1,
+      formData.addressLine2,
+      formData.city,
+      formData.state,
+      formData.pincode,
+      formData.country,
+    ]
+      .map((p) => String(p || '').trim())
+      .filter(Boolean);
+    const mergedAddress = addressPartsToSend.join(', ');
+
+    // Always send the combined address field expected by the backend
+    if (mergedAddress) {
+      formDataToSend.append('address', mergedAddress);
+    } else if (formData.address) {
+      formDataToSend.append('address', formData.address);
+    }
 
     // Append allowed fields
     allowedFields.forEach((field) => {
@@ -1015,6 +1097,12 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
 
   const sectionClassName = "bg-white p-6 rounded-lg space-y-4 border border-gray-200";
   const labelClassName = "block text-sm font-medium text-gray-700 mb-1";
+
+  const selectedRelFromApiUI = dropdownData.religions.find(
+    (r) => String(r.id) === String(formData.religionId)
+  );
+  const selectedReligionNameUI = selectedRelFromApiUI?.name || String(formData.religionId || '');
+  const isHinduReligionUI = /hindu/i.test(selectedReligionNameUI);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 font-inter">
@@ -1507,18 +1595,93 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
               <h3 className="text-lg font-semibold text-gray-800 mb-4">Contact Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
-                  <label htmlFor="address" className={labelClassName}>
-                    Address
+                  <label htmlFor="addressLine1" className={labelClassName}>
+                    Address Line 1
                   </label>
-                  <textarea
-                    id="address"
-                    name="address"
-                    value={formData.address || ''} // FIXED: Ensure never undefined
+                  <input
+                    id="addressLine1"
+                    name="addressLine1"
+                    type="text"
+                    value={formData.addressLine1 || ''}
                     onChange={handleChange}
-                    className={inputClassName('address')}
-                    placeholder="Full address"
-                    rows="2"
-                    maxLength={500}
+                    className={inputClassName('addressLine1')}
+                    placeholder="Flat / House / Street"
+                    maxLength={150}
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label htmlFor="addressLine2" className={labelClassName}>
+                    Address Line 2 (Optional)
+                  </label>
+                  <input
+                    id="addressLine2"
+                    name="addressLine2"
+                    type="text"
+                    value={formData.addressLine2 || ''}
+                    onChange={handleChange}
+                    className={inputClassName('addressLine2')}
+                    placeholder="Area / Landmark"
+                    maxLength={150}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="city" className={labelClassName}>
+                    City
+                  </label>
+                  <input
+                    id="city"
+                    name="city"
+                    type="text"
+                    value={formData.city || ''}
+                    onChange={handleChange}
+                    className={inputClassName('city')}
+                    placeholder="City"
+                    maxLength={80}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="state" className={labelClassName}>
+                    State
+                  </label>
+                  <input
+                    id="state"
+                    name="state"
+                    type="text"
+                    value={formData.state || ''}
+                    onChange={handleChange}
+                    className={inputClassName('state')}
+                    placeholder="State"
+                    maxLength={80}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="pincode" className={labelClassName}>
+                    Pincode
+                  </label>
+                  <input
+                    id="pincode"
+                    name="pincode"
+                    type="text"
+                    value={formData.pincode || ''}
+                    onChange={handleChange}
+                    className={inputClassName('pincode')}
+                    placeholder="e.g., 600001"
+                    maxLength={10}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="country" className={labelClassName}>
+                    Country
+                  </label>
+                  <input
+                    id="country"
+                    name="country"
+                    type="text"
+                    value={formData.country || ''}
+                    onChange={handleChange}
+                    className={inputClassName('country')}
+                    placeholder="Country"
+                    maxLength={80}
                   />
                 </div>
               </div>
@@ -1791,62 +1954,67 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
                   {errors.caste && <p className="text-red-500 text-xs mt-1">{errors.caste}</p>}
                 </div>
                 
-                {/* Gothram Dropdown */}
-                <div>
-                  <label htmlFor="gothramId" className={labelClassName}>
-                    Gothram
-                  </label>
-                  <select
-                    id="gothramId"
-                    name="gothramId"
-                    value={formData.gothramId || ''} // FIXED: Ensure never undefined
-                    onChange={handleChange}
-                    className={inputClassName('gothramId')}
-                    disabled={dropdownData.loading}
-                  >
-                    <option value="">Select Gothram</option>
-                    {dropdownData.gothrams.map(gothram => (
-                      <option key={gothram.id} value={String(gothram.id)}>
-                        {gothram.name}
-                      </option>
-                    ))}
-                    <option value="other">Others</option>
-                  </select>
-                  {dropdownData.loading && (
-                    <p className="text-xs text-gray-500 mt-1">Loading gothrams...</p>
-                  )}
-                  {formData.gothramId === 'other' && (
-                    <div className="mt-2">
-                      <input
-                        name="gothramOther"
-                        type="text"
-                        value={formData.gothramOther || ''}
+                {isHinduReligionUI && (
+                  <>
+                    {/* Gothram Dropdown */}
+                    <div>
+                      <label htmlFor="gothramId" className={labelClassName}>
+                        Gothram
+                      </label>
+                      <select
+                        id="gothramId"
+                        name="gothramId"
+                        value={formData.gothramId || ''} // FIXED: Ensure never undefined
                         onChange={handleChange}
-                        className={inputClassName('gothramOther')}
-                        placeholder="Enter gothram"
+                        className={inputClassName('gothramId')}
+                        disabled={dropdownData.loading}
+                      >
+                        <option value="">Select Gothram</option>
+                        {dropdownData.gothrams.map(gothram => (
+                          <option key={gothram.id} value={String(gothram.id)}>
+                            {gothram.name}
+                          </option>
+                        ))}
+                        <option value="other">Others</option>
+                      </select>
+                      {dropdownData.loading && (
+                        <p className="text-xs text-gray-500 mt-1">Loading gothrams...</p>
+                      )}
+                      {formData.gothramId === 'other' && (
+                        <div className="mt-2">
+                          <input
+                            name="gothramOther"
+                            type="text"
+                            value={formData.gothramOther || ''}
+                            onChange={handleChange}
+                            className={inputClassName('gothramOther')}
+                            placeholder="Enter gothram"
+                            maxLength={80}
+                          />
+                          {errors.gothramOther && <p className="text-red-500 text-xs mt-1">{errors.gothramOther}</p>}
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div>
+                      <label htmlFor="kuladevata" className={labelClassName}>
+                        Kuladevata
+                      </label>
+                      <input
+                        id="kuladevata"
+                        name="kuladevata"
+                        type="text"
+                        value={formData.kuladevata || ''} // FIXED: Ensure never undefined
+                        onChange={handleChange}
+                        className={inputClassName('kuladevata')}
+                        placeholder="Family deity"
                         maxLength={80}
                       />
-                      {errors.gothramOther && <p className="text-red-500 text-xs mt-1">{errors.gothramOther}</p>}
+                      {errors.kuladevata && <p className="text-red-500 text-xs mt-1">{errors.kuladevata}</p>}
                     </div>
-                  )}
-                </div>
+                  </>
+                )}
                 
-                <div>
-                  <label htmlFor="kuladevata" className={labelClassName}>
-                    Kuladevata
-                  </label>
-                  <input
-                    id="kuladevata"
-                    name="kuladevata"
-                    type="text"
-                    value={formData.kuladevata || ''} // FIXED: Ensure never undefined
-                    onChange={handleChange}
-                    className={inputClassName('kuladevata')}
-                    placeholder="Family deity"
-                    maxLength={80}
-                  />
-                  {errors.kuladevata && <p className="text-red-500 text-xs mt-1">{errors.kuladevata}</p>}
-                </div>
                 <div>
                   <label htmlFor="region" className={labelClassName}>
                     Region
@@ -1949,14 +2117,14 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
             </div>
 
             {/* Submit Button */}
-            <div className="flex justify-between items-center pt-4">
+            <div className="flex justify-between items-center pt-4 gap-3">
               {/* Delete Profile Button - Only show for current user profile editing */}
               {isCurrentUserProfile && (
                 <button
                   type="button"
                   onClick={handleDeleteProfile}
                   disabled={isDeleting}
-                  className={`px-6 py-2.5 bg-gradient-to-r from-secondary-500 to-secondary-600 text-white font-medium rounded-lg transition-colors flex items-center ${
+                  className={`px-4 py-2.5 bg-gradient-to-r from-secondary-500 to-secondary-600 text-white font-medium rounded-lg transition-colors flex items-center ${
                     isDeleting ? 'opacity-75 cursor-not-allowed' : ''
                   }`}
                 >
@@ -1973,16 +2141,9 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
               {/* Action Buttons */}
               <div className="flex gap-3">
                 <button
-                  type="button"
-                  onClick={onClose}
-                  className="bg-unset px-6 py-2.5 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
                   type="submit"
                   disabled={isLoading}
-                  className={`px-6 py-2.5 bg-[var(--color-primary)] hover:bg-[var(--color-primary)] text-white font-medium rounded-lg transition-colors flex items-center ${
+                  className={`px-4 py-2.5 bg-[var(--color-primary)] hover:bg-[var(--color-primary)] text-white font-medium rounded-lg transition-colors flex items-center ${
                     isLoading ? 'opacity-75 cursor-not-allowed' : ''
                   }`}
                 >
@@ -1994,6 +2155,14 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
                   )}
                   {submitButtonText}
                 </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="bg-unset px-4 py-2.5 border border-gray-300 rounded-lg font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                
               </div>
             </div>
           </form>
