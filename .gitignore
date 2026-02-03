@@ -30,3 +30,9 @@ android/.idea/
 # Signing keys (important)
 *.jks
 *.keystore
+
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
+.env
