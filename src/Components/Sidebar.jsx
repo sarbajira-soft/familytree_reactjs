@@ -58,6 +58,12 @@ const Sidebar = ({
       icon: <RiGitMergeLine size={19} />,
     },
     {
+      id: "linkedFamilyTrees",
+      label: "Linked Family Trees",
+      route: "/linked-family-trees",
+      icon: <FiLink size={19} />,
+    },
+    {
       id: "familyManagement",
       label: "Family Management",
       icon: <FiUsers size={19} />,

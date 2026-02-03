@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+
 import { useLanguage } from '../../Contexts/LanguageContext';
 import { X, UserPlus, Users, Edit, Plus, UserMinus, Camera, Save, ArrowLeft, Send } from 'lucide-react';
 import { fetchRelationships } from '../../utils/familyTreeApi';
@@ -8,6 +9,7 @@ const PRIMARY_COLOR = "#1976D2";
 const SECONDARY_COLOR = "#f97316";
 
 const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, token, existingMemberIds = [] }) => {
+
     const [count, setCount] = useState(1);
     const [forms, setForms] = useState([]);
     const [imageData, setImageData] = useState({});
@@ -21,6 +23,41 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
     const { language } = useLanguage();
     // Add state for relationships
     const [relationshipTypes, setRelationshipTypes] = useState([]);
+
+    const defaultLinkRelationshipType =
+        action?.type === 'children'
+            ? 'parent'
+            : action?.type === 'parents'
+              ? 'child'
+              : 'sibling';
+    const [linkRequest, setLinkRequest] = useState({
+        receiverFamilyCode: '',
+        receiverNodeUid: '',
+        relationshipType: defaultLinkRelationshipType,
+        parentRole: '',
+    });
+    const [linkRequestSending, setLinkRequestSending] = useState(false);
+
+    const [targetFamilyLoading, setTargetFamilyLoading] = useState(false);
+    const [targetFamilyPeople, setTargetFamilyPeople] = useState([]);
+    const [targetFamilyLoadedCode, setTargetFamilyLoadedCode] = useState('');
+    const [targetPersonSearch, setTargetPersonSearch] = useState('');
+    const [targetPersonDropdownOpen, setTargetPersonDropdownOpen] = useState(false);
+    const [selectedTargetPerson, setSelectedTargetPerson] = useState(null);
+
+    const [linkRequestParents, setLinkRequestParents] = useState({
+        father: { receiverFamilyCode: '', receiverNodeUid: '', relationshipType: 'child', parentRole: 'father' },
+        mother: { receiverFamilyCode: '', receiverNodeUid: '', relationshipType: 'child', parentRole: 'mother' },
+    });
+    const [linkRequestSendingParents, setLinkRequestSendingParents] = useState({
+        father: false,
+        mother: false,
+    });
+
+    const [targetFamilyParents, setTargetFamilyParents] = useState({
+        father: { loading: false, people: [], loadedCode: '', search: '', dropdownOpen: false, selected: null },
+        mother: { loading: false, people: [], loadedCode: '', search: '', dropdownOpen: false, selected: null },
+    });
 
     // ===== Mobile invite state (for spouse) =====
     // Initialize phoneInvite with all required fields to prevent uncontrolled input warning
@@ -148,6 +185,194 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
         }
     };
 
+    const handleSendTreeLinkRequest = async () => {
+        const senderNodeUid = String(action?.person?.nodeUid || '').trim();
+        const receiverFamilyCode = String(linkRequest.receiverFamilyCode || '').trim();
+        const receiverNodeUid = String(linkRequest.receiverNodeUid || '').trim();
+        const relationshipType = String(linkRequest.relationshipType || '').trim();
+        const parentRole = String(linkRequest.parentRole || '').trim().toLowerCase();
+
+        if (!senderNodeUid) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Missing sender nodeUid',
+                text: 'This card does not have a nodeUid. Please open the request from a valid person card.',
+            });
+            return;
+        }
+        if (!receiverFamilyCode || !receiverNodeUid || !relationshipType) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Missing details',
+                text: 'Please enter Receiver Family Code, Receiver nodeUid, and Relationship Type.',
+            });
+            return;
+        }
+        if (!['parent', 'child', 'sibling'].includes(relationshipType)) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Invalid relationship type',
+                text: 'Relationship Type must be parent, child, or sibling.',
+            });
+            return;
+        }
+
+        if (['parent', 'child'].includes(relationshipType)) {
+            if (!['father', 'mother'].includes(parentRole)) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Missing parent role',
+                    text: 'Please select Father or Mother for parent/child links.',
+                });
+                return;
+            }
+        }
+
+        try {
+            setLinkRequestSending(true);
+            const authToken = token || localStorage.getItem('access_token');
+            if (!authToken) {
+                throw new Error('Authentication token not found');
+            }
+
+            const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+            const res = await fetch(`${API_BASE}/family/request-tree-link`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`,
+                    'accept': 'application/json',
+                },
+                body: JSON.stringify({
+                    senderNodeUid,
+                    receiverFamilyCode,
+                    receiverNodeUid,
+                    relationshipType,
+                    ...(parentRole ? { parentRole } : {}),
+                }),
+            });
+
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data?.message || 'Failed to send tree link request');
+            }
+
+            await Swal.fire({
+                icon: 'success',
+                title: 'Tree link request sent',
+                text: data?.message || 'Request sent successfully.',
+                confirmButtonColor: PRIMARY_COLOR,
+            });
+
+            onClose();
+        } catch (err) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Failed to send request',
+                text: err?.message || 'Please try again.',
+            });
+        } finally {
+            setLinkRequestSending(false);
+        }
+    };
+
+    const handleSendTreeLinkRequestForParent = async (parentType) => {
+        const senderNodeUid = String(action?.person?.nodeUid || '').trim();
+        const req = linkRequestParents[parentType] || {
+            receiverFamilyCode: '',
+            receiverNodeUid: '',
+            relationshipType: 'child',
+            parentRole: parentType,
+        };
+        const receiverFamilyCode = String(req.receiverFamilyCode || '').trim();
+        const receiverNodeUid = String(req.receiverNodeUid || '').trim();
+        const relationshipType = String(req.relationshipType || 'child').trim();
+        const parentRole = String(req.parentRole || parentType || '').trim().toLowerCase();
+
+        if (!senderNodeUid) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Missing sender nodeUid',
+                text: 'This card does not have a nodeUid. Please open the request from a valid person card.',
+            });
+            return;
+        }
+        if (!receiverFamilyCode || !receiverNodeUid || !relationshipType) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Missing details',
+                text: 'Please enter Receiver Family Code, Receiver nodeUid, and Relationship Type.',
+            });
+            return;
+        }
+        if (!['parent', 'child', 'sibling'].includes(relationshipType)) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Invalid relationship type',
+                text: 'Relationship Type must be parent, child, or sibling.',
+            });
+            return;
+        }
+
+        if (['parent', 'child'].includes(relationshipType)) {
+            if (!['father', 'mother'].includes(parentRole)) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Missing parent role',
+                    text: 'Please select Father or Mother for parent/child links.',
+                });
+                return;
+            }
+        }
+
+        try {
+            setLinkRequestSendingParents((p) => ({ ...p, [parentType]: true }));
+            const authToken = token || localStorage.getItem('access_token');
+            if (!authToken) {
+                throw new Error('Authentication token not found');
+            }
+
+            const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+            const res = await fetch(`${API_BASE}/family/request-tree-link`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`,
+                    'accept': 'application/json',
+                },
+                body: JSON.stringify({
+                    senderNodeUid,
+                    receiverFamilyCode,
+                    receiverNodeUid,
+                    relationshipType,
+                    parentRole, // Include parentRole in request body
+                }),
+            });
+
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data?.message || 'Failed to send tree link request');
+            }
+
+            await Swal.fire({
+                icon: 'success',
+                title: 'Tree link request sent',
+                text: data?.message || 'Request sent successfully.',
+                confirmButtonColor: PRIMARY_COLOR,
+            });
+
+            onClose();
+        } catch (err) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Failed to send request',
+                text: err?.message || 'Please try again.',
+            });
+        } finally {
+            setLinkRequestSendingParents((p) => ({ ...p, [parentType]: false }));
+        }
+    };
+
     // Fetch relationship types on mount
     useEffect(() => {
         fetchRelationships()
@@ -229,6 +454,31 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                 }
             }
             setActiveTabs(initialTabs);
+
+            setLinkRequest({
+                receiverFamilyCode: '',
+                receiverNodeUid: '',
+                relationshipType: defaultLinkRelationshipType,
+                parentRole: '',
+            });
+
+            setTargetFamilyLoading(false);
+            setTargetFamilyPeople([]);
+            setTargetFamilyLoadedCode('');
+            setTargetPersonSearch('');
+            setTargetPersonDropdownOpen(false);
+            setSelectedTargetPerson(null);
+
+            setTargetFamilyParents({
+                father: { loading: false, people: [], loadedCode: '', search: '', dropdownOpen: false, selected: null },
+                mother: { loading: false, people: [], loadedCode: '', search: '', dropdownOpen: false, selected: null },
+            });
+
+            setLinkRequestParents({
+                father: { receiverFamilyCode: '', receiverNodeUid: '', relationshipType: 'child', parentRole: 'father' },
+                mother: { receiverFamilyCode: '', receiverNodeUid: '', relationshipType: 'child', parentRole: 'mother' },
+            });
+            setLinkRequestSendingParents({ father: false, mother: false });
         }
     }, [isOpen, count, action]);
 
@@ -466,7 +716,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                         imgPreview: imagePreview[form.index] || '',
                         dob: member.user.userProfile.dob,
                         memberId: member.user.id,
-                        birthOrder: parseInt(formData.get(`birthOrder_${form.index}`)) || 1,
+                        birthOrder: action.type === 'siblings' ? parseInt(formData.get(`birthOrder_${form.index}`)) : parseInt(formData.get(`birthOrder_${form.index}`)) || 1,
                         lifeStatus: formData.get(`lifeStatus_${form.index}`) || member.lifeStatus || 'living',
                     });
                     hasValidPerson = true;
@@ -500,7 +750,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                           ? { imgPreview: imagePreview[form.index] }
                           : {}),
                         lifeStatus: formData.get(`lifeStatus_${form.index}`) || 'living',
-                        birthOrder: parseInt(formData.get(`birthOrder_${form.index}`)) || 1,
+                        birthOrder: action.type === 'siblings' ? parseInt(formData.get(`birthOrder_${form.index}`)) : parseInt(formData.get(`birthOrder_${form.index}`)) || 1,
                     };
                     if (action.type === 'edit' && action.person) {
                         personObj.id = action.person.id;
@@ -554,6 +804,152 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
             }));
         }
     };
+
+    const normalizeFamilyCode = (val) => String(val || '').trim().toUpperCase();
+
+    const fetchTargetFamilyPeople = async (familyCodeInput) => {
+        const code = normalizeFamilyCode(familyCodeInput);
+        if (!code) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Missing family code',
+                text: 'Please enter Receiver Family Code',
+            });
+            return;
+        }
+
+        try {
+            setTargetFamilyLoading(true);
+            const authToken = token || localStorage.getItem('access_token');
+            if (!authToken) {
+                throw new Error('Authentication token not found');
+            }
+
+            const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+            const res = await fetch(`${API_BASE}/family/tree/${encodeURIComponent(code)}`, {
+                headers: {
+                    'Authorization': `Bearer ${authToken}`,
+                    'accept': 'application/json',
+                },
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data?.message || 'Failed to fetch target family tree');
+            }
+
+            const people = Array.isArray(data?.people) ? data.people : [];
+            setTargetFamilyPeople(people);
+            setTargetFamilyLoadedCode(code);
+            setTargetPersonDropdownOpen(true);
+            setTargetPersonSearch('');
+            setSelectedTargetPerson(null);
+            setLinkRequest((p) => ({ ...p, receiverNodeUid: '' }));
+        } catch (e) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Search failed',
+                text: e?.message || 'Unable to load target family members',
+            });
+        } finally {
+            setTargetFamilyLoading(false);
+        }
+    };
+
+    const fetchTargetFamilyPeopleForParent = async (parentType, familyCodeInput) => {
+        const code = normalizeFamilyCode(familyCodeInput);
+        if (!code) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Missing family code',
+                text: 'Please enter Receiver Family Code',
+            });
+            return;
+        }
+
+        try {
+            setTargetFamilyParents((p) => ({
+                ...p,
+                [parentType]: {
+                    ...(p[parentType] || {}),
+                    loading: true,
+                },
+            }));
+
+            const authToken = token || localStorage.getItem('access_token');
+            if (!authToken) {
+                throw new Error('Authentication token not found');
+            }
+
+            const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+            const res = await fetch(`${API_BASE}/family/tree/${encodeURIComponent(code)}`, {
+                headers: {
+                    'Authorization': `Bearer ${authToken}`,
+                    'accept': 'application/json',
+                },
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data?.message || 'Failed to fetch target family tree');
+            }
+
+            const people = Array.isArray(data?.people) ? data.people : [];
+            setTargetFamilyParents((p) => ({
+                ...p,
+                [parentType]: {
+                    ...(p[parentType] || {}),
+                    people,
+                    loadedCode: code,
+                    dropdownOpen: true,
+                    search: '',
+                    selected: null,
+                },
+            }));
+
+            setLinkRequestParents((p) => ({
+                ...p,
+                [parentType]: {
+                    ...(p[parentType] || {}),
+                    receiverNodeUid: '',
+                },
+            }));
+        } catch (e) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Search failed',
+                text: e?.message || 'Unable to load target family members',
+            });
+        } finally {
+            setTargetFamilyParents((p) => ({
+                ...p,
+                [parentType]: {
+                    ...(p[parentType] || {}),
+                    loading: false,
+                },
+            }));
+        }
+    };
+
+    useEffect(() => {
+        const code = normalizeFamilyCode(linkRequest.receiverFamilyCode);
+        if (!code) {
+            if (targetFamilyLoadedCode) {
+                setTargetFamilyLoadedCode('');
+                setTargetFamilyPeople([]);
+                setSelectedTargetPerson(null);
+                setTargetPersonSearch('');
+                setTargetPersonDropdownOpen(false);
+                setLinkRequest((p) => ({ ...p, receiverNodeUid: '' }));
+            }
+            return;
+        }
+        if (targetFamilyLoadedCode && code !== targetFamilyLoadedCode) {
+            setTargetFamilyPeople([]);
+            setSelectedTargetPerson(null);
+            setTargetPersonSearch('');
+            setTargetPersonDropdownOpen(false);
+            setLinkRequest((p) => ({ ...p, receiverNodeUid: '' }));
+        }
+    }, [linkRequest.receiverFamilyCode]);
 
     if (!isOpen) return null;
 
@@ -728,6 +1124,23 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                 >
                                     Select Existing
                                 </button>
+                                <button 
+                                    type="button" 
+                                    onClick={() => handleTabSwitch(form.type, 'link')} 
+                                    style={{ 
+                                        padding: '10px 24px', 
+                                        background: tab === 'link' ? PRIMARY_COLOR : 'transparent', 
+                                        color: tab === 'link' ? '#fff' : PRIMARY_COLOR, 
+                                        border: 'none', 
+                                        outline: 'none', 
+                                        cursor: 'pointer', 
+                                        transition: 'all 0.3s ease',
+                                        fontWeight: 600
+                                    }} 
+                                    disabled={!String(action?.person?.nodeUid || '').trim()}
+                                >
+                                    Link Family Tree
+                                </button>
                             </div>
 
                             {/* Existing Member Dropdown */}
@@ -776,6 +1189,482 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                             )}
 
                             {/* Manual entry for parent if needed */}
+                            {tab === 'link' && (
+                                <div className="person-form-upgraded" style={{ 
+                                    background: '#f6fdf7',
+                                    borderRadius: 16, 
+                                    padding: 24, 
+                                    marginBottom: 0, 
+                                    boxShadow: `0 4px 20px ${PRIMARY_COLOR}10`,
+                                    border: `1px solid ${PRIMARY_COLOR}10`
+                                }}>
+                                    <h4 style={{
+                                        marginBottom: 16,
+                                        fontWeight: 700,
+                                        fontSize: 18,
+                                        color: '#333',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 8,
+                                    }}>
+                                        🔗 Link Family Tree ({form.type === 'father' ? 'Father' : 'Mother'})
+                                    </h4>
+
+                                    <div style={{ marginBottom: 12, fontSize: 14 }}>
+                                        <div style={{ fontWeight: 600, marginBottom: 4 }}>Sender nodeUid</div>
+                                        <div
+                                            style={{
+                                                padding: '10px 12px',
+                                                borderRadius: 10,
+                                                border: `2px solid ${PRIMARY_COLOR}22`,
+                                                background: 'rgba(255, 255, 255, 0.9)',
+                                                fontFamily: 'monospace',
+                                                fontSize: 12,
+                                                wordBreak: 'break-all',
+                                            }}
+                                        >
+                                            {String(action?.person?.nodeUid || '')}
+                                        </div>
+                                    </div>
+
+                                    <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
+                                        <div style={{ flex: 1 }}>
+                                            <label style={{ fontWeight: 600, color: '#333', marginBottom: 6, display: 'block' }}>
+                                                Receiver Family Code:
+                                            </label>
+                                            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                                <input
+                                                    type="text"
+                                                    value={linkRequestParents[form.type]?.receiverFamilyCode || ''}
+                                                    onChange={(e) => {
+                                                        const nextCode = e.target.value;
+                                                        setLinkRequestParents((p) => ({
+                                                            ...p,
+                                                            [form.type]: {
+                                                                ...(p[form.type] || { relationshipType: 'child' }),
+                                                                receiverFamilyCode: nextCode,
+                                                                receiverNodeUid: '',
+                                                            },
+                                                        }));
+                                                        setTargetFamilyParents((prev) => {
+                                                            const cur = prev[form.type] || {
+                                                                loading: false,
+                                                                people: [],
+                                                                loadedCode: '',
+                                                                search: '',
+                                                                dropdownOpen: false,
+                                                                selected: null,
+                                                            };
+                                                            const nextNorm = normalizeFamilyCode(nextCode);
+                                                            const loadedNorm = normalizeFamilyCode(cur.loadedCode);
+                                                            if (!nextNorm || (loadedNorm && nextNorm !== loadedNorm)) {
+                                                                return {
+                                                                    ...prev,
+                                                                    [form.type]: {
+                                                                        ...cur,
+                                                                        people: [],
+                                                                        loadedCode: '',
+                                                                        search: '',
+                                                                        dropdownOpen: false,
+                                                                        selected: null,
+                                                                    },
+                                                                };
+                                                            }
+                                                            return prev;
+                                                        });
+                                                    }}
+                                                    style={{
+                                                        width: '100%',
+                                                        borderRadius: 12,
+                                                        border: `2px solid ${PRIMARY_COLOR}22`,
+                                                        padding: '12px 16px',
+                                                        background: 'rgba(255, 255, 255, 0.9)',
+                                                        fontSize: 14,
+                                                        fontWeight: 500,
+                                                        outline: 'none',
+                                                        textTransform: 'uppercase',
+                                                    }}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        fetchTargetFamilyPeopleForParent(
+                                                            form.type,
+                                                            linkRequestParents[form.type]?.receiverFamilyCode,
+                                                        )
+                                                    }
+                                                    disabled={!!targetFamilyParents?.[form.type]?.loading}
+                                                    style={{
+                                                        padding: '10px 12px',
+                                                        borderRadius: 10,
+                                                        border: `1px solid ${PRIMARY_COLOR}33`,
+                                                        background: '#fff',
+                                                        cursor: targetFamilyParents?.[form.type]?.loading
+                                                            ? 'not-allowed'
+                                                            : 'pointer',
+                                                        fontWeight: 700,
+                                                        color: PRIMARY_COLOR,
+                                                        whiteSpace: 'nowrap',
+                                                    }}
+                                                >
+                                                    {targetFamilyParents?.[form.type]?.loading ? 'Loading...' : 'Search'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div style={{ flex: 1 }}>
+                                            <label style={{ fontWeight: 600, color: '#333', marginBottom: 6, display: 'block' }}>
+                                                Relationship Type:
+                                            </label>
+                                            <select
+                                                value={linkRequestParents[form.type]?.relationshipType || 'child'}
+                                                onChange={(e) =>
+                                                    setLinkRequestParents((p) => ({
+                                                        ...p,
+                                                        [form.type]: {
+                                                            ...(p[form.type] || {}),
+                                                            relationshipType: e.target.value,
+                                                        },
+                                                    }))
+                                                }
+                                                style={{
+                                                    width: '100%',
+                                                    borderRadius: 12,
+                                                    border: `2px solid ${PRIMARY_COLOR}22`,
+                                                    padding: '12px 16px',
+                                                    background: 'rgba(255, 255, 255, 0.9)',
+                                                    fontSize: 14,
+                                                    fontWeight: 500,
+                                                    outline: 'none',
+                                                }}
+                                            >
+                                                <option value="child">child</option>
+                                                <option value="parent">parent</option>
+                                                <option value="sibling">sibling</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div style={{ marginBottom: 12 }}>
+                                        <label style={{ fontWeight: 600, color: '#333', marginBottom: 6, display: 'block' }}>
+                                            Receiver person (search):
+                                        </label>
+
+                                        <input
+                                            type="text"
+                                            value={targetFamilyParents?.[form.type]?.search || ''}
+                                            placeholder={
+                                                targetFamilyParents?.[form.type]?.loadedCode
+                                                    ? 'Search by name...'
+                                                    : 'Enter family code and click Search'
+                                            }
+                                            onChange={(e) => {
+                                                const v = e.target.value;
+                                                setTargetFamilyParents((p) => ({
+                                                    ...p,
+                                                    [form.type]: {
+                                                        ...(p[form.type] || {}),
+                                                        search: v,
+                                                        dropdownOpen: true,
+                                                    },
+                                                }));
+                                            }}
+                                            onFocus={() =>
+                                                setTargetFamilyParents((p) => ({
+                                                    ...p,
+                                                    [form.type]: {
+                                                        ...(p[form.type] || {}),
+                                                        dropdownOpen: true,
+                                                    },
+                                                }))
+                                            }
+                                            disabled={!targetFamilyParents?.[form.type]?.loadedCode}
+                                            style={{
+                                                width: '100%',
+                                                borderRadius: 12,
+                                                border: `2px solid ${PRIMARY_COLOR}22`,
+                                                padding: '12px 16px',
+                                                background: targetFamilyParents?.[form.type]?.loadedCode
+                                                    ? 'rgba(255, 255, 255, 0.9)'
+                                                    : 'rgba(240, 240, 240, 0.9)',
+                                                fontSize: 14,
+                                                fontWeight: 500,
+                                                outline: 'none',
+                                            }}
+                                        />
+
+                                        {targetFamilyParents?.[form.type]?.loadedCode &&
+                                            targetFamilyParents?.[form.type]?.dropdownOpen && (
+                                                <div
+                                                    style={{
+                                                        marginTop: 8,
+                                                        borderRadius: 12,
+                                                        border: `1px solid ${PRIMARY_COLOR}22`,
+                                                        background: '#fff',
+                                                        overflow: 'hidden',
+                                                    }}
+                                                >
+                                                    <div
+                                                        style={{
+                                                            maxHeight: 240,
+                                                            overflowY: 'auto',
+                                                        }}
+                                                    >
+                                                        {(() => {
+                                                            const code = normalizeFamilyCode(
+                                                                linkRequestParents[form.type]?.receiverFamilyCode,
+                                                            );
+                                                            const term = String(
+                                                                targetFamilyParents?.[form.type]?.search || '',
+                                                            )
+                                                                .trim()
+                                                                .toLowerCase();
+                                                            const candidates = (
+                                                                Array.isArray(targetFamilyParents?.[form.type]?.people)
+                                                                    ? targetFamilyParents[form.type].people
+                                                                    : []
+                                                            )
+                                                                .filter((p) => {
+                                                                    const primary = normalizeFamilyCode(
+                                                                        p?.primaryFamilyCode || p?.familyCode,
+                                                                    );
+                                                                    if (primary && primary !== code) return false;
+                                                                    return true;
+                                                                })
+                                                                .filter((p) => {
+                                                                    if (!term) return true;
+                                                                    const nm = String(p?.name || '').toLowerCase();
+                                                                    return nm.includes(term);
+                                                                });
+
+                                                            if (candidates.length === 0) {
+                                                                return (
+                                                                    <div
+                                                                        style={{
+                                                                            padding: 12,
+                                                                            color: '#666',
+                                                                            fontSize: 13,
+                                                                        }}
+                                                                    >
+                                                                        No matching people found (spouse cards are excluded)
+                                                                    </div>
+                                                                );
+                                                            }
+
+                                                            return candidates.map((p) => (
+                                                                <button
+                                                                    key={String(p?.nodeUid || p?.id)}
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setTargetFamilyParents((prev) => ({
+                                                                            ...prev,
+                                                                            [form.type]: {
+                                                                                ...(prev[form.type] || {}),
+                                                                                selected: p,
+                                                                                dropdownOpen: false,
+                                                                            },
+                                                                        }));
+                                                                        setLinkRequestParents((prev) => ({
+                                                                            ...prev,
+                                                                            [form.type]: {
+                                                                                ...(prev[form.type] || {}),
+                                                                                receiverNodeUid: String(p?.nodeUid || ''),
+                                                                            },
+                                                                        }));
+                                                                    }}
+                                                                    style={{
+                                                                        width: '100%',
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        gap: 10,
+                                                                        padding: '10px 12px',
+                                                                        border: 'none',
+                                                                        borderBottom: `1px solid ${PRIMARY_COLOR}10`,
+                                                                        background: 'transparent',
+                                                                        cursor: 'pointer',
+                                                                        textAlign: 'left',
+                                                                    }}
+                                                                >
+                                                                    <div
+                                                                        style={{
+                                                                            width: 34,
+                                                                            height: 34,
+                                                                            borderRadius: 999,
+                                                                            background: '#eee',
+                                                                            overflow: 'hidden',
+                                                                            flex: '0 0 auto',
+                                                                            display: 'flex',
+                                                                            alignItems: 'center',
+                                                                            justifyContent: 'center',
+                                                                            fontWeight: 800,
+                                                                            color: '#666',
+                                                                        }}
+                                                                    >
+                                                                        {p?.img ? (
+                                                                            <img
+                                                                                src={p.img}
+                                                                                alt={p?.name || 'person'}
+                                                                                style={{
+                                                                                    width: '100%',
+                                                                                    height: '100%',
+                                                                                    objectFit: 'cover',
+                                                                                }}
+                                                                            />
+                                                                        ) : (
+                                                                            <span>
+                                                                                {String(p?.name || 'P')
+                                                                                    .trim()
+                                                                                    .slice(0, 1)
+                                                                                    .toUpperCase()}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    <div style={{ minWidth: 0, flex: 1 }}>
+                                                                        <div
+                                                                            style={{
+                                                                                fontWeight: 700,
+                                                                                color: '#222',
+                                                                                fontSize: 14,
+                                                                                lineHeight: 1.2,
+                                                                            }}
+                                                                        >
+                                                                            {p?.name || 'Unknown'}
+                                                                        </div>
+                                                                        <div
+                                                                            style={{
+                                                                                fontSize: 12,
+                                                                                color: '#666',
+                                                                                marginTop: 2,
+                                                                            }}
+                                                                        >
+                                                                            {String(p?.gender || 'unknown')} ·{' '}
+                                                                            {String(p?.nodeUid || '').slice(0, 10)}...
+                                                                        </div>
+                                                                    </div>
+                                                                </button>
+                                                            ));
+                                                        })()}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                        {targetFamilyParents?.[form.type]?.selected?.nodeUid && (
+                                            <div
+                                                style={{
+                                                    marginTop: 10,
+                                                    padding: '10px 12px',
+                                                    borderRadius: 12,
+                                                    background: 'rgba(255,255,255,0.9)',
+                                                    border: `1px solid ${PRIMARY_COLOR}10`,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: 10,
+                                                }}
+                                            >
+                                                <div style={{ minWidth: 0, flex: 1 }}>
+                                                    <div style={{ fontWeight: 700, color: '#222', fontSize: 13 }}>
+                                                        {targetFamilyParents?.[form.type]?.selected?.name || 'Unknown'}
+                                                    </div>
+                                                    <div
+                                                        style={{
+                                                            fontFamily: 'monospace',
+                                                            fontSize: 11,
+                                                            color: '#666',
+                                                            wordBreak: 'break-all',
+                                                        }}
+                                                    >
+                                                        {String(targetFamilyParents?.[form.type]?.selected?.nodeUid)}
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setTargetFamilyParents((p) => ({
+                                                            ...p,
+                                                            [form.type]: {
+                                                                ...(p[form.type] || {}),
+                                                                selected: null,
+                                                                search: '',
+                                                                dropdownOpen: true,
+                                                            },
+                                                        }));
+                                                        setLinkRequestParents((p) => ({
+                                                            ...p,
+                                                            [form.type]: {
+                                                                ...(p[form.type] || {}),
+                                                                receiverNodeUid: '',
+                                                            },
+                                                        }));
+                                                    }}
+                                                    style={{
+                                                        padding: '6px 10px',
+                                                        borderRadius: 10,
+                                                        border: `1px solid ${PRIMARY_COLOR}22`,
+                                                        background: '#fff',
+                                                        cursor: 'pointer',
+                                                        fontWeight: 700,
+                                                        color: PRIMARY_COLOR,
+                                                    }}
+                                                >
+                                                    Change
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div style={{ marginBottom: 12 }}>
+                                        <label style={{ fontWeight: 600, color: '#333', marginBottom: 6, display: 'block' }}>
+                                            Receiver nodeUid:
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={linkRequestParents[form.type]?.receiverNodeUid || ''}
+                                            onChange={(e) =>
+                                                setLinkRequestParents((p) => ({
+                                                    ...p,
+                                                    [form.type]: {
+                                                        ...(p[form.type] || {}),
+                                                        receiverNodeUid: e.target.value,
+                                                    },
+                                                }))
+                                            }
+                                            style={{
+                                                width: '100%',
+                                                borderRadius: 12,
+                                                border: `2px solid ${PRIMARY_COLOR}22`,
+                                                padding: '12px 16px',
+                                                background: 'rgba(255, 255, 255, 0.9)',
+                                                fontSize: 14,
+                                                fontWeight: 500,
+                                                outline: 'none',
+                                                fontFamily: 'monospace',
+                                            }}
+                                        />
+                                    </div>
+
+                                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleSendTreeLinkRequestForParent(form.type)}
+                                            disabled={!!linkRequestSendingParents[form.type]}
+                                            style={{
+                                                padding: '10px 16px',
+                                                background: PRIMARY_COLOR,
+                                                color: '#fff',
+                                                border: 'none',
+                                                borderRadius: 10,
+                                                cursor: 'pointer',
+                                                fontWeight: 700,
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 8,
+                                            }}
+                                        >
+                                            <UserPlus size={16} />
+                                            {linkRequestSendingParents[form.type] ? 'Sending...' : 'Send Link Request'}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                             {tab === 'new' && (
                                 <div className="person-form-upgraded" style={{ 
                                     background: '#f6fdf7',
@@ -1082,6 +1971,26 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                               >
                                 Select Existing
                               </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleTabSwitch(form.index, "link")
+                                }
+                                style={{
+                                  padding: "10px 24px",
+                                  background:
+                                    tab === "link" ? PRIMARY_COLOR : "transparent",
+                                  color: tab === "link" ? "#fff" : PRIMARY_COLOR,
+                                  border: "none",
+                                  outline: "none",
+                                  cursor: "pointer",
+                                  transition: "all 0.3s ease",
+                                  fontWeight: 600,
+                                }}
+                                disabled={!String(action?.person?.nodeUid || '').trim()}
+                              >
+                                Link Family Tree
+                              </button>
                             </div>
 
                             {/* Existing Member Dropdown */}
@@ -1172,6 +2081,421 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                               )}
 
                             {/* Manual entry for other types if needed */}
+                            {tab === "link" && (
+                              <div
+                                className="person-form-upgraded"
+                                style={{
+                                  background: "#f6fdf7",
+                                  borderRadius: 16,
+                                  marginBottom: 0,
+                                  border: `1px solid ${PRIMARY_COLOR}10`,
+                                }}
+                              >
+                                <h4
+                                  style={{
+                                    marginBottom: 16,
+                                    fontWeight: 700,
+                                    fontSize: 18,
+                                    color: "#333",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 8,
+                                  }}
+                                >
+                                  🔗 Link Family Tree
+                                </h4>
+
+                                <div style={{ marginBottom: 12, fontSize: 14 }}>
+                                  <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                                    Sender nodeUid
+                                  </div>
+                                  <div
+                                    style={{
+                                      padding: "10px 12px",
+                                      borderRadius: 10,
+                                      border: `2px solid ${PRIMARY_COLOR}22`,
+                                      background: "rgba(255, 255, 255, 0.9)",
+                                      fontFamily: "monospace",
+                                      fontSize: 12,
+                                      wordBreak: "break-all",
+                                    }}
+                                  >
+                                    {String(action?.person?.nodeUid || "")}
+                                  </div>
+                                </div>
+
+                                <div style={{ display: "flex", gap: 16, marginBottom: 12 }}>
+                                  <div style={{ flex: 1 }}>
+                                    <label style={{ fontWeight: 600, color: "#333", marginBottom: 6, display: "block" }}>
+                                      Receiver Family Code:
+                                    </label>
+                                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                      <input
+                                        type="text"
+                                        value={linkRequest.receiverFamilyCode}
+                                        onChange={(e) =>
+                                          setLinkRequest((p) => ({
+                                            ...p,
+                                            receiverFamilyCode: e.target.value,
+                                          }))
+                                        }
+                                        style={{
+                                          width: "100%",
+                                          borderRadius: 12,
+                                          border: `2px solid ${PRIMARY_COLOR}22`,
+                                          padding: "12px 16px",
+                                          background: "rgba(255, 255, 255, 0.9)",
+                                          fontSize: 14,
+                                          fontWeight: 500,
+                                          outline: "none",
+                                          textTransform: 'uppercase',
+                                        }}
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => fetchTargetFamilyPeople(linkRequest.receiverFamilyCode)}
+                                        disabled={targetFamilyLoading}
+                                        style={{
+                                          padding: '10px 12px',
+                                          borderRadius: 10,
+                                          border: `1px solid ${PRIMARY_COLOR}33`,
+                                          background: '#fff',
+                                          cursor: targetFamilyLoading ? 'not-allowed' : 'pointer',
+                                          fontWeight: 700,
+                                          color: PRIMARY_COLOR,
+                                          whiteSpace: 'nowrap',
+                                        }}
+                                      >
+                                        {targetFamilyLoading ? 'Loading...' : 'Search'}
+                                      </button>
+                                    </div>
+                                  </div>
+                                  <div style={{ flex: 1 }}>
+                                    <label style={{ fontWeight: 600, color: "#333", marginBottom: 6, display: "block" }}>
+                                      Relationship Type:
+                                    </label>
+                                    <select
+                                      value={linkRequest.relationshipType}
+                                      onChange={(e) =>
+                                        setLinkRequest((p) => ({
+                                          ...p,
+                                          relationshipType: e.target.value,
+                                        }))
+                                      }
+                                      style={{
+                                        width: "100%",
+                                        borderRadius: 12,
+                                        border: `2px solid ${PRIMARY_COLOR}22`,
+                                        padding: "12px 16px",
+                                        background: "rgba(255, 255, 255, 0.9)",
+                                        fontSize: 14,
+                                        fontWeight: 500,
+                                        outline: "none",
+                                      }}
+                                    >
+                                      <option value="parent">parent</option>
+                                      <option value="child">child</option>
+                                      <option value="sibling">sibling</option>
+                                    </select>
+                                  </div>
+                                </div>
+
+                                {(linkRequest.relationshipType === 'parent' || linkRequest.relationshipType === 'child') && (
+                                  <div style={{ marginBottom: 12 }}>
+                                    <label style={{ fontWeight: 600, color: "#333", marginBottom: 6, display: "block" }}>
+                                      Parent Role:
+                                    </label>
+                                    <select
+                                      value={linkRequest.parentRole || ''}
+                                      onChange={(e) =>
+                                        setLinkRequest((p) => ({
+                                          ...p,
+                                          parentRole: e.target.value,
+                                        }))
+                                      }
+                                      style={{
+                                        width: "100%",
+                                        borderRadius: 12,
+                                        border: `2px solid ${PRIMARY_COLOR}22`,
+                                        padding: "12px 16px",
+                                        background: "rgba(255, 255, 255, 0.9)",
+                                        fontSize: 14,
+                                        fontWeight: 500,
+                                        outline: "none",
+                                      }}
+                                    >
+                                      <option value="">Select...</option>
+                                      <option value="father">father</option>
+                                      <option value="mother">mother</option>
+                                    </select>
+                                  </div>
+                                )}
+                                <div style={{ marginBottom: 12 }}>
+                                  <label style={{ fontWeight: 600, color: "#333", marginBottom: 6, display: "block" }}>
+                                    Receiver person (search):
+                                  </label>
+
+                                  <input
+                                    type="text"
+                                    value={targetPersonSearch}
+                                    placeholder={
+                                      targetFamilyLoadedCode
+                                        ? 'Search by name...'
+                                        : 'Enter family code and click Search'
+                                    }
+                                    onChange={(e) => {
+                                      setTargetPersonSearch(e.target.value);
+                                      setTargetPersonDropdownOpen(true);
+                                    }}
+                                    onFocus={() => setTargetPersonDropdownOpen(true)}
+                                    disabled={!targetFamilyLoadedCode}
+                                    style={{
+                                      width: "100%",
+                                      borderRadius: 12,
+                                      border: `2px solid ${PRIMARY_COLOR}22`,
+                                      padding: "12px 16px",
+                                      background: targetFamilyLoadedCode
+                                        ? "rgba(255, 255, 255, 0.9)"
+                                        : "rgba(240, 240, 240, 0.9)",
+                                      fontSize: 14,
+                                      fontWeight: 500,
+                                      outline: "none",
+                                    }}
+                                  />
+
+                                  {targetFamilyLoadedCode && targetPersonDropdownOpen && (
+                                    <div
+                                      style={{
+                                        marginTop: 8,
+                                        borderRadius: 12,
+                                        border: `1px solid ${PRIMARY_COLOR}22`,
+                                        background: '#fff',
+                                        overflow: 'hidden',
+                                      }}
+                                    >
+                                      <div
+                                        style={{
+                                          maxHeight: 240,
+                                          overflowY: 'auto',
+                                        }}
+                                      >
+                                        {(() => {
+                                          const code = normalizeFamilyCode(linkRequest.receiverFamilyCode);
+                                          const term = String(targetPersonSearch || '').trim().toLowerCase();
+                                          const candidates = (Array.isArray(targetFamilyPeople) ? targetFamilyPeople : [])
+                                            .filter((p) => {
+                                              const primary = normalizeFamilyCode(p?.primaryFamilyCode || p?.familyCode);
+                                              if (primary && primary !== code) return false;
+                                              return true;
+                                            })
+                                            .filter((p) => {
+                                              if (!term) return true;
+                                              const nm = String(p?.name || '').toLowerCase();
+                                              return nm.includes(term);
+                                            });
+
+                                          if (candidates.length === 0) {
+                                            return (
+                                              <div style={{ padding: 12, color: '#666', fontSize: 13 }}>
+                                                No matching people found (spouse cards are excluded)
+                                              </div>
+                                            );
+                                          }
+
+                                          return candidates.map((p) => (
+                                            <button
+                                              key={String(p?.nodeUid || p?.id)}
+                                              type="button"
+                                              onClick={() => {
+                                                setSelectedTargetPerson(p);
+                                                setLinkRequest((prev) => ({ ...prev, receiverNodeUid: String(p?.nodeUid || '') }));
+                                                setTargetPersonDropdownOpen(false);
+                                              }}
+                                              style={{
+                                                width: '100%',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 10,
+                                                padding: '10px 12px',
+                                                border: 'none',
+                                                borderBottom: `1px solid ${PRIMARY_COLOR}10`,
+                                                background: 'transparent',
+                                                cursor: 'pointer',
+                                                textAlign: 'left',
+                                              }}
+                                            >
+                                              <div
+                                                style={{
+                                                  width: 34,
+                                                  height: 34,
+                                                  borderRadius: 999,
+                                                  background: '#eee',
+                                                  overflow: 'hidden',
+                                                  flex: '0 0 auto',
+                                                  display: 'flex',
+                                                  alignItems: 'center',
+                                                  justifyContent: 'center',
+                                                  fontWeight: 800,
+                                                  color: '#666',
+                                                }}
+                                              >
+                                                {p?.img ? (
+                                                  <img
+                                                    src={p.img}
+                                                    alt={p?.name || 'person'}
+                                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                  />
+                                                ) : (
+                                                  <span>
+                                                    {String(p?.name || 'P')
+                                                      .trim()
+                                                      .slice(0, 1)
+                                                      .toUpperCase()}
+                                                  </span>
+                                                )}
+                                              </div>
+                                              <div style={{ minWidth: 0, flex: 1 }}>
+                                                <div style={{ fontWeight: 700, color: '#222', fontSize: 14, lineHeight: 1.2 }}>
+                                                  {p?.name || 'Unknown'}
+                                                </div>
+                                                <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>
+                                                  {String(p?.gender || 'unknown')} · {String(p?.nodeUid || '').slice(0, 10)}...
+                                                </div>
+                                              </div>
+                                            </button>
+                                          ));
+                                        })()}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {selectedTargetPerson?.nodeUid && (
+                                    <div
+                                      style={{
+                                        marginTop: 10,
+                                        padding: '10px 12px',
+                                        borderRadius: 12,
+                                        background: 'rgba(255,255,255,0.9)',
+                                        border: `1px solid ${PRIMARY_COLOR}10`,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 10,
+                                      }}
+                                    >
+                                      <div
+                                        style={{
+                                          width: 30,
+                                          height: 30,
+                                          borderRadius: 999,
+                                          background: '#eee',
+                                          overflow: 'hidden',
+                                          flex: '0 0 auto',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          fontWeight: 800,
+                                          color: '#666',
+                                        }}
+                                      >
+                                        {selectedTargetPerson?.img ? (
+                                          <img
+                                            src={selectedTargetPerson.img}
+                                            alt={selectedTargetPerson?.name || 'person'}
+                                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                          />
+                                        ) : (
+                                          <span>
+                                            {String(selectedTargetPerson?.name || 'P')
+                                              .trim()
+                                              .slice(0, 1)
+                                              .toUpperCase()}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div style={{ minWidth: 0, flex: 1 }}>
+                                        <div style={{ fontWeight: 700, color: '#222', fontSize: 13 }}>
+                                          {selectedTargetPerson?.name || 'Unknown'}
+                                        </div>
+                                        <div style={{ fontFamily: 'monospace', fontSize: 11, color: '#666', wordBreak: 'break-all' }}>
+                                          {String(selectedTargetPerson.nodeUid)}
+                                        </div>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setSelectedTargetPerson(null);
+                                          setTargetPersonSearch('');
+                                          setLinkRequest((p) => ({ ...p, receiverNodeUid: '' }));
+                                          setTargetPersonDropdownOpen(true);
+                                        }}
+                                        style={{
+                                          padding: '6px 10px',
+                                          borderRadius: 10,
+                                          border: `1px solid ${PRIMARY_COLOR}22`,
+                                          background: '#fff',
+                                          cursor: 'pointer',
+                                          fontWeight: 700,
+                                          color: PRIMARY_COLOR,
+                                        }}
+                                      >
+                                        Change
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div style={{ marginBottom: 12 }}>
+                                  <label style={{ fontWeight: 600, color: "#333", marginBottom: 6, display: "block" }}>
+                                    Receiver nodeUid:
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={linkRequest.receiverNodeUid}
+                                    onChange={(e) =>
+                                      setLinkRequest((p) => ({
+                                        ...p,
+                                        receiverNodeUid: e.target.value,
+                                      }))
+                                    }
+                                    style={{
+                                      width: "100%",
+                                      borderRadius: 12,
+                                      border: `2px solid ${PRIMARY_COLOR}22`,
+                                      padding: "12px 16px",
+                                      background: "rgba(255, 255, 255, 0.9)",
+                                      fontSize: 14,
+                                      fontWeight: 500,
+                                      outline: "none",
+                                      fontFamily: "monospace",
+                                    }}
+                                  />
+                                </div>
+
+                                <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                                  <button
+                                    type="button"
+                                    onClick={handleSendTreeLinkRequest}
+                                    disabled={linkRequestSending}
+                                    style={{
+                                      padding: "10px 16px",
+                                      background: PRIMARY_COLOR,
+                                      color: "#fff",
+                                      border: "none",
+                                      borderRadius: 10,
+                                      cursor: "pointer",
+                                      fontWeight: 700,
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: 8,
+                                    }}
+                                  >
+                                    <UserPlus size={16} />
+                                    {linkRequestSending ? "Sending..." : "Send Link Request"}
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
                             {tab === "new" && (
                               <div
                                 className="person-form-upgraded"
@@ -1677,7 +3001,8 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                         type="number"
                                         name={`birthOrder_${form.index}`}
                                         min="1"
-                                        defaultValue="1"
+                                        defaultValue={action.type === "children" ? "1" : ""}
+                                        required={action.type === "siblings"}
                                         style={{
                                           width: "100%",
                                           borderRadius: 12,

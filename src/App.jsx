@@ -46,6 +46,9 @@ const SuggestionApproving = lazy(() => import("./Pages/SuggestionApproving"));
 const AssociatedFamilyTreePage = lazy(() =>
   import("./Pages/AssociatedFamilyTreePage")
 );
+const LinkedFamilyTreesPage = lazy(() =>
+  import("./Pages/LinkedFamilyTreesPage")
+);
 const ProfileModule = lazy(() => import("./Pages/ProfileFormPage"));
 const UserProfile = lazy(() => import("./Pages/UserProfile"));
 
@@ -203,6 +206,10 @@ function App() {
                       <AssociatedFamilyTreePage />
                     </FamilyTreeProvider>
                   }
+                />
+                <Route
+                  path="/linked-family-trees"
+                  element={<LinkedFamilyTreesPage />}
                 />
 
                 {/* Requests, Posts, Events, Gifts */}
