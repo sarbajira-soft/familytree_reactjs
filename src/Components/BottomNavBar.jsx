@@ -4,10 +4,10 @@ import { useNavigate } from 'react-router-dom';
 import {
   FiHome,
   FiCalendar,
-  FiShare2,
   FiGift,
-  FiUser,
-  } from "react-icons/fi";
+  FiImage,
+  FiUsers,
+} from "react-icons/fi";
 
 import { RiGitMergeLine } from "react-icons/ri";
 const BottomNavBar = ({ activeTab, setActiveTab }) => {
@@ -17,33 +17,39 @@ const BottomNavBar = ({ activeTab, setActiveTab }) => {
     {
       id: "home",
       label: "Home",
-      icon: <FiHome size={20} />,
+      icon: <FiHome size={18} />,
       path: "/dashboard",
     },
     {
       id: "upcomingEvent",
       label: "Events",
-      icon: <FiCalendar size={20} />,
+      icon: <FiCalendar size={18} />,
       path: "/events",
     },
     // { id: 'postsStories', label: 'Posts', icon: <FiShare2 size={20} />, path: '/posts-and-feeds' },
     {
       id: "familyTree",
-      label: "Family",
+      label: "Tree",
       path: "/family-tree",
-      icon: <RiGitMergeLine size={20} />,
+      icon: <RiGitMergeLine size={18} />,
+    },
+    {
+      id: "familyManagement",
+      label: "Family",
+      icon: <FiUsers size={18} />,
+      path: "/family-management",
+    },
+    {
+      id: "gallery",
+      label: "Gallery",
+      icon: <FiImage size={18} />,
+      path: "/family-gallery",
     },
     {
       id: "gifts",
       label: "Gifts",
-      icon: <FiGift size={20} />,
+      icon: <FiGift size={18} />,
       path: "/gifts-memories",
-    },
-    {
-      id: "profile",
-      label: "Profile",
-      icon: <FiUser size={20} />,
-      path: "/myprofile",
     },
   ];
 
@@ -62,19 +68,19 @@ const BottomNavBar = ({ activeTab, setActiveTab }) => {
           "var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))",
       }}
     >
-      <div className="flex justify-between items-center px-2 py-1">
+      <div className="flex justify-between items-center px-2 py-0.5">
         {tabs.map((item) => {
           const isActive = activeTab === item.id;
           return (
             <div
               key={item.id}
               onClick={() => handleItemClick(item)}
-              className="flex flex-col items-center justify-center flex-1 py-1 cursor-pointer"
+              className="flex flex-col items-center justify-center flex-1 py-0.5 cursor-pointer"
             >
-              <div className={`p-1 ${isActive ? 'text-white' : 'text-white/80'}`}>
+              <div className={`p-0.5 ${isActive ? 'text-white' : 'text-white/80'}`}>
                 {item.icon}
               </div>
-              <span className={`text-xs mt-0.5 ${isActive ? 'text-white font-semibold' : 'text-white/80'}`}>
+              <span className={`text-xs mt-0 ${isActive ? 'text-white font-semibold' : 'text-white/80'}`}>
                 {item.label}
               </span>
             </div>

@@ -356,8 +356,8 @@ const EditEventModal = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 font-inter">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl relative max-h-[95vh] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start justify-center px-2 sm:px-4 pt-10 pb-24 sm:pt-6 sm:pb-8 z-50 font-inter">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl relative max-h-[calc(100vh-160px)] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="bg-gradient-to-r from-primary-600 to-primary-700 text-white p-4 relative">
           <button

@@ -13,6 +13,7 @@ import {
   FiClock,
   FiSmile,
   FiChevronDown,
+  FiSend,
 } from "react-icons/fi";
 import { FaRegHeart, FaHeart, FaCommentDots } from "react-icons/fa";
 import { MdPublic, MdPeople } from "react-icons/md";
@@ -962,8 +963,19 @@ const PostPage = () => {
                     )}
 
                     {/* ✏️ Add comment box */}
-                    <div className="flex items-center gap-2 mt-4 relative">
-                      <div className="flex items-center gap-2 flex-1">
+                    <div className="mt-3 relative max-w-[95%] sm:max-w-full mx-auto">
+                      <div className="flex items-center gap-2 px-3 py-1 bg-white text-gray-700 rounded-lg border border-gray-200 shadow-sm sm:py-1.5">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setActiveEmojiPostId((prev) =>
+                              prev === post.id ? null : post.id
+                            )
+                          }
+                          className="flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 rounded-full hover:bg-gray-100 text-primary-500 transition-colors"
+                        >
+                          <FiSmile size={16} />
+                        </button>
                         <input
                           ref={(el) => (commentInputRefs.current[post.id] = el)}
                           type="text"
@@ -985,68 +997,23 @@ const PostPage = () => {
                               handlePostComment(post.id);
                             }
                           }}
-                          className="flex-1 border border-gray-300 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          className="flex-1 bg-transparent border-none text-[11px] sm:text-sm placeholder-gray-400 focus:outline-none"
                         />
                         <button
-                          type="button"
-                          onClick={() =>
-                            setActiveEmojiPostId((prev) =>
-                              prev === post.id ? null : post.id
-                            )
+                          onClick={() => handlePostComment(post.id)}
+                          disabled={
+                            postingComment.has(post.id) ||
+                            !newComment[post.id]?.trim()
                           }
-                          className="p-2 rounded-full bg-white text-primary-600 border border-gray-300 hover:bg-yellow-50 shadow-sm transition-colors flex items-center justify-center"
+                          className="flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-full text-primary-500 hover:text-white hover:bg-primary-500 disabled:opacity-40"
                         >
-                          <FiSmile size={18} />
+                          {postingComment.has(post.id) ? (
+                            <span className="animate-spin w-4 h-4 border-2 border-primary-500 border-t-transparent rounded-full" />
+                          ) : (
+                            <FiSend size={16} />
+                          )}
                         </button>
                       </div>
-
-                      <button
-                        onClick={() => handlePostComment(post.id)}
-                        disabled={postingComment.has(post.id)}
-                        className={`p-2 rounded-full ${
-                          postingComment.has(post.id)
-                            ? "bg-gray-300 cursor-not-allowed"
-                            : "bg-blue-500 hover:bg-blue-600"
-                        } text-white flex items-center justify-center transition-all`}
-                      >
-                        {postingComment.has(post.id) ? (
-                          <svg
-                            className="animate-spin h-4 w-4 text-white"
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                          >
-                            <circle
-                              className="opacity-25"
-                              cx="12"
-                              cy="12"
-                              r="10"
-                              stroke="currentColor"
-                              strokeWidth="4"
-                            ></circle>
-                            <path
-                              className="opacity-75"
-                              fill="currentColor"
-                              d="M4 12a8 8 0 018-8v8H4z"
-                            ></path>
-                          </svg>
-                        ) : (
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            strokeWidth={2}
-                            stroke="currentColor"
-                            className="w-5 h-5"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M4.5 19.5l15-7.5-15-7.5v6l10 1.5-10 1.5v6z"
-                            />
-                          </svg>
-                        )}
-                      </button>
 
                       {activeEmojiPostId === post.id && (
                         <div
@@ -1103,7 +1070,7 @@ const PostPage = () => {
       {/* Floating Create Button */}
       <button
         onClick={() => setIsCreateModalOpen(true)}
-        className="fixed bottom-20 right-5 sm:right-6 bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 hover:scale-110 transition-all lg:hidden"
+        className="fixed bottom-32 right-5 sm:right-6 bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 hover:scale-110 transition-all lg:hidden"
       >
         <FiPlusCircle size={26} />
       </button>
