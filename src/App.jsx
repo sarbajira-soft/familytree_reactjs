@@ -43,6 +43,7 @@ const GiftListingPage = lazy(() => import("./Pages/GiftListingPage"));
 const EventsPage = lazy(() => import("./Pages/EventsPage"));
 const OrderManagementPage = lazy(() => import("./Pages/OrderManagementPage"));
 const SuggestionApproving = lazy(() => import("./Pages/SuggestionApproving"));
+const FamilyManagementMobile = lazy(() => import("./Pages/FamilyManagementMobile"));
 const AssociatedFamilyTreePage = lazy(() =>
   import("./Pages/AssociatedFamilyTreePage")
 );
@@ -51,6 +52,7 @@ const LinkedFamilyTreesPage = lazy(() =>
 );
 const ProfileModule = lazy(() => import("./Pages/ProfileFormPage"));
 const UserProfile = lazy(() => import("./Pages/UserProfile"));
+const EditProfilePage = lazy(() => import("./Pages/EditProfilePage"));
 
 // ---------------- Loading Fallback ----------------
 const LoadingFallback = () => (
@@ -174,11 +176,13 @@ function App() {
                 {/* Dashboard & Profile */}
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/myprofile" element={<MyProfile />} />
+                <Route path="/profile/edit" element={<EditProfilePage />} />
                 <Route path="/user/:userId" element={<UserProfile />} />
 
                 {/* Family & Members */}
                 <Route path="/my-family" element={<MyFamily />} />
                 <Route path="/my-family-member" element={<MyFamilyMember />} />
+                <Route path="/family-management" element={<FamilyManagementMobile />} />
 
                 {/* Family Trees */}
                 <Route path="/family-tree" element={<FamilyTreePage />} />

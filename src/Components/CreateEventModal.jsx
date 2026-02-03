@@ -339,8 +339,11 @@ const CreateEventModal = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 font-inter">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl relative max-h-[95vh] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start sm:items-center justify-center px-2 sm:px-4 pt-8 pb-24 sm:pt-4 sm:pb-6 z-50 font-inter">
+      <div
+        className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-md sm:max-w-2xl relative flex flex-col overflow-hidden"
+        style={{ maxHeight: "calc(100vh - 140px)" }}
+      >
         {/* NEW: Success Popup */}
         {showSuccess && (
           <div className="absolute inset-0 bg-white/90 flex flex-col items-center justify-center z-10 p-6 text-center">
@@ -375,7 +378,7 @@ const CreateEventModal = ({
         )}
 
         {/* Header */}
-        <div className="bg-gradient-to-r from-primary-600 to-primary-700 text-white p-4 relative">
+        <div className="bg-gradient-to-r from-primary-600 to-primary-700 text-white px-4 py-3 sm:p-4 relative">
           <button
             onClick={onClose}
             className="absolute top-3 right-3 text-white/80 hover:text-white transition-colors p-1.5 rounded-full hover:bg-white/10"
@@ -385,11 +388,11 @@ const CreateEventModal = ({
           <div className="text-center">
             <div className="flex items-center justify-center gap-3">
               <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
-                <FiCalendar size={16} />
+                <FiCalendar size={14} />
               </div>
               <div>
-                <h2 className="text-xl font-bold">Create New Event</h2>
-                <p className="text-primary-100 text-xs">
+                <h2 className="text-lg sm:text-xl font-bold">Create New Event</h2>
+                <p className="text-primary-100 text-[11px] sm:text-xs">
                   Plan your next family gathering
                 </p>
               </div>
@@ -398,13 +401,13 @@ const CreateEventModal = ({
         </div>
 
         {/* Form Content */}
-        <div className="flex-1 overflow-y-auto p-6">
-          <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="flex-1 overflow-y-auto px-4 py-4 sm:p-6">
+          <form onSubmit={handleSubmit} className="space-y-5 sm:space-y-6">
             {/* Event Title */}
             <div className="space-y-2">
-              <label className="flex items-center gap-2 text-gray-700 font-semibold text-sm">
+              <label className="flex items-center gap-2 text-gray-700 font-semibold text-xs sm:text-sm">
                 <div className="w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center">
-                  <FiFileText size={12} className="text-primary-600" />
+                  <FiFileText size={11} className="text-primary-600" />
                 </div>
                 Event Title
               </label>
@@ -413,7 +416,7 @@ const CreateEventModal = ({
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 required
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
+                className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white text-sm"
                 placeholder="Enter event title..."
               />
             </div>
@@ -421,9 +424,9 @@ const CreateEventModal = ({
             {/* Date and Time */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="flex items-center gap-2 text-gray-700 font-semibold text-sm">
+                <label className="flex items-center gap-2 text-gray-700 font-semibold text-xs sm:text-sm">
                   <div className="w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center">
-                    <FiCalendar size={12} className="text-primary-600" />
+                    <FiCalendar size={11} className="text-primary-600" />
                   </div>
                   Date
                 </label>
@@ -432,13 +435,13 @@ const CreateEventModal = ({
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
                   required
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
+                  className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white text-sm"
                 />
               </div>
               <div className="space-y-2">
-                <label className="flex items-center gap-2 text-gray-700 font-semibold text-sm">
+                <label className="flex items-center gap-2 text-gray-700 font-semibold text-xs sm:text-sm">
                   <div className="w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center">
-                    <FiClock size={12} className="text-primary-600" />
+                    <FiClock size={11} className="text-primary-600" />
                   </div>
                   Time
                 </label>
@@ -447,16 +450,16 @@ const CreateEventModal = ({
                   value={time}
                   onChange={(e) => setTime(e.target.value)}
                   required
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
+                  className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white text-sm"
                 />
               </div>
             </div>
 
             {/* Location */}
             <div className="space-y-2">
-              <label className="flex items-center gap-2 text-gray-700 font-semibold text-sm">
+              <label className="flex items-center gap-2 text-gray-700 font-semibold text-xs sm:text-sm">
                 <div className="w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center">
-                  <FiMapPin size={12} className="text-primary-600" />
+                  <FiMapPin size={11} className="text-primary-600" />
                 </div>
                 Location
               </label>
@@ -465,16 +468,16 @@ const CreateEventModal = ({
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 required
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
+                className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white text-sm"
                 placeholder="Enter event location..."
               />
             </div>
 
             {/* Description */}
             <div className="space-y-2">
-              <label className="flex items-center gap-2 text-gray-700 font-semibold text-sm">
+              <label className="flex items-center gap-2 text-gray-700 font-semibold text-xs sm:text-sm">
                 <div className="w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center">
-                  <FiFileText size={12} className="text-primary-600" />
+                  <FiFileText size={11} className="text-primary-600" />
                 </div>
                 Description
               </label>
@@ -482,16 +485,16 @@ const CreateEventModal = ({
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows="4"
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white resize-none"
+                className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white resize-none text-sm"
                 placeholder="Tell us about your event..."
               ></textarea>
             </div>
 
             {/* Image Upload */}
             <div className="space-y-3">
-              <label className="flex items-center gap-2 text-gray-700 font-semibold text-sm">
+              <label className="flex items-center gap-2 text-gray-700 font-semibold text-xs sm:text-sm">
                 <div className="w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center">
-                  <FiImage size={12} className="text-primary-600" />
+                  <FiImage size={11} className="text-primary-600" />
                 </div>
                 Event Images
               </label>
@@ -565,13 +568,13 @@ const CreateEventModal = ({
         </div>
 
         {/* Footer */}
-        <div className="bg-gray-50 p-6 pb-20 border-t border-gray-200">
-          <div className="flex gap-3">
+        <div className="bg-gray-50 px-4 py-3 sm:p-6 pb-4 sm:pb-6 border-t border-gray-200">
+          <div className="flex flex-row gap-3">
             <button
               type="button"
               onClick={onClose}
               disabled={isLoading}
-              className="flex-1 py-3 px-6 border bg-white border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-100 transition-colors disabled:opacity-50"
+              className="flex-1 py-2.5 px-4 border bg-white border-gray-300 text-gray-700 rounded-xl font-medium text-sm sm:text-base hover:bg-gray-100 transition-colors disabled:opacity-50"
             >
               Cancel
             </button>
@@ -579,7 +582,7 @@ const CreateEventModal = ({
               type="submit"
               onClick={handleSubmit}
               disabled={isLoading}
-              className="flex-1 bg-gradient-to-r from-secondary-500 to-secondary-600 text-white py-3 px-6 rounded-xl font-semibold hover:from-secondary-500 hover:to-secondary-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="flex-1 bg-gradient-to-r from-secondary-500 to-secondary-600 text-white py-2.5 px-4 rounded-xl font-semibold text-sm sm:text-base hover:from-secondary-500 hover:to-secondary-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {isLoading ? (
                 <>

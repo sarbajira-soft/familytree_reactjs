@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import Swal from "sweetalert2";
+import { useNavigate } from "react-router-dom";
 import {
   FiEdit3,
   FiHeart,
@@ -15,7 +16,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import CreatePostModal from "../Components/CreatePostModal";
 import CreateAlbumModal from "../Components/CreateAlbumModal";
-import ProfileFormModal from "../Components/ProfileFormModal";
 import GalleryViewerModal from "../Components/GalleryViewerModal";
 import PostViewerModal from "../Components/PostViewerModal";
 import { UserProvider, useUser } from "../Contexts/UserContext";
@@ -27,13 +27,13 @@ const ProfilePage = () => {
   const [user, setUser] = useState(null);
   const { userInfo, userLoading, refetchUser } = useUser();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const profileFileInputRef = useRef(null);
 
   const [showPosts, setShowPosts] = useState(true);
   const [isCreatePostModalOpen, setIsCreatePostModalOpen] = useState(false);
   const [isCreateAlbumModalOpen, setIsCreateAlbumModalOpen] = useState(false);
-  const [isProfileFormModalOpen, setIsProfileFormModalOpen] = useState(false);
 
   const [isGalleryViewerOpen, setIsGalleryViewerOpen] = useState(false);
   const [selectedAlbum, setSelectedAlbum] = useState(null);
@@ -449,7 +449,7 @@ const ProfilePage = () => {
 
   const handleCreatePostClick = () => setIsCreatePostModalOpen(true);
   const handleCreateAlbumClick = () => setIsCreateAlbumModalOpen(true);
-  const handleEditProfileClick = () => setIsProfileFormModalOpen(true);
+  const handleEditProfileClick = () => navigate("/profile/edit");
 
   const handleViewAlbum = (album) => {
     setSelectedAlbum(album);
@@ -1145,12 +1145,6 @@ const ProfilePage = () => {
         authToken={token}
         mode="edit"
         albumData={albumToEdit}
-      />
-      <ProfileFormModal
-        isOpen={isProfileFormModalOpen}
-        onClose={() => setIsProfileFormModalOpen(false)}
-        mode="edit-profile"
-        onProfileUpdated={refetchUser}
       />
       <CreatePostModal
         isOpen={isCreatePostModalOpen}

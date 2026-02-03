@@ -2,7 +2,6 @@ import React, { useState, useMemo, useEffect } from "react";
 import { useUser } from "../Contexts/UserContext";
 import { useGiftEvent } from "../Contexts/GiftEventContext";
 import CreateEventModal from "../Components/CreateEventModal";
-import ProfileFormModal from "../Components/ProfileFormModal";
 import CreateAlbumModal from "../Components/CreateAlbumModal";
 import CreatePostModal from "../Components/CreatePostModal";
 import { useNavigate } from "react-router-dom";
@@ -277,7 +276,6 @@ const MiniEventCalendar = ({ events = [] }) => {
 
 const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
   const [isCreateEventModalOpen, setIsCreateEventModalOpen] = useState(false);
-  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isCreateAlbumModalOpen, setIsCreateAlbumModalOpen] = useState(false);
   const [isCreatePostModalOpen, setIsCreatePostModalOpen] = useState(false);
   const [isScheduleOptionsOpen, setIsScheduleOptionsOpen] = useState(false);
@@ -979,10 +977,6 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
         <CreateEventModal
           isOpen={isCreateEventModalOpen}
           onClose={() => setIsCreateEventModalOpen(false)}
-        />
-        <ProfileFormModal
-          isOpen={isProfileModalOpen}
-          onClose={() => setIsProfileModalOpen(false)}
         />
         <CreateAlbumModal
           isOpen={isCreateAlbumModalOpen}

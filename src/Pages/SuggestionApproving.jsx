@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiClock } from 'react-icons/fi';
+import { FiClock, FiArrowLeft } from 'react-icons/fi';
 import { useUser } from '../Contexts/UserContext';
 import RelationshipCalculator from '../utils/relationshipCalculator';
 
@@ -444,6 +444,15 @@ const SuggestionApproving = () => {
   return (
     <>
       <div className="flex-1 max-w-7xl mx-auto px-4 py-8 md:px-6 lg:px-8">
+        <button
+          type="button"
+          onClick={() => navigate('/family-management')}
+          className="mb-4 inline-flex items-center text-sm text-primary-600 hover:text-primary-700"
+        >
+          <FiArrowLeft className="mr-1.5" />
+          <span>Back to Family Management</span>
+        </button>
+
         <div className="flex items-center mb-6">
           <FiClock className="text-primary-600 text-3xl mr-3" />
           <h1 className="text-3xl font-bold text-gray-800">Pending Join Requests</h1>

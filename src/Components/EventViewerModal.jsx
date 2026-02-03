@@ -108,14 +108,15 @@ const EventViewerModal = ({
   return (
     <AnimatePresence>
       <motion.div
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90 backdrop-blur"
+        className="fixed inset-0 z-50 flex items-start justify-center bg-black bg-opacity-90 backdrop-blur px-2 sm:px-4 pt-10 pb-24 sm:pt-8 sm:pb-8"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
       >
         <motion.div
-          className="relative bg-white rounded-2xl m-3 shadow-2xl w-full max-w-5xl h-[92vh] flex flex-col overflow-hidden"
+          className="relative bg-white rounded-2xl m-3 shadow-2xl w-full max-w-5xl flex flex-col overflow-hidden"
+          style={{ maxHeight: "calc(100vh - 160px)" }}
           initial={{ scale: 0.98, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.98, opacity: 0 }}
@@ -296,7 +297,7 @@ const EventViewerModal = ({
         <AnimatePresence>
           {isFullScreen && (
             <motion.div
-              className="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-95"
+              className="fixed inset-0 z-[60] flex items-start justify-center bg-black bg-opacity-95 pt-10 pb-24"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}

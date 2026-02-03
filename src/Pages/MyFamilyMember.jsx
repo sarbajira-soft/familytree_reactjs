@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useUser } from '../Contexts/UserContext';
 import FamilyOverView from '../Components/FamilyOverView';
 import ProfileFormModal from '../Components/ProfileFormModal';
@@ -8,11 +9,12 @@ import NoFamilyView from '../Components/NoFamilyView';
 import PendingApprovalView from '../Components/PendingApprovalView';
 import CreateFamilyModal from '../Components/CreateFamilyModal';
 import JoinFamilyModal from '../Components/JoinFamilyModal';
-import { FiPlus, FiLoader } from 'react-icons/fi';
+import { FiPlus, FiLoader, FiArrowLeft } from 'react-icons/fi';
 import {jwtDecode} from 'jwt-decode';
 
 const FamilyMemberListing = () => {
   const { userInfo, userLoading } = useUser();
+  const navigate = useNavigate();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editMemberData, setEditMemberData] = useState(null);
@@ -227,6 +229,14 @@ const FamilyMemberListing = () => {
     return (
       <>
         <div className="max-w-7xl mx-auto px-4 py-8">
+          <button
+            type="button"
+            onClick={() => navigate('/family-management')}
+            className="mb-4 inline-flex items-center text-sm text-primary-600 hover:text-primary-700"
+          >
+            <FiArrowLeft className="mr-1.5" />
+            <span>Back to Family Management</span>
+          </button>
           <div className="flex flex-col items-center justify-center py-20">
             <FiLoader className="text-6xl text-primary-600 animate-spin mb-4" />
             <h2 className="text-2xl font-semibold text-gray-700 mb-2">Loading Family Members...</h2>
@@ -242,6 +252,14 @@ const FamilyMemberListing = () => {
     return (
       <>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <button
+            type="button"
+            onClick={() => navigate('/family-management')}
+            className="mb-4 inline-flex items-center text-sm text-primary-600 hover:text-primary-700"
+          >
+            <FiArrowLeft className="mr-1.5" />
+            <span>Back to Family Management</span>
+          </button>
           <NoFamilyView 
             onCreateFamily={handleCreateFamily}
             onJoinFamily={handleJoinFamily}
@@ -256,6 +274,14 @@ const FamilyMemberListing = () => {
     return (
       <>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <button
+            type="button"
+            onClick={() => navigate('/family-management')}
+            className="mb-4 inline-flex items-center text-sm text-primary-600 hover:text-primary-700"
+          >
+            <FiArrowLeft className="mr-1.5" />
+            <span>Back to Family Management</span>
+          </button>
           <PendingApprovalView 
             familyCode={userInfo.familyCode}
             onJoinFamily={() => {
@@ -271,6 +297,14 @@ const FamilyMemberListing = () => {
   return (
     <>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <button
+          type="button"
+          onClick={() => navigate('/family-management')}
+          className="mb-4 inline-flex items-center text-sm text-primary-600 hover:text-primary-700"
+        >
+          <FiArrowLeft className="mr-1.5" />
+          <span>Back to Family Management</span>
+        </button>
         <h1 className="text-3xl font-extrabold mb-4">My Family Tree</h1>
 
         <FamilyOverView familyCode={userInfo?.familyCode} token={token} />

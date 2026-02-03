@@ -3,12 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import AuthLogo from '../Components/AuthLogo';
 import { setAuthData, isAuthenticated } from '../utils/auth';
 import { useUser } from '../Contexts/UserContext';
+import { useTheme } from '../Contexts/ThemeContext';
+import { FiMoon, FiSun } from 'react-icons/fi';
 import { MEDUSA_TOKEN_KEY } from '../Retail/utils/constants';
 import * as retailAuthService from '../Retail/services/authService';
 
 const Login = () => {
   const navigate = useNavigate();
   const { userInfo, userLoading, refetchUser } = useUser();
+  const { theme, toggleTheme } = useTheme();
+
   const usernameRef = useRef(null);
   const passwordRef = useRef(null);
 
@@ -106,7 +110,17 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen w-full bg-gray-50 flex items-center justify-center px-4">
+    <div className="min-h-screen w-full bg-gray-50 flex items-center justify-center px-4 relative dark:bg-slate-950">
+      {/* Theme Toggle */}
+      <button
+        type="button"
+        onClick={toggleTheme}
+        className="absolute top-4 right-4 bg-unset rounded-full p-2 text-gray-700 hover:bg-gray-100 dark:text-slate-200 dark:hover:bg-slate-800"
+        title={theme === 'dark' ? 'Switch to Light' : 'Switch to Dark'}
+      >
+        {theme === 'dark' ? <FiSun size={18} /> : <FiMoon size={18} />}
+      </button>
+
       <div className="w-full max-w-md px-4 sm:px-6 lg:px-8">
         {/* Logo */}
         <div className="flex justify-center mb-1">

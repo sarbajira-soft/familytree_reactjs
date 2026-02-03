@@ -472,47 +472,47 @@ const EventsPage = () => {
               </div>
 
               {/* Mobile View (Compact UI) */}
-              <div className="flex md:hidden items-center justify-between gap-2">
+              <div className="flex md:hidden items-center gap-2">
                 {/* Upcoming */}
                 <button
                   onClick={() => setActiveTab("upcoming")}
-                  className={`flex items-center justify-center gap-1 py-2 px-3 text-xs w-full rounded-lg font-semibold transition-all
+                  className={`flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-2 text-[11px] rounded-full font-semibold transition-all
         ${
           activeTab === "upcoming"
             ? "bg-orange-500 text-white shadow-md"
-            : "bg-[#1976D2] text-white hover:bg-[#1565C0]"
+            : "bg-white text-[#1976D2] border border-[#1976D2]/30"
         }`}
                 >
                   <FiCalendar size={14} />
-                  Upcoming
+                  <span>Upcoming</span>
                 </button>
 
                 {/* My Events */}
                 <button
                   onClick={() => setActiveTab("my-events")}
-                  className={`flex items-center justify-center gap-1 py-2 px-3 text-xs w-full rounded-lg font-semibold transition-all
+                  className={`flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-2 text-[11px] rounded-full font-semibold transition-all
         ${
           activeTab === "my-events"
             ? "bg-orange-500 text-white shadow-md"
-            : "bg-[#1976D2] text-white hover:bg-[#1565C0]"
+            : "bg-white text-[#1976D2] border border-[#1976D2]/30"
         }`}
                 >
                   <FiList size={14} />
-                  My Events
+                  <span>My Events</span>
                 </button>
 
                 {/* All */}
                 <button
                   onClick={() => setActiveTab("all")}
-                  className={`flex items-center justify-center gap-1 py-2 px-3 text-xs w-full rounded-lg font-semibold transition-all
+                  className={`flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-2 text-[11px] rounded-full font-semibold transition-all
         ${
           activeTab === "all"
             ? "bg-orange-500 text-white shadow-md"
-            : "bg-[#1976D2] text-white hover:bg-[#1565C0]"
+            : "bg-white text-[#1976D2] border border-[#1976D2]/30"
         }`}
                 >
                   <FiGlobe size={14} />
-                  All
+                  <span>All</span>
                 </button>
               </div>
             </div>

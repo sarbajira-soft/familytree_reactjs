@@ -607,7 +607,7 @@ const PostsAndFeedsPage = () => {
             {/* Floating Action Button for Mobile - Optional */}
             <button
                 onClick={() => setIsCreateModalOpen(true)}
-                className="fixed bottom-20 right-6 bg-primary-600 text-white p-4 rounded-full shadow-lg lg:hidden z-40 hover:bg-primary-700 transition-colors transform hover:scale-110"
+                className="fixed bottom-32 right-6 bg-primary-600 text-white p-4 rounded-full shadow-lg lg:hidden z-40 hover:bg-primary-700 transition-colors transform hover:scale-110"
                 title="Create New Post"
             >
                 <FiPlusCircle size={28} />

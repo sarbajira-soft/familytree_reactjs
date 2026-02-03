@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import CreateFamilyModal from '../Components/CreateFamilyModal';
 import { useUser } from '../Contexts/UserContext';
 import FamilyOverView from '../Components/FamilyOverView';
-import { FiLoader } from 'react-icons/fi';
+import { FiLoader, FiArrowLeft } from 'react-icons/fi';
 import SuggestFamilyModal from '../Components/SuggestFamilyModal';
 import {jwtDecode} from 'jwt-decode';
 import Swal from 'sweetalert2';
@@ -220,6 +220,15 @@ const FamilyHubPage = () => {
     <>
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 dark:from-slate-950 dark:to-slate-900">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+          <button
+            type="button"
+            onClick={() => navigate('/family-management')}
+            className="mb-4 inline-flex items-center text-sm text-primary-600 hover:text-primary-700"
+          >
+            <FiArrowLeft className="mr-1.5" />
+            <span>Back to Family Management</span>
+          </button>
+
           {/* Condition 1: No family code - show NoFamilyView */}
           {!userInfo?.familyCode ? (
             <NoFamilyView onCreateFamily={handleCreateFamily} onJoinFamily={handleJoinFamily} />

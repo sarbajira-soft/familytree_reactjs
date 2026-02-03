@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { FaRegHeart, FaHeart, FaCommentDots, FaTimes, FaUndoAlt } from "react-icons/fa";
-import { FiSmile } from "react-icons/fi";
+import { FiSmile, FiSend } from "react-icons/fi";
 import { AnimatePresence, motion } from "framer-motion";
 import EmojiPicker from "emoji-picker-react";
 import CommentItem from "./CommentItem";
@@ -258,7 +258,7 @@ const PostViewerModal = ({
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur pt-4 pb-24 md:pt-0 md:pb-0"
           variants={backdropVariants}
           initial="hidden"
           animate="visible"
@@ -266,7 +266,8 @@ const PostViewerModal = ({
           onClick={onClose}
         >
           <motion.div
-            className="relative bg-white rounded-3xl m-2 shadow-2xl w-full max-w-4xl h-[100vh] flex flex-col overflow-hidden"
+            className="relative bg-white rounded-3xl m-2 shadow-2xl w-full max-w-4xl flex flex-col overflow-hidden"
+            style={{ maxHeight: "calc(100vh - 140px)" }}
             variants={modalVariants}
             onClick={(e) => e.stopPropagation()}
           >
@@ -362,39 +363,35 @@ const PostViewerModal = ({
                     )}
                   </div>
                   {/* Comment input (sticks at bottom) */}
-                  <div className="flex mb-14 items-end gap-2 p-4 pt-0 bg-gray-50 flex-shrink-0 border-t relative">
-                    <div className="flex items-end gap-2 flex-1">
-                      <textarea
-                        ref={textareaRef}
-                        rows="1"
-                        value={newComment}
-                        onChange={(e) => setNewComment(e.target.value)}
-                        placeholder="Write a comment..."
-                        className="flex-1 p-3 mt-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-400 text-sm resize-none min-h-[38px] max-h-[100px] md:min-h-[38px] md:max-h-[60px]"
-                        style={{ lineHeight: "1.4" }}
-                      />
+                  <div className="px-4 pt-2 pb-4 bg-gray-50 flex-shrink-0 border-t relative">
+                    <div className="flex items-center gap-2 px-3 py-1 bg-white text-gray-700 rounded-lg border border-gray-200 shadow-sm sm:py-1.5">
                       <button
                         type="button"
                         onClick={() => setShowEmojiPicker((prev) => !prev)}
-                        className="mb-1 p-2 rounded-full bg-white text-primary-600 border border-gray-300 hover:bg-yellow-50 shadow-sm transition-colors flex items-center justify-center"
+                        className="flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 rounded-full hover:bg-gray-100 text-primary-500 transition-colors"
                       >
-                        <FiSmile size={20} />
+                        <FiSmile size={16} />
+                      </button>
+                      <input
+                        ref={textareaRef}
+                        type="text"
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        placeholder="Add a comment..."
+                        className="flex-1 bg-transparent border-none text-[11px] sm:text-sm placeholder-gray-400 focus:outline-none"
+                      />
+                      <button
+                        onClick={handlePostComment}
+                        disabled={!newComment.trim() || isCommentLoading}
+                        className="flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-full text-primary-500 hover:text-white hover:bg-primary-500 disabled:opacity-40"
+                      >
+                        {isCommentLoading ? (
+                          <span className="animate-spin w-4 h-4 border-2 border-primary-500 border-t-transparent rounded-full" />
+                        ) : (
+                          <FiSend size={16} />
+                        )}
                       </button>
                     </div>
-                    <button
-                      onClick={handlePostComment}
-                      disabled={!newComment.trim() || isCommentLoading}
-                      className={`px-4 py-2 rounded-lg font-semibold whitespace-nowrap shadow-md
-                        ${
-                          isCommentLoading
-                            ? "bg-gray-400 text-white"
-                            : "bg-primary-600 hover:bg-primary-700 text-white"
-                        }
-                      `}
-                      style={{ minHeight: "38px", height: "auto" }}
-                    >
-                      {isCommentLoading ? "..." : "Post"}
-                    </button>
                     {showEmojiPicker && (
                       <div
                         ref={emojiPickerRef}
@@ -429,7 +426,10 @@ const PostViewerModal = ({
             onClick={() => setIsFullScreen(false)}
           >
             {/* Close & Rotate Buttons */}
-            <div className="fixed top-4 right-4 flex gap-3 z-50">
+            <div
+              className="fixed right-4 flex gap-3 z-50"
+              style={{ top: "calc(env(safe-area-inset-top, 16px) + 8px)" }}
+            >
               {/* ROTATE BUTTON */}
               <button
                 onClick={(e) => {

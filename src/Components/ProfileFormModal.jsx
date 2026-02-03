@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import PhoneInput from 'react-phone-input-2';
 import Swal from 'sweetalert2';
+import { FiArrowLeft } from 'react-icons/fi';
 import { useUser } from '../Contexts/UserContext';
 
 const INDIAN_RELIGIONS = [
@@ -29,7 +30,15 @@ const INDIAN_LANGUAGES = [
   'English',
 ];
 
-const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode = 'add', memberData = {} }) => {
+const ProfileFormModal = ({
+  isOpen,
+  onClose,
+  onAddMember,
+  onUpdateProfile,
+  mode = 'add',
+  memberData = {},
+  variant = 'modal',
+}) => {
   const mobileRef = useRef(null);
   const profileFileInputRef = useRef(null);
   const { userInfo, userLoading } = useUser();
@@ -967,7 +976,9 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
           text: 'Family member created successfully.',
           confirmButtonColor: '#3f982c',
         }).then(() => {
-          window.location.reload();
+          if (variant !== 'page') {
+            window.location.reload();
+          }
         });
       } else {
         // For edit modes, always show alert regardless of callback
@@ -987,7 +998,9 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
             text: 'Your request to join the family has been sent. Please wait for the family admin to approve your request.',
             confirmButtonColor: '#3f982c',
           }).then(() => {
-            window.location.reload();
+            if (variant !== 'page') {
+              window.location.reload();
+            }
           });
         } else {
           // Regular profile update
@@ -1000,11 +1013,15 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
             text: alertText,
             confirmButtonColor: '#3f982c',
           }).then(() => {
-            window.location.reload();
+            if (variant !== 'page') {
+              window.location.reload();
+            }
           });
         }
       }
-      onClose();
+      if (variant !== 'page') {
+        onClose();
+      }
       
     } catch (error) {
       const errorMessage = 'Network error or server unreachable. Please try again.';
@@ -1085,9 +1102,12 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
     }
   };
 
-  if (!isOpen) return null;
+  const isPageVariant = variant === 'page';
+
+  if (!isPageVariant && !isOpen) return null;
 
   const title = mode === 'add' ? 'Add New Family Member' : (mode === 'edit-profile' ? 'Edit Profile' : 'Edit Family Member Profile');
+  
   const submitButtonText = isLoading ? 'Processing...' : (mode === 'add' ? 'Add Member' : 'Save');
   const lockEmailAndMobile = mode === 'edit-profile' || mode === 'edit-member';
 
@@ -1104,24 +1124,60 @@ const ProfileFormModal = ({ isOpen, onClose, onAddMember, onUpdateProfile, mode 
   const selectedReligionNameUI = selectedRelFromApiUI?.name || String(formData.religionId || '');
   const isHinduReligionUI = /hindu/i.test(selectedReligionNameUI);
 
+  const outerClassName = isPageVariant
+    ? "w-full font-inter px-3 sm:px-4 py-4 sm:py-6"
+    : "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 font-inter";
+
+  const containerClassName = isPageVariant
+    ? "w-full max-w-5xl mx-auto"
+    : "bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto";
+
+  const headerClassName = isPageVariant
+    ? "flex justify-between items-center mb-4 sm:mb-6"
+    : "flex justify-between items-center p-5 border-b border-gray-200 sticky top-0 bg-white z-10";
+
+  const titleClassName = isPageVariant
+    ? "text-xl sm:text-2xl font-bold text-gray-800"
+    : "text-2xl font-bold text-gray-800";
+
+  const contentWrapperClassName = isPageVariant
+    ? ""
+    : "p-6";
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 font-inter">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-center p-5 border-b border-gray-200 sticky top-0 bg-white z-10">
-          <h2 className="text-2xl font-bold text-gray-800">{title}</h2>
-          <button
-            onClick={onClose}
-            className="bg-unset p-2 rounded-full hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700"
-            aria-label="Close modal"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-          </button>
+    <div className={outerClassName}>
+      <div className={containerClassName}>
+        <div className={headerClassName}>
+          <div className="flex items-center gap-3">
+            {isPageVariant && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="bg-unset inline-flex items-center text-sm text-gray-600 hover:text-gray-900"
+              >
+                <FiArrowLeft className="mr-1 h-4 w-4" />
+                <span className="hidden xs:inline sm:inline">Back</span>
+              </button>
+            )}
+            <h2 className={titleClassName}>{title}</h2>
+          </div>
+
+          {!isPageVariant && (
+            <button
+              onClick={onClose}
+              className="bg-unset p-2 rounded-full hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700"
+              aria-label="Close modal"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          )}
         </div>
 
-        <div className="p-6">
+        <div className={contentWrapperClassName}>
+
           {apiError && (
             <div 
               ref={errorRef}

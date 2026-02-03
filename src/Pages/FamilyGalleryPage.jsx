@@ -303,58 +303,59 @@ const FamilyGalleryPage = () => {
     gap-3
   "
             >
-              {/* FEED SWITCHER */}
-              <div
-                className="
-      flex w-full sm:w-auto 
+              <div className="w-full flex flex-row gap-2">
+                {/* FEED SWITCHER */}
+                <div
+                  className="
+      flex flex-1 sm:flex-none 
       justify-between sm:justify-start 
       gap-2 bg-gray-100 p-1 rounded-full
     "
-              >
-                <button
-                  onClick={() => setActiveFeed("public")}
-                  className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 
-          py-2 px-4 text-sm font-semibold rounded-full transition-all
+                >
+                  <button
+                    onClick={() => setActiveFeed("public")}
+                    className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 
+          py-1.5 px-2.5 sm:px-4 text-xs sm:text-sm font-semibold rounded-full transition-all
           ${
             activeFeed === "public"
               ? "bg-gradient-to-r from-secondary-500 to-secondary-600 text-white shadow"
               : "bg-primary-700 text-white hover:bg-primary-800"
           }`}
-                >
-                  <MdPublic size={18} /> Public
-                </button>
+                  >
+                    <MdPublic size={16} /> Public
+                  </button>
 
-                {userInfo?.familyCode &&
-                  userInfo?.approveStatus === "approved" && (
-                    <button
-                      onClick={() => setActiveFeed("family")}
-                      className={`flex-1 sm:flex-none flex items-center justify-center 
-            gap-1.5 py-2 px-4 text-sm font-semibold rounded-full transition-all
+                  {userInfo?.familyCode &&
+                    userInfo?.approveStatus === "approved" && (
+                      <button
+                        onClick={() => setActiveFeed("family")}
+                        className={`flex-1 sm:flex-none flex items-center justify-center 
+            gap-1.5 py-1.5 px-2.5 sm:px-4 text-xs sm:text-sm font-semibold rounded-full transition-all
             ${
               activeFeed === "family"
                 ? "bg-gradient-to-r from-secondary-500 to-secondary-600 text-white shadow"
                 : "bg-primary-700 text-white hover:bg-primary-800"
             }`}
-                    >
-                      <MdPeople size={18} /> Family
-                    </button>
-                  )}
-              </div>
+                      >
+                        <MdPeople size={16} /> Family
+                      </button>
+                    )}
+                </div>
 
-              {/* CREATE ALBUM BTN */}
-              <button
-                className="
-        w-full sm:w-auto 
+                {/* CREATE ALBUM BTN */}
+                <button
+                  className="
         flex items-center justify-center 
-        gap-2 px-4 py-2 
+        gap-1.5 px-2.5 sm:px-4 py-1.5 
         bg-primary-700 hover:bg-primary-800 text-white 
-        font-semibold rounded-full shadow 
-        transition-all whitespace-nowrap
+        text-xs sm:text-sm font-semibold rounded-full shadow 
+        transition-all whitespace-nowrap flex-none
       "
-                onClick={openCreateAlbumModal}
-              >
-                <FiPlusCircle size={20} /> Create Album
-              </button>
+                  onClick={openCreateAlbumModal}
+                >
+                  <FiPlusCircle size={16} /> Create Album
+                </button>
+              </div>
 
               {/* SEARCH */}
               <input

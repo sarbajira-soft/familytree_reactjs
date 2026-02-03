@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FaUserPlus, FaSearch, FaWhatsapp } from 'react-icons/fa';
-import { FiLoader, FiX } from 'react-icons/fi';
+import { FiLoader, FiX, FiArrowLeft } from 'react-icons/fi';
+import { useNavigate } from 'react-router-dom';
 import JoinFamilyModal from '../Components/JoinFamilyModal';
 import { useUser } from '../Contexts/UserContext';
 
@@ -134,6 +135,7 @@ const FamilyMemberListing = () => {
   const [selectedMember, setSelectedMember] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const { userInfo, userLoading, refetchUser } = useUser();
+  const navigate = useNavigate();
 
   const fetchMembers = async () => {
     try {
@@ -200,6 +202,14 @@ const FamilyMemberListing = () => {
     return (
       <>
         <div className="max-w-7xl mx-auto px-4 py-8 flex flex-col items-center justify-center py-20">
+          <button
+            type="button"
+            onClick={() => navigate('/family-management')}
+            className="self-start mb-4 inline-flex items-center text-sm text-primary-600 hover:text-primary-700"
+          >
+            <FiArrowLeft className="mr-1.5" />
+            <span>Back to Family Management</span>
+          </button>
           <FiLoader className="text-6xl text-blue-600 animate-spin mb-4" />
           <h2 className="text-2xl font-semibold text-gray-700 mb-2">Loading...</h2>
           <p className="text-gray-500">Please wait while we verify your access.</p>
@@ -212,6 +222,14 @@ const FamilyMemberListing = () => {
     return (
       <>
         <div className="max-w-7xl mx-auto px-4 py-8 flex flex-col items-center justify-center py-20">
+          <button
+            type="button"
+            onClick={() => navigate('/family-management')}
+            className="self-start mb-4 inline-flex items-center text-sm text-primary-600 hover:text-primary-700"
+          >
+            <FiArrowLeft className="mr-1.5" />
+            <span>Back to Family Management</span>
+          </button>
           <div className="text-center">
             <FaUserPlus className="text-6xl text-gray-400 mx-auto mb-4" />
             <h2 className="text-2xl font-semibold text-gray-700 mb-2">Join a Family First</h2>
@@ -246,6 +264,14 @@ const FamilyMemberListing = () => {
     return (
       <>
         <div className="max-w-7xl mx-auto px-4 py-8 flex flex-col items-center justify-center py-20">
+          <button
+            type="button"
+            onClick={() => navigate('/family-management')}
+            className="self-start mb-4 inline-flex items-center text-sm text-primary-600 hover:text-primary-700"
+          >
+            <FiArrowLeft className="mr-1.5" />
+            <span>Back to Family Management</span>
+          </button>
           <FiLoader className="text-6xl text-blue-600 animate-spin mb-4" />
           <h2 className="text-2xl font-semibold text-gray-700 mb-2">Loading Members...</h2>
           <p className="text-gray-500">Please wait while we fetch family members.</p>
@@ -257,6 +283,14 @@ const FamilyMemberListing = () => {
   return (
     <>
       <div className="max-w-7xl mx-auto px-4 py-8">
+        <button
+          type="button"
+          onClick={() => navigate('/family-management')}
+          className="mb-4 inline-flex items-center text-sm text-primary-600 hover:text-primary-700"
+        >
+          <FiArrowLeft className="mr-1.5" />
+          <span>Back to Family Management</span>
+        </button>
         <div className="mb-6">
           <h1 className="text-3xl font-bold mb-2 flex items-center">
             <FaUserPlus className="mr-3 text-blue-600" />

@@ -23,7 +23,6 @@ import { RiGitMergeLine } from "react-icons/ri";
 import { useUser } from "../Contexts/UserContext";
 import { useTheme } from "../Contexts/ThemeContext";
 import { MEDUSA_TOKEN_KEY, MEDUSA_CART_ID_KEY } from "../Retail/utils/constants";
-import ProfileFormModal from "./ProfileFormModal";
 import NotificationPanel from "./NotificationPanel";
 
 const Layout = ({ noScroll = false }) => {
@@ -35,10 +34,16 @@ const Layout = ({ noScroll = false }) => {
   useEffect(() => {
     const pathToTabId = {
       "/dashboard": "home",
-      "/myprofile": "profile",
       "/events": "upcomingEvent",
       "/upcoming-events": "upcomingEvent",
+      "/family-tree": "familyTree",
+      "/family-management": "familyManagement",
+      "/my-family": "familyManagement",
+      "/my-family-member": "familyManagement",
+      "/pending-request": "familyManagement",
+      "/suggestion-approving": "familyManagement",
       // "/posts-and-feeds": "postsStories",
+      "/family-gallery": "gallery",
       "/gifts": "gifts",
       "/gifts-memories": "gifts",
     };
@@ -51,7 +56,6 @@ const Layout = ({ noScroll = false }) => {
   const [familyMenuOpen, setFamilyMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
-  const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
 
   const menuButtonRef = useRef(null);
   const sidebarRef = useRef(null);
@@ -129,38 +133,8 @@ const Layout = ({ noScroll = false }) => {
     {
       id: "familyManagement",
       label: "Family",
+      route: "/family-management",
       icon: <FiUsers size={20} />,
-      children: [
-        {
-          id: "myFamily",
-          label: "My Family",
-          route: "/my-family",
-          icon: <FiUsers size={18} />,
-        },
-        {
-          id: "myFamilyMembers",
-          label: "All Members",
-          route: "/my-family-member",
-          icon: <FiUsers size={18} />,
-        },
-        {
-          id: "pendingRequests",
-          label: "Invite Links",
-          route: "/pending-request",
-          icon: <FiLink size={18} />,
-          requiresApproval: true,
-        },
-        ...(userInfo?.role === 2 || userInfo?.role === 3
-          ? [
-              {
-                id: "suggestionApproving",
-                label: "Suggestion Approving",
-                route: "/suggestion-approving",
-                icon: <FiClock size={18} />,
-              },
-            ]
-          : []),
-      ],
     },
     {
       id: "gallery",
@@ -209,6 +183,17 @@ const Layout = ({ noScroll = false }) => {
     });
 
   const isHeaderItemActive = (item) => {
+    if (item.id === "familyManagement") {
+      const familyPaths = [
+        "/family-management",
+        "/my-family",
+        "/my-family-member",
+        "/pending-request",
+        "/suggestion-approving",
+      ];
+      return familyPaths.includes(location.pathname);
+    }
+
     if (item.route) return location.pathname === item.route;
     if (item.children) {
       return item.children.some((child) => location.pathname === child.route);
@@ -230,13 +215,9 @@ const Layout = ({ noScroll = false }) => {
     navigate("/login");
   };
 
-  const openAddMemberModal = () => {
-    setIsAddMemberModalOpen(true);
+  const handleEditProfile = () => {
     setProfileOpen(false);
-  };
-
-  const closeAddMemberModal = () => {
-    setIsAddMemberModalOpen(false);
+    navigate("/profile/edit");
   };
 
   const decrementUnreadCount = () => {
@@ -265,10 +246,10 @@ const Layout = ({ noScroll = false }) => {
       <main className="h-full flex flex-col overflow-hidden">
         {/* Header */}
         <header className="bg-white border-b border-gray-100 px-4 lg:px-6 sticky top-0 z-50 shadow-md dark:bg-slate-900 dark:border-slate-800">
-          <div className="flex items-center justify-between h-16">
+          <div className="flex items-center justify-between h-14 lg:h-16">
             {/* Left Section */}
             <div className="flex items-center gap-2">
-              {isMobile && (
+              {false && isMobile && (
                 <button
                   ref={menuButtonRef}
                   onClick={(e) => {
@@ -278,14 +259,14 @@ const Layout = ({ noScroll = false }) => {
                     setNotificationOpen(false);
                     setFamilyMenuOpen(false);
                   }}
-                  className="p-2 rounded-xl bg-primary-600 text-white shadow-sm hover:bg-primary-700"
+                  className="p-1.5 rounded-lg bg-primary-600 text-white shadow-sm hover:bg-primary-700"
                 >
-                  <FiMenu size={18} />
+                  <FiMenu size={16} />
                 </button>
               )}
 
               <div className={`flex items-center ${isMobile ? "gap-1.5" : "gap-2"}`}>
-                <div className={isMobile ? "w-9 h-9" : "w-12 h-12"}>
+                <div className={isMobile ? "w-8 h-8" : "w-12 h-12"}>
                   <img
                     src="/assets/family-logo.png"
                     alt="Familyss Logo"
@@ -296,7 +277,7 @@ const Layout = ({ noScroll = false }) => {
    <img
                   src="/assets/familyss.png"
                   alt="Familyss"
-                  className={isMobile ? "h-10 w-auto" : "h-16 w-auto"}
+                  className={isMobile ? "h-8 w-auto" : "h-16 w-auto"}
                 />
 
               </div>
@@ -388,18 +369,7 @@ const Layout = ({ noScroll = false }) => {
             )}
 
             {/* Right Section */}
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleTheme();
-                }}
-                className="p-2 bg-unset rounded-2xl text-gray-700 hover:bg-gray-100 dark:text-slate-200 dark:hover:bg-slate-800"
-                title={theme === "dark" ? "Switch to Light" : "Switch to Dark"}
-              >
-                {theme === "dark" ? <FiSun size={18} /> : <FiMoon size={18} />}
-              </button>
-
+            <div className={`flex items-center ${isMobile ? "space-x-3" : "space-x-4"}`}>
               {/* Notifications */}
               <div className="relative">
                 <button
@@ -407,9 +377,9 @@ const Layout = ({ noScroll = false }) => {
                     e.stopPropagation();
                     setNotificationOpen(!notificationOpen);
                   }}
-                  className="p-1 bg-unset text-primary-600 relative rounded-3xl hover:bg-gray-100 dark:hover:bg-slate-800"
+                  className={`bg-unset text-primary-600 relative rounded-3xl hover:bg-gray-100 dark:hover:bg-slate-800 ${isMobile ? "p-1" : "p-1.5"}`}
                 >
-                  <FiBell size={20} />
+                  <FiBell size={isMobile ? 18 : 20} />
                   {unreadCount > 0 && (
                     <span className="absolute top-0 right-0 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-500 rounded-full">
                       {unreadCount}
@@ -428,16 +398,16 @@ const Layout = ({ noScroll = false }) => {
                     e.stopPropagation();
                     setProfileOpen(!profileOpen);
                   }}
-                  className="bg-unset flex items-center space-x-2 p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800"
+                  className={`bg-unset flex items-center space-x-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 ${isMobile ? "p-0.5" : "p-1"}`}
                 >
                   {userInfo?.profileUrl ? (
                     <img
                       src={userInfo.profileUrl}
                       alt="User Profile"
-                      className="w-8 h-8 rounded-full object-cover"
+                      className={`${isMobile ? "w-7 h-7" : "w-8 h-8"} rounded-full object-cover`}
                     />
                   ) : (
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-primary-500 to-primary-600 flex items-center justify-center text-white">
+                    <div className={`${isMobile ? "w-7 h-7" : "w-8 h-8"} rounded-full bg-gradient-to-r from-primary-500 to-primary-600 flex items-center justify-center text-white`}>
                       <RiUser3Line size={16} />
                     </div>
                   )}
@@ -454,7 +424,7 @@ const Layout = ({ noScroll = false }) => {
                 {profileOpen && (
                   <div
                     className="fixed md:absolute right-4 mt-2 w-48 bg-white rounded-lg shadow-lg py-1 z-50 border border-gray-200 dark:bg-slate-800 dark:border-slate-700"
-                    style={{ top: "4rem" }}
+                    style={{ top: isMobile ? "3.5rem" : "4rem" }}
                   >
                     <div className="px-4 py-2  text-sm text-gray-800 border-b border-gray-100 dark:text-slate-100 dark:border-slate-700">
                       <p className="font-semibold">
@@ -473,10 +443,24 @@ const Layout = ({ noScroll = false }) => {
                       My Profile
                     </button>
                     <button
-                      onClick={openAddMemberModal}
+                      onClick={handleEditProfile}
                       className="block w-full bg-white text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
                     >
                       Edit Profile
+                    </button>
+                    <button
+                      onClick={() => {
+                        toggleTheme();
+                        setProfileOpen(false);
+                      }}
+                      className="block w-full bg-white text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 flex items-center justify-between"
+                    >
+                      <span>
+                         {theme === "dark" ? "Light" : "Dark"} Mode
+                      </span>
+                      <span className="ml-2 text-primary-600 dark:text-primary-400">
+                        {theme === "dark" ? <FiSun size={16} /> : <FiMoon size={16} />}
+                      </span>
                     </button>
                     <div className="border-t border-gray-200 dark:border-slate-700"></div>
                     <button
@@ -500,7 +484,7 @@ const Layout = ({ noScroll = false }) => {
             />
             <div
               ref={sidebarRef}
-                className="fixed top-16 bottom-0 left-0 z-50 bg-white shadow-2xl border-r border-gray-200 overflow-hidden"
+                className="fixed top-14 lg:top-16 bottom-0 left-0 z-50 bg-white shadow-2xl border-r border-gray-200 overflow-hidden"
             >
               <Sidebar
                 activeTab={activeTab}
@@ -514,11 +498,13 @@ const Layout = ({ noScroll = false }) => {
           </>
         )}
 
-        {/* Page Outlet (Content changes, layout persists) */}
+        {/* Page Outlet (Content changes, layout persists)
+            Note: extra bottom padding ensures content is not hidden
+            behind the fixed mobile BottomNavBar. */}
         <div
           className={`flex-1 ${
             noScroll ? "overflow-hidden" : "overflow-y-auto"
-           } pt-0 px-1 pb-1 md:px-2 md:pb-2 bg-gray-50`}
+           } pt-0 px-1 pb-20 md:px-2 md:pb-16 lg:pb-6 bg-gray-50`}
         >
           <Outlet />
         </div>
@@ -539,12 +525,6 @@ const Layout = ({ noScroll = false }) => {
         refetchUnreadCount={refetchUnreadCount}
       />
 
-      {/* Settings/Profile Modal */}
-      <ProfileFormModal
-        isOpen={isAddMemberModalOpen}
-        onClose={closeAddMemberModal}
-        mode="edit-profile"
-      />
     </div>
   );
 };
