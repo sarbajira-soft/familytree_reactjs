@@ -15,12 +15,12 @@ function getAllDescendants(tree, personId, visited = new Set()) {
     return descendants;
 }
 
-export function autoArrange(tree) {
-    const g = new dagre.graphlib.Graph({ compound: true });
-    
+function getSpacingConfig(memberCount) {
     // Dynamic spacing based on tree size AND screen size
-    const memberCount = tree.people.size;
-    const isMobile = typeof window !== 'undefined' && window.innerWidth <= 640;
+    const isMobile =
+        typeof globalThis !== "undefined" &&
+        globalThis.window &&
+        globalThis.window.innerWidth <= 640;
     let nodesep, ranksep, marginx, marginy, coupleSpacing, nodeWidth, nodeHeight;
     
     // Mobile-responsive spacing
@@ -72,6 +72,136 @@ export function autoArrange(tree) {
         marginy = 50;
     }
 
+    return { isMobile, nodesep, ranksep, marginx, marginy, coupleSpacing, nodeWidth, nodeHeight };
+}
+
+function applyGenerationSubgraphs(tree, g, memberCount) {
+    // For large trees, apply additional organization
+    if (memberCount > 20) {
+        // Group by generations for better organization
+        const generationGroups = new Map();
+        tree.people.forEach(person => {
+            const gen = person.generation || 0;
+            if (!generationGroups.has(gen)) {
+                generationGroups.set(gen, []);
+            }
+            generationGroups.get(gen).push(person.id);
+        });
+
+        // Create subgraphs for each generation
+        generationGroups.forEach((personIds, generation) => {
+            if (personIds.length > 5) {
+                const subgraphId = `gen-${generation}`;
+                g.setNode(subgraphId, {
+                    cluster: true,
+                    label: `Generation ${generation}`,
+                    style: 'fill: #f8f9fa',
+                    margin: 30,
+                    rank: 'same',
+                    rankdir: 'LR'
+                });
+                
+                personIds.forEach(pid => {
+                    if (!g.parent(pid.toString())) {  // Only if not already in a family cluster
+                        g.setParent(pid.toString(), subgraphId);
+                    }
+                });
+            }
+        });
+    }
+}
+
+function enforceSpousePairsSameRow(tree, g, nodeWidth, coupleSpacing) {
+    // Post-process: HARD ENFORCE spouses on the same row, side-by-side
+    // This corrects cases where Dagre still ends up placing spouses with slight Y offsets.
+    const adjustedSpousePairs = new Set();
+    tree.people.forEach(person => {
+        person.spouses.forEach(spouseId => {
+            const key = [person.id, spouseId].sort().join('-');
+            if (adjustedSpousePairs.has(key)) return;
+            adjustedSpousePairs.add(key);
+
+            const n1 = g.node(person.id.toString());
+            const n2 = g.node(spouseId.toString());
+            if (!n1 || !n2) return;
+
+            // Force same Y (row)
+            const targetY = Math.round((n1.y + n2.y) / 2);
+            n1.y = targetY;
+            n2.y = targetY;
+
+            // Ensure a minimum horizontal gap between spouses
+            const minGap = (nodeWidth || 160) + (coupleSpacing || 40);
+            const dx = Math.abs(n1.x - n2.x);
+            if (dx < minGap) {
+                const centerX = (n1.x + n2.x) / 2;
+                n1.x = centerX - minGap / 2;
+                n2.x = centerX + minGap / 2;
+            }
+        });
+    });
+}
+
+function calculateGraphOffsets(g, padding) {
+    // Calculate offsets with better bounds checking and padding
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    g.nodes().forEach(v => {
+        const node = g.node(v);
+        if (node) {
+            // For clusters, use their bounds if available
+            if (node.cluster) {
+                if (node.x !== undefined && node.y !== undefined) {
+                    minX = Math.min(minX, node.x - (node.width || 0) / 2);
+                    minY = Math.min(minY, node.y - (node.height || 0) / 2);
+                    maxX = Math.max(maxX, node.x + (node.width || 0) / 2);
+                    maxY = Math.max(maxY, node.y + (node.height || 0) / 2);
+                }
+            } else {
+                minX = Math.min(minX, node.x - (node.width || 0) / 2);
+                minY = Math.min(minY, node.y - (node.height || 0) / 2);
+                maxX = Math.max(maxX, node.x + (node.width || 0) / 2);
+                maxY = Math.max(maxY, node.y + (node.height || 0) / 2);
+            }
+        }
+    });
+
+    // Ensure minimum bounds with padding
+    if (minX === Infinity) minX = 0;
+    if (minY === Infinity) minY = 0;
+    if (maxX === -Infinity) maxX = 100;
+    if (maxY === -Infinity) maxY = 100;
+
+    // Add padding
+    minX -= padding;
+    minY -= padding;
+    maxX += padding;
+    maxY += padding;
+
+    const dagreLayoutOffsetX = -minX + padding;
+    const dagreLayoutOffsetY = -minY + padding;
+
+    return { dagreLayoutOffsetX, dagreLayoutOffsetY };
+}
+
+function updatePeoplePositions(tree, g, dagreLayoutOffsetX, dagreLayoutOffsetY) {
+    // Update person positions
+    g.nodes().forEach(v => {
+        const personId = Number.parseInt(v, 10);
+        if (!Number.isNaN(personId) && tree.people.has(personId)) {
+            const node = g.node(v);
+            const person = tree.people.get(personId);
+            person.x = node.x + dagreLayoutOffsetX;
+            person.y = node.y + dagreLayoutOffsetY;
+        }
+    });
+}
+
+export function autoArrange(tree) {
+    const g = new dagre.graphlib.Graph({ compound: true });
+    
+    const memberCount = tree.people.size;
+    const { isMobile, nodesep, ranksep, marginx, marginy, coupleSpacing, nodeWidth, nodeHeight } = getSpacingConfig(memberCount);
+
     g.setGraph({
         rankdir: 'TB',
         nodesep: nodesep,
@@ -96,7 +226,6 @@ export function autoArrange(tree) {
     });
     g.setDefaultEdgeLabel(() => ({}));
 
-    const personNodeSize = memberCount > 80 ? 200 : 220; // Match actual card dimensions
     const familyNodeSize = 10;
     const familyUnits = new Map();
 
@@ -245,7 +374,6 @@ export function autoArrange(tree) {
     });
 
     // Create a map to track couples and their positions
-    const coupleMap = new Map();
     const processedPairs = new Set();
     const coupleNodes = [];
 
@@ -254,8 +382,6 @@ export function autoArrange(tree) {
         person.spouses.forEach(spouseId => {
             const pairKey = [person.id, spouseId].sort().join('-');
             if (!processedPairs.has(pairKey)) {
-                coupleMap.set(person.id, { spouseId, isLeft: true });
-                coupleMap.set(spouseId, { spouseId: person.id, isLeft: false });
                 coupleNodes.push([person.id, spouseId]);
                 processedPairs.add(pairKey);
             }
@@ -327,39 +453,7 @@ export function autoArrange(tree) {
         });
     });
 
-    // For large trees, apply additional organization
-    if (memberCount > 20) {
-        // Group by generations for better organization
-        const generationGroups = new Map();
-        tree.people.forEach(person => {
-            const gen = person.generation || 0;
-            if (!generationGroups.has(gen)) {
-                generationGroups.set(gen, []);
-            }
-            generationGroups.get(gen).push(person.id);
-        });
-
-        // Create subgraphs for each generation
-        generationGroups.forEach((personIds, generation) => {
-            if (personIds.length > 5) {
-                const subgraphId = `gen-${generation}`;
-                g.setNode(subgraphId, {
-                    cluster: true,
-                    label: `Generation ${generation}`,
-                    style: 'fill: #f8f9fa',
-                    margin: 30,
-                    rank: 'same',
-                    rankdir: 'LR'
-                });
-                
-                personIds.forEach(pid => {
-                    if (!g.parent(pid.toString())) {  // Only if not already in a family cluster
-                        g.setParent(pid.toString(), subgraphId);
-                    }
-                });
-            }
-        });
-    }
+    applyGenerationSubgraphs(tree, g, memberCount);
 
     // Apply layout with better configuration
     const layoutConfig = {
@@ -389,83 +483,11 @@ export function autoArrange(tree) {
     // Apply the layout
     dagre.layout(g, layoutConfig);
 
-    // Post-process: HARD ENFORCE spouses on the same row, side-by-side
-    // This corrects cases where Dagre still ends up placing spouses with slight Y offsets.
-    const adjustedSpousePairs = new Set();
-    tree.people.forEach(person => {
-        person.spouses.forEach(spouseId => {
-            const key = [person.id, spouseId].sort().join('-');
-            if (adjustedSpousePairs.has(key)) return;
-            adjustedSpousePairs.add(key);
+    enforceSpousePairsSameRow(tree, g, nodeWidth, coupleSpacing);
 
-            const n1 = g.node(person.id.toString());
-            const n2 = g.node(spouseId.toString());
-            if (!n1 || !n2) return;
-
-            // Force same Y (row)
-            const targetY = Math.round((n1.y + n2.y) / 2);
-            n1.y = targetY;
-            n2.y = targetY;
-
-            // Ensure a minimum horizontal gap between spouses
-            const minGap = (nodeWidth || 160) + (coupleSpacing || 40);
-            const dx = Math.abs(n1.x - n2.x);
-            if (dx < minGap) {
-                const centerX = (n1.x + n2.x) / 2;
-                n1.x = centerX - minGap / 2;
-                n2.x = centerX + minGap / 2;
-            }
-        });
-    });
-
-    // Calculate offsets with better bounds checking and padding
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    g.nodes().forEach(v => {
-        const node = g.node(v);
-        if (node) {
-            // For clusters, use their bounds if available
-            if (node.cluster) {
-                if (node.x !== undefined && node.y !== undefined) {
-                    minX = Math.min(minX, node.x - (node.width || 0) / 2);
-                    minY = Math.min(minY, node.y - (node.height || 0) / 2);
-                    maxX = Math.max(maxX, node.x + (node.width || 0) / 2);
-                    maxY = Math.max(maxY, node.y + (node.height || 0) / 2);
-                }
-            } else {
-                minX = Math.min(minX, node.x - (node.width || 0) / 2);
-                minY = Math.min(minY, node.y - (node.height || 0) / 2);
-                maxX = Math.max(maxX, node.x + (node.width || 0) / 2);
-                maxY = Math.max(maxY, node.y + (node.height || 0) / 2);
-            }
-        }
-    });
-
-    // Ensure minimum bounds with padding
     const padding = 100;
-    if (minX === Infinity) minX = 0;
-    if (minY === Infinity) minY = 0;
-    if (maxX === -Infinity) maxX = 100;
-    if (maxY === -Infinity) maxY = 100;
-
-    // Add padding
-    minX -= padding;
-    minY -= padding;
-    maxX += padding;
-    maxY += padding;
-
-    const dagreLayoutOffsetX = -minX + padding;
-    const dagreLayoutOffsetY = -minY + padding;
-
-    // Update person positions
-    g.nodes().forEach(v => {
-        const personId = parseInt(v);
-        if (!isNaN(personId) && tree.people.has(personId)) {
-            const node = g.node(v);
-            const person = tree.people.get(personId);
-            person.x = node.x + dagreLayoutOffsetX;
-            person.y = node.y + dagreLayoutOffsetY;
-        }
-    });
+    const { dagreLayoutOffsetX, dagreLayoutOffsetY } = calculateGraphOffsets(g, padding);
+    updatePeoplePositions(tree, g, dagreLayoutOffsetX, dagreLayoutOffsetY);
 
     return { g, dagreLayoutOffsetX, dagreLayoutOffsetY };
 } 

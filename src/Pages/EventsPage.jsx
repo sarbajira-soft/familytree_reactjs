@@ -346,81 +346,72 @@ const EventsPage = () => {
     );
   }
 
-  if (!userInfo?.familyCode) {
-    return (
-      <>
-        <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex items-center justify-center px-4">
-          <NoFamilyView
-            onCreateFamily={handleCreateFamily}
-            onJoinFamily={handleJoinFamily}
-          />
-        </div>
-      </>
-    );
-  }
-
-  if (userInfo?.familyCode && userInfo?.approveStatus !== "approved") {
-    return (
-      <>
-        <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex items-center justify-center px-4">
-          <PendingApprovalView
-            familyCode={userInfo.familyCode}
-            onJoinFamily={handleJoinFamily}
-          />
-        </div>
-      </>
-    );
-  }
+  const accessView = !userInfo?.familyCode ? (
+    <NoFamilyView
+      onCreateFamily={handleCreateFamily}
+      onJoinFamily={handleJoinFamily}
+    />
+  ) : userInfo?.approveStatus !== "approved" ? (
+    <PendingApprovalView
+      familyCode={userInfo.familyCode}
+      onJoinFamily={handleJoinFamily}
+    />
+  ) : null;
 
   return (
     <>
-      <div className="min-h-screen bg-gray-50 dark:bg-slate-950 pb-16">
-        <div className="max-w-7xl mx-auto px-4 py-8 md:px-6 lg:px-8 space-y-5">
-          {/* Header Section */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-            {/* Left Block - hidden on mobile to keep header compact */}
-            <div className="hidden sm:flex sm:flex-col w-full sm:w-auto">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-[#1976D2] rounded-lg flex items-center justify-center">
-                  <FiCalendar size={22} className="text-white" />
+      {accessView ? (
+        <div className="min-h-[calc(100vh-6rem)] bg-gray-50 flex items-center justify-center px-4 py-6">
+          {accessView}
+        </div>
+      ) : (
+        <div className="min-h-screen bg-gray-50 dark:bg-slate-950 pb-16">
+          <div className="max-w-7xl mx-auto px-4 py-8 md:px-6 lg:px-8 space-y-5">
+            {/* Header Section */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+              {/* Left Block - hidden on mobile to keep header compact */}
+              <div className="hidden sm:flex sm:flex-col w-full sm:w-auto">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-[#1976D2] rounded-lg flex items-center justify-center">
+                    <FiCalendar size={22} className="text-white" />
+                  </div>
+                  <h1 className="text-2xl sm:text-4xl font-extrabold text-[#1976D2]">
+                     Events
+                  </h1>
                 </div>
-                <h1 className="text-2xl sm:text-4xl font-extrabold text-[#1976D2]">
-                   Events
-                </h1>
+
+                <p className="text-gray-600 dark:text-slate-300 mt-1 text-sm sm:text-lg">
+                  Create, manage and celebrate memorable moments
+                </p>
+
+                {/* Legend */}
+                {/* <div className="flex items-center gap-4 mt-3 text-xs sm:text-sm">
+                  <div className="flex items-center gap-1">
+                    <div className="w-2.5 h-2.5 bg-pink-500 rounded-full"></div>
+                    <span>Birthdays</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-2.5 h-2.5 bg-red-500 rounded-full"></div>
+                    <span>Anniversaries</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-2.5 h-2.5 bg-[#1976D2] rounded-full"></div>
+                    <span>Custom Events</span>
+                  </div>
+                </div> */}
               </div>
 
-              <p className="text-gray-600 dark:text-slate-300 mt-1 text-sm sm:text-lg">
-                Create, manage and celebrate memorable moments
-              </p>
-
-              {/* Legend */}
-              {/* <div className="flex items-center gap-4 mt-3 text-xs sm:text-sm">
-                <div className="flex items-center gap-1">
-                  <div className="w-2.5 h-2.5 bg-pink-500 rounded-full"></div>
-                  <span>Birthdays</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <div className="w-2.5 h-2.5 bg-red-500 rounded-full"></div>
-                  <span>Anniversaries</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <div className="w-2.5 h-2.5 bg-[#1976D2] rounded-full"></div>
-                  <span>Custom Events</span>
-                </div>
-              </div> */}
+              {/* Right Button */}
+              <button
+                onClick={handleCreateEventClick}
+                className="bg-gradient-to-r from-orange-500 to-orange-600 
+      text-white px-4 py-2 sm:px-8 sm:py-4 rounded-xl shadow-lg 
+      hover:opacity-90 transition duration-300 flex items-center gap-2 sm:gap-3 
+      text-sm sm:text-lg font-semibold w-full sm:w-auto justify-center"
+              >
+                <FiPlusSquare size={20} /> Create Event
+              </button>
             </div>
-
-            {/* Right Button */}
-            <button
-              onClick={handleCreateEventClick}
-              className="bg-gradient-to-r from-orange-500 to-orange-600 
-    text-white px-4 py-2 sm:px-8 sm:py-4 rounded-xl shadow-lg 
-    hover:opacity-90 transition duration-300 flex items-center gap-2 sm:gap-3 
-    text-sm sm:text-lg font-semibold w-full sm:w-auto justify-center"
-            >
-              <FiPlusSquare size={20} /> Create Event
-            </button>
-          </div>
 
           {/* Filter Tabs – Responsive (Mobile vs Desktop) */}
           <div className="flex justify-center w-full mt-1">
@@ -736,6 +727,7 @@ const EventsPage = () => {
           </div>
         </div>
       </div>
+      )}
 
       {/* Modals */}
       <CreateEventModal

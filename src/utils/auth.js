@@ -26,8 +26,8 @@ export const getUserIdFromToken = (token) => {
     if (tokenParts.length !== 3) return null;
     
     const base64Url = tokenParts[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const payload = JSON.parse(window.atob(base64));
+    const base64 = base64Url.replaceAll('-', '+').replaceAll('_', '/');
+    const payload = JSON.parse(globalThis.atob(base64));
     
     return payload?.id || payload?.sub || payload?.userId || null;
   } catch (error) {
@@ -52,7 +52,7 @@ export const getCurrentUserId = () => {
 export const getToken = () => {
   // Check if session has expired
   const expiryTime = localStorage.getItem(STORAGE_KEYS.SESSION_EXPIRY);
-  if (expiryTime && new Date().getTime() > Number(expiryTime)) {
+  if (expiryTime && Date.now() > Number(expiryTime)) {
     clearAuthData();
     return null;
   }
@@ -84,12 +84,10 @@ export const setAuthData = (token, user, stayLoggedIn = false) => {
   localStorage.setItem(STORAGE_KEYS.STAY_LOGGED_IN, stayLoggedIn.toString());
   
   // Set session expiry if not staying logged in
-  if (!stayLoggedIn) {
-    const expiryTime = new Date().getTime() + SESSION_TIMEOUT;
-    localStorage.setItem(STORAGE_KEYS.SESSION_EXPIRY, expiryTime.toString());
-  } else {
-    localStorage.removeItem(STORAGE_KEYS.SESSION_EXPIRY);
-  }
+  const expiryTime = stayLoggedIn ? null : Date.now() + SESSION_TIMEOUT;
+  return expiryTime
+    ? localStorage.setItem(STORAGE_KEYS.SESSION_EXPIRY, expiryTime.toString())
+    : localStorage.removeItem(STORAGE_KEYS.SESSION_EXPIRY);
 };
 
 /**
@@ -107,11 +105,7 @@ export const clearAuthData = () => {
  * @returns {boolean} True if user is authenticated
  */
 export const isAuthenticated = () => {
-  const token = getToken();
-  if (!token) return false;
-  
-  // Additional token validation can be added here
-  return true;
+  return Boolean(getToken());
 };
 
 /**
@@ -121,7 +115,7 @@ export const isAuthenticated = () => {
 export const initializeAuth = () => {
   // Clear expired session if exists
   const expiryTime = localStorage.getItem(STORAGE_KEYS.SESSION_EXPIRY);
-  if (expiryTime && new Date().getTime() > Number(expiryTime)) {
+  if (expiryTime && Date.now() > Number(expiryTime)) {
     clearAuthData();
   }
 };

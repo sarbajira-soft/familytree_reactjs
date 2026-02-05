@@ -4,16 +4,13 @@
  * Color-coded by relationship type
  */
 
-import React, { useMemo } from "react";
-import {
-  generateFamilyUnitPaths,
-  generateSpousePath,
-  calculateCanvasBounds,
-} from "../../utils/HierarchicalTreeLayout";
+import React from "react";
+import PropTypes from "prop-types";
+import { calculateCanvasBounds } from "../../utils/HierarchicalTreeLayout";
 
-const HierarchicalConnections = ({ positions, connections }) => {
+const HierarchicalConnections = ({ positions = new Map(), connections = [] } = {}) => {
   // Calculate canvas size
-  const canvasSize = useMemo(() => {
+  const canvasSize = React.useMemo(() => {
     if (!positions || positions.size === 0) {
       return { width: 2000, height: 2000 };
     }
@@ -21,11 +18,10 @@ const HierarchicalConnections = ({ positions, connections }) => {
   }, [positions]);
 
   // Generate connection paths with family-unit-based T-shaped routing
-  const connectionPaths = useMemo(() => {
+  const connectionPaths = React.useMemo(() => {
     if (!connections || !positions) return [];
 
     const allPaths = [];
-    const processedChildren = new Set();
 
     // Group connections by type
     const spouseConnections = connections.filter((c) => c.type === "spouse");
@@ -49,27 +45,29 @@ const HierarchicalConnections = ({ positions, connections }) => {
 
         const path = `M ${fromX} ${y} L ${toX} ${y}`;
 
-        allPaths.push({
-          id: `spouse-${index}`,
-          path: path,
-          type: "spouse",
-          from: conn.from,
-          to: conn.to,
-          fromPos: fromPos,
-          toPos: toPos,
-          showMarriageSymbol: false, // Don't show marriage symbol
-        });
-
         // Add junction dot at center of spouse line (where child connection will start)
         const midX = (fromPos.x + toPos.x) / 2;
         const midY = fromPos.y;
-        allPaths.push({
-          id: `spouse-junction-${index}`,
-          type: "junction",
-          point: { x: midX, y: midY },
-          color: "#f59e0b", // Orange to match other connections
-          spouseMidpoint: { x: midX, y: midY }, // Store for connecting line
-        });
+
+        allPaths.push(
+          {
+            id: `spouse-${index}`,
+            path: path,
+            type: "spouse",
+            from: conn.from,
+            to: conn.to,
+            fromPos: fromPos,
+            toPos: toPos,
+            showMarriageSymbol: false, // Don't show marriage symbol
+          },
+          {
+            id: `spouse-junction-${index}`,
+            type: "junction",
+            point: { x: midX, y: midY },
+            color: "#f59e0b", // Orange to match other connections
+            spouseMidpoint: { x: midX, y: midY }, // Store for connecting line
+          }
+        );
       }
     });
 
@@ -169,51 +167,45 @@ const HierarchicalConnections = ({ positions, connections }) => {
           // 1. Vertical line down from parent center
           const midY = (connectionStartY + childTopY) / 2;
 
-          // 2. Draw vertical line from parent to midpoint
-          allPaths.push({
-            id: `parent-vertical-${coupleKey}`,
-            path: `M ${connectionStartX} ${connectionStartY} L ${connectionStartX} ${midY}`,
-            type: "parent-child",
-            from: parentIds[0],
-            to: "mid",
-            fromPos: firstParentPos,
-            toPos: null,
-          });
-
-          // 3. Draw horizontal line from midpoint to child
-          allPaths.push({
-            id: `parent-horizontal-${coupleKey}`,
-            path: `M ${connectionStartX} ${midY} L ${childX} ${midY}`,
-            type: "parent-child",
-            from: "mid",
-            to: child.id,
-            fromPos: null,
-            toPos: null,
-          });
-
-          // 4. Draw vertical line from horizontal to child top
-          allPaths.push({
-            id: `child-vertical-${child.id}`,
-            path: `M ${childX} ${midY} L ${childX} ${childTopY}`,
-            type: "parent-child",
-            from: "mid",
-            to: child.id,
-            fromPos: null,
-            toPos: child.pos,
-          });
-
-          // Add junction points
-          allPaths.push({
-            id: `junction-mid-${coupleKey}`,
-            type: "junction",
-            point: { x: connectionStartX, y: midY },
-          });
-
-          allPaths.push({
-            id: `junction-child-${child.id}`,
-            type: "junction",
-            point: { x: childX, y: midY },
-          });
+          allPaths.push(
+            {
+              id: `parent-vertical-${coupleKey}`,
+              path: `M ${connectionStartX} ${connectionStartY} L ${connectionStartX} ${midY}`,
+              type: "parent-child",
+              from: parentIds[0],
+              to: "mid",
+              fromPos: firstParentPos,
+              toPos: null,
+            },
+            {
+              id: `parent-horizontal-${coupleKey}`,
+              path: `M ${connectionStartX} ${midY} L ${childX} ${midY}`,
+              type: "parent-child",
+              from: "mid",
+              to: child.id,
+              fromPos: null,
+              toPos: null,
+            },
+            {
+              id: `child-vertical-${child.id}`,
+              path: `M ${childX} ${midY} L ${childX} ${childTopY}`,
+              type: "parent-child",
+              from: "mid",
+              to: child.id,
+              fromPos: null,
+              toPos: child.pos,
+            },
+            {
+              id: `junction-mid-${coupleKey}`,
+              type: "junction",
+              point: { x: connectionStartX, y: midY },
+            },
+            {
+              id: `junction-child-${child.id}`,
+              type: "junction",
+              point: { x: childX, y: midY },
+            }
+          );
         } else {
           // Child is single - direct vertical line
           allPaths.push({
@@ -226,8 +218,6 @@ const HierarchicalConnections = ({ positions, connections }) => {
             toPos: child.pos,
           });
         }
-
-        processedChildren.add(child.id);
       } else {
         // MULTIPLE CHILDREN - Use T-shaped connection with horizontal bar
         const childXPositions = children.map((c) => c.pos.x);
@@ -239,35 +229,12 @@ const HierarchicalConnections = ({ positions, connections }) => {
 
         // Horizontal bar spans children with padding
         const barPadding = 10;
-        const adjustedMinX = minChildX;
-        const adjustedMaxX = maxChildX;
+        const adjustedMinX = minChildX - barPadding;
+        const adjustedMaxX = maxChildX + barPadding;
 
-        // Draw vertical line from parent to horizontal bar
-        allPaths.push({
-          id: `parent-vertical-${coupleKey}`,
-          path: `M ${connectionStartX} ${connectionStartY} L ${connectionStartX} ${horizontalBarY}`,
-          type: "parent-child",
-          from: parentIds[0],
-          to: "bar",
-          fromPos: firstParentPos,
-          toPos: null,
-        });
-
-        // Draw horizontal bar
-        allPaths.push({
-          id: `parent-horizontal-${coupleKey}`,
-          path: `M ${adjustedMinX} ${horizontalBarY} L ${adjustedMaxX} ${horizontalBarY}`,
-          type: "parent-child",
-          from: parentIds[0],
-          to: "bar",
-          fromPos: firstParentPos,
-          toPos: null,
-        });
-
-        // Draw vertical lines from horizontal bar to each child
-        children.forEach((child) => {
+        const childVerticalPaths = children.map((child) => {
           const childTopY = child.pos.y - ACTUAL_CARD_HALF_HEIGHT;
-          allPaths.push({
+          return {
             id: `child-vertical-${child.id}`,
             path: `M ${child.pos.x} ${horizontalBarY} L ${child.pos.x} ${childTopY}`,
             type: "parent-child",
@@ -275,24 +242,44 @@ const HierarchicalConnections = ({ positions, connections }) => {
             to: child.id,
             fromPos: firstParentPos,
             toPos: child.pos,
-          });
-          processedChildren.add(child.id);
+          };
         });
 
-        // Add junction points
-        allPaths.push({
-          id: `junction-center-${coupleKey}`,
-          type: "junction",
-          point: { x: connectionStartX, y: horizontalBarY },
-        });
-
-        children.forEach((child) => {
-          allPaths.push({
+        const childJunctions = children.map((child) => {
+          return {
             id: `junction-child-${child.id}`,
             type: "junction",
             point: { x: child.pos.x, y: horizontalBarY },
-          });
+          };
         });
+
+        allPaths.push(
+          {
+            id: `parent-vertical-${coupleKey}`,
+            path: `M ${connectionStartX} ${connectionStartY} L ${connectionStartX} ${horizontalBarY}`,
+            type: "parent-child",
+            from: parentIds[0],
+            to: "bar",
+            fromPos: firstParentPos,
+            toPos: null,
+          },
+          {
+            id: `parent-horizontal-${coupleKey}`,
+            path: `M ${adjustedMinX} ${horizontalBarY} L ${adjustedMaxX} ${horizontalBarY}`,
+            type: "parent-child",
+            from: parentIds[0],
+            to: "bar",
+            fromPos: firstParentPos,
+            toPos: null,
+          },
+          ...childVerticalPaths,
+          {
+            id: `junction-center-${coupleKey}`,
+            type: "junction",
+            point: { x: connectionStartX, y: horizontalBarY },
+          },
+          ...childJunctions
+        );
       }
     });
 
@@ -437,6 +424,31 @@ const MarriageSymbol = ({ fromPos, toPos }) => {
       />
     </g>
   );
+};
+
+HierarchicalConnections.propTypes = {
+  positions: PropTypes.shape({
+    size: PropTypes.number,
+    get: PropTypes.func,
+  }),
+  connections: PropTypes.arrayOf(
+    PropTypes.shape({
+      type: PropTypes.string.isRequired,
+      from: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+      to: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+    })
+  ),
+};
+
+MarriageSymbol.propTypes = {
+  fromPos: PropTypes.shape({
+    x: PropTypes.number.isRequired,
+    y: PropTypes.number.isRequired,
+  }).isRequired,
+  toPos: PropTypes.shape({
+    x: PropTypes.number.isRequired,
+    y: PropTypes.number.isRequired,
+  }).isRequired,
 };
 
 export default HierarchicalConnections;

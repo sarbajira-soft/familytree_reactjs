@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { FaEdit, FaTrash, FaReply, FaSave, FaTimes } from 'react-icons/fa';
+import PropTypes from 'prop-types';
+import { FaReply, FaTimes } from 'react-icons/fa';
 import { FiSmile } from 'react-icons/fi';
 import { motion } from 'framer-motion';
 import EmojiPicker from 'emoji-picker-react';
@@ -89,7 +90,7 @@ const CommentItem = ({
   };
 
   const handleDelete = async () => {
-    if (!window.confirm('Are you sure you want to delete this comment and all its replies?')) return;
+    if (!globalThis.confirm('Are you sure you want to delete this comment and all its replies?')) return;
     setIsLoading(true);
     try {
       await onDelete(comment.id);
@@ -137,12 +138,17 @@ const CommentItem = ({
       transition={{ duration: 0.3 }}
     >
       {/* Avatar */}
-      <img
-        src={profileUrl}
-        alt={fullName}
-        className="w-9 h-9 rounded-full object-cover border border-gray-300 flex-shrink-0 cursor-pointer"
+      <button
+        type="button"
+        className="bg-transparent p-0"
         onClick={() => goToUserProfile(commenterId)}
-      />
+      >
+        <img
+          src={profileUrl}
+          alt={fullName}
+          className="w-9 h-9 rounded-full object-cover border border-gray-300 flex-shrink-0"
+        />
+      </button>
 
       {/* Comment Content */}
       <div className="flex-1">
@@ -180,12 +186,13 @@ const CommentItem = ({
           ) : (
             <>
               <div className="text-[13px]">
-                <span
-                  className="font-semibold text-gray-900 mr-2 cursor-pointer"
+                <button
+                  type="button"
+                  className="font-semibold text-gray-900 mr-2 bg-transparent p-0"
                   onClick={() => goToUserProfile(commenterId)}
                 >
                   {fullName}
-                </span>
+                </button>
                 <span className="text-gray-700">{commentText}</span>
               </div>
               <div className="text-[11px] text-gray-500 mt-1">
@@ -312,6 +319,30 @@ const CommentItem = ({
       </div>
     </motion.div>
   );
+};
+
+CommentItem.propTypes = {
+  comment: PropTypes.shape({
+    id: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+    userId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+    user: PropTypes.shape({
+      userId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+      firstName: PropTypes.string,
+      lastName: PropTypes.string,
+      profile: PropTypes.string,
+    }),
+    comment: PropTypes.string,
+    content: PropTypes.string,
+    createdAt: PropTypes.oneOfType([PropTypes.string, PropTypes.number, PropTypes.instanceOf(Date)]),
+    updatedAt: PropTypes.oneOfType([PropTypes.string, PropTypes.number, PropTypes.instanceOf(Date)]),
+    replies: PropTypes.arrayOf(PropTypes.object),
+  }).isRequired,
+  currentUserId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+  onEdit: PropTypes.func.isRequired,
+  onDelete: PropTypes.func.isRequired,
+  onReply: PropTypes.func.isRequired,
+  depth: PropTypes.number,
+  maxDepth: PropTypes.number,
 };
 
 export default CommentItem;

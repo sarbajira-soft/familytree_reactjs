@@ -2,7 +2,99 @@ import React, { useState, useEffect, useRef } from 'react';
 import PhoneInput from 'react-phone-input-2';
 import 'react-phone-input-2/lib/style.css';
 import Swal from 'sweetalert2';
-import AuthLogo from '../Components/AuthLogo';
+import PropTypes from 'prop-types';
+
+const reconcileChildKeys = (prevKeys, desiredCount) => {
+  const safeCount = Math.max(0, Number(desiredCount) || 0);
+  const keys = Array.isArray(prevKeys) ? [...prevKeys] : [];
+
+  while (keys.length < safeCount) {
+    const newKey =
+      globalThis?.crypto?.randomUUID?.() ||
+      `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    keys.push(newKey);
+  }
+
+  return keys.slice(0, safeCount);
+};
+
+const MemberValidationLoadingView = () => (
+  <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+    <div className="bg-white p-8 rounded-lg shadow-sm max-w-md w-full mx-4">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+        <h2 className="text-lg font-semibold text-gray-800 mb-2">Validating Member Access</h2>
+        <p className="text-gray-600 text-sm">Please wait while we verify your permissions...</p>
+      </div>
+    </div>
+  </div>
+);
+
+const MemberValidationErrorView = ({ isLinkUsed, memberValidationError, onGoBack, onRetry }) => (
+  <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+    <div className="bg-white p-8 rounded-lg shadow-sm max-w-md w-full mx-4">
+      <div className="text-center">
+        <div
+          className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4 ${
+            isLinkUsed ? 'bg-orange-100' : 'bg-red-100'
+          }`}
+        >
+          <svg
+            className={`w-6 h-6 ${isLinkUsed ? 'text-orange-600' : 'text-red-600'}`}
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            {isLinkUsed ? (
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+              />
+            ) : (
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            )}
+          </svg>
+        </div>
+        <h2 className="text-lg font-semibold text-gray-800 mb-2">{isLinkUsed ? 'Link Already Used' : 'Access Denied'}</h2>
+        <p className="text-gray-600 text-sm mb-4">{memberValidationError}</p>
+        {isLinkUsed ? (
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-4">
+            <p className="text-orange-700 text-xs">
+              This invitation link has been used and is no longer valid. If you need to update your profile again, please contact your family administrator.
+            </p>
+          </div>
+        ) : null}
+        <div className="flex gap-2 justify-center">
+          <button
+            onClick={onGoBack}
+            className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm"
+          >
+            Go Back
+          </button>
+          {!isLinkUsed && (
+            <button onClick={onRetry} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm">
+              Retry
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+MemberValidationErrorView.propTypes = {
+  isLinkUsed: PropTypes.bool.isRequired,
+  memberValidationError: PropTypes.string.isRequired,
+  onGoBack: PropTypes.func.isRequired,
+  onRetry: PropTypes.func.isRequired,
+};
 
 const ProfileFormPage = () => {
   const [formData, setFormData] = useState({
@@ -41,7 +133,6 @@ const ProfileFormPage = () => {
   });
 
   const [showPassword, setShowPassword] = useState(false);
-  const [isEditingPassword, setIsEditingPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedImageFile, setSelectedImageFile] = useState(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState('');
@@ -59,8 +150,6 @@ const ProfileFormPage = () => {
   const [currentMemberData, setCurrentMemberData] = useState(null);
   const [isLinkUsed, setIsLinkUsed] = useState(false);
 
-  const baseUrl = import.meta.env.VITE_API_BASE_URL;
-
   // State for dropdown data
   const [dropdownData, setDropdownData] = useState({
     languages: [],
@@ -70,9 +159,13 @@ const ProfileFormPage = () => {
     error: null
   });
 
+  // State for children names keys
+  const [childrenNameKeys, setChildrenNameKeys] = useState([]);
+
   // Get URL parameters
   const getUrlParams = () => {
-    const urlParams = new URLSearchParams(window.location.search);
+    const search = globalThis?.location?.search || '';
+    const urlParams = new URLSearchParams(search);
     const familyCode = urlParams.get('familyCode');
     const memberId = urlParams.get('memberId');
     return { familyCode, memberId };
@@ -89,6 +182,8 @@ const ProfileFormPage = () => {
       if (!familyCode || !memberId) {
         throw new Error('Missing family code or member ID in URL');
       }
+
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
       // Simple validation call
       const response = await fetch(`${baseUrl}/family/member/public/${familyCode}/member/${memberId}/exists`, {
@@ -112,7 +207,7 @@ const ProfileFormPage = () => {
         }
         
         setIsAuthorizedMember(true);
-        setCurrentMemberData({ memberId: parseInt(memberId), familyCode });
+        setCurrentMemberData({ memberId: Number.parseInt(memberId, 10), familyCode });
         // Set familyCode in form
         setFormData(prev => ({ ...prev, familyCode }));
       } else {
@@ -126,26 +221,6 @@ const ProfileFormPage = () => {
     } finally {
       setIsValidatingMember(false);
     }
-  };
-
-  // Populate form with existing member data
-  const populateFormWithMemberData = (memberData) => {
-    const user = memberData.user;
-    const userProfile = user.userProfile;
-
-    setFormData(prevData => ({
-      ...prevData,
-      email: user.email || '',
-      mobile: user.mobile || '',
-      firstName: userProfile?.firstName || '',
-      lastName: userProfile?.lastName || '',
-      profileImageUrl: user.profileImage || userProfile?.profile || '',
-      gender: userProfile?.gender || '',
-      dob: userProfile?.dob || '',
-      address: userProfile?.address || '',
-      familyCode: memberData.familyCode || '',
-      // Add other fields as they become available in the API response
-    }));
   };
 
   // Enhanced fetchDropdownData function with error handling
@@ -198,57 +273,70 @@ const ProfileFormPage = () => {
   };
 
   // Form validation function
+  const validateEmailField = (newErrors) => {
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email is required';
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = 'Invalid email address';
+    }
+  };
+
+  const validateDobField = (newErrors) => {
+    const dobValue = formData.dob.trim();
+    if (!dobValue) {
+      newErrors.dob = 'Date of birth is required';
+      return;
+    }
+
+    const today = new Date();
+    const birthDate = new Date(dobValue);
+    if (birthDate >= today) {
+      newErrors.dob = 'Date of birth must be in the past';
+    }
+  };
+
+  const validateMaritalFields = (newErrors) => {
+    if (!formData.maritalStatus) {
+      newErrors.maritalStatus = 'Marital status is required';
+      return;
+    }
+
+    if (formData.maritalStatus !== 'Married') return;
+    if (!formData.marriageDate) {
+      newErrors.marriageDate = 'Marriage date is required for married individuals';
+    }
+    if (!formData.spouseName.trim()) {
+      newErrors.spouseName = 'Spouse name is required for married individuals';
+    }
+  };
+
+  const validateOptionalNameField = (newErrors, fieldName, rawValue, message) => {
+    const textNameRegex = /^[A-Za-z][A-Za-z ]*$/;
+    const trimmed = String(rawValue || '').trim();
+    if (trimmed && !textNameRegex.test(trimmed)) {
+      newErrors[fieldName] = message;
+    }
+  };
+
   const validate = () => {
     const newErrors = {};
 
-    const textNameRegex = /^[A-Za-z][A-Za-z ]*$/;
-
-    // Basic validation
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = 'Invalid email address';
-    }
+    validateEmailField(newErrors);
 
     if (!formData.firstName.trim()) newErrors.firstName = 'First name is required';
     if (!formData.lastName.trim()) newErrors.lastName = 'Last name is required';
     if (!formData.gender) newErrors.gender = 'Gender is required';
-    
-    if (!formData.dob.trim()) {
-      newErrors.dob = 'Date of birth is required';
-    } else {
-      const today = new Date();
-      const birthDate = new Date(formData.dob);
-      if (birthDate >= today) {
-        newErrors.dob = 'Date of birth must be in the past';
-      }
-    }
-    if (!formData.maritalStatus) newErrors.maritalStatus = 'Marital status is required';
 
-    if (formData.maritalStatus === 'Married') {
-      if (!formData.marriageDate) newErrors.marriageDate = 'Marriage date is required for married individuals';
-      if (!formData.spouseName.trim()) newErrors.spouseName = 'Spouse name is required for married individuals';
-    }
+    validateDobField(newErrors);
+    validateMaritalFields(newErrors);
 
-    if (String(formData.fatherName || '').trim() && !textNameRegex.test(String(formData.fatherName || '').trim())) {
-      newErrors.fatherName = "Father's name can contain only letters and spaces";
-    }
-
-    if (String(formData.motherName || '').trim() && !textNameRegex.test(String(formData.motherName || '').trim())) {
-      newErrors.motherName = "Mother's name can contain only letters and spaces";
-    }
-
-    if (String(formData.caste || '').trim() && !textNameRegex.test(String(formData.caste || '').trim())) {
-      newErrors.caste = "Caste can contain only letters and spaces";
-    }
-
-    if (String(formData.kuladevata || '').trim() && !textNameRegex.test(String(formData.kuladevata || '').trim())) {
-      newErrors.kuladevata = "Kuladevata can contain only letters and spaces";
-    }
-
-    if (String(formData.region || '').trim() && !textNameRegex.test(String(formData.region || '').trim())) {
-      newErrors.region = "Region can contain only letters and spaces";
-    }
+    validateOptionalNameField(newErrors, 'fatherName', formData.fatherName, "Father's name can contain only letters and spaces");
+    validateOptionalNameField(newErrors, 'motherName', formData.motherName, "Mother's name can contain only letters and spaces");
+    validateOptionalNameField(newErrors, 'caste', formData.caste, 'Caste can contain only letters and spaces');
+    validateOptionalNameField(newErrors, 'kuladevata', formData.kuladevata, 'Kuladevata can contain only letters and spaces');
+    validateOptionalNameField(newErrors, 'region', formData.region, 'Region can contain only letters and spaces');
 
     setErrors(newErrors);
     if (Object.keys(newErrors).length > 0) {
@@ -274,7 +362,7 @@ const ProfileFormPage = () => {
     ]);
 
     const sanitizedValue = restrictedNameFields.has(name)
-      ? String(value || '').replace(/[^A-Za-z ]/g, '')
+      ? String(value || '').replaceAll(/[^A-Za-z ]/g, '')
       : (value || '');
 
     setFormData(prevData => ({
@@ -293,7 +381,7 @@ const ProfileFormPage = () => {
 
   const handleMobileChange = (value, data) => {
     const dialCode = `+${data.dialCode}`;
-    const fullNumber = value.replace(/\D/g, '');
+    const fullNumber = value.replaceAll(/\D/g, '');
     const mobile = fullNumber.startsWith(data.dialCode)
       ? fullNumber.slice(data.dialCode.length)
       : fullNumber;
@@ -313,7 +401,7 @@ const ProfileFormPage = () => {
   };
 
   const getFullMobile = (countryCode, mobile) => {
-    return `${countryCode.replace('+', '')}${mobile || ''}`;
+    return `${countryCode.replaceAll('+', '')}${mobile || ''}`;
   };
 
   const handleSubmit = async (e) => {
@@ -374,7 +462,7 @@ const ProfileFormPage = () => {
         if (
           ['religionId', 'languageId', 'gothramId', 'countryId', 'age', 'status', 'role'].includes(field)
         ) {
-          formDataToSend.append(field, parseInt(value));
+          formDataToSend.append(field, Number.parseInt(value, 10));
         } else if (field === 'childrenNames' && Array.isArray(value)) {
           formDataToSend.append(field, JSON.stringify(value));
         } else {
@@ -413,7 +501,7 @@ const ProfileFormPage = () => {
         return;
       }
 
-      const resultData = await response.json();
+      await response.json();
       
       // Mark the link as used after successful save
       try {
@@ -436,10 +524,13 @@ const ProfileFormPage = () => {
         confirmButtonColor: '#3f982c',
       }).then(() => {
         // Redirect to login page after successful submission
-        window.location.href = '/login';
+        if (globalThis?.location) {
+          globalThis.location.href = '/login';
+        }
       });
       
     } catch (error) {
+      console.error('Profile update failed:', error);
       const errorMessage = 'Network error or server unreachable. Please try again.';
       setApiError(errorMessage);
       Swal.fire({
@@ -613,70 +704,24 @@ const ProfileFormPage = () => {
     };
   }, [imagePreviewUrl]);
 
+  useEffect(() => {
+    setChildrenNameKeys(prevKeys => reconcileChildKeys(prevKeys, formData.childrenCount));
+  }, [formData.childrenCount]);
+
   // Show loading state while validating member
   if (isValidatingMember) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="bg-white p-8 rounded-lg shadow-sm max-w-md w-full mx-4">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <h2 className="text-lg font-semibold text-gray-800 mb-2">Validating Member Access</h2>
-            <p className="text-gray-600 text-sm">Please wait while we verify your permissions...</p>
-          </div>
-        </div>
-      </div>
-    );
+    return <MemberValidationLoadingView />;
   }
 
   // Show error state if member validation failed
   if (memberValidationError) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="bg-white p-8 rounded-lg shadow-sm max-w-md w-full mx-4">
-          <div className="text-center">
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4 ${
-              isLinkUsed ? 'bg-orange-100' : 'bg-red-100'
-            }`}>
-              <svg className={`w-6 h-6 ${
-                isLinkUsed ? 'text-orange-600' : 'text-red-600'
-              }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                {isLinkUsed ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-                ) : (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                )}
-              </svg>
-            </div>
-            <h2 className="text-lg font-semibold text-gray-800 mb-2">
-              {isLinkUsed ? 'Link Already Used' : 'Access Denied'}
-            </h2>
-            <p className="text-gray-600 text-sm mb-4">{memberValidationError}</p>
-            {isLinkUsed ? (
-              <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-4">
-                <p className="text-orange-700 text-xs">
-                  This invitation link has been used and is no longer valid. If you need to update your profile again, please contact your family administrator.
-                </p>
-              </div>
-            ) : null}
-            <div className="flex gap-2 justify-center">
-              <button
-                onClick={() => window.history.back()}
-                className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm"
-              >
-                Go Back
-              </button>
-              {!isLinkUsed && (
-                <button
-                  onClick={validateMemberAccess}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm"
-                >
-                  Retry
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
+      <MemberValidationErrorView
+        isLinkUsed={isLinkUsed}
+        memberValidationError={memberValidationError}
+        onGoBack={() => globalThis?.history?.back?.()}
+        onRetry={validateMemberAccess}
+      />
     );
   }
 
@@ -686,7 +731,6 @@ const ProfileFormPage = () => {
   }
 
   const title = `Edit Profile - ${currentMemberData?.user?.fullName || 'Member'}`;
-  const submitButtonText = isLoading ? 'Processing...' : 'Save Changes';
 
   const inputClassName = (fieldName) => `w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 text-sm font-inter text-gray-800 placeholder-gray-400 transition-all duration-200 ${
     errors[fieldName] ? 'border-red-400 focus:ring-red-200 bg-red-50' : 'border-gray-200 focus:ring-blue-200 focus:border-blue-400 bg-white hover:border-gray-300'
@@ -716,7 +760,7 @@ const ProfileFormPage = () => {
             </div>
             <div className="flex w-full sm:w-auto">
               <button
-                onClick={() => window.history.back()}
+                onClick={() => globalThis?.history?.back?.()}
                 className="bg-blue-500 hover:bg-blue-600 px-4 sm:px-6 py-2.5 sm:py-3 border border-blue-400 rounded-lg sm:rounded-xl font-medium text-white transition-all duration-200 flex items-center justify-center gap-2 text-sm sm:text-base w-full sm:w-auto shadow-lg hover:shadow-xl"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -799,7 +843,7 @@ const ProfileFormPage = () => {
                     />
                   ) : (
                     <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
                     </svg>
                   )}
                 </div>
@@ -896,7 +940,7 @@ const ProfileFormPage = () => {
                 {errors.mobile && <p className="text-red-500 text-xs mt-1">{errors.mobile}</p>}
               </div>
               
-              <div className="relative">
+              <div>
                 <label htmlFor="password" className={labelClassName}>
                   Password
                 </label>
@@ -1025,7 +1069,7 @@ const ProfileFormPage = () => {
                             });
                           }
                         }}
-                        className="text-gray-400 hover:text-gray-600 transition-colors duration-200 p-1 rounded-full hover:bg-gray-100"
+                        className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-full hover:bg-gray-100"
                       >
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1071,7 +1115,7 @@ const ProfileFormPage = () => {
               <div className="w-8 h-8 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-lg flex items-center justify-center">
                 <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2"/>
                 </svg>
               </div>
               <h3 className="text-xl font-bold text-gray-800">Contact Information</h3>
@@ -1167,11 +1211,11 @@ const ProfileFormPage = () => {
                       min="0"
                       value={formData.childrenCount}
                       onChange={(e) => {
-                        const count = Math.max(0, parseInt(e.target.value) || 0);
+                        const count = Math.max(0, Number.parseInt(e.target.value, 10) || 0);
                         setFormData(prev => ({
                           ...prev,
                           childrenCount: count,
-                          childrenNames: Array(count).fill('').map((_, i) =>
+                          childrenNames: new Array(count).fill('').map((_, i) =>
                             prev.childrenNames && prev.childrenNames[i] ? prev.childrenNames[i] : ''
                           )
                         }));
@@ -1184,13 +1228,13 @@ const ProfileFormPage = () => {
                     <div className="md:col-span-2 space-y-3">
                       <h4 className="text-sm font-medium text-gray-700">Children Names</h4>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {Array.from({ length: formData.childrenCount }).map((_, index) => (
-                          <div key={index}>
-                            <label htmlFor={`child-${index}`} className="block text-xs font-medium text-gray-600 mb-1">
+                        {childrenNameKeys.map((childKey, index) => (
+                          <div key={childKey}>
+                            <label htmlFor={`child-${childKey}`} className="block text-xs font-medium text-gray-600 mb-1">
                               Child {index + 1}
                             </label>
                             <input
-                              id={`child-${index}`}
+                              id={`child-${childKey}`}
                               type="text"
                               value={formData.childrenNames[index] || ''}
                               onChange={(e) => {
@@ -1481,7 +1525,7 @@ const ProfileFormPage = () => {
               <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                 <button
                   type="button"
-                  onClick={() => window.history.back()}
+                  onClick={() => globalThis?.history?.back?.()}
                   className="bg-white/20 backdrop-blur-sm hover:bg-white/30 px-4 sm:px-6 py-2.5 sm:py-3 border border-white/30 rounded-lg sm:rounded-xl font-medium text-white transition-all duration-200 flex items-center justify-center gap-2 text-sm sm:text-base order-2 sm:order-1"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

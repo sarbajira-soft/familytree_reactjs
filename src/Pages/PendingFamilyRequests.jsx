@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import PropTypes from 'prop-types';
 import { FaUserPlus, FaSearch, FaWhatsapp } from 'react-icons/fa';
 import { FiLoader, FiX, FiArrowLeft } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
@@ -8,7 +9,7 @@ import { useUser } from '../Contexts/UserContext';
 
 // ✅ WhatsApp Share Modal
 const WhatsAppShareModal = ({ onClose, familyCode, member }) => {
-  const rawBaseUrl = import.meta.env.VITE_BASE_URL || window.location.origin;
+  const rawBaseUrl = import.meta.env.VITE_BASE_URL || globalThis?.location?.origin;
   const baseUrl = /^https?:\/\//i.test(rawBaseUrl)
     ? rawBaseUrl
     : `https://${rawBaseUrl}`;
@@ -17,7 +18,7 @@ const WhatsAppShareModal = ({ onClose, familyCode, member }) => {
   const handleWhatsAppShare = () => {
     const message = `Hi ${member?.name}, join our family tree! Use this link: ${inviteLink}`;
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
-    window.open(whatsappUrl, '_blank');
+    globalThis?.open?.(whatsappUrl, '_blank');
   };
 
   return (
@@ -37,9 +38,9 @@ const WhatsAppShareModal = ({ onClose, familyCode, member }) => {
 
         {/* Invite Link */}
         <div className="mb-8 flex flex-col items-center">
-          <label className="block text-gray-700 font-semibold mb-2 text-center w-full">
+          <p className="block text-gray-700 font-semibold mb-2 text-center w-full">
             Invitation Link
-          </label>
+          </p>
           <a
             href={inviteLink}
             target="_blank"
@@ -52,7 +53,7 @@ const WhatsAppShareModal = ({ onClose, familyCode, member }) => {
 
         {/* WhatsApp Share Button */}
         <div className="mb-2">
-          <label className="block text-gray-700 font-semibold mb-2">Share via WhatsApp</label>
+          <p className="block text-gray-700 font-semibold mb-2">Share via WhatsApp</p>
           <button
             onClick={handleWhatsAppShare}
             className="w-full px-4 py-3 bg-green-500 text-white rounded-lg font-bold text-lg flex items-center justify-center gap-2 hover:bg-green-600 transition-all shadow-md"
@@ -69,6 +70,13 @@ const WhatsAppShareModal = ({ onClose, familyCode, member }) => {
 
 // ✅ Family Member Card
 const FamilyMemberCard = ({ member, onWhatsAppClick }) => {
+  let statusClass = 'bg-gray-100 text-gray-800';
+  if (member.status === 'approved') {
+    statusClass = 'bg-green-100 text-green-800';
+  } else if (member.status === 'pending') {
+    statusClass = 'bg-yellow-100 text-yellow-800';
+  }
+
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md hover:border-gray-300 transition-all duration-200 p-5 mb-4">
       <div className="flex flex-col md:flex-row md:items-center gap-5">
@@ -93,13 +101,7 @@ const FamilyMemberCard = ({ member, onWhatsAppClick }) => {
 
               {/* ✅ Contact field removed */}
 
-              <span className={`inline-block mt-1 px-2 py-1 text-xs font-medium rounded-full ${
-                member.status === 'approved' 
-                  ? 'bg-green-100 text-green-800' 
-                  : member.status === 'pending'
-                  ? 'bg-yellow-100 text-yellow-800'
-                  : 'bg-gray-100 text-gray-800'
-              }`}>
+              <span className={`inline-block mt-1 px-2 py-1 text-xs font-medium rounded-full ${statusClass}`}>
                 {member.status}
               </span>
             </div>
@@ -163,7 +165,7 @@ const FamilyMemberListing = () => {
         memberId: item.memberId,
         familyCode: item.familyCode,
         name: (item.user.fullName && !/\bnull\b|\bundefined\b/i.test(item.user.fullName))
-          ? item.user.fullName.replace(/\bnull\b|\bundefined\b/gi, '').replace(/\s+/g, ' ').trim()
+          ? item.user.fullName.replaceAll(/\bnull\b|\bundefined\b/gi, '').replaceAll(/\s+/g, ' ').trim()
           : (
               [item.user.userProfile?.firstName, item.user.userProfile?.lastName]
                 .filter(val => val && val !== 'null' && val !== 'undefined')
@@ -200,21 +202,19 @@ const FamilyMemberListing = () => {
 
   if (userLoading) {
     return (
-      <>
-        <div className="max-w-7xl mx-auto px-4 py-8 flex flex-col items-center justify-center py-20">
-          <button
-            type="button"
-            onClick={() => navigate('/family-management')}
-            className="self-start mb-4 inline-flex items-center text-sm text-primary-600 hover:text-primary-700"
-          >
-            <FiArrowLeft className="mr-1.5" />
-            <span>Back to Family Management</span>
-          </button>
-          <FiLoader className="text-6xl text-blue-600 animate-spin mb-4" />
-          <h2 className="text-2xl font-semibold text-gray-700 mb-2">Loading...</h2>
-          <p className="text-gray-500">Please wait while we verify your access.</p>
-        </div>
-      </>
+      <div className="max-w-7xl mx-auto px-4 py-8 flex flex-col items-center justify-center py-20">
+        <button
+          type="button"
+          onClick={() => navigate('/family-management')}
+          className="self-start mb-4 inline-flex items-center text-sm text-primary-600 hover:text-primary-700"
+        >
+          <FiArrowLeft className="mr-1.5" />
+          <span>Back to Family Management</span>
+        </button>
+        <FiLoader className="text-6xl text-blue-600 animate-spin mb-4" />
+        <h2 className="text-2xl font-semibold text-gray-700 mb-2">Loading...</h2>
+        <p className="text-gray-500">Please wait while we verify your access.</p>
+      </div>
     );
   }
 
@@ -262,21 +262,19 @@ const FamilyMemberListing = () => {
 
   if (isLoading) {
     return (
-      <>
-        <div className="max-w-7xl mx-auto px-4 py-8 flex flex-col items-center justify-center py-20">
-          <button
-            type="button"
-            onClick={() => navigate('/family-management')}
-            className="self-start mb-4 inline-flex items-center text-sm text-primary-600 hover:text-primary-700"
-          >
-            <FiArrowLeft className="mr-1.5" />
-            <span>Back to Family Management</span>
-          </button>
-          <FiLoader className="text-6xl text-blue-600 animate-spin mb-4" />
-          <h2 className="text-2xl font-semibold text-gray-700 mb-2">Loading Members...</h2>
-          <p className="text-gray-500">Please wait while we fetch family members.</p>
-        </div>
-      </>
+      <div className="max-w-7xl mx-auto px-4 py-8 flex flex-col items-center justify-center py-20">
+        <button
+          type="button"
+          onClick={() => navigate('/family-management')}
+          className="self-start mb-4 inline-flex items-center text-sm text-primary-600 hover:text-primary-700"
+        >
+          <FiArrowLeft className="mr-1.5" />
+          <span>Back to Family Management</span>
+        </button>
+        <FiLoader className="text-6xl text-blue-600 animate-spin mb-4" />
+        <h2 className="text-2xl font-semibold text-gray-700 mb-2">Loading Members...</h2>
+        <p className="text-gray-500">Please wait while we fetch family members.</p>
+      </div>
     );
   }
 
@@ -349,3 +347,25 @@ const FamilyMemberListing = () => {
 };
 
 export default FamilyMemberListing;
+
+WhatsAppShareModal.propTypes = {
+  onClose: PropTypes.func.isRequired,
+  familyCode: PropTypes.string,
+  member: PropTypes.shape({
+    memberId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+    name: PropTypes.string,
+  }),
+};
+
+FamilyMemberCard.propTypes = {
+  member: PropTypes.shape({
+    id: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+    memberId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+    profilePic: PropTypes.string,
+    name: PropTypes.string,
+    email: PropTypes.string,
+    status: PropTypes.string,
+    requestedDate: PropTypes.string,
+  }).isRequired,
+  onWhatsAppClick: PropTypes.func.isRequired,
+};
