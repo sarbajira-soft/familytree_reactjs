@@ -295,9 +295,9 @@ const CommentItem = ({
         {/* Nested Replies */}
         {hasReplies && (
           <div className="mt-2">
-            {comment.replies.map((reply) => (
+            {comment.replies.map((reply, index) => (
               <CommentItem
-                key={reply.id}
+                key={reply.id || `reply-${comment.id || "root"}-${index}`}
                 comment={reply}
                 currentUserId={currentUserId}
                 onEdit={onEdit}

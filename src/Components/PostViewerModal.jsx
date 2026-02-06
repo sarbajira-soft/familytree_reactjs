@@ -346,9 +346,9 @@ const PostViewerModal = ({
                     className="flex-1 overflow-y-auto px-4 pb-4 space-y-3 custom-scrollbar min-h-0"
                   >
                     {comments.length > 0 ? (
-                      buildCommentTree(comments).map((comment) => (
+                      buildCommentTree(comments).map((comment, index) => (
                         <CommentItem
-                          key={comment.id}
+                          key={comment.id || `comment-${index}`}
                           comment={comment}
                           currentUserId={currentUser?.userId}
                           onEdit={handleEditComment}

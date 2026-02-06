@@ -2349,7 +2349,16 @@ const FamilyTreePage = () => {
 
               {canEdit && (
                 <>
-                  <div className="sm:hidden fixed top-16 left-0 right-0 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 shadow-sm z-50 px-3 py-2">
+                  <div
+                    className="sm:hidden fixed left-0 right-0 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 shadow-sm z-50 px-3 py-2"
+                    style={{
+                      // Position this header just below the global app header
+                      // while also respecting any safe-area inset at the top
+                      // (for devices with notches).
+                      top:
+                        "calc(3.5rem + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)))",
+                    }}
+                  >
                     <div className="flex items-center justify-between gap-2">
                       {/* <button className="w-10 h-10 bg-green-600 text-white rounded-lg flex items-center justify-center active:scale-95 transition-transform">
 

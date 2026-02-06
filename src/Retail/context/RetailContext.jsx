@@ -622,58 +622,14 @@ export const RetailProvider = ({ children }) => {
           token: state.token || null,
         });
 
-        // 3. Attach the selected shipping method directly, using dynamic
-        // Shiprocket amount (if present) via the custom backend route.
-        // To avoid double-charging shipping when restarting checkout we
-        // reuse an existing method only when BOTH:
-        //  - it uses the same shipping option id, and
-        //  - its Shiprocket amount (if any) matches the requested one.
-        const existingMethods = Array.isArray(updatedWithBilling.shipping_methods)
-          ? updatedWithBilling.shipping_methods
-          : Array.isArray(updatedWithBilling.shippingMethods)
-          ? updatedWithBilling.shippingMethods
-          : [];
-
-        const existingMethod = existingMethods[0] || null;
-
-        const existingOptionId =
-          existingMethod?.shipping_option_id ||
-          existingMethod?.shipping_option?.id ||
-          existingMethod?.shippingOption?.id ||
-          null;
-
-        const existingData =
-          (existingMethod && (existingMethod.data || existingMethod.metadata)) || {};
-
-        const existingShiprocketAmount =
-          typeof existingData.shiprocket_amount === 'number' &&
-          !Number.isNaN(existingData.shiprocket_amount)
-            ? existingData.shiprocket_amount
-            : null;
-
-        const requestedShiprocketAmount =
-          shippingMeta &&
-          typeof shippingMeta.shiprocket_amount === 'number' &&
-          !Number.isNaN(shippingMeta.shiprocket_amount)
-            ? shippingMeta.shiprocket_amount
-            : null;
-
-        const canReuseExisting =
-          existingOptionId &&
-          existingOptionId === shippingMethodId &&
-          (requestedShiprocketAmount == null ||
-            (existingShiprocketAmount != null &&
-              existingShiprocketAmount === requestedShiprocketAmount));
-
-        const cartWithShipping =
-          canReuseExisting
-            ? updatedWithBilling
-            : await cartService.addShippingMethod({
-                cartId: updatedWithBilling.id,
-                optionId: shippingMethodId,
-                data: shippingMeta || {},
-                token: state.token || null,
-              });
+        // 3. Attach the selected shipping method directly. The backend
+        // clears any previous shipping methods before adding a new one.
+        const cartWithShipping = await cartService.addShippingMethod({
+          cartId: updatedWithBilling.id,
+          optionId: shippingMethodId,
+          data: shippingMeta || {},
+          token: state.token || null,
+        });
 
         // 4. Create payment collection for this cart
         const paymentCollection = await cartService.createPaymentCollection(
@@ -730,52 +686,14 @@ export const RetailProvider = ({ children }) => {
           token: state.token || null,
         });
 
-        const existingMethods = Array.isArray(updatedWithBilling.shipping_methods)
-          ? updatedWithBilling.shipping_methods
-          : Array.isArray(updatedWithBilling.shippingMethods)
-          ? updatedWithBilling.shippingMethods
-          : [];
-
-        const existingMethod = existingMethods[0] || null;
-
-        const existingOptionId =
-          existingMethod?.shipping_option_id ||
-          existingMethod?.shipping_option?.id ||
-          existingMethod?.shippingOption?.id ||
-          null;
-
-        const existingData =
-          (existingMethod && (existingMethod.data || existingMethod.metadata)) || {};
-
-        const existingShiprocketAmount =
-          typeof existingData.shiprocket_amount === 'number' &&
-          !Number.isNaN(existingData.shiprocket_amount)
-            ? existingData.shiprocket_amount
-            : null;
-
-        const requestedShiprocketAmount =
-          shippingMeta &&
-          typeof shippingMeta.shiprocket_amount === 'number' &&
-          !Number.isNaN(shippingMeta.shiprocket_amount)
-            ? shippingMeta.shiprocket_amount
-            : null;
-
-        const canReuseExisting =
-          existingOptionId &&
-          existingOptionId === shippingMethodId &&
-          (requestedShiprocketAmount == null ||
-            (existingShiprocketAmount != null &&
-              existingShiprocketAmount === requestedShiprocketAmount));
-
-        const cartWithShipping =
-          canReuseExisting
-            ? updatedWithBilling
-            : await cartService.addShippingMethod({
-                cartId: updatedWithBilling.id,
-                optionId: shippingMethodId,
-                data: shippingMeta || {},
-                token: state.token || null,
-              });
+        // Attach the selected shipping method directly. The backend clears any
+        // previous shipping methods before adding a new one.
+        const cartWithShipping = await cartService.addShippingMethod({
+          cartId: updatedWithBilling.id,
+          optionId: shippingMethodId,
+          data: shippingMeta || {},
+          token: state.token || null,
+        });
 
         setCartPersistent(cartWithShipping);
 

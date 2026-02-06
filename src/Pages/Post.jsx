@@ -769,9 +769,16 @@ const PostPage = () => {
                                   cmt.userId === user?.id ||
                                   cmt.userId === userInfo?.userId;
 
+                                const commentKey =
+                                  cmt.id !== undefined && cmt.id !== null && cmt.id !== ""
+                                    ? String(cmt.id)
+                                    : `comment-${post.id}-${cmt.createdAt || ""}-${
+                                        cmt.userId || cmt.user?.userId || ""
+                                      }`;
+
                                 return (
                                   <div
-                                    key={cmt.id}
+                                    key={commentKey}
                                     className={isReply ? "ml-10 mt-2" : ""}
                                   >
                                     <div className="flex items-start gap-2.5 opacity-0 animate-fadeIn">

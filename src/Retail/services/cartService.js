@@ -94,127 +94,180 @@ export async function updateCart({ cartId, body, token }) {
 }
 
 export async function getShippingOptions(cartId, token, paymentMode) {
-  // 1) Load real Medusa shipping options that are valid for this cart.
+  // 1) Load Medusa shipping options that are valid for this cart.
   const baseRes = await client.get('/store/shipping-options', {
     params: { cart_id: cartId },
     headers: buildBaseHeaders(token),
   });
 
   const baseData = baseRes.data || {};
-  let baseOptions = [];
+  let options = [];
   if (Array.isArray(baseData)) {
-    baseOptions = baseData;
+    options = baseData;
   } else if (Array.isArray(baseData.shipping_options)) {
-    baseOptions = baseData.shipping_options;
+    options = baseData.shipping_options;
   } else if (Array.isArray(baseData.shippingOptions)) {
-    baseOptions = baseData.shippingOptions;
+    options = baseData.shippingOptions;
   } else if (Array.isArray(baseData.data)) {
-    baseOptions = baseData.data;
+    options = baseData.data;
   }
 
-  // If no base options are available, there is nothing valid we can attach.
-  if (!Array.isArray(baseOptions) || baseOptions.length === 0) {
+  if (!Array.isArray(options) || options.length === 0) {
     return [];
   }
 
-  // 2) Fetch dynamic Shiprocket rates (Standard / Express) for this cart,
-  // using the current payment mode (e.g., 'cod' vs 'online') so Shiprocket
-  // can apply the correct COD flag.
-  let dynamic = null;
+  // 1.5) Optionally load Shiprocket standard/express metadata (ETA etc.) via
+  // the existing custom /store/shipping/rates endpoint. This endpoint uses
+  // the same aggregation logic as the fulfillment provider but also exposes
+  // `eta` and `eta_days` for the selected standard/express choices.
+  let shiprocketRates = null;
   try {
     const ratesRes = await client.post(
       '/store/shipping/rates',
       {
         cart_id: cartId,
-        payment_type: paymentMode || undefined,
+        // Forward payment mode so the backend can distinguish COD vs online.
+        payment_mode: paymentMode || undefined,
       },
       { headers: buildJsonHeaders(token) },
     );
-    dynamic = ratesRes.data || null;
-  } catch {
-    // If Shiprocket fails, fall back to native prices.
-    dynamic = null;
+
+    shiprocketRates = ratesRes.data || null;
+  } catch (e) {
+    // If this call fails for any reason, we still proceed with calculated
+    // pricing; we just won't have dynamic ETA metadata.
+    shiprocketRates = null;
   }
 
-  const standardRate =
-    dynamic && dynamic.serviceable !== false && dynamic.standard
-      ? dynamic.standard
-      : null;
-  const expressRate =
-    dynamic && dynamic.serviceable !== false && dynamic.express
-      ? dynamic.express
-      : null;
+  // 2) For options with price_type="calculated", ask Medusa to calculate
+  // their price using the associated fulfillment provider (Shiprocket).
+  const enriched = await Promise.all(
+    options.map(async (opt) => {
+      const priceType = (opt.price_type || opt.priceType || '').toString().toLowerCase();
 
-  // 3) Merge: keep real option IDs, but override label/amount for Standard/Express
-  // using Shiprocket rates when available.
-  const merged = baseOptions.map((opt) => {
-    const typeCode =
-      (opt.type && opt.type.code) ||
-      opt.code ||
-      (typeof opt.name === 'string' ? opt.name.toLowerCase() : '');
+      if (priceType !== 'calculated') {
+        return opt;
+      }
 
-    if (typeCode === 'standard' && standardRate && typeof standardRate.amount === 'number') {
-      return {
-        ...opt,
-        label: standardRate.eta
-          ? `Standard (${standardRate.eta})`
-          : opt.type?.label || opt.name || 'Standard Delivery',
-        amount: standardRate.amount,
-        metadata: {
-          ...(opt.metadata || {}),
-          shipping_type: 'standard',
-          eta: standardRate.eta || null,
-          eta_days: standardRate.eta_days ?? null,
-        },
-      };
+      try {
+        const res = await client.post(
+          `/store/shipping-options/${opt.id}/calculate`,
+          {
+            cart_id: cartId,
+            // Forward a minimal hint about payment mode so the provider
+            // can distinguish COD vs online if needed.
+            data: paymentMode ? { payment_mode: paymentMode } : {},
+          },
+          { headers: buildJsonHeaders(token) },
+        );
+
+        const payload = res.data || {};
+        const so = payload.shipping_option || payload.shippingOption || null;
+        const calc = so?.calculated_price || so?.calculatedPrice || null;
+        const calculated =
+          typeof calc?.calculated_amount === 'number'
+            ? calc.calculated_amount
+            : typeof so?.amount === 'number'
+            ? so.amount
+            : null;
+
+        if (calculated == null) {
+          return opt;
+        }
+
+        // Merge expected delivery date metadata when available. We only do
+        // this for Shiprocket-backed options, and we rely on the option's
+        // data.id / data.name to distinguish standard vs express.
+        let metadata = opt.metadata || null;
+
+        const providerId = (opt.provider_id || opt.providerId || '').toString().toLowerCase();
+
+        if (shiprocketRates && providerId.includes('shiprocket')) {
+          const dataObj = (opt.data || {});
+          const idOrNameRaw =
+            (typeof dataObj.id === 'string' && dataObj.id) ||
+            (typeof dataObj.name === 'string' && dataObj.name) ||
+            '';
+
+          const idOrName = idOrNameRaw.toString().toLowerCase();
+          const isExpress = idOrName.includes('express');
+
+          const rateBlock = isExpress
+            ? shiprocketRates.express || shiprocketRates.standard || null
+            : shiprocketRates.standard || shiprocketRates.express || null;
+
+          if (rateBlock) {
+            const nextMeta = { ...(metadata || {}) };
+
+            if (typeof rateBlock.eta === 'string') {
+              nextMeta.eta = rateBlock.eta;
+            }
+
+            if (typeof rateBlock.eta_days === 'number') {
+              nextMeta.eta_days = rateBlock.eta_days;
+            }
+
+            metadata = nextMeta;
+          }
+        }
+
+        const enrichedOpt = {
+          ...opt,
+          amount: calculated,
+        };
+
+        if (metadata) {
+          enrichedOpt.metadata = metadata;
+        }
+
+        return enrichedOpt;
+      } catch {
+        // If calculation fails, fall back to the original option.
+        return opt;
+      }
+    }),
+  );
+
+  return enriched;
+}
+
+export async function clearShippingMethods(cartId, token) {
+  const cart = await getCart(cartId, token);
+  const methods = Array.isArray(cart.shipping_methods)
+    ? cart.shipping_methods
+    : Array.isArray(cart.shippingMethods)
+    ? cart.shippingMethods
+    : [];
+
+  if (!methods.length) {
+    return cart;
+  }
+
+  for (const method of methods) {
+    if (!method || !method.id) continue;
+    try {
+      await client.delete(
+        `/store/carts/${cartId}/shipping-methods/${method.id}`,
+        { headers: buildBaseHeaders(token) },
+      );
+    } catch {
+      // ignore and continue deleting others
     }
+  }
 
-    if (typeCode === 'express' && expressRate && typeof expressRate.amount === 'number') {
-      return {
-        ...opt,
-        label: expressRate.eta
-          ? `Express (${expressRate.eta})`
-          : opt.type?.label || opt.name || 'Express Delivery',
-        amount: expressRate.amount,
-        metadata: {
-          ...(opt.metadata || {}),
-          shipping_type: 'express',
-          eta: expressRate.eta || null,
-          eta_days: expressRate.eta_days ?? null,
-        },
-      };
-    }
-
-    return opt;
-  });
-
-  return merged;
+  const refreshed = await getCart(cartId, token);
+  return refreshed;
 }
 
 export async function addShippingMethod({ cartId, optionId, data = {}, token }) {
-  const hasShiprocketAmount =
-    data &&
-    typeof data.shiprocket_amount === 'number' &&
-    !Number.isNaN(data.shiprocket_amount) &&
-    data.shiprocket_amount >= 0;
+  await clearShippingMethods(cartId, token);
 
-  const endpoint = hasShiprocketAmount
-    ? '/store/shiprocket/shipping-method'
-    : `/store/carts/${cartId}/shipping-methods`;
+  const body = {
+    option_id: optionId,
+    data,
+  };
 
-  const body = hasShiprocketAmount
-    ? {
-        cart_id: cartId,
-        shipping_option_id: optionId,
-        amount: data.shiprocket_amount,
-        data,
-      }
-    : {
-        option_id: optionId,
-        data,
-      };
-
-  const res = await client.post(endpoint, body, {
+  const res = await client.post(`/store/carts/${cartId}/shipping-methods`, body, {
     headers: buildJsonHeaders(token),
   });
 
