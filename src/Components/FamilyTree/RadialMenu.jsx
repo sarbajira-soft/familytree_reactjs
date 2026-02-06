@@ -1,4 +1,5 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 
 import { UserPlus, Users, Edit, Trash2, Plus, User, UserMinus } from 'lucide-react';
 
@@ -26,7 +27,19 @@ const iconMap = {
 
 
 
-const RadialMenu = ({ isActive, position, items, onItemClick, onClose }) => {
+const RadialMenu = ({
+
+    isActive = false,
+
+    position = { x: 0, y: 0 },
+
+    items = [],
+
+    onItemClick = () => {},
+
+    onClose = () => {},
+
+} = {}) => {
 
     if (!isActive) return null;
 
@@ -102,7 +115,11 @@ const RadialMenu = ({ isActive, position, items, onItemClick, onClose }) => {
 
             {/* Overlay for outside click */}
 
-            <div
+            <button
+
+                type="button"
+
+                aria-label="Close menu"
 
                 style={{
 
@@ -119,6 +136,10 @@ const RadialMenu = ({ isActive, position, items, onItemClick, onClose }) => {
                     zIndex: 999,
 
                     background: 'transparent',
+
+                    border: 'none',
+
+                    padding: 0,
 
                 }}
 
@@ -180,8 +201,6 @@ const RadialMenu = ({ isActive, position, items, onItemClick, onClose }) => {
 
                 }}
 
-                onClick={e => e.stopPropagation()}
-
             >
 
                 {items.map((item, i) => {
@@ -234,11 +253,11 @@ const RadialMenu = ({ isActive, position, items, onItemClick, onClose }) => {
 
                     return (
 
-                        <div
+                        <button
 
                             key={item.label}
 
-                            tabIndex={0}
+                            type="button"
 
                             style={itemStyle}
 
@@ -254,19 +273,9 @@ const RadialMenu = ({ isActive, position, items, onItemClick, onClose }) => {
 
                             }}
 
-                            onKeyDown={e => {
+                            disabled={isDisabled}
 
-                                if (e.key === 'Enter' || e.key === ' ') {
-
-                                    if (isDisabled) return;
-
-                                    onItemClick(item);
-
-                                    onClose();
-
-                                }
-
-                            }}
+                            aria-disabled={isDisabled}
 
                             onMouseEnter={e => {
 
@@ -332,7 +341,7 @@ const RadialMenu = ({ isActive, position, items, onItemClick, onClose }) => {
 
                             }}>{item.label}</span>
 
-                        </div>
+                        </button>
 
                     );
 
@@ -347,5 +356,36 @@ const RadialMenu = ({ isActive, position, items, onItemClick, onClose }) => {
 };
 
 
+RadialMenu.propTypes = {
 
-export default RadialMenu; 
+    isActive: PropTypes.bool,
+
+    position: PropTypes.shape({
+
+        x: PropTypes.number,
+
+        y: PropTypes.number,
+
+    }),
+
+    items: PropTypes.arrayOf(
+
+        PropTypes.shape({
+
+            label: PropTypes.string.isRequired,
+
+            disabled: PropTypes.bool,
+
+        })
+
+    ),
+
+    onItemClick: PropTypes.func,
+
+    onClose: PropTypes.func,
+
+};
+
+
+
+export default RadialMenu;

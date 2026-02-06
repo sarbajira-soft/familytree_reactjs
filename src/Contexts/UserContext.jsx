@@ -1,4 +1,5 @@
 import React, { createContext, useState, useEffect, useContext, useCallback, useMemo } from 'react';
+import PropTypes from 'prop-types';
 import { 
   getToken, 
   getUserIdFromToken,
@@ -33,6 +34,85 @@ export const UserProvider = ({ children }) => {
     clearAuthData();
   }, []);
 
+  const redirectToLogin = useCallback(() => {
+    if (globalThis?.location) {
+      globalThis.location.href = '/login';
+    }
+  }, []);
+
+  const parseChildrenNames = useCallback((childrenNames) => {
+    if (!childrenNames) return [];
+    if (Array.isArray(childrenNames)) return childrenNames;
+
+    if (typeof childrenNames === 'string') {
+      try {
+        const parsed = JSON.parse(childrenNames);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (err) {
+        console.warn('Failed to parse childrenNames JSON, falling back to CSV:', err);
+      }
+      return childrenNames.split(',').map((c) => c.trim());
+    }
+
+    return [];
+  }, []);
+
+  const toIntOrZero = useCallback((value) => {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }, []);
+
+  const persistAuthData = useCallback((token, user) => {
+    try {
+      const stayLoggedIn = localStorage.getItem('stayLoggedIn') === 'true';
+      setAuthData(token, user, stayLoggedIn);
+    } catch (err) {
+      console.warn('Failed to persist auth data:', err);
+    }
+  }, []);
+
+  const buildMinimalUser = useCallback((token, jsonData) => {
+    const data = jsonData?.data || {};
+    const tokenUserId = getUserIdFromToken(token);
+    const currentUser = jsonData?.currentUser || {};
+
+    const isAppUser =
+      typeof data.isAppUser === 'boolean' ? data.isAppUser : !!currentUser.isAppUser;
+    const hasAcceptedTerms =
+      typeof data.hasAcceptedTerms === 'boolean'
+        ? data.hasAcceptedTerms
+        : !!currentUser.hasAcceptedTerms;
+
+    return {
+      userId: tokenUserId,
+      email: data.email || currentUser.email || '',
+      countryCode: data.countryCode || currentUser.countryCode || '',
+      mobile: data.mobile || currentUser.mobile || '',
+      status: data.status || currentUser.status || 0,
+      role: data.role || currentUser.role || 0,
+      isAppUser,
+      hasAcceptedTerms,
+      termsVersion: data.termsVersion || 'v1.0.0',
+      termsAcceptedAt: data.termsAcceptedAt || null,
+      raw: null,
+    };
+  }, []);
+
+  const handleUnauthorized = useCallback(
+    async (response) => {
+      try {
+        const errJson = await response.json();
+        console.error('User session error:', errJson?.message || errJson);
+      } catch (err) {
+        console.warn('Failed to parse 401 response:', err);
+      }
+
+      clearUserData();
+      redirectToLogin();
+    },
+    [clearUserData, redirectToLogin],
+  );
+
   const fetchUserDetails = useCallback(async () => {
     const token = getToken();
     if (!token) {
@@ -52,20 +132,13 @@ export const UserProvider = ({ children }) => {
         },
       });
       if (response.status === 401) {
-        // Treat 401 from myProfile as invalid session
-        try {
-          const errJson = await response.json();
-          console.error('User session error:', errJson?.message || errJson);
-        } catch (_) {
-          // ignore json parse errors
-        }
-        clearUserData();
-        window.location.href = '/login';
+        await handleUnauthorized(response);
         return;
       }
       if (!response.ok) throw new Error('Failed to fetch user details');
 
       const jsonData = await response.json();
+      const data = jsonData.data || {};
       const {
         userProfile,
         email,
@@ -77,60 +150,22 @@ export const UserProvider = ({ children }) => {
         hasAcceptedTerms,
         termsVersion,
         termsAcceptedAt,
-      } = jsonData.data || {};
+      } = data;
 
       if (!userProfile) {
-        const tokenUserId = getUserIdFromToken(token);
-        const minimalUser = {
-          userId: tokenUserId,
-          email: email || jsonData?.currentUser?.email || '',
-          countryCode: countryCode || jsonData?.currentUser?.countryCode || '',
-          mobile: mobile || jsonData?.currentUser?.mobile || '',
-          status: status || jsonData?.currentUser?.status || 0,
-          role: role || jsonData?.currentUser?.role || 0,
-          isAppUser:
-            typeof isAppUser === 'boolean'
-              ? isAppUser
-              : !!jsonData?.currentUser?.isAppUser,
-          hasAcceptedTerms:
-            typeof hasAcceptedTerms === 'boolean'
-              ? hasAcceptedTerms
-              : !!jsonData?.currentUser?.hasAcceptedTerms,
-          termsVersion: termsVersion || 'v1.0.0',
-          termsAcceptedAt: termsAcceptedAt || null,
-          raw: null,
-        };
-
+        const minimalUser = buildMinimalUser(token, jsonData);
         setUserInfo(minimalUser);
-        try {
-          const stayLoggedIn = localStorage.getItem('stayLoggedIn') === 'true';
-          setAuthData(token, minimalUser, stayLoggedIn);
-        } catch (_) {
-          // ignore storage issues
-        }
+        persistAuthData(token, minimalUser);
         return;
       }
 
-      let childrenArray = [];
-
-      if (userProfile.childrenNames) {
-        try {
-          // If it's valid JSON (e.g. '["Son", "Daugther"]')
-          childrenArray = JSON.parse(userProfile.childrenNames);
-          if (!Array.isArray(childrenArray)) {
-            childrenArray = userProfile.childrenNames.split(',').map(c => c.trim());
-          }
-        } catch (err) {
-          // Fallback: treat as comma-separated string
-          childrenArray = userProfile.childrenNames.split(',').map(c => c.trim());
-        }
-      }
+      const childrenArray = parseChildrenNames(userProfile.childrenNames);
 
       const childFields = {};
       childrenArray.forEach((name, index) => {
         childFields[`childName${index}`] = name;
       });
-      
+
       setUserInfo({
         userId: userProfile.userId,
         firstName: userProfile.firstName || '',
@@ -148,10 +183,10 @@ export const UserProvider = ({ children }) => {
 
         fatherName: userProfile.fatherName || '',
         motherName: userProfile.motherName || '',
-        motherTongue: parseInt(userProfile.languageId) || 0,
-        religionId: parseInt(userProfile.religionId) || 0,
+        motherTongue: toIntOrZero(userProfile.languageId),
+        religionId: toIntOrZero(userProfile.religionId),
         caste: userProfile.caste || '',
-        gothram: parseInt(userProfile.gothramId) || 0,
+        gothram: toIntOrZero(userProfile.gothramId),
         kuladevata: userProfile.kuladevata || '',
         hobbies: userProfile.hobbies || '',
         likes: userProfile.likes || '',
@@ -201,13 +236,13 @@ export const UserProvider = ({ children }) => {
             raw: null,
           });
         }
-      } catch (_) {
-        // keep current state
+      } catch (storageError) {
+        console.warn('Failed to recover user from storage:', storageError);
       }
     } finally {
       setUserLoading(false);
     }
-  }, [clearUserData]);
+  }, [buildMinimalUser, clearUserData, handleUnauthorized, parseChildrenNames, persistAuthData, toIntOrZero]);
 
   useEffect(() => {
     fetchUserDetails();
@@ -229,12 +264,12 @@ export const UserProvider = ({ children }) => {
         
         // If user previously chose not to stay logged in, clear the session
         if (stayLoggedIn === 'false') {
-          clearAuthData();
           clearUserData();
           
           // Redirect to login if on a protected page
-          if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
-            window.location.href = '/login';
+          const path = globalThis?.location?.pathname;
+          if (path && path !== '/login' && path !== '/register') {
+            redirectToLogin();
           }
         }
       }
@@ -246,7 +281,7 @@ export const UserProvider = ({ children }) => {
     // REMOVED: beforeunload and visibility change handlers as they were causing issues
     // The session will only be cleared when a new browser session starts (not during page refreshes or form submissions)
 
-  }, [clearUserData]);
+  }, [clearUserData, redirectToLogin]);
 
   const contextValue = useMemo(() => ({
     userInfo,
@@ -261,6 +296,10 @@ export const UserProvider = ({ children }) => {
       {children}
     </UserContext.Provider>
   );
+};
+
+UserProvider.propTypes = {
+  children: PropTypes.node.isRequired,
 };
 
 export const useUser = () => useContext(UserContext);

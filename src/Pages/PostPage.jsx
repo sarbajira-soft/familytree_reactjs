@@ -1,25 +1,25 @@
-import React, { useState, useEffect, useRef } from "react";
-import CreatePostModal from "../Components/CreatePostModal";
-import PostViewerModal from "../Components/PostViewerModal";
-import { useUser } from "../Contexts/UserContext";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useRef, useState } from "react";
+import { FaCommentDots, FaHeart, FaRegHeart } from "react-icons/fa";
 import {
   FiImage,
   FiUsers,
   FiPlusCircle,
-  FiFeather,
-  FiSearch,
   FiGlobe,
   FiClock,
   FiSmile,
   FiChevronDown,
   FiSend,
 } from "react-icons/fi";
-import { FaRegHeart, FaHeart, FaCommentDots } from "react-icons/fa";
-import { MdPublic, MdPeople } from "react-icons/md";
+import { MdPeople, MdPublic } from "react-icons/md";
+import { useNavigate } from "react-router-dom";
+import CreatePostModal from "../Components/CreatePostModal";
+import PostViewerModal from "../Components/PostViewerModal";
+import { useUser } from "../Contexts/UserContext";
 import PostsShimmer from "./PostsShimmer";
 import DeleteConfirmModal from "./DeleteConfirmModal";
 import EmojiPicker from "emoji-picker-react";
+
+const EMPTY_VTT_TRACK_SRC = "data:text/vtt,WEBVTT";
 
 const PostPage = () => {
   const [token, setToken] = useState(null);
@@ -31,9 +31,6 @@ const PostPage = () => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isPostViewerOpen, setIsPostViewerOpen] = useState(false);
   const [selectedPost, setSelectedPost] = useState(null);
-  const [showSearchInput, setShowSearchInput] = useState(false);
-  const [searchCaption, setSearchCaption] = useState("");
-  const searchTimeoutRef = useRef(null);
   const { userInfo } = useUser();
   const [postComments, setPostComments] = useState({});
   const [loadingComments, setLoadingComments] = useState(new Set());
@@ -41,8 +38,6 @@ const PostPage = () => {
   const [newComment, setNewComment] = useState({});
   const [visibleComments, setVisibleComments] = useState({});
   const [showHeart, setShowHeart] = useState(null);
-  const [showHeartAnimation, setShowHeartAnimation] = useState(false);
-  const [likedPostId, setLikedPostId] = useState(null);
   const [editingCommentId, setEditingCommentId] = useState(null);
   const [editCommentText, setEditCommentText] = useState({});
   const [replyingToCommentId, setReplyingToCommentId] = useState(null);
@@ -341,10 +336,18 @@ const PostPage = () => {
   };
 
   const handleLike = async (postId) => {
+    if (likeLoadingIds.has(postId)) return;
     console.log("Post ID liked:", postId);
     setShowHeart(postId);
     setTimeout(() => setShowHeart(null), 1000); // Hide heart after 0.8s
     await toggleLike(postId); // Your existing like toggle logic
+  };
+
+  const handleShowMoreComments = (postId) => {
+    setVisibleComments((prev) => {
+      const current = prev[postId] || 3;
+      return { ...prev, [postId]: current + 3 };
+    });
   };
 
   const fetchComments = async (postId, authToken) => {
@@ -453,8 +456,7 @@ const PostPage = () => {
             (c) => c.parentCommentId === parentId
           );
           children.forEach((child) => {
-            childIds.push(child.id);
-            childIds.push(...getAllChildIds(child.id, comments));
+            childIds.push(child.id, ...getAllChildIds(child.id, comments));
           });
           return childIds;
         };
@@ -463,12 +465,12 @@ const PostPage = () => {
         setPostComments((prev) => {
           const currentComments = prev[postId] || [];
           const childIds = getAllChildIds(commentId, currentComments);
-          const idsToRemove = [commentId, ...childIds];
+          const idsToRemove = new Set([commentId, ...childIds]);
 
           return {
             ...prev,
             [postId]: currentComments.filter(
-              (c) => !idsToRemove.includes(c.id)
+              (c) => !idsToRemove.has(c.id)
             ),
           };
         });
@@ -545,6 +547,431 @@ const PostPage = () => {
     setSelectedPost(post);
     setIsPostViewerOpen(true);
   };
+
+  const renderComment = (cmt, postId, isReply = false) => {
+    const isOwner = cmt.userId === user?.id || cmt.userId === userInfo?.userId;
+
+    return (
+      <div key={cmt.id} className={isReply ? "ml-10 mt-2" : ""}>
+        <div className="flex items-start gap-2.5 opacity-0 animate-fadeIn">
+          <img
+            src={cmt.user?.profile || "/assets/user.png"}
+            alt="User"
+            className="w-8 h-8 rounded-full object-cover border border-gray-200"
+          />
+          <div className="flex-1">
+            {editingCommentId === cmt.id ? (
+              <div className="mt-1">
+                <input
+                  type="text"
+                  autoFocus
+                  value={editCommentText[cmt.id] || ""}
+                  onChange={(e) =>
+                    setEditCommentText({
+                      ...editCommentText,
+                      [cmt.id]: e.target.value,
+                    })
+                  }
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+                <div className="flex gap-2 mt-2">
+                  <button
+                    onClick={() => handleEditComment(cmt.id, postId)}
+                    className="px-3 py-1 bg-blue-500 text-white rounded-lg text-xs hover:bg-blue-600"
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={() => {
+                      setEditingCommentId(null);
+                      setEditCommentText({});
+                    }}
+                    className="px-3 py-1 bg-gray-300 text-gray-700 rounded-lg text-xs hover:bg-gray-400"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="text-[13px]">
+                  <span className="font-semibold text-gray-900 mr-2">
+                    {cmt.user?.firstName} {cmt.user?.lastName}
+                  </span>
+                  <span className="text-gray-700">{cmt.content}</span>
+                </div>
+
+                <div className="flex items-center gap-4 mt-1 text-[12px] text-gray-500">
+                  <span className="text-[11px]">
+                    {new Date(cmt.createdAt).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </span>
+                  <button
+                    onClick={() => setReplyingToCommentId(cmt.id)}
+                    className="font-medium hover:text-gray-700 bg-transparent"
+                  >
+                    Reply
+                  </button>
+                  {isOwner && (
+                    <>
+                      <button
+                        onClick={() => {
+                          setEditingCommentId(cmt.id);
+                          setEditCommentText({
+                            [cmt.id]: cmt.content,
+                          });
+                        }}
+                        className="font-medium hover:text-gray-700 bg-transparent"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => askDeleteComment(cmt.id, postId)}
+                        className="font-medium text-red-500 hover:text-red-700 bg-transparent"
+                      >
+                        Delete
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                {replyingToCommentId === cmt.id && (
+                  <div className="mt-2">
+                    <input
+                      type="text"
+                      autoFocus
+                      placeholder="Write a reply..."
+                      value={replyText[cmt.id] || ""}
+                      onChange={(e) =>
+                        setReplyText({
+                          ...replyText,
+                          [cmt.id]: e.target.value,
+                        })
+                      }
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                    <div className="flex gap-2 mt-2">
+                      <button
+                        onClick={() => handleReplyToComment(cmt.id, postId)}
+                        className="px-3 py-1 bg-blue-500 text-white rounded-lg text-xs hover:bg-blue-600"
+                      >
+                        Reply
+                      </button>
+                      <button
+                        onClick={() => {
+                          setReplyingToCommentId(null);
+                          setReplyText({});
+                        }}
+                        className="px-3 py-1 bg-gray-300 text-gray-700 rounded-lg text-xs hover:bg-gray-400"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+
+        {cmt.replies && cmt.replies.length > 0 && (
+          <div className="ml-10 mt-2 space-y-2">
+            {cmt.replies.map((reply) => renderComment(reply, postId, true))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderCommentsBody = (post) => {
+    if (loadingComments.has(post.id)) {
+      return (
+        <div className="space-y-3 mt-3">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="flex items-start gap-3 bg-gray-50 border border-gray-200/60 p-2.5 rounded-xl animate-pulse"
+            >
+              <div className="w-8 h-8 rounded-full bg-gray-300"></div>
+              <div className="flex-1 space-y-2">
+                <div className="w-24 h-3 bg-gray-300 rounded"></div>
+                <div className="w-3/4 h-3 bg-gray-200 rounded"></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    const currentComments = postComments[post.id];
+    if (currentComments?.length) {
+      const visibleCount = visibleComments[post.id] || 3;
+      const commentTree = buildCommentTree(currentComments);
+
+      return (
+        <>
+          <div className="sp mt-2 space-y-3">
+            {commentTree
+              .slice(0, visibleCount)
+              .map((comment) => renderComment(comment, post.id))}
+          </div>
+
+          {currentComments.length > visibleCount && (
+            <button
+              type="button"
+              onClick={() => handleShowMoreComments(post.id)}
+              className="text-[13px] bg-white text-gray-500 hover:text-gray-700 mt-2 font-normal"
+            >
+              View more comments
+            </button>
+          )}
+
+          {currentComments.length > 3 && (
+            <button
+              onClick={() => handleViewPost(post)}
+              className="text-[13px] bg-white text-gray-500 hover:text-gray-700 mt-2 font-normal"
+            >
+              View all {currentComments.length} comments
+            </button>
+          )}
+        </>
+      );
+    }
+
+    return (
+      <div className="flex flex-col items-center justify-center py-4 text-gray-500 text-sm italic">
+        No comments yet.
+      </div>
+    );
+  };
+
+  let feedSection = null;
+  if (loadingFeed) {
+    feedSection = (
+      <div className="space-y-5 animate-pulse">
+        <PostsShimmer />
+      </div>
+    );
+  } else if (posts.length) {
+    feedSection = (
+      <>
+        {posts.map((post) => (
+          <div
+            key={post.id}
+            className="bg-white rounded-xl border pb-3 border-gray-200 shadow-sm hover:shadow-md transition-all overflow-hidden"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-3">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  className="bg-transparent p-0"
+                  onClick={() => goToUserProfile(post.authorId)}
+                >
+                  <img
+                    src={post.avatar}
+                    alt={post.author}
+                    className="w-8 h-8 sm:w-9 sm:h-9 rounded-full border object-cover"
+                  />
+                </button>
+                <div>
+                  <button
+                    type="button"
+                    className="font-semibold text-gray-900 text-sm sm:text-base bg-transparent p-0"
+                    onClick={() => goToUserProfile(post.authorId)}
+                  >
+                    {post.author}
+                  </button>
+                  <p className="text-xs text-gray-500">{post.time}</p>
+                </div>
+              </div>
+              <span className="text-secondary-600 flex items-center gap-1 text-xs sm:text-sm">
+                {post.privacy === "family" ? <FiUsers /> : <FiGlobe />}
+                {post.privacy === "family" ? "Family" : "Public"}
+              </span>
+            </div>
+
+            {/* Caption */}
+            {post.caption && (
+              <div className="px-4 pb-2 text-sm text-gray-800">{post.caption}</div>
+            )}
+
+            {/* Media */}
+            {post.postVideo ? (
+              <div className="relative w-full bg-black group overflow-hidden">
+                <video
+                  src={post.postVideo}
+                  className="w-full h-auto  max-h-[60vh] sm:max-h-[65vh] lg:max-h-[600px] object-contain transition-transform duration-500"
+                  controls
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <track
+                    kind="captions"
+                    src={EMPTY_VTT_TRACK_SRC}
+                    srcLang="en"
+                    label="English"
+                    default
+                  />
+                </video>
+              </div>
+            ) : (
+              post.fullImageUrl && (
+                <button
+                  type="button"
+                  className="relative w-full bg-black cursor-pointer group overflow-hidden"
+                  onClick={() => handleViewPost(post)}
+                >
+                  <img
+                    src={post.fullImageUrl}
+                    alt="Post"
+                    className="w-full h-auto  max-h-[60vh] sm:max-h-[65vh] lg:max-h-[600px] object-contain transition-transform duration-500"
+                    loading="lazy"
+                  />
+
+                  {/* ❤️ Like animation overlay */}
+                  {showHeart === post.id && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-transparent animate-heart-pop">
+                      <FaHeart className="text-secondary-600 text-7xl drop-shadow-lg" />
+                    </div>
+                  )}
+                </button>
+              )
+            )}
+
+            {/* Actions */}
+            <div className="flex items-center gap-8 px-4 pt-3 pb-1 ">
+              <button
+                onClick={() => handleLike(post.id)}
+                disabled={likeLoadingIds.has(post.id)}
+                className="flex items-center bg-white gap-2 text-gray-700 hover:text-secondary-600 transition-colors duration-200 active:scale-95 disabled:opacity-60"
+              >
+                {post.liked ? (
+                  <FaHeart size={20} className="text-secondary-600" />
+                ) : (
+                  <FaRegHeart size={20} />
+                )}
+                <span className="text-sm">{post.likes}</span>
+              </button>
+              <button
+                onClick={() => handleCommentClick(post.id)}
+                className="flex items-center bg-white gap-2 text-gray-700 hover:text-blue-600 transition-colors duration-200 active:scale-95"
+              >
+                <FaCommentDots size={19} />
+                <span className="text-sm">{post.comments}</span>
+              </button>
+            </div>
+
+            {/* Comments Section */}
+            {post.showComments && (
+              <div className="px-4 pb-4 border-t border-gray-100 mt-2 animate-fadeIn">
+                <div className="max-w-[80%] sm:max-w-[70%] ml-6 mx-auto">
+                  <h4 className="text-sm font-semibold text-gray-800 mt-3 mb-2 flex items-center gap-2">
+                    <FaCommentDots size={19} className="text-gray-600" />
+                    Comments
+                  </h4>
+                  {renderCommentsBody(post)}
+
+                  <div className="mt-3 relative max-w-[95%] sm:max-w-full mx-auto">
+                    <div className="flex items-center gap-2 px-3 py-1 bg-white text-gray-700 rounded-lg border border-gray-200 shadow-sm sm:py-1.5">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setActiveEmojiPostId((prev) =>
+                            prev === post.id ? null : post.id
+                          )
+                        }
+                        className="flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 rounded-full hover:bg-gray-100 text-primary-500 transition-colors"
+                      >
+                        <FiSmile size={16} />
+                      </button>
+                      <input
+                        ref={(el) => (commentInputRefs.current[post.id] = el)}
+                        type="text"
+                        placeholder="Add a comment..."
+                        value={newComment[post.id] || ""}
+                        onChange={(e) =>
+                          setNewComment((prev) => ({
+                            ...prev,
+                            [post.id]: e.target.value,
+                          }))
+                        }
+                        onKeyDown={(e) => {
+                          if (
+                            e.key === "Enter" &&
+                            !e.shiftKey &&
+                            newComment[post.id]?.trim()
+                          ) {
+                            e.preventDefault();
+                            handlePostComment(post.id);
+                          }
+                        }}
+                        className="flex-1 bg-transparent border-none text-[11px] sm:text-sm placeholder-gray-400 focus:outline-none"
+                      />
+                      <button
+                        onClick={() => handlePostComment(post.id)}
+                        disabled={
+                          postingComment.has(post.id) ||
+                          !newComment[post.id]?.trim()
+                        }
+                        className="flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-full text-primary-500 hover:text-white hover:bg-primary-500 disabled:opacity-40"
+                      >
+                        {postingComment.has(post.id) ? (
+                          <span className="animate-spin w-4 h-4 border-2 border-primary-500 border-t-transparent rounded-full" />
+                        ) : (
+                          <FiSend size={16} />
+                        )}
+                      </button>
+                    </div>
+
+                    {activeEmojiPostId === post.id && (
+                      <div
+                        ref={emojiPickerRef}
+                        className="absolute bottom-12 left-0 z-40 shadow-2xl rounded-xl bg-white"
+                      >
+                        <EmojiPicker
+                          onEmojiClick={(emojiData) =>
+                            handleEmojiClickForPost(post.id, emojiData)
+                          }
+                          width={300}
+                          height={350}
+                          previewConfig={{ showPreview: false }}
+                          searchDisabled
+                          skinTonesDisabled
+                          lazyLoadEmojis
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+
+        <div className="flex flex-col items-center justify-center py-8 text-center text-gray-500">
+          <div className="w-16 h-16 flex items-center justify-center rounded-full bg-gradient-to-br from-pink-100 to-blue-100 mb-3">
+            <FiClock className="text-gray-600 text-3xl" />
+          </div>
+          <h3 className="font-semibold text-gray-700 text-lg">You’re all caught up!</h3>
+          <p className="text-sm text-gray-500 mt-1">You’ve seen all new posts.</p>
+        </div>
+      </>
+    );
+  } else {
+    feedSection = (
+      <div className="text-center bg-white rounded-xl border p-10 shadow-sm">
+        <p className="text-gray-600 mb-4">No posts in the {activeFeed} feed yet.</p>
+        <button
+          onClick={() => setIsCreateModalOpen(true)}
+          className="bg-blue-600 text-white px-4 py-2 rounded-full hover:bg-blue-700 transition-all flex items-center gap-2 mx-auto"
+        >
+          Create First Post
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-4xl mx-auto px-0 sm:px-4 sm:py-3">

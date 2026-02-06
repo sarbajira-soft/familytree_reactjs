@@ -21,17 +21,21 @@ const VerifyOtp = () => {
   
   // Check for email in location state or redirect
   useEffect(() => {
-    if (!location.state?.email) {
-      navigate('/register', { replace: true });
-    } else {
-      setEmail(location.state.email);
+    const stateEmail = location.state?.email;
+    const stateMobile = location.state?.mobile;
+
+    if (stateEmail) {
+      setEmail(stateEmail);
+      if (stateMobile) setMobile(stateMobile);
+      return;
     }
-    if (location.state.mobile) setMobile(location.state.mobile);
+
+    navigate('/register', { replace: true });
   }, [location.state, navigate]);
 
   // Handle OTP resend cooldown
   useEffect(() => {
-    let otpSent = parseInt(localStorage.getItem('otp_sent_time'), 10);
+    let otpSent = Number.parseInt(localStorage.getItem('otp_sent_time') || '', 10);
 
     if (!otpSent) {
       otpSent = Date.now();
@@ -80,7 +84,6 @@ const VerifyOtp = () => {
       if (!response.ok) {
         const errorData = await response.json();
         setError(errorData.message || 'OTP verification failed');
-        setIsLoading(false);
         return;
       }
 
@@ -108,9 +111,9 @@ const VerifyOtp = () => {
         navigate('/on-boarding');
       }
     } catch (err) {
-      console.log(err);
-      
+      console.error('OTP verification failed:', err);
       setError('OTP verification failed. Please try again.');
+    } finally {
       setIsLoading(false);
     }
   };
@@ -136,6 +139,7 @@ const VerifyOtp = () => {
 
       setError('OTP has been resent to your email');
     } catch (err) {
+      console.error('Failed to resend OTP:', err);
       setError('Failed to resend OTP. Please try again.');
     }
   };

@@ -110,6 +110,16 @@ const Layout = ({ noScroll = false }) => {
 
   const isAdmin = userInfo && userInfo.role === 3;
   const isApproved = userInfo && userInfo.approveStatus === "approved";
+  const isRestrictedFamilyRoute =
+    location.pathname === "/events" ||
+    location.pathname === "/my-family" ||
+    location.pathname === "/family-management" ||
+    location.pathname.startsWith("/family-tree");
+  const shouldLockScroll =
+    noScroll ||
+    (isRestrictedFamilyRoute &&
+      userInfo &&
+      (!userInfo.familyCode || userInfo.approveStatus !== "approved"));
 
   const headerNavItems = [
     {
@@ -502,9 +512,11 @@ const Layout = ({ noScroll = false }) => {
             Note: extra bottom padding ensures content is not hidden
             behind the fixed mobile BottomNavBar. */}
         <div
-          className={`flex-1 ${
-            noScroll ? "overflow-hidden" : "overflow-y-auto"
-           } pt-0 px-1 pb-20 md:px-2 md:pb-16 lg:pb-6 bg-gray-50`}
+          className={`flex-1 bg-gray-50 ${
+            shouldLockScroll
+              ? "overflow-hidden"
+              : "overflow-y-auto pt-0 px-1 pb-20 md:px-2 md:pb-16 lg:pb-6"
+          }`}
         >
           <Outlet />
         </div>

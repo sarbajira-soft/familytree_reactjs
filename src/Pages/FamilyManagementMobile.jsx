@@ -4,6 +4,9 @@ import { useUser } from "../Contexts/UserContext";
 import FamilyOverView from "../Components/FamilyOverView";
 import FamilyView from "../Components/FamilyView";
 import CreateFamilyModal from "../Components/CreateFamilyModal";
+import JoinFamilyModal from "../Components/JoinFamilyModal";
+import NoFamilyView from "../Components/NoFamilyView";
+import PendingApprovalView from "../Components/PendingApprovalView";
 
 const FamilyManagementMobile = () => {
   const navigate = useNavigate();
@@ -22,6 +25,8 @@ const FamilyManagementMobile = () => {
   const [showCopyMessage, setShowCopyMessage] = useState(false);
 
   const [token, setToken] = useState(null);
+  const [isCreateFamilyModalOpen, setIsCreateFamilyModalOpen] = useState(false);
+  const [isJoinFamilyModalOpen, setIsJoinFamilyModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const [membersPreview, setMembersPreview] = useState([]);
@@ -213,6 +218,24 @@ const FamilyManagementMobile = () => {
     setIsEditModalOpen(true);
   };
 
+  const handleCreateFamily = () => {
+    setIsCreateFamilyModalOpen(true);
+  };
+
+  const handleJoinFamily = () => {
+    setIsJoinFamilyModalOpen(true);
+  };
+
+  const handleFamilyCreated = () => {
+    setIsCreateFamilyModalOpen(false);
+    globalThis.location.reload();
+  };
+
+  const handleFamilyJoined = () => {
+    setIsJoinFamilyModalOpen(false);
+    globalThis.location.reload();
+  };
+
   const handleShareFamilyCode = () => {
     if (!familyData?.familyCode) return;
 
@@ -227,6 +250,15 @@ const FamilyManagementMobile = () => {
       });
   };
 
+  const accessView = !hasFamily ? (
+    <NoFamilyView onCreateFamily={handleCreateFamily} onJoinFamily={handleJoinFamily} />
+  ) : !isApproved ? (
+    <PendingApprovalView
+      familyCode={userInfo?.familyCode}
+      onJoinFamily={handleJoinFamily}
+    />
+  ) : null;
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white dark:from-slate-950 dark:to-slate-900">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-24">
@@ -238,22 +270,18 @@ const FamilyManagementMobile = () => {
             Quickly access all family-related tools from a single place.
           </p>
         </div>
-
-        {!hasFamily && (
-          <div className="mb-4 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-sm">
-            It looks like you are not connected to a family yet. Create or join a family
-            from the <span className="font-semibold">My Family</span> section.
+      ) : (
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-24">
+          <div className="mb-4">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-50">
+              Family Management
+            </h1>
+            <p className="mt-1 text-sm text-gray-600 dark:text-slate-300">
+              Quickly access all family-related tools from a single place.
+            </p>
           </div>
-        )}
 
-        {hasFamily && !isApproved && (
-          <div className="mb-4 p-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-800 text-sm">
-            Your family access is pending approval. Some tools will be available once
-            you are approved.
-          </div>
-        )}
-
-        {hasFamily && (
+          {hasFamily && (
           <div className="mb-5 space-y-3">
             {familyLoading ? (
               <div className="h-40 rounded-3xl bg-white/60 dark:bg-slate-900/40 border border-gray-100 dark:border-slate-800 animate-pulse" />
@@ -472,18 +500,32 @@ const FamilyManagementMobile = () => {
           </div>
         )}
 
-        {isEditModalOpen && (
-          <CreateFamilyModal
-            isOpen={isEditModalOpen}
-            onClose={() => setIsEditModalOpen(false)}
-            onFamilyCreated={() => {}}
-            token={token}
-            mode="edit"
-            initialData={familyData}
-          />
-        )}
+          {isEditModalOpen && (
+            <CreateFamilyModal
+              isOpen={isEditModalOpen}
+              onClose={() => setIsEditModalOpen(false)}
+              onFamilyCreated={() => {}}
+              token={token}
+              mode="edit"
+              initialData={familyData}
+            />
+          )}
+        </div>
+      )}
 
-      </div>
+      <CreateFamilyModal
+        isOpen={isCreateFamilyModalOpen}
+        onClose={() => setIsCreateFamilyModalOpen(false)}
+        onFamilyCreated={handleFamilyCreated}
+        token={token}
+      />
+
+      <JoinFamilyModal
+        isOpen={isJoinFamilyModalOpen}
+        onClose={() => setIsJoinFamilyModalOpen(false)}
+        onFamilyJoined={handleFamilyJoined}
+        token={token}
+      />
     </div>
   );
 };

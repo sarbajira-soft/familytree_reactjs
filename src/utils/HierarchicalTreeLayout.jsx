@@ -35,9 +35,11 @@ export function calculateHierarchicalLayout(tree) {
 
     const positions = new Map();
     const connections = [];
-    const processed = new Set();
     const generations = new Map(); // Map of generation level -> people
     const spousePairs = new Map(); // Map of personId -> spouseId
+    const childrenMap = new Map(); // parentId -> [childIds]
+    const parentMap = new Map(); // childId -> [parentIds]
+    const subtreeWidths = new Map(); // personId -> width of their subtree
     
     // Step 1: Organize people by generation and identify spouse pairs
     tree.people.forEach(person => {
@@ -58,9 +60,6 @@ export function calculateHierarchicalLayout(tree) {
     });
 
     // Step 2: Build parent-child map and find root couples
-    const childrenMap = new Map(); // parentId -> [childIds]
-    const parentMap = new Map(); // childId -> [parentIds]
-    
     tree.people.forEach(person => {
         if (person.children && person.children.size > 0) {
             person.children.forEach(childId => {
@@ -83,8 +82,6 @@ export function calculateHierarchicalLayout(tree) {
     });
     
     // Step 3: Calculate subtree widths recursively
-    const subtreeWidths = new Map(); // personId -> width of their subtree
-    
     function calculateSubtreeWidth(personId) {
         if (subtreeWidths.has(personId)) {
             return subtreeWidths.get(personId);
@@ -119,6 +116,25 @@ export function calculateHierarchicalLayout(tree) {
     
     // Step 4: Position people recursively, generation by generation
     const sortedGens = Array.from(generations.keys()).sort((a, b) => a - b);
+
+    function setPersonPosition(person, x, y) {
+        positions.set(person.id, {
+            x,
+            y,
+            person
+        });
+    }
+
+    function getParentCoupleCenterX(parentId) {
+        const parentPos = positions.get(parentId);
+        if (!parentPos) return null;
+
+        const parentSpouseId = spousePairs.get(parentId);
+        if (!parentSpouseId) return parentPos.x;
+
+        const parentSpousePos = positions.get(parentSpouseId);
+        return parentSpousePos ? (parentPos.x + parentSpousePos.x) / 2 : parentPos.x;
+    }
     
     function positionGeneration(gen, startX, startY) {
         const peopleAtLevel = generations.get(gen) || [];
@@ -127,7 +143,6 @@ export function calculateHierarchicalLayout(tree) {
         
         peopleAtLevel.forEach(person => {
             if (processedAtLevel.has(person.id)) return;
-            
             // Skip if this person has parents (will be positioned under parents)
             const parents = parentMap.get(person.id) || [];
             if (gen > sortedGens[0] && parents.length > 0) return;
@@ -135,23 +150,14 @@ export function calculateHierarchicalLayout(tree) {
             const spouseId = spousePairs.get(person.id);
             const spouse = spouseId ? tree.people.get(spouseId) : null;
             
-            // Calculate subtree width
             const subtreeWidth = calculateSubtreeWidth(person.id);
             const coupleWidth = CARD_WIDTH * 2 + SPOUSE_SPACING;
             const coupleStartX = currentX + (subtreeWidth - coupleWidth) / 2;
             
             // Position couple
             if (spouse && spouse.generation === gen) {
-                positions.set(person.id, {
-                    x: coupleStartX + CARD_WIDTH / 2,
-                    y: startY,
-                    person: person
-                });
-                positions.set(spouse.id, {
-                    x: coupleStartX + CARD_WIDTH + SPOUSE_SPACING + CARD_WIDTH / 2,
-                    y: startY,
-                    person: spouse
-                });
+                setPersonPosition(person, coupleStartX + CARD_WIDTH / 2, startY);
+                setPersonPosition(spouse, coupleStartX + CARD_WIDTH + SPOUSE_SPACING + CARD_WIDTH / 2, startY);
                 connections.push({
                     from: person.id,
                     to: spouse.id,
@@ -159,12 +165,9 @@ export function calculateHierarchicalLayout(tree) {
                 });
                 processedAtLevel.add(spouse.id);
             } else {
-                positions.set(person.id, {
-                    x: coupleStartX + CARD_WIDTH / 2,
-                    y: startY,
-                    person: person
-                });
+                setPersonPosition(person, coupleStartX + CARD_WIDTH / 2, startY);
             }
+
             processedAtLevel.add(person.id);
             
             // Position children under this couple
@@ -182,6 +185,7 @@ export function calculateHierarchicalLayout(tree) {
         if (children.length === 0) return;
         
         let currentX = parentSubtreeStartX;
+        const isSingleChild = children.length === 1;
         
         children.forEach(childId => {
             const child = tree.people.get(childId);
@@ -196,64 +200,20 @@ export function calculateHierarchicalLayout(tree) {
             
             // Position child couple
             if (spouse && spouse.generation === child.generation) {
-                positions.set(childId, {
-                    x: coupleStartX + CARD_WIDTH / 2,
-                    y: childY,
-                    person: child
-                });
-                positions.set(spouse.id, {
-                    x: coupleStartX + CARD_WIDTH + SPOUSE_SPACING + CARD_WIDTH / 2,
-                    y: childY,
-                    person: spouse
-                });
+                setPersonPosition(child, coupleStartX + CARD_WIDTH / 2, childY);
+                setPersonPosition(spouse, coupleStartX + CARD_WIDTH + SPOUSE_SPACING + CARD_WIDTH / 2, childY);
                 connections.push({
                     from: childId,
                     to: spouse.id,
                     type: 'spouse'
                 });
-            } else {
+            } else if (isSingleChild) {
                 // Single child - center under parent couple
-                if (children.length === 1) {
-                    const parentPos = positions.get(parentId);
-                    if (parentPos) {
-                        // Check if parent has a spouse
-                        const parentSpouseId = spousePairs.get(parentId);
-                        let centerX;
-                        
-                        if (parentSpouseId) {
-                            const parentSpousePos = positions.get(parentSpouseId);
-                            if (parentSpousePos) {
-                                // Parent has spouse - center between them
-                                centerX = (parentPos.x + parentSpousePos.x) / 2;
-                            } else {
-                                centerX = parentPos.x;
-                            }
-                        } else {
-                            centerX = parentPos.x;
-                        }
-                        
-                        // Position single child at center
-                        positions.set(childId, {
-                            x: centerX,
-                            y: childY,
-                            person: child
-                        });
-                    } else {
-                        // Fallback
-                        positions.set(childId, {
-                            x: coupleStartX + CARD_WIDTH / 2,
-                            y: childY,
-                            person: child
-                        });
-                    }
-                } else {
-                    // Multiple children - use calculated position
-                    positions.set(childId, {
-                        x: coupleStartX + CARD_WIDTH / 2,
-                        y: childY,
-                        person: child
-                    });
-                }
+                const parentCenterX = getParentCoupleCenterX(parentId);
+                setPersonPosition(child, parentCenterX ?? (coupleStartX + CARD_WIDTH / 2), childY);
+            } else {
+                // Multiple children - use calculated position
+                setPersonPosition(child, coupleStartX + CARD_WIDTH / 2, childY);
             }
             
             // Recursively position grandchildren
@@ -321,26 +281,26 @@ export function generateFamilyUnitPaths(familyUnit) {
     const barEndX = round(familyUnit.horizontalBarEndX);
     
     // 1. Vertical line from parent down to horizontal bar
-    paths.push({
-        type: 'parent-vertical',
-        path: `M ${parentX} ${parentY} L ${parentX} ${barY}`
-    });
-    
-    // 2. Horizontal bar connecting all children
-    paths.push({
-        type: 'horizontal-bar',
-        path: `M ${barStartX} ${barY} L ${barEndX} ${barY}`
-    });
-    
-    // 3. Vertical lines from horizontal bar down to each child
-    familyUnit.children.forEach(child => {
+    const childPaths = familyUnit.children.map(child => {
         const childX = round(child.x);
         const childY = round(child.topY);
-        paths.push({
+        return {
             type: 'child-vertical',
             path: `M ${childX} ${barY} L ${childX} ${childY}`
-        });
+        };
     });
+
+    paths.push(
+        {
+            type: 'parent-vertical',
+            path: `M ${parentX} ${parentY} L ${parentX} ${barY}`
+        },
+        {
+            type: 'horizontal-bar',
+            path: `M ${barStartX} ${barY} L ${barEndX} ${barY}`
+        },
+        ...childPaths
+    );
     
     return paths;
 }

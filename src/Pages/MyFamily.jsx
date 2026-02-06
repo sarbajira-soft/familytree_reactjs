@@ -15,9 +15,7 @@ import Swal from 'sweetalert2';
 const FamilyHubPage = () => {
   const navigate = useNavigate();
   const [token, setToken] = useState(null);
-  const [user, setUser] = useState(null);
   const { userInfo, userLoading } = useUser();
-  const [activeTab, setActiveTab] = useState('myFamily');
   const [familyData, setFamilyData] = useState(null);
   const [isCreateFamilyModalOpen, setIsCreateFamilyModalOpen] = useState(false);
   const [isJoinFamilyModalOpen, setIsJoinFamilyModalOpen] = useState(false);
@@ -25,7 +23,6 @@ const FamilyHubPage = () => {
   const [males, setMales] = useState(0);
   const [females, setFemales] = useState(0);
   const [averageAge, setAverageAge] = useState(0);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showCopyMessage, setShowCopyMessage] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -46,11 +43,9 @@ const FamilyHubPage = () => {
     const fetchFamilyData = async () => {
       // Only fetch family data if user has family code and is approved
       if (!userInfo?.familyCode || userInfo?.approveStatus !== 'approved' || userLoading) {
-        setLoading(false);
         return;
       }
 
-      setLoading(true);
       setError(null);
 
       try {
@@ -77,8 +72,6 @@ const FamilyHubPage = () => {
           setError('Failed to load family data.');
           setFamilyData(null);
         }
-      } finally {
-        if (!ignore) setLoading(false);
       }
     };
 
@@ -113,6 +106,12 @@ const FamilyHubPage = () => {
       setSuggestedFamilies(data.data || []);
     } catch (err) {
       setSuggestedFamilies([]);
+      console.error('Failed to load suggested families', err);
+      Swal.fire({
+        icon: 'error',
+        title: 'Unable to load suggestions',
+        text: 'Please try again in a moment.',
+      });
     } finally {
       setLoadingSuggestions(false);
     }
@@ -125,21 +124,18 @@ const FamilyHubPage = () => {
 
   const handleJoinFamily = (familyCode = null) => {
     if (familyCode) {
-      // Handle joining with specific family code
       console.log('Joining family with code:', familyCode);
-      // TODO: Implement API call to join family with new code
-      // For now, just show the modal
       setIsJoinFamilyModalOpen(true);
-    } else {
-      setIsJoinFamilyModalOpen(true);
+      return;
     }
+    setIsJoinFamilyModalOpen(true);
   };
 
   const handleFamilyJoined = (familyData) => {
     // Refresh user info to get updated family code and approval status
     setIsJoinFamilyModalOpen(false);
     // Reload the page to reflect the changes
-    window.location.reload();
+    globalThis.location.reload();
   };
 
   const handleManageMembers = () => {
@@ -194,83 +190,89 @@ const FamilyHubPage = () => {
 
   if (userLoading) {
     return (
-      <>
-        <div className="max-w-7xl mx-auto px-4 py-8 md:px-6 lg:px-8">
-            <div className="flex flex-col items-center justify-center py-20">
-                <FiLoader className="text-6xl text-primary-600 animate-spin mb-4" />
-                <h2 className="text-2xl font-semibold text-gray-700 mb-2">Loading User Data...</h2>
-                <p className="text-gray-500">Please wait while we fetch your information.</p>
-            </div>
+      <div className="max-w-7xl mx-auto px-4 py-8 md:px-6 lg:px-8">
+        <div className="flex flex-col items-center justify-center py-20">
+          <FiLoader className="text-6xl text-primary-600 animate-spin mb-4" />
+          <h2 className="text-2xl font-semibold text-gray-700 mb-2">Loading User Data...</h2>
+          <p className="text-gray-500">Please wait while we fetch your information.</p>
         </div>
-      </>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <>
-        <div className="min-h-screen flex items-center justify-center text-red-600">
-          {error}
-        </div>
-      </>
+      <div className="min-h-screen flex items-center justify-center text-red-600">
+        {error}
+      </div>
+    );
+  }
+
+  const hasFamily = Boolean(userInfo?.familyCode);
+  const isApproved = userInfo?.approveStatus === 'approved';
+  let accessView = null;
+
+  if (hasFamily === false) {
+    accessView = (
+      <NoFamilyView onCreateFamily={handleCreateFamily} onJoinFamily={handleJoinFamily} />
+    );
+  } else if (isApproved === false) {
+    accessView = (
+      <PendingApprovalView
+        familyCode={userInfo.familyCode}
+        onJoinFamily={handleJoinFamily}
+      />
     );
   }
 
   return (
     <>
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 dark:from-slate-950 dark:to-slate-900">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
-          <button
-            type="button"
-            onClick={() => navigate('/family-management')}
-            className="mb-4 inline-flex items-center text-sm text-primary-600 hover:text-primary-700"
-          >
-            <FiArrowLeft className="mr-1.5" />
-            <span>Back to Family Management</span>
-          </button>
-
-          {/* Condition 1: No family code - show NoFamilyView */}
-          {!userInfo?.familyCode ? (
-            <NoFamilyView onCreateFamily={handleCreateFamily} onJoinFamily={handleJoinFamily} />
-          ) : 
-          /* Condition 2: Has family code but not approved - show PendingApprovalView */
-          userInfo?.familyCode && userInfo?.approveStatus !== 'approved' ? (
-            <PendingApprovalView 
-              familyCode={userInfo.familyCode} 
-              onJoinFamily={handleJoinFamily} 
-            />
-          ) : 
-          /* Condition 3: Has family code and approved - show family details */
-          familyData ? (
-            <>
-              <FamilyView
-                familyData={familyData}
-                totalMembers={totalMembers}
-                males={males}
-                females={females}
-                averageAge={averageAge}
-                onManageMembers={handleManageMembers}
-                onManageEvents={handleManageEvent}
-                onManageGifts={handleManageGifts}
-                onEditFamily={handleEditFamily}
-                onShareFamilyCode={handleShareFamilyCode}
-              />
-
-              <FamilyOverView 
-                familyCode={userInfo?.familyCode} 
-                token={token} 
-              />
-            </>
-          ) : (
-            /* Fallback: Loading state for approved users */
-            <div className="flex flex-col items-center justify-center py-20">
-              <FiLoader className="text-6xl text-primary-600 animate-spin mb-4" />
-              <h2 className="text-2xl font-semibold text-gray-700 dark:text-slate-200 mb-2">Loading Family Data...</h2>
-              <p className="text-gray-500 dark:text-slate-400">Please wait while we fetch your family information.</p>
-            </div>
-          )}
+      {accessView ? (
+        <div className="min-h-[calc(100vh-6rem)] bg-gray-50 flex items-center justify-center px-4 py-6">
+          {accessView}
         </div>
-      </div>
+      ) : (
+        <div className="min-h-screen bg-gray-50">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+            <button
+              type="button"
+              onClick={() => navigate('/family-management')}
+              className="mb-4 inline-flex items-center text-sm text-primary-600 hover:text-primary-700"
+            >
+              <FiArrowLeft className="mr-1.5" />
+              <span>Back to Family Management</span>
+            </button>
+
+            {familyData ? (
+              <div className="space-y-6">
+                <FamilyView
+                  familyData={familyData}
+                  totalMembers={totalMembers}
+                  males={males}
+                  females={females}
+                  averageAge={averageAge}
+                  onManageMembers={handleManageMembers}
+                  onManageEvents={handleManageEvent}
+                  onManageGifts={handleManageGifts}
+                  onEditFamily={handleEditFamily}
+                  onShareFamilyCode={handleShareFamilyCode}
+                />
+
+                <FamilyOverView
+                  familyCode={userInfo?.familyCode}
+                  token={token}
+                />
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-20">
+                <FiLoader className="text-6xl text-primary-600 animate-spin mb-4" />
+                <h2 className="text-2xl font-semibold text-gray-700 dark:text-slate-200 mb-2">Loading Family Data...</h2>
+                <p className="text-gray-500 dark:text-slate-400">Please wait while we fetch your family information.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <CreateFamilyModal
         isOpen={isCreateFamilyModalOpen}

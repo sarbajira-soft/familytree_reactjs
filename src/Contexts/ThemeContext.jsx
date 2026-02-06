@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import PropTypes from "prop-types";
 
 const ThemeContext = createContext(null);
 
@@ -10,8 +11,9 @@ const getInitialTheme = () => {
     if (stored === "light" || stored === "dark") return stored;
   } catch {}
 
-  if (typeof window !== "undefined" && window.matchMedia) {
-    return window.matchMedia("(prefers-color-scheme: dark)").matches
+  const win = globalThis?.window;
+  if (win?.matchMedia) {
+    return win.matchMedia("(prefers-color-scheme: dark)").matches
       ? "dark"
       : "light";
   }
@@ -45,6 +47,10 @@ export const ThemeProvider = ({ children }) => {
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+};
+
+ThemeProvider.propTypes = {
+  children: PropTypes.node.isRequired,
 };
 
 export const useTheme = () => {

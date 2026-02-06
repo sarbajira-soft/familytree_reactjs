@@ -96,14 +96,23 @@ const Login = () => {
           }
         }
       } catch (err) {
-        console.warn('Medusa customer login failed:', err);
+        console.error('Medusa customer login failed:', err);
       }
       
       await refetchUser();
       
       navigate('/dashboard');
     } catch (error) {
-      setApiError('Login failed. Please check your network or credentials.');
+      console.error('Login failed:', error);
+      const errorMessage =
+        error instanceof Error && typeof error.message === 'string'
+          ? error.message
+          : '';
+      setApiError(
+        errorMessage
+          ? `Login failed. ${errorMessage}`
+          : 'Login failed. Please check your network or credentials.',
+      );
     } finally {
       setIsSubmitting(false);
     }

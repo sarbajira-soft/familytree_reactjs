@@ -26,6 +26,14 @@ import AddPersonModal from "../Components/FamilyTree/AddPersonModal";
 
 import SearchBar from "../Components/FamilyTree/SearchBar";
 
+import NoFamilyView from "../Components/NoFamilyView";
+
+import PendingApprovalView from "../Components/PendingApprovalView";
+
+import CreateFamilyModal from "../Components/CreateFamilyModal";
+
+import JoinFamilyModal from "../Components/JoinFamilyModal";
+
 import { useLanguage } from "../Contexts/LanguageContext";
 
 import RelationshipCalculator from "../utils/relationshipCalculator";
@@ -222,6 +230,10 @@ const FamilyTreePage = () => {
     action: { type: "", person: null },
   });
 
+  const [isCreateFamilyModalOpen, setIsCreateFamilyModalOpen] = useState(false);
+
+  const [isJoinFamilyModalOpen, setIsJoinFamilyModalOpen] = useState(false);
+
   const [debugPanel, setDebugPanel] = useState(false);
 
   const containerRef = useRef(null);
@@ -386,40 +398,49 @@ const FamilyTreePage = () => {
       return;
     }
 
-    // Check if user is approved and has familyCode
-
-    if (userInfo.approveStatus !== "approved" || !userInfo.familyCode) {
-      Swal.fire({
-        icon: "warning",
-
-        title: "Access Restricted",
-
-        text:
-          userInfo.approveStatus !== "approved"
-            ? "Your family membership is pending approval. Please wait for admin approval."
-            : "You need to create or join a family first.",
-
-        confirmButtonText: "Go to My Family",
-
-        showCancelButton: false,
-      }).then(() => {
-        navigate("/my-family");
-      });
-
-      return;
-    }
+    // Access gates handled in-page
   }, [userInfo, userLoading, navigate]);
 
-  const showAccessLoading =
-    userLoading ||
-    !userInfo ||
-    userInfo.approveStatus !== "approved" ||
-    !userInfo.familyCode;
+  const handleCreateFamily = () => {
+    setIsCreateFamilyModalOpen(true);
+  };
+
+  const handleJoinFamily = () => {
+    setIsJoinFamilyModalOpen(true);
+  };
+
+  const handleFamilyCreated = () => {
+    setIsCreateFamilyModalOpen(false);
+    globalThis.location.reload();
+  };
+
+  const handleFamilyJoined = () => {
+    setIsJoinFamilyModalOpen(false);
+    globalThis.location.reload();
+  };
+
+  const showAccessLoading = userLoading || !userInfo;
+
+  const hasFamily = Boolean(userInfo?.familyCode);
+
+  const isApproved = userInfo?.approveStatus === "approved";
+
+  const accessView = !hasFamily ? (
+    <NoFamilyView
+      onCreateFamily={handleCreateFamily}
+      onJoinFamily={handleJoinFamily}
+    />
+  ) : !isApproved ? (
+    <PendingApprovalView
+      familyCode={userInfo.familyCode}
+      onJoinFamily={handleJoinFamily}
+    />
+  ) : null;
 
   const showFullScreenLoading = showAccessLoading || (!tree && treeLoading);
 
   const showWaitForAdmin =
-    !showAccessLoading && !canEdit && (!tree || tree.people.size === 0);
+    !showAccessLoading && !accessView && !canEdit && (!tree || tree.people.size === 0);
 
   // Search handlers - memoized to prevent infinite re-renders
 
@@ -2294,6 +2315,10 @@ const FamilyTreePage = () => {
               </p>
             </div>
           </div>
+        ) : accessView ? (
+          <div className="min-h-[calc(100vh-6rem)] bg-gray-50 flex items-center justify-center px-4 py-6">
+            {accessView}
+          </div>
         ) : showWaitForAdmin ? (
           <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-slate-950 px-4">
             <div className="text-center max-w-xl bg-white dark:bg-slate-900 rounded-xl shadow p-6 border border-gray-200 dark:border-slate-800">
@@ -3027,6 +3052,20 @@ const FamilyTreePage = () => {
             )}
           </>
         )}
+
+        <CreateFamilyModal
+          isOpen={isCreateFamilyModalOpen}
+          onClose={() => setIsCreateFamilyModalOpen(false)}
+          onFamilyCreated={handleFamilyCreated}
+          token={localStorage.getItem("access_token")}
+        />
+
+        <JoinFamilyModal
+          isOpen={isJoinFamilyModalOpen}
+          onClose={() => setIsJoinFamilyModalOpen(false)}
+          onFamilyJoined={handleFamilyJoined}
+          token={localStorage.getItem("access_token")}
+        />
       </>
     </FamilyTreeProvider>
   );

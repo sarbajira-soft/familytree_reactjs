@@ -1,29 +1,26 @@
-import React, { useState, useMemo, useEffect } from "react";
-import { useUser } from "../Contexts/UserContext";
-import { useGiftEvent } from "../Contexts/GiftEventContext";
-import CreateEventModal from "../Components/CreateEventModal";
-import CreateAlbumModal from "../Components/CreateAlbumModal";
-import CreatePostModal from "../Components/CreatePostModal";
-import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import PropTypes from "prop-types";
+import React, { useEffect, useMemo, useState } from "react";
 import {
-  FiUsers,
   FiCalendar,
-  FiGift,
-  FiImage,
-  FiLoader,
   FiChevronLeft,
   FiChevronRight,
+  FiGift,
+  FiImage
 } from "react-icons/fi";
-import Swal from "sweetalert2";
-import { fetchUserFamilyCodes } from "../utils/familyTreeApi";
-import { getToken } from "../utils/auth";
-import { useQuery } from "@tanstack/react-query";
-import PostPage from "./PostPage";
-import DashboardShimmer from "./DashboardShimmer";
-import GalleryViewerModal from "../Components/GalleryViewerModal";
+import { useNavigate } from "react-router-dom";
+import CreateAlbumModal from "../Components/CreateAlbumModal";
+import CreateEventModal from "../Components/CreateEventModal";
+import CreatePostModal from "../Components/CreatePostModal";
 import DashboardGiftProductModal from "../Components/DashboardGiftProductModal";
+import GalleryViewerModal from "../Components/GalleryViewerModal";
+import { useGiftEvent } from "../Contexts/GiftEventContext";
+import { useUser } from "../Contexts/UserContext";
 import { fetchProducts as fetchMedusaProducts } from "../Retail/services/productService";
 import { getProductThumbnail } from "../Retail/utils/helpers";
+import { getToken } from "../utils/auth";
+import DashboardShimmer from "./DashboardShimmer";
+import PostPage from "./PostPage";
 
 const getLocalDateKey = (dateValue) => {
   if (!dateValue) return "";
@@ -117,6 +114,22 @@ const MiniEventCalendar = ({ events = [] }) => {
     });
   }, [selectedDateKey]);
 
+  const getDayCellClass = (dayKey, hasEvent, isSelected) => {
+    if (dayKey === todayKey && hasEvent) {
+      return "bg-secondary-400 text-white font-semibold";
+    }
+    if (dayKey === todayKey) {
+      return "bg-primary-600 text-white font-semibold";
+    }
+    if (isSelected) {
+      return "bg-gray-200 text-gray-900 font-semibold";
+    }
+    if (hasEvent) {
+      return "bg-secondary-400 text-white font-semibold";
+    }
+    return "bg-white text-gray-700 hover:bg-gray-50";
+  };
+
   return (
     <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
       <div className="flex items-center justify-between mb-3">
@@ -173,26 +186,11 @@ const MiniEventCalendar = ({ events = [] }) => {
                 key={`${wi}-${di}`}
                 type="button"
                 onClick={() => setSelectedDateKey(key)}
-                className={`
-    relative h-7 flex items-center justify-center rounded-md text-[11px] cursor-pointer transition
-    
-    ${
-      // CASE 1: Today + Event
-      key === todayKey && hasEvent
-        ? "bg-secondary-400 text-white font-semibold"
-        : // CASE 2: Today (no event)
-        key === todayKey
-        ? "bg-primary-600 text-white font-semibold"
-        : // CASE 3: Selected day
-        isSelected
-        ? "bg-gray-200 text-gray-900 font-semibold"
-        : // CASE 4: Event day (not today & not selected)
-        hasEvent
-        ? "bg-secondary-400 text-white font-semibold"
-        : // CASE 5: Normal day
-          "bg-white text-gray-700 hover:bg-gray-50"
-    }
-  `}
+                className={`relative h-7 flex items-center justify-center rounded-md text-[11px] cursor-pointer transition ${getDayCellClass(
+                  key,
+                  hasEvent,
+                  isSelected,
+                )}`}
               >
                 {dayNum}
               </button>
@@ -209,13 +207,16 @@ const MiniEventCalendar = ({ events = [] }) => {
         )}
         {selectedDateEvents.length > 0 ? (
           <div className="space-y-2 max-h-64 overflow-y-auto">
-            {selectedDateEvents.map((event) => {
+            {selectedDateEvents.map((event, index) => {
               const imageSrc =
                 (event.eventImages && event.eventImages[0]) ||
                 event.profileImage ||
                 "https://placehold.co/800x450/e0f2fe/0369a1?text=Event";
               const title = event.eventTitle || event.title || "Event";
-              const dateDisplay = `${event.eventDate || event.date || ""}$${
+              const dateKey = getLocalDateKey(event.eventDate || event.date);
+              const timeKey = event.eventTime || event.time || "time";
+              const eventKey = `${event.id || title || "event"}_${dateKey}_${timeKey}_${index}`;
+              const dateDisplay = `${event.eventDate || event.date || ""}$$${
                 event.eventTime ? " • " + event.eventTime : ""
               }`;
               const location = event.location;
@@ -223,7 +224,7 @@ const MiniEventCalendar = ({ events = [] }) => {
 
               return (
                 <div
-                  key={event.id}
+                  key={eventKey}
                   className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden"
                 >
                   <div className="relative h-28 overflow-hidden">
@@ -272,6 +273,26 @@ const MiniEventCalendar = ({ events = [] }) => {
       </div>
     </div>
   );
+};
+
+const buildGiftSuggestionsByEvent = (events, productSuggestionsPool, prev) => {
+  const next = { ...prev };
+  let changed = false;
+
+  events.forEach((event, index) => {
+    const key = event.id || index;
+    const existing = next[key];
+
+    if (!Array.isArray(existing) || existing.length === 0) {
+      const shuffled = [...productSuggestionsPool].sort(
+        () => Math.random() - 0.5,
+      );
+      next[key] = shuffled.slice(0, 3);
+      changed = true;
+    }
+  });
+
+  return changed ? next : prev;
 };
 
 const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
@@ -326,32 +347,6 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
     },
     enabled: !!userInfo?.familyCode && !!token,
   });
-
-  const processedData = useMemo(() => {
-    if (!dashboardData)
-      return {
-        familyStats: { totalMembers: 0 },
-        upcomingEventsCount: 0,
-        galleryCount: 0,
-        productCount: 0,
-      };
-    const { stats, events, gallery, products } = dashboardData;
-    return {
-      familyStats: stats?.data || { totalMembers: 0 },
-      upcomingEventsCount: Array.isArray(events?.data)
-        ? events.data.length
-        : events.length || 0,
-      galleryCount: Array.isArray(gallery?.data)
-        ? gallery.data.length
-        : gallery.length || 0,
-      productCount: Array.isArray(products?.data)
-        ? products.data.length
-        : products.length || 0,
-    };
-  }, [dashboardData]);
-
-  const { familyStats, upcomingEventsCount, galleryCount, productCount } =
-    processedData;
 
   const upcomingEventsPreview = useMemo(() => {
     if (!dashboardData?.events) return [];
@@ -433,25 +428,13 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
     if (!upcomingEventsPreview.length) return;
     if (!productSuggestionsPool.length) return;
 
-    setGiftSuggestionsByEvent((prev) => {
-      const next = { ...prev };
-      let changed = false;
-
-      upcomingEventsPreview.forEach((event, index) => {
-        const key = event.id || index;
-        const existing = next[key];
-
-        if (!Array.isArray(existing) || existing.length === 0) {
-          const shuffled = [...productSuggestionsPool].sort(
-            () => Math.random() - 0.5
-          );
-          next[key] = shuffled.slice(0, 3);
-          changed = true;
-        }
-      });
-
-      return changed ? next : prev;
-    });
+    setGiftSuggestionsByEvent((prev) =>
+      buildGiftSuggestionsByEvent(
+        upcomingEventsPreview,
+        productSuggestionsPool,
+        prev,
+      ),
+    );
   }, [upcomingEventsPreview, productSuggestionsPool]);
 
   const getEventCardStyle = (eventType) => {
@@ -532,47 +515,11 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
   };
 
   if (isLoading) {
-    return (
-      <>
-        {/* <div className="flex flex-col items-center justify-center h-screen">
-          <FiLoader className="text-5xl text-blue-500 animate-spin mb-4" />
-          <p className="text-gray-600">Loading Dashboard...</p>
-        </div> */}
-        <DashboardShimmer/>
-      </>
-    );
+    return <DashboardShimmer />;
   }
 
-  const dashboardCards = [
-    {
-      name: "Family",
-      icon: <FiUsers size={32} />,
-      count: familyStats.totalMembers,
-      onClick: () => navigate("/my-family-member"),
-    },
-    {
-      name: "Events",
-      icon: <FiCalendar size={32} />,
-      count: upcomingEventsCount,
-      onClick: () => navigate("/events"),
-    },
-    {
-      name: "Gifts",
-      icon: <FiGift size={32} />,
-      count: productCount,
-      onClick: () => navigate("/gifts-memories"),
-    },
-    {
-      name: "Gallery",
-      icon: <FiImage size={32} />,
-      count: galleryCount,
-      onClick: () => navigate("/family-gallery"),
-    },
-  ];
-
   return (
-    <>
-      <div className="max-w-7xl mx-auto px-3 sm:px-5 py-4 pt-2 space-y-5">
+    <div className="max-w-7xl mx-auto px-3 sm:px-5 py-4 pt-2 space-y-5">
         {/* Header */}
        
 
@@ -639,10 +586,14 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
                         album.galleryAlbums[0].album) ||
                       "https://via.placeholder.com/150x150?text=Photo";
                     return (
-                      <div
+                      <button
+                        type="button"
                         key={album.id}
-                        className="relative w-full pt-[100%] overflow-hidden rounded-lg cursor-pointer group"
+                        className="relative w-full pt-[100%] overflow-hidden rounded-lg cursor-pointer group bg-transparent p-0 border-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
                         onClick={() => openGalleryModal(album)}
+                        aria-label={`Open album ${
+                          album.galleryTitle || album.title || "Album"
+                        }`}
                       >
                         <img
                           src={cover}
@@ -658,7 +609,7 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
                             </p>
                           </div>
                         </div>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -687,9 +638,13 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
                     const dateInfo = formatEventDate(dateValue);
                     const daysUntil = getDaysUntil(dateValue);
                     const title = getEventTitle(event);
+                    const timeKey = timeValue || "time";
+                    const eventKey = `${event.id || title || "event"}_${getLocalDateKey(
+                      dateValue,
+                    )}_${timeKey}_${index}`;
                     return (
                       <div
-                        key={event.id || index}
+                        key={eventKey}
                         className="group relative rounded-xl overflow-hidden bg-white shadow-sm border border-gray-100 hover:shadow-md hover:-translate-y-0.5 transition-all duration-300"
                         style={{
                           animation: `fadeInUp 0.5s ease-out ${
@@ -1004,9 +959,16 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
             authToken={token}
           />
         )}
-      </div>
-    </>
+    </div>
   );
+};
+
+MiniEventCalendar.propTypes = {
+  events: PropTypes.arrayOf(PropTypes.object),
+};
+
+Dashboard.propTypes = {
+  apiBaseUrl: PropTypes.string,
 };
 
 export default Dashboard;
