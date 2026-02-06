@@ -66,7 +66,7 @@ const FamilyOverView = ({ familyCode, token }) => {
         </h2>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
-          <div className="bg-blue-50 dark:bg-slate-800 px-3 py-3 rounded-xl text-center border border-transparent dark:border-slate-700">
+          <div className="bg-blue-50 dark:bg-slate-800 px-3 py-3 rounded-xl text-center border border-transparent dark:border-slate-700 col-span-2 sm:col-span-1">
             <FaUserFriends className="mx-auto text-blue-500 text-2xl mb-1.5" />
             <p className="text-[11px] sm:text-xs text-gray-600 dark:text-slate-300">
               Total Members
@@ -86,7 +86,7 @@ const FamilyOverView = ({ familyCode, token }) => {
             </p>
           </div>
 
-          <div className="bg-pink-50 dark:bg-slate-800 px-3 py-3 rounded-xl text-center border border-transparent dark:border-slate-700 col-span-2 sm:col-span-1">
+          <div className="bg-pink-50 dark:bg-slate-800 px-3 py-3 rounded-xl text-center border border-transparent dark:border-slate-700 col-span-1 sm:col-span-1">
             <FaFemale className="mx-auto text-pink-500 text-2xl mb-1.5" />
             <p className="text-[11px] sm:text-xs text-gray-600 dark:text-slate-300">
               Female Members

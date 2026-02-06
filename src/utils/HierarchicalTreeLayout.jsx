@@ -12,16 +12,16 @@
  * - No overlapping cards or connections
  */
 
-// Card dimensions for layout spacing - responsive to screen size
-const isMobile =
-    typeof globalThis !== "undefined" &&
-    globalThis.window &&
-    globalThis.window.innerWidth <= 640;
-const CARD_WIDTH = isMobile ? 120 : 200;  // Layout spacing width
-const CARD_HEIGHT = isMobile ? 80 : 100;  // Layout spacing height
-const HORIZONTAL_SPACING = isMobile ? 30 : 80;  // Space between siblings/family units
-const VERTICAL_SPACING = isMobile ? 100 : 150;   // Space between generations
-const SPOUSE_SPACING = isMobile ? 20 : 40;      // Space between spouse pairs
+// Card dimensions for layout spacing
+// NOTE: We intentionally use a fixed "desktop" virtual canvas here (approx. 13" display)
+// for all devices so that the tree structure (card spacing and line lengths)
+// is identical on mobile and desktop. Viewport differences are handled by
+// zooming/scrolling in the React components, not by changing these numbers.
+const CARD_WIDTH = 200;           // Layout spacing width
+const CARD_HEIGHT = 100;          // Layout spacing height
+const HORIZONTAL_SPACING = 80;    // Space between siblings/family units
+const VERTICAL_SPACING = 150;     // Space between generations
+const SPOUSE_SPACING = 40;        // Space between spouse pairs
 
 /**
  * Calculate hierarchical tree layout positions

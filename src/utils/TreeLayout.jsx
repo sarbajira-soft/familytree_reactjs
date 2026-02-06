@@ -15,62 +15,37 @@ function getAllDescendants(tree, personId, visited = new Set()) {
     return descendants;
 }
 
-function getSpacingConfig(memberCount) {
-    // Dynamic spacing based on tree size AND screen size
-    const isMobile =
-        typeof globalThis !== "undefined" &&
-        globalThis.window &&
-        globalThis.window.innerWidth <= 640;
-    let nodesep, ranksep, marginx, marginy, coupleSpacing, nodeWidth, nodeHeight;
+export function autoArrange(tree) {
+    const g = new dagre.graphlib.Graph({ compound: true });
     
-    // Mobile-responsive spacing
-    if (isMobile) {
-        // Compact layout for mobile
-        if (memberCount > 100) {
-            nodesep = 100;
-            ranksep = 120;
-            coupleSpacing = 30;
-            nodeWidth = 100;
-            nodeHeight = 60;
-        } else if (memberCount > 50) {
-            nodesep = 90;
-            ranksep = 110;
-            coupleSpacing = 25;
-            nodeWidth = 95;
-            nodeHeight = 55;
-        } else {
-            nodesep = 80;
-            ranksep = 100;
-            coupleSpacing = 20;
-            nodeWidth = 90;
-            nodeHeight = 50;
-        }
-        marginx = 20;
-        marginy = 20;
+    // Dynamic spacing based on tree size only (use a fixed desktop-style canvas
+    // on all devices so that line lengths and spacing are consistent between
+    // mobile and desktop; viewport differences are handled via zoom/scroll).
+    const memberCount = tree.people.size;
+    let nodesep, ranksep, marginx, marginy, coupleSpacing, nodeWidth, nodeHeight;
+
+    // Desktop spacing values (previously used for non-mobile)
+    if (memberCount > 100) {
+        nodesep = 250;
+        ranksep = 220;
+        coupleSpacing = 80;
+        nodeWidth = 200;
+        nodeHeight = 80;
+    } else if (memberCount > 50) {
+        nodesep = 220;
+        ranksep = 200;
+        coupleSpacing = 70;
+        nodeWidth = 180;
+        nodeHeight = 75;
     } else {
-        // Desktop spacing - original values
-        if (memberCount > 100) {
-            nodesep = 250;
-            ranksep = 220;
-            coupleSpacing = 80;
-            nodeWidth = 200;
-            nodeHeight = 80;
-        } else if (memberCount > 50) {
-            nodesep = 220;
-            ranksep = 200;
-            coupleSpacing = 70;
-            nodeWidth = 180;
-            nodeHeight = 75;
-        } else {
-            nodesep = 200;
-            ranksep = 180;
-            coupleSpacing = 60;
-            nodeWidth = 160;
-            nodeHeight = 70;
-        }
-        marginx = 50;
-        marginy = 50;
+        nodesep = 200;
+        ranksep = 180;
+        coupleSpacing = 60;
+        nodeWidth = 160;
+        nodeHeight = 70;
     }
+    marginx = 50;
+    marginy = 50;
 
     return { isMobile, nodesep, ranksep, marginx, marginy, coupleSpacing, nodeWidth, nodeHeight };
 }
@@ -214,8 +189,8 @@ export function autoArrange(tree) {
         ranker: 'network-simplex',
         // Force same rank for spouses
         align: 'UL',
-        // Edge constraints for better spacing - responsive to mobile
-        edgesep: isMobile ? 30 : 80,
+        // Edge constraints for better spacing
+        edgesep: 80,
         // Allow edges to be very short
         minlen: 1,
         // Disable complex acyclicer to prevent errors

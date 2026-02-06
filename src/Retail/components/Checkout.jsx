@@ -393,13 +393,15 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
       const shippingMeta = selectedOption
         ? {
             shipping_type: selectedOption.metadata?.shipping_type || null,
-            shiprocket_amount:
-              typeof selectedOption.amount === 'number' ? selectedOption.amount : null,
             shiprocket_eta: selectedOption.metadata?.eta || null,
             shiprocket_eta_days:
               typeof selectedOption.metadata?.eta_days === 'number'
                 ? selectedOption.metadata.eta_days
                 : null,
+            // Forward payment mode so the Shiprocket provider can
+            // distinguish COD vs online when the shipping method
+            // is actually attached to the cart.
+            payment_mode: paymentMethod || null,
           }
         : null;
 

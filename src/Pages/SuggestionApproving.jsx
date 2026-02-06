@@ -453,11 +453,11 @@ const SuggestionApproving = () => {
           <span>Back to Family Management</span>
         </button>
 
-        <div className="flex items-center mb-6">
+        <div className="flex items-center  mb-6">
           <FiClock className="text-primary-600 text-3xl mr-3" />
-          <h1 className="text-3xl font-bold text-gray-800">Pending Join Requests</h1>
+          <h1 className="text-3xl font-bold text-gray-800">Pending Requests</h1>
         </div>
-        <p className="text-gray-500 mb-6">Review and manage pending join requests for your family.</p>
+        <p className="hidden md:block text-gray-500 mb-6">Review and manage pending join requests for your family.</p>
         {loading ? (
           <div>Loading...</div>
         ) : requests.length === 0 ? (
