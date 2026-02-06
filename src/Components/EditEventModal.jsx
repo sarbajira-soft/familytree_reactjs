@@ -20,6 +20,7 @@ const EditEventModal = ({
   onEventUpdated,
   apiBaseUrl = import.meta.env.VITE_API_BASE_URL,
 }) => {
+  const MAX_EVENT_TITLE_LENGTH = 50;
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
@@ -146,6 +147,7 @@ const EditEventModal = ({
         .filter(Boolean)
         .map((m) => {
           if (m === "eventTitle should not be empty") return "Event title is required.";
+          if (m === "Event title must be at most 50 characters") return "Event title must be 50 characters or less.";
           if (m === "eventDate should not be empty") return "Event date is required.";
           if (m === "eventDate must be a valid ISO 8601 date string") return "Event date is invalid. Please choose a valid date.";
           return m;
@@ -229,6 +231,18 @@ const EditEventModal = ({
       return;
     }
 
+    const normalizedTitle = String(title || "").trim();
+    if (normalizedTitle.length > MAX_EVENT_TITLE_LENGTH) {
+      Swal.fire({
+        icon: "warning",
+        title: "Title too long",
+        text: `Event title must be ${MAX_EVENT_TITLE_LENGTH} characters or less.`,
+        confirmButtonColor: "#10b981",
+      });
+      setIsLoading(false);
+      return;
+    }
+
     if (!date || !String(date).trim()) {
       Swal.fire({
         icon: "warning",
@@ -245,17 +259,6 @@ const EditEventModal = ({
         icon: "warning",
         title: "Invalid date",
         text: "Please choose a valid date.",
-        confirmButtonColor: "#10b981",
-      });
-      setIsLoading(false);
-      return;
-    }
-
-    if (!time || !String(time).trim()) {
-      Swal.fire({
-        icon: "warning",
-        title: "Missing time",
-        text: "Event time is required.",
         confirmButtonColor: "#10b981",
       });
       setIsLoading(false);
@@ -288,17 +291,11 @@ const EditEventModal = ({
       const token = localStorage.getItem("access_token");
 
       const formData = new FormData();
-      formData.append("eventTitle", title);
-      if (description && String(description).trim()) {
-        formData.append("eventDescription", String(description).trim());
-      }
+      formData.append("eventTitle", normalizedTitle);
+      formData.append("eventDescription", String(description || "").trim());
       formData.append("eventDate", date);
-      if (time && String(time).trim()) {
-        formData.append("eventTime", String(time).trim());
-      }
-      if (location && String(location).trim()) {
-        formData.append("location", String(location).trim());
-      }
+      formData.append("eventTime", String(time || "").trim());
+      formData.append("location", String(location || "").trim());
       formData.append("familyCode", familyCode);
 
       // Add new images
@@ -310,6 +307,11 @@ const EditEventModal = ({
       existingImages.forEach((img) => {
         formData.append("eventImages", img);
       });
+
+      // If user removed all images, explicitly signal to clear them
+      if ((existingImages || []).length === 0 && (images || []).length === 0) {
+        formData.append("clearImages", "true");
+      }
 
       const updateEndpoint = `${apiBaseUrl}/event/edit/${event.id}`;
 
@@ -397,9 +399,16 @@ const EditEventModal = ({
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 required
+                maxLength={MAX_EVENT_TITLE_LENGTH}
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
                 placeholder="Enter event title..."
               />
+              <div className="text-[11px] text-gray-500 flex items-center justify-between">
+                <span>Max {MAX_EVENT_TITLE_LENGTH} characters.</span>
+                <span className={title.length > MAX_EVENT_TITLE_LENGTH ? "text-red-600" : ""}>
+                  {title.length}/{MAX_EVENT_TITLE_LENGTH}
+                </span>
+              </div>
             </div>
 
             {/* Date and Time */}
@@ -430,7 +439,6 @@ const EditEventModal = ({
                   type="time"
                   value={time}
                   onChange={(e) => setTime(e.target.value)}
-                  required
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
                 />
               </div>
@@ -448,7 +456,6 @@ const EditEventModal = ({
                 type="text"
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
-                required
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
                 placeholder="Enter event location..."
               />

@@ -51,7 +51,88 @@ const SECTIONS = [
 
 const NAME_PATTERN = /^[a-zA-Z0-9\s]+$/;
 
+const INDIAN_RELIGIONS = [
+  "Hindu",
+  "Muslim",
+  "Christian",
+  "Sikh",
+  "Buddhist",
+  "Jain",
+  "Zoroastrian (Parsi)",
+];
+
+const INDIAN_LANGUAGES = [
+  "Tamil",
+  "Hindi",
+  "Telugu",
+  "Malayalam",
+  "Kannada",
+  "Marathi",
+  "Gujarati",
+  "Bengali",
+  "Punjabi",
+  "Urdu",
+  "Odia",
+  "Assamese",
+  "English",
+];
+
+const MAX_PROFILE_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const ALLOWED_PROFILE_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/jpg",
+  "image/gif",
+]);
+
 const isBlank = (value) => String(value || "").trim() === "";
+
+const normalizePhoneDigits = (value) => String(value || "").replaceAll(/\D/g, "");
+
+const getContactNumberFallback = (profileContact, userCountryCode, userMobile) => {
+  const profileDigits = normalizePhoneDigits(profileContact);
+  if (profileDigits) return profileDigits;
+  return normalizePhoneDigits(`${userCountryCode || ""}${userMobile || ""}`);
+};
+
+const deriveContactFields = (data) => {
+  const digits = normalizePhoneDigits(data.contactNumber);
+  if (!digits) return null;
+
+  const dialCodeDigits = normalizePhoneDigits(data.contactCountryCode);
+  if (dialCodeDigits && digits.startsWith(dialCodeDigits)) {
+    const mobile = digits.slice(dialCodeDigits.length);
+    if (mobile) {
+      return {
+        contactNumber: digits,
+        countryCode: `+${dialCodeDigits}`,
+        mobile,
+      };
+    }
+  }
+
+  return { contactNumber: digits };
+};
+
+const validateProfileFile = (file) => {
+  if (!file) return { isValid: true };
+
+  if (file.size > MAX_PROFILE_FILE_SIZE) {
+    return {
+      isValid: false,
+      message: "File too large. Max size is 5MB.",
+    };
+  }
+
+  if (!ALLOWED_PROFILE_TYPES.has(file.type)) {
+    return {
+      isValid: false,
+      message: "Unsupported file type. Please upload JPG, PNG, or GIF.",
+    };
+  }
+
+  return { isValid: true };
+};
 
 const validateName = (value, fieldLabel) => {
   const trimmed = String(value || "").trim();
@@ -60,6 +141,28 @@ const validateName = (value, fieldLabel) => {
   if (!NAME_PATTERN.test(trimmed))
     return `${fieldLabel} should only contain letters and numbers`;
   return null;
+};
+
+const OPTIONAL_TEXT_PATTERN = /^[A-Za-z][A-Za-z .'-]*$/;
+
+const validateOptionalText = (value, fieldLabel) => {
+  const trimmed = String(value || "").trim();
+  if (trimmed === "") return null;
+  if (!OPTIONAL_TEXT_PATTERN.test(trimmed)) {
+    return `${fieldLabel} can contain only letters, spaces, and . ' -`;
+  }
+  return null;
+};
+
+const isNumericValue = (value) => {
+  const parsed = Number.parseInt(String(value || ""), 10);
+  return !Number.isNaN(parsed);
+};
+
+const parsePositiveInt = (value) => {
+  const parsed = Number.parseInt(String(value || ""), 10);
+  if (Number.isNaN(parsed) || parsed <= 0) return null;
+  return parsed;
 };
 
 const calculateAge = (dobValue) => {
@@ -120,6 +223,21 @@ const validateSelectWithOther = (
   return errors;
 };
 
+const validateOptionalSelectWithOther = (
+  selectedValue,
+  otherValue,
+  otherKey,
+  otherMessage,
+) => {
+  const errors = {};
+
+  if (selectedValue === "other" && isBlank(otherValue)) {
+    errors[otherKey] = otherMessage;
+  }
+
+  return errors;
+};
+
 const buildBasicSectionErrors = (data) => {
   const errors = {};
 
@@ -143,6 +261,12 @@ const buildFamilySectionErrors = (data) => {
   if (isBlank(data.fatherName)) errors.fatherName = "Father's name is required";
   if (isBlank(data.motherName)) errors.motherName = "Mother's name is required";
 
+  const casteError = validateOptionalText(data.caste, "Caste");
+  if (casteError) errors.caste = casteError;
+
+  const kuladevataError = validateOptionalText(data.kuladevata, "Kuladevata");
+  if (kuladevataError) errors.kuladevata = kuladevataError;
+
   Object.assign(
     errors,
     validateSelectWithOther(
@@ -157,24 +281,20 @@ const buildFamilySectionErrors = (data) => {
 
   Object.assign(
     errors,
-    validateSelectWithOther(
+    validateOptionalSelectWithOther(
       data.religionId,
       data.religionOther,
-      "religionId",
       "religionOther",
-      "Religion is required",
       "Please enter religion",
     ),
   );
 
   Object.assign(
     errors,
-    validateSelectWithOther(
+    validateOptionalSelectWithOther(
       data.gothram,
       data.gothramOther,
-      "gothram",
       "gothramOther",
-      "Gothram is required",
       "Please enter gothram",
     ),
   );
@@ -207,10 +327,68 @@ const getSectionErrors = (activeSection, data) => {
   return builder ? builder(data) : {};
 };
 
+const SECTION_FIELD_MAP = {
+  basic: new Set(["firstName", "lastName", "dob", "gender", "profile"]),
+  family: new Set([
+    "fatherName",
+    "motherName",
+    "motherTongue",
+    "motherTongueOther",
+    "religionId",
+    "religionOther",
+    "caste",
+    "gothram",
+    "gothramOther",
+    "kuladevata",
+  ]),
+  contact: new Set(["contactNumber", "address"]),
+};
+
+const getSectionForErrors = (errors) => {
+  const errorKeys = Object.keys(errors);
+  for (const key of errorKeys) {
+    for (const [section, fields] of Object.entries(SECTION_FIELD_MAP)) {
+      if (fields.has(key)) return section;
+    }
+  }
+  return null;
+};
+
+const getAllSectionErrors = (data) => ({
+  ...buildBasicSectionErrors(data),
+  ...buildFamilySectionErrors(data),
+  ...buildContactSectionErrors(data),
+});
+
+const getFieldErrorFromApiMessage = (message) => {
+  const lower = String(message || "").toLowerCase();
+  if (lower.includes("file") || lower.includes("image")) {
+    return { field: "profile", section: "basic" };
+  }
+  if (lower.includes("caste")) {
+    return { field: "caste", section: "family" };
+  }
+  if (lower.includes("phone number") || lower.includes("mobile")) {
+    return { field: "contactNumber", section: "contact" };
+  }
+  return null;
+};
+
 const focusFirstErrorField = (errors, fieldRefs) => {
   const firstError = Object.keys(errors)[0];
-  if (firstError && fieldRefs[firstError]?.current) {
-    fieldRefs[firstError].current.focus();
+  if (!firstError) return;
+  const ref = fieldRefs[firstError]?.current;
+  if (ref) {
+    ref.scrollIntoView({ behavior: "smooth", block: "center" });
+    ref.focus();
+    return;
+  }
+  const fallback = document.querySelector(
+    `[name="${firstError}"], [id="${firstError}"]`,
+  );
+  if (fallback) {
+    fallback.scrollIntoView({ behavior: "smooth", block: "center" });
+    fallback.focus();
   }
 };
 
@@ -229,10 +407,7 @@ const areAllMandatoryFieldsFilled = (data) => {
     isBlank(data.motherName) ||
     !data.motherTongue ||
     data.motherTongue === 0 ||
-    !data.religionId ||
-    data.religionId === 0 ||
-    !data.gothram ||
-    data.gothram === 0
+    data.motherTongue === ""
   ) {
     return false;
   }
@@ -267,10 +442,22 @@ const fetchDropdownDataForOnboarding = async (setDropdownData) => {
     const responses = await Promise.all(endpoints.map((url) => fetch(url)));
     const data = await Promise.all(responses.map((res) => res.json()));
 
+    const languages = data[0].data || data[0] || [];
+    const religions = data[1].data || data[1] || [];
+    const gothrams = data[2].data || data[2] || [];
+    const fallbackLanguages = INDIAN_LANGUAGES.map((language) => ({
+      id: language,
+      name: language,
+    }));
+    const fallbackReligions = INDIAN_RELIGIONS.map((religion) => ({
+      id: religion,
+      name: religion,
+    }));
+
     setDropdownData({
-      languages: data[0].data || data[0],
-      religions: data[1].data || data[1],
-      gothrams: data[2].data || data[2],
+      languages: languages.length > 0 ? languages : fallbackLanguages,
+      religions: religions.length > 0 ? religions : fallbackReligions,
+      gothrams,
       loading: false,
       error: null,
     });
@@ -322,13 +509,46 @@ const fetchAndApplyUserDetails = async ({
 
     const jsonData = await response.json();
     const { userProfile } = jsonData.data;
+    const userCountryCode = jsonData.data?.countryCode || "";
+    const userMobile = jsonData.data?.mobile || "";
 
     const childrenArray = userProfile.childrenNames
       ? JSON.parse(userProfile.childrenNames)
       : [];
 
+    const otherLanguage = userProfile.otherLanguage || "";
+    const otherReligion = userProfile.otherReligion || "";
+    const otherGothram = userProfile.otherGothram || "";
+
     setFormData((prev) => {
       const childFields = buildChildFieldsFromNames(childrenArray);
+
+      const contactNumber = getContactNumberFallback(
+        userProfile.contactNumber,
+        userCountryCode,
+        userMobile,
+      );
+
+      let motherTongueValue = 0;
+      if (userProfile.languageId) {
+        motherTongueValue = Number.parseInt(userProfile.languageId, 10);
+      } else if (otherLanguage) {
+        motherTongueValue = "other";
+      }
+
+      let religionValue = 0;
+      if (userProfile.religionId) {
+        religionValue = Number.parseInt(userProfile.religionId, 10);
+      } else if (otherReligion) {
+        religionValue = "other";
+      }
+
+      let gothramValue = 0;
+      if (userProfile.gothramId) {
+        gothramValue = Number.parseInt(userProfile.gothramId, 10);
+      } else if (otherGothram) {
+        gothramValue = "other";
+      }
 
       return {
         ...prev,
@@ -346,26 +566,21 @@ const fetchAndApplyUserDetails = async ({
         ...childFields,
         fatherName: userProfile.fatherName || "",
         motherName: userProfile.motherName || "",
-        motherTongue: userProfile.languageId
-          ? Number.parseInt(userProfile.languageId, 10)
-          : 0,
-        motherTongueOther: userProfile.otherLanguage || "",
-        religionId: userProfile.religionId
-          ? Number.parseInt(userProfile.religionId, 10)
-          : 0,
-        religionOther: userProfile.otherReligion || "",
+        motherTongue: motherTongueValue,
+        motherTongueOther: otherLanguage,
+        religionId: religionValue,
+        religionOther: otherReligion,
         caste: userProfile.caste || "",
-        gothram: userProfile.gothramId
-          ? Number.parseInt(userProfile.gothramId, 10)
-          : 0,
-        gothramOther: userProfile.otherGothram || "",
+        gothram: gothramValue,
+        gothramOther: otherGothram,
         kuladevata: userProfile.kuladevata || "",
         hobbies: userProfile.hobbies || "",
         likes: userProfile.likes || "",
         dislikes: userProfile.dislikes || "",
         favoriteFoods: userProfile.favoriteFoods || "",
         address: userProfile.address || "",
-        contactNumber: userProfile.contactNumber || "",
+        contactNumber,
+        contactCountryCode: userCountryCode || prev.contactCountryCode || "+91",
         bio: userProfile.bio || "",
         profile: userProfile.profile || "",
         profileUrl: userProfile.profile || "",
@@ -390,14 +605,28 @@ const shouldSkipOnSave = (key, data) => {
     key === "gothramOther"
   )
     return true;
+  if (["motherTongue", "religionId", "gothram"].includes(key)) return true;
+  if (key === "contactCountryCode") return true;
   if (key === "childrenNames" || key === "profile") return true;
   if (key.startsWith("childName")) return true;
 
   const value = data[key];
   if (value === undefined || value === null) return true;
 
+  const optionalTrimmedFields = new Set([
+    "caste",
+    "kuladevata",
+    "region",
+    "hobbies",
+    "likes",
+    "dislikes",
+    "favoriteFoods",
+    "bio",
+  ]);
+
   const isSingle = data.maritalStatus === "Single";
   const trimmed = typeof value === "string" ? value.trim() : value;
+  if (optionalTrimmedFields.has(key) && trimmed === "") return true;
   if (key === "marriageDate" && (isSingle || !trimmed)) return true;
   if (key === "spouseName" && (isSingle || !trimmed)) return true;
 
@@ -413,35 +642,104 @@ const appendNonSkippedFields = (payload, data) => {
 };
 
 const applyLanguageFields = (payload, data) => {
-  if (data.motherTongue === "other") {
-    payload.set("languageId", "");
-    payload.set("otherLanguage", String(data.motherTongueOther || "").trim());
+  const selectedValue = String(data.motherTongue || "").trim();
+  const otherValue = String(data.motherTongueOther || "").trim();
+  if (selectedValue === "" || selectedValue === "0") {
+    payload.delete("languageId");
+    payload.delete("otherLanguage");
+    return;
+  }
+  if (selectedValue === "other") {
+    payload.delete("languageId");
+    if (otherValue) {
+      payload.set("otherLanguage", otherValue);
+    } else {
+      payload.delete("otherLanguage");
+    }
+    return;
+  }
+
+  const parsedId = parsePositiveInt(selectedValue);
+  if (parsedId) {
+    payload.set("languageId", parsedId);
+    payload.delete("otherLanguage");
+    return;
+  }
+
+  if (selectedValue) {
+    payload.delete("languageId");
+    payload.set("otherLanguage", selectedValue);
   } else {
-    payload.set(
-      "languageId",
-      Number.parseInt(String(data.motherTongue), 10) || "",
-    );
+    payload.delete("languageId");
+    payload.delete("otherLanguage");
   }
 };
 
 const applyReligionFields = (payload, data) => {
-  if (data.religionId === "other") {
-    payload.set("religionId", "");
-    payload.set("otherReligion", String(data.religionOther || "").trim());
+  const selectedValue = String(data.religionId || "").trim();
+  const otherValue = String(data.religionOther || "").trim();
+  if (selectedValue === "" || selectedValue === "0") {
+    payload.delete("religionId");
+    payload.delete("otherReligion");
+    return;
+  }
+  if (selectedValue === "other") {
+    payload.delete("religionId");
+    if (otherValue) {
+      payload.set("otherReligion", otherValue);
+    } else {
+      payload.delete("otherReligion");
+    }
+    return;
+  }
+
+  const parsedId = parsePositiveInt(selectedValue);
+  if (parsedId) {
+    payload.set("religionId", parsedId);
+    payload.delete("otherReligion");
+    return;
+  }
+
+  if (selectedValue) {
+    payload.delete("religionId");
+    payload.set("otherReligion", selectedValue);
   } else {
-    payload.set(
-      "religionId",
-      Number.parseInt(String(data.religionId), 10) || "",
-    );
+    payload.delete("religionId");
+    payload.delete("otherReligion");
   }
 };
 
 const applyGothramFields = (payload, data) => {
-  if (data.gothram === "other") {
-    payload.set("gothramId", "");
-    payload.set("otherGothram", String(data.gothramOther || "").trim());
-  } else if (data.gothram && Number.parseInt(String(data.gothram), 10) > 0) {
-    payload.set("gothramId", Number.parseInt(String(data.gothram), 10));
+  const selectedValue = String(data.gothram || "").trim();
+  const otherValue = String(data.gothramOther || "").trim();
+  if (selectedValue === "" || selectedValue === "0") {
+    payload.delete("gothramId");
+    payload.delete("otherGothram");
+    return;
+  }
+  if (selectedValue === "other") {
+    payload.delete("gothramId");
+    if (otherValue) {
+      payload.set("otherGothram", otherValue);
+    } else {
+      payload.delete("otherGothram");
+    }
+    return;
+  }
+
+  const parsedId = parsePositiveInt(selectedValue);
+  if (parsedId) {
+    payload.set("gothramId", parsedId);
+    payload.delete("otherGothram");
+    return;
+  }
+
+  if (selectedValue) {
+    payload.delete("gothramId");
+    payload.set("otherGothram", selectedValue);
+  } else {
+    payload.delete("gothramId");
+    payload.delete("otherGothram");
   }
 };
 
@@ -466,6 +764,23 @@ const applyProfileFile = (payload, data) => {
   }
 };
 
+const applyContactFields = (payload, data) => {
+  const derived = deriveContactFields(data);
+  if (!derived) return;
+
+  if (derived.contactNumber) {
+    payload.set("contactNumber", derived.contactNumber);
+  }
+
+  if (derived.countryCode) {
+    payload.set("countryCode", derived.countryCode);
+  }
+
+  if (derived.mobile) {
+    payload.set("mobile", derived.mobile);
+  }
+};
+
 const finalizeProfilePayload = (payload, data) => {
   payload.set(
     "childrenCount",
@@ -476,6 +791,7 @@ const finalizeProfilePayload = (payload, data) => {
   payload.delete("gothram");
   payload.delete("childrenCount");
   payload.delete("profileUrl");
+  payload.delete("contactCountryCode");
 };
 
 const buildProfileUpdateFormData = (data) => {
@@ -486,6 +802,7 @@ const buildProfileUpdateFormData = (data) => {
   applyGothramFields(payload, data);
   applyChildrenNames(payload, data);
   applyProfileFile(payload, data);
+  applyContactFields(payload, data);
   finalizeProfilePayload(payload, data);
   return payload;
 };
@@ -835,11 +1152,15 @@ const FamilySection = ({
 
         <select
           id="religionId"
+          ref={fieldRefs.religionId}
           name="religionId"
           value={formData.religionId || ""}
           onChange={handleChange}
           disabled={dropdownData.loading}
-          className="w-full px-4 py-2.5 border border-gray-300 rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] disabled:bg-gray-100 disabled:cursor-not-allowed"
+          className={`w-full px-4 py-2.5 border rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 disabled:bg-gray-100 disabled:cursor-not-allowed ${errors.religionId
+              ? "border-red-500 focus:ring-red-300"
+              : "border-gray-300 focus:ring-[var(--color-primary)]"
+            }`}
         >
           <option value="">Select Religion</option>
 
@@ -889,13 +1210,21 @@ const FamilySection = ({
 
         <input
           id="caste"
+          ref={fieldRefs.caste}
           type="text"
           name="caste"
           value={formData.caste}
           onChange={handleChange}
           placeholder="Enter your caste"
-          className="w-full px-4 py-2.5 border border-gray-300 rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+          className={`w-full px-4 py-2.5 border rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 ${errors.caste
+              ? "border-red-500 focus:ring-red-300"
+              : "border-gray-300 focus:ring-[var(--color-primary)]"
+            }`}
         />
+
+        {errors.caste && (
+          <p className="text-red-500 text-xs mt-1">{errors.caste}</p>
+        )}
       </div>
 
       <div>
@@ -908,11 +1237,15 @@ const FamilySection = ({
 
         <select
           id="gothram"
+          ref={fieldRefs.gothram}
           name="gothram"
           value={formData.gothram || ""}
           onChange={handleChange}
           disabled={dropdownData.loading}
-          className="w-full px-4 py-2.5 border border-gray-300 rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] disabled:bg-gray-100 disabled:cursor-not-allowed"
+          className={`w-full px-4 py-2.5 border rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 disabled:bg-gray-100 disabled:cursor-not-allowed ${errors.gothram
+              ? "border-red-500 focus:ring-red-300"
+              : "border-gray-300 focus:ring-[var(--color-primary)]"
+            }`}
         >
           <option value="">Select Gothram</option>
 
@@ -962,13 +1295,21 @@ const FamilySection = ({
 
         <input
           id="kuladevata"
+          ref={fieldRefs.kuladevata}
           type="text"
           name="kuladevata"
           value={formData.kuladevata || ""}
           onChange={handleChange}
           placeholder="Enter Kuladevata"
-          className="w-full px-4 py-2.5 border border-gray-300 rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+          className={`w-full px-4 py-2.5 border rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 ${errors.kuladevata
+              ? "border-red-500 focus:ring-red-300"
+              : "border-gray-300 focus:ring-[var(--color-primary)]"
+            }`}
         />
+
+        {errors.kuladevata && (
+          <p className="text-red-500 text-xs mt-1">{errors.kuladevata}</p>
+        )}
       </div>
     </div>
   </div>
@@ -1000,6 +1341,7 @@ const BasicSection = ({
   setFormData,
   setErrors,
   calculateAge,
+  setApiError,
 }) => (
   <div className="max-w-3xl mx-auto">
     {/* Header Section */}
@@ -1052,16 +1394,32 @@ const BasicSection = ({
                 <input
                   id="profileUpload"
                   type="file"
-                  accept="image/*"
-                  onChange={(e) =>
+                  accept="image/jpeg,image/png,image/jpg,image/gif"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+
+                    const validation = validateProfileFile(file);
+                    if (!validation.isValid) {
+                      setErrors((prev) => ({
+                        ...prev,
+                        profile: validation.message,
+                      }));
+                      setApiError("");
+                      return;
+                    }
+
+                    setErrors((prev) => {
+                      const nextErrors = { ...prev };
+                      delete nextErrors.profile;
+                      return nextErrors;
+                    });
+                    setApiError("");
                     setFormData((prev) => ({
                       ...prev,
-
-                      profile: e.target.files[0],
-
-                      // clear server image once new is selected
-                    }))
-                  }
+                      profile: file,
+                    }));
+                  }}
                   className="hidden"
                 />
               </label>
@@ -1108,20 +1466,42 @@ const BasicSection = ({
             <input
               id="profileUpload"
               type="file"
-              accept="image/*"
-              onChange={(e) =>
+              accept="image/jpeg,image/png,image/jpg,image/gif"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+
+                const validation = validateProfileFile(file);
+                if (!validation.isValid) {
+                  setErrors((prev) => ({
+                    ...prev,
+                    profile: validation.message,
+                  }));
+                  setApiError("");
+                  return;
+                }
+
+                setErrors((prev) => {
+                  const nextErrors = { ...prev };
+                  delete nextErrors.profile;
+                  return nextErrors;
+                });
+                setApiError("");
                 setFormData((prev) => ({
                   ...prev,
-
-                  profile: e.target.files[0],
-                }))
-              }
+                  profile: file,
+                }));
+              }}
               className="hidden"
             />
           </label>
         )}
       </div>
     </div>
+
+    {errors.profile && (
+      <p className="text-red-500 text-xs mt-2 text-center">{errors.profile}</p>
+    )}
 
     {/* Form Grid */}
 
@@ -1203,14 +1583,14 @@ const BasicSection = ({
             value={formData.dob || ""}
             onChange={handleChange}
             max={new Date().toISOString().split("T")[0]}
-            className={`w-full px-4 py-2.5 pr-10 border rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 ${errors.dob
+            className={`w-full px-4 py-2.5 pr-16 border rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 ${errors.dob
                 ? "border-red-500 focus:ring-red-300"
                 : "border-gray-300 focus:ring-[var(--color-primary)]"
               }`}
             placeholder="Select your date of birth"
           />
 
-          <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+          <div className="absolute inset-y-0 right-2 flex items-center pointer-events-none">
             <svg
               className="w-5 h-5 text-gray-400"
               fill="none"
@@ -1227,7 +1607,7 @@ const BasicSection = ({
           </div>
 
           {formData.dob && (
-            <div className="absolute inset-y-0 right-8 flex items-center pr-2">
+            <div className="absolute inset-y-0 right-10 flex items-center pr-1">
               <button
                 type="button"
                 onClick={() => {
@@ -1243,7 +1623,7 @@ const BasicSection = ({
                     });
                   }
                 }}
-                className=" text-white-400 hover:text-red-500 transition-colors duration-200"
+                className="text-gray-400 hover:text-red-500 transition-colors duration-200"
                 title="Clear date"
               >
                 <svg
@@ -1417,11 +1797,11 @@ const BasicSection = ({
               value={formData.marriageDate || ""}
               onChange={handleChange}
               max={new Date().toISOString().split("T")[0]}
-              className="w-full px-4 py-2.5 pr-10 border border-gray-300 rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+              className="w-full px-4 py-2.5 pr-16 border border-gray-300 rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
               placeholder="Select marriage date"
             />
 
-            <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+            <div className="absolute inset-y-0 right-2 flex items-center pointer-events-none">
               <svg
                 className="w-5 h-5 text-gray-400"
                 fill="none"
@@ -1438,7 +1818,7 @@ const BasicSection = ({
             </div>
 
             {formData.marriageDate && (
-              <div className="absolute inset-y-0 right-8 flex items-center pr-2">
+              <div className="absolute inset-y-0 right-10 flex items-center pr-1">
                 <button
                   type="button"
                   onClick={() => {
@@ -1587,6 +1967,8 @@ BasicSection.propTypes = {
 
   setErrors: PropTypes.func.isRequired,
 
+  setApiError: PropTypes.func.isRequired,
+
   calculateAge: PropTypes.func.isRequired,
 };
 
@@ -1624,10 +2006,11 @@ const ContactSection = ({
           <PhoneInput
             country={"in"}
             value={formData.contactNumber}
-            onChange={(phone) => {
+            onChange={(phone, data) => {
               setFormData((prev) => ({
                 ...prev,
                 contactNumber: phone,
+                contactCountryCode: data?.dialCode ? `+${data.dialCode}` : prev.contactCountryCode,
               }));
 
               setErrors((prev) => {
@@ -1991,6 +2374,7 @@ const SectionContent = ({
   handleChange,
   setFormData,
   setErrors,
+  setApiError,
   dropdownData,
   calculateAge,
 }) => {
@@ -2013,6 +2397,7 @@ const SectionContent = ({
         setFormData={setFormData}
         setErrors={setErrors}
         calculateAge={calculateAge}
+        setApiError={setApiError}
       />
     ),
     contact: (
@@ -2045,6 +2430,8 @@ SectionContent.propTypes = {
   setFormData: PropTypes.func.isRequired,
 
   setErrors: PropTypes.func.isRequired,
+
+  setApiError: PropTypes.func.isRequired,
 
   dropdownData: PropTypes.shape({
     languages: PropTypes.arrayOf(PropTypes.object).isRequired,
@@ -2096,6 +2483,14 @@ const OnBoarding = () => {
     motherName: useRef(null),
 
     motherTongue: useRef(null),
+
+    caste: useRef(null),
+
+    religionId: useRef(null),
+
+    gothram: useRef(null),
+
+    kuladevata: useRef(null),
 
     contactNumber: useRef(null),
 
@@ -2162,6 +2557,7 @@ const OnBoarding = () => {
     address: "",
 
     contactNumber: "",
+    contactCountryCode: "+91",
 
     bio: "",
 
@@ -2209,15 +2605,17 @@ const OnBoarding = () => {
 
     let processedValue = value;
 
-    if (
-      ["motherTongue", "religionId", "gothram"].includes(name) &&
-      value === "other"
-    ) {
-      processedValue = "other";
-    } else if (
-      type === "number" ||
-      ["childrenCount", "motherTongue", "religionId", "gothram"].includes(name)
-    ) {
+    if (["motherTongue", "religionId", "gothram"].includes(name)) {
+      if (value === "other") {
+        processedValue = "other";
+      } else if (value === "") {
+        processedValue = 0;
+      } else if (isNumericValue(value)) {
+        processedValue = Number.parseInt(value, 10);
+      } else {
+        processedValue = value;
+      }
+    } else if (type === "number" || name === "childrenCount") {
       processedValue = value === "" ? 0 : Number.parseInt(value, 10);
     }
 
@@ -2249,6 +2647,19 @@ const OnBoarding = () => {
         return newErrors;
       });
     }
+
+    const otherFieldMap = {
+      motherTongue: "motherTongueOther",
+      religionId: "religionOther",
+      gothram: "gothramOther",
+    };
+    if (otherFieldMap[name] && processedValue !== "other") {
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors[otherFieldMap[name]];
+        return newErrors;
+      });
+    }
   };
 
   const validateCurrentSection = () => {
@@ -2276,16 +2687,68 @@ const OnBoarding = () => {
     }
   };
 
-  const handleSave = async () => {
-    // Check all mandatory fields before saving
+  const applyValidationErrors = (allErrors) => {
+    setErrors(allErrors);
+    const targetSection = getSectionForErrors(allErrors);
+    if (targetSection && targetSection !== activeSection) {
+      setActiveSection(targetSection);
+    } else {
+      focusFirstErrorField(allErrors, fieldRefs);
+    }
+    setApiError("");
+  };
 
-    if (!areAllMandatoryFieldsFilled(formData)) {
-      setApiError("Please fill in all mandatory fields before saving.");
+  useEffect(() => {
+    const errorKeys = Object.keys(errors);
+    if (errorKeys.length === 0) return;
+    const targetSection = getSectionForErrors(errors);
+    if (targetSection && targetSection !== activeSection) return;
+    const timer = setTimeout(() => {
+      focusFirstErrorField(errors, fieldRefs);
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [errors, activeSection, fieldRefs]);
 
-      return;
+  const validateProfileFileSelection = () => {
+    if (!(formData.profile instanceof File)) return true;
+    const validation = validateProfileFile(formData.profile);
+    if (validation.isValid) return true;
+    setErrors((prev) => ({
+      ...prev,
+      profile: validation.message,
+    }));
+    setApiError("");
+    setActiveSection("basic");
+    return false;
+  };
+
+  const validateBeforeSave = () => {
+    const allErrors = getAllSectionErrors(formData);
+    if (Object.keys(allErrors).length > 0) {
+      applyValidationErrors(allErrors);
+      return false;
     }
 
-    if (!validateCurrentSection()) return;
+    return validateProfileFileSelection();
+  };
+
+  const applyApiErrorToField = (error) => {
+    const fieldError = getFieldErrorFromApiMessage(error?.message);
+    if (fieldError) {
+      setErrors((prev) => ({
+        ...prev,
+        [fieldError.field]: error.message,
+      }));
+      setActiveSection(fieldError.section);
+      setApiError("");
+      return true;
+    }
+    return false;
+  };
+
+  const handleSave = async () => {
+    // Check all mandatory fields before saving
+    if (!validateBeforeSave()) return;
 
     setIsSaving(true);
 
@@ -2316,9 +2779,21 @@ const OnBoarding = () => {
       );
 
       if (!response.ok) {
-        const errorData = await response.json();
+        let errorMessage =
+          response.status === 413
+            ? "File too large. Max size is 5MB."
+            : "Failed to update profile";
 
-        throw new Error(errorData.message || "Failed to update profile");
+        try {
+          const errorData = await response.json();
+          if (errorData?.message) {
+            errorMessage = errorData.message;
+          }
+        } catch (error) {
+          console.warn("Failed to parse error response:", error);
+        }
+
+        throw new Error(errorMessage);
       }
 
       setApiSuccess("Profile updated successfully!");
@@ -2354,7 +2829,9 @@ const OnBoarding = () => {
         }
       });
     } catch (error) {
-      setApiError(error.message || "Network error. Please try again.");
+      if (!applyApiErrorToField(error)) {
+        setApiError(error?.message || "Network error. Please try again.");
+      }
     } finally {
       setIsSaving(false);
     }
@@ -2407,6 +2884,7 @@ const OnBoarding = () => {
             handleChange={handleChange}
             setFormData={setFormData}
             setErrors={setErrors}
+            setApiError={setApiError}
             dropdownData={dropdownData}
             calculateAge={calculateAge}
           />

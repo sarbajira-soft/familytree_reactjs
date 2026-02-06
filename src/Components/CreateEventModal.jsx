@@ -19,6 +19,7 @@ const CreateEventModal = ({
   onClose,
   apiBaseUrl = import.meta.env.VITE_API_BASE_URL,
 }) => {
+  const MAX_EVENT_TITLE_LENGTH = 50;
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
@@ -152,6 +153,7 @@ const CreateEventModal = ({
         .filter(Boolean)
         .map((m) => {
           if (m === "eventTitle should not be empty") return "Event title is required.";
+          if (m === "Event title must be at most 50 characters") return "Event title must be 50 characters or less.";
           if (m === "eventDate should not be empty") return "Event date is required.";
           if (m === "eventDate must be a valid ISO 8601 date string") return "Event date is invalid. Please choose a valid date.";
           return m;
@@ -229,6 +231,17 @@ const CreateEventModal = ({
       return;
     }
 
+    const normalizedTitle = String(title || "").trim();
+    if (normalizedTitle.length > MAX_EVENT_TITLE_LENGTH) {
+      Swal.fire({
+        icon: "warning",
+        title: "Title too long",
+        text: `Event title must be ${MAX_EVENT_TITLE_LENGTH} characters or less.`,
+      });
+      setIsLoading(false);
+      return;
+    }
+
     if (!date || !String(date).trim()) {
       Swal.fire({
         icon: "warning",
@@ -284,7 +297,7 @@ const CreateEventModal = ({
 
       const formData = new FormData();
       formData.append("userId", userInfo?.userId);
-      formData.append("eventTitle", title);
+      formData.append("eventTitle", normalizedTitle);
       if (description && String(description).trim()) {
         formData.append("eventDescription", String(description).trim());
       }
@@ -416,9 +429,16 @@ const CreateEventModal = ({
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 required
+                maxLength={MAX_EVENT_TITLE_LENGTH}
                 className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white text-sm"
                 placeholder="Enter event title..."
               />
+              <div className="text-[11px] text-gray-500 flex items-center justify-between">
+                <span>Max {MAX_EVENT_TITLE_LENGTH} characters.</span>
+                <span className={title.length > MAX_EVENT_TITLE_LENGTH ? "text-red-600" : ""}>
+                  {title.length}/{MAX_EVENT_TITLE_LENGTH}
+                </span>
+              </div>
             </div>
 
             {/* Date and Time */}

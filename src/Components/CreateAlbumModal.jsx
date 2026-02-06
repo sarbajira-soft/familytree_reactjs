@@ -30,6 +30,8 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
 
     const coverPhotoInputRef = useRef(null);
     const galleryPhotoInputRef = useRef(null);
+    const getResolvedFamilyCode = () =>
+        String(familyCode || currentUser?.familyCode || userInfo?.familyCode || '').trim();
 
     // Effect to initialize form fields when modal opens or mode/albumData changes
     useEffect(() => {
@@ -61,6 +63,13 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
             }
         }
     }, [isOpen, mode, albumData, currentUser, userInfo]);
+
+    useEffect(() => {
+        if (privacy === 'family' && !familyCode.trim()) {
+            const resolved = getResolvedFamilyCode();
+            if (resolved) setFamilyCode(resolved);
+        }
+    }, [privacy, familyCode, currentUser?.familyCode, userInfo?.familyCode]);
 
     const resetForm = () => {
         setTitle('');
@@ -131,7 +140,18 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
             return;
         }
 
-        if (!title.trim()) {
+        if (!authToken) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Not authenticated',
+                text: 'Please sign in again and try updating the album.',
+                confirmButtonColor: '#d33',
+            });
+            return;
+        }
+
+        const trimmedTitle = title.trim();
+        if (!trimmedTitle) {
             Swal.fire({
                 icon: 'warning',
                 title: 'Missing Title',
@@ -141,7 +161,8 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
             return;
         }
 
-        if (privacy === 'family' && !familyCode.trim()) {
+        const resolvedFamilyCode = getResolvedFamilyCode();
+        if (privacy === 'family' && !resolvedFamilyCode) {
             Swal.fire({
                 icon: 'warning',
                 title: 'Missing Family Code',
@@ -150,19 +171,22 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
             });
             return;
         }
+        if (privacy === 'family' && resolvedFamilyCode !== familyCode) {
+            setFamilyCode(resolvedFamilyCode);
+        }
 
         // Set submitting state to prevent duplicates
         setIsSubmitting(true);
 
         const formData = new FormData();
-        formData.append('galleryTitle', title);
+        formData.append('galleryTitle', trimmedTitle);
         formData.append('galleryDescription', description || '');
         formData.append('privacy', privacy === 'family' ? 'private' : privacy);
         formData.append('status', 1);
         formData.append('createdBy', currentUser?.userId || '');
         
         if (privacy === 'family') {
-            formData.append('familyCode', familyCode);
+            formData.append('familyCode', resolvedFamilyCode);
         }
 
         if (coverPhotoFile) {
@@ -199,11 +223,23 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
                 body: formData,
             });
 
-            const result = await response.json();
+            const rawText = await response.text();
+            let result = null;
+            if (rawText) {
+                try {
+                    result = JSON.parse(rawText);
+                } catch (err) {
+                    result = null;
+                }
+            }
 
             if (!response.ok) {
-                const errorMessage = result?.message || `Failed to ${mode} album`;
+                const errorMessage = result?.message || rawText || `Failed to ${mode} album`;
                 throw new Error(errorMessage);
+            }
+
+            if (!result) {
+                result = {};
             }
 
             console.log(`Album ${mode === 'create' ? 'Created' : 'Updated'}:`, result);
@@ -308,7 +344,14 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
                                             name="privacy"
                                             value="family"
                                             checked={privacy === 'family'}
-                                            onChange={(e) => setPrivacy(e.target.value)}
+                                            onChange={(e) => {
+                                                const nextValue = e.target.value;
+                                                setPrivacy(nextValue);
+                                                if (nextValue === 'family' && !familyCode.trim()) {
+                                                    const resolved = getResolvedFamilyCode();
+                                                    if (resolved) setFamilyCode(resolved);
+                                                }
+                                            }}
                                             disabled={isSubmitting}
                                         />
                                         <span className={`ml-2 text-gray-700 ${isSubmitting ? 'opacity-50' : ''}`}>Family</span>
