@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { FaTimes, FaUpload, FaImage, FaTrashAlt, FaPlus } from 'react-icons/fa';
 import Swal from 'sweetalert2';
+import { throwIfNotOk } from '../utils/apiMessages';
 import { useUser } from '../Contexts/UserContext';
 
 const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authToken, mode = 'create', albumData = null }) => {
@@ -183,7 +184,8 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
         formData.append('galleryDescription', description || '');
         formData.append('privacy', privacy === 'family' ? 'private' : privacy);
         formData.append('status', 1);
-        formData.append('createdBy', currentUser?.userId || '');
+        // Backend derives createdBy from the auth token; keep this only as a best-effort fallback.
+        formData.append('createdBy', currentUser?.userId || userInfo?.userId || '');
         
         if (privacy === 'family') {
             formData.append('familyCode', resolvedFamilyCode);
@@ -223,24 +225,11 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
                 body: formData,
             });
 
-            const rawText = await response.text();
-            let result = null;
-            if (rawText) {
-                try {
-                    result = JSON.parse(rawText);
-                } catch (err) {
-                    result = null;
-                }
-            }
+            await throwIfNotOk(response, {
+                fallback: `Unable to ${mode === 'create' ? 'create' : 'update'} the album. Please try again.`,
+            });
 
-            if (!response.ok) {
-                const errorMessage = result?.message || rawText || `Failed to ${mode} album`;
-                throw new Error(errorMessage);
-            }
-
-            if (!result) {
-                result = {};
-            }
+            const result = await response.json().catch(() => ({}));
 
             console.log(`Album ${mode === 'create' ? 'Created' : 'Updated'}:`, result);
 
@@ -250,8 +239,10 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
 
             Swal.fire({
                 icon: 'success',
-                title: 'Success!',
-                text: `Album ${mode === 'create' ? 'created' : 'updated'} successfully.`,
+                title: mode === 'create' ? 'Album created' : 'Album updated',
+                text: mode === 'create'
+                    ? 'Your album is now visible based on the privacy you selected.'
+                    : 'Your changes have been saved.',
                 confirmButtonColor: '#3f982c',
             });
 
@@ -260,8 +251,8 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
 
             Swal.fire({
                 icon: 'error',
-                title: 'Oops...',
-                text: err.message || 'Something went wrong.',
+                title: 'Can’t save album',
+                text: err?.message || 'Something went wrong. Please try again.',
                 confirmButtonColor: '#d33',
             });
         } finally {

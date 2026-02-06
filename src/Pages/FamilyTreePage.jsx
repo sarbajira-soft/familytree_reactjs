@@ -102,6 +102,12 @@ const normalizeExternalLinked = (value) =>
 const FamilyTreePage = () => {
   const [tree, setTree] = useState(null);
 
+  // Bug 58: don't show "Family tree is not created yet" after a blocked user closes the popup.
+  const [blockedAccess, setBlockedAccess] = useState({
+    active: false,
+    message: "",
+  });
+
   const [stats, setStats] = useState({
     total: 1,
 
@@ -440,7 +446,11 @@ const FamilyTreePage = () => {
   const showFullScreenLoading = showAccessLoading || (!tree && treeLoading);
 
   const showWaitForAdmin =
-    !showAccessLoading && !accessView && !canEdit && (!tree || tree.people.size === 0);
+    !showAccessLoading &&
+    !blockedAccess.active &&
+    !accessView &&
+    !canEdit &&
+    (!tree || tree.people.size === 0);
 
   // Search handlers - memoized to prevent infinite re-renders
 
@@ -620,6 +630,7 @@ const FamilyTreePage = () => {
       }
 
       setTreeLoading(true);
+      setBlockedAccess({ active: false, message: "" });
 
       let data = null;
 
@@ -657,14 +668,24 @@ const FamilyTreePage = () => {
             // ignore JSON parse errors
           }
 
-          await Swal.fire({
+          const result = await Swal.fire({
             icon: "error",
-
             title: "Access Restricted",
-
             text: message,
+            showCloseButton: true,
+            showCancelButton: true,
+            confirmButtonText: "Go to My Family",
+            cancelButtonText: "Close",
+            allowOutsideClick: true,
+            allowEscapeKey: true,
           });
 
+          if (result.isConfirmed) {
+            navigate("/my-family");
+          }
+
+          setTree(null);
+          setBlockedAccess({ active: true, message });
           setTreeLoading(false);
 
           return;
@@ -2313,6 +2334,26 @@ const FamilyTreePage = () => {
               <p className="text-gray-600 dark:text-slate-300">
                 Loading family tree...
               </p>
+            </div>
+          </div>
+        ) : blockedAccess.active ? (
+          <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-slate-950 px-4">
+            <div className="text-center max-w-xl bg-white dark:bg-slate-900 rounded-xl shadow p-6 border border-gray-200 dark:border-slate-800">
+              <div className="text-lg font-semibold text-gray-900 dark:text-slate-100 mb-2">
+                Access Restricted
+              </div>
+
+              <div className="text-gray-600 dark:text-slate-300">
+                {blockedAccess.message || "You have been blocked from this family."}
+              </div>
+
+              <button
+                type="button"
+                className="mt-5 bg-blue-600 text-white px-4 py-2 rounded-lg"
+                onClick={() => navigate("/my-family")}
+              >
+                Go to My Family
+              </button>
             </div>
           </div>
         ) : accessView ? (

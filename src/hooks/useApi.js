@@ -1,13 +1,17 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getToken } from '../utils/auth';
+import { throwIfNotOk } from '../utils/apiMessages';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 // Generic fetch function with auth
 const fetchWithAuth = async (endpoint, options = {}) => {
   const token = getToken();
+  const isFormData =
+    typeof FormData !== 'undefined' && options?.body instanceof FormData;
+
   const headers = {
-    'Content-Type': 'application/json',
+    ...(!isFormData && { 'Content-Type': 'application/json' }),
     ...(token && { Authorization: `Bearer ${token}` }),
     ...options.headers,
   };
@@ -17,11 +21,15 @@ const fetchWithAuth = async (endpoint, options = {}) => {
     headers,
   });
 
-  if (!response.ok) {
-    throw new Error(`API Error: ${response.status} ${response.statusText}`);
-  }
+  await throwIfNotOk(response, {
+    fallback: 'We couldn’t complete your request right now. Please try again.',
+  });
 
-  return response.json();
+  try {
+    return await response.json();
+  } catch (_) {
+    return null;
+  }
 };
 
 // Hook for dashboard summary data

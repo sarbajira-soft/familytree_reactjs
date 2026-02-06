@@ -322,7 +322,8 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
       const [postsRes, statsRes, eventsRes, galleryRes, productsRes] =
         await Promise.all([
           fetch(
-            `${apiBaseUrl}/post/by-options?privacy=private&familyCode=${userInfo.familyCode}`,
+            // Bug 51: show family feed across linked families (spouse-connected families may have different codes)
+            `${apiBaseUrl}/post/by-options?privacy=private`,
             { headers }
           ),
           fetch(`${apiBaseUrl}/family/member/${userInfo.familyCode}/stats`, {

@@ -71,9 +71,16 @@ const FamilyTreeHierarchical = () => {
                 text: userInfo.approveStatus !== 'approved'
                     ? 'Your family membership is pending approval.'
                     : 'You need to create or join a family first.',
+                showCloseButton: true,
+                showCancelButton: true,
                 confirmButtonText: 'Go to My Family',
-            }).then(() => {
-                navigate('/my-family');
+                cancelButtonText: 'Close',
+                allowOutsideClick: true,
+                allowEscapeKey: true,
+            }).then((res) => {
+                if (res.isConfirmed) {
+                    navigate('/my-family');
+                }
             });
             return;
         }

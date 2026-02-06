@@ -13,6 +13,7 @@ import {
 import { jwtDecode } from "jwt-decode";
 import Swal from "sweetalert2";
 import { useUser } from "../Contexts/UserContext";
+import { throwIfNotOk } from "../utils/apiMessages";
 
 const CreateEventModal = ({
   isOpen,
@@ -102,16 +103,9 @@ const CreateEventModal = ({
           headers: { Authorization: `Bearer ${token}` },
         });
 
-        if (!res.ok) {
-          const errorText = await res.text();
-          console.error("❌ User API failed:", errorText);
-          Swal.fire({
-            icon: "error",
-            title: "API Error",
-            text: `${res.status} - ${errorText}`,
-          });
-          return;
-        }
+        await throwIfNotOk(res, {
+          fallback: "Unable to load your profile. Please sign in again.",
+        });
 
         const userData = await res.json();
 
@@ -328,7 +322,7 @@ const CreateEventModal = ({
         const errText = await response.text().catch(() => "");
         Swal.fire({
           icon: "error",
-          title: "Create Event Failed",
+          title: "Can’t create event",
           text: getFriendlyError(response.status, errText),
         });
         setIsLoading(false);

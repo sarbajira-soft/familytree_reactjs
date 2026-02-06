@@ -13,6 +13,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import EmojiPicker from "emoji-picker-react";
 import CommentItem from "./CommentItem";
 import { buildCommentTree, countComments } from "../utils/commentUtils";
+import Swal from "sweetalert2";
+import { throwIfNotOk } from "../utils/apiMessages";
 
 const GalleryViewerModal = ({
   isOpen,
@@ -161,6 +163,7 @@ const GalleryViewerModal = ({
         `${import.meta.env.VITE_API_BASE_URL}/gallery/${album.id}/comments`,
         { headers: { Authorization: `Bearer ${authToken}` } }
       );
+      await throwIfNotOk(res, { fallback: "Unable to load comments." });
       const data = await res.json();
       setComments(data.comments || []);
       setTimeout(() => {
@@ -170,6 +173,11 @@ const GalleryViewerModal = ({
       }, 100);
     } catch (err) {
       console.error("Fetching comments failed", err);
+      Swal.fire({
+        icon: "error",
+        title: "Can’t load comments",
+        text: err?.message || "Unable to load comments right now.",
+      });
     }
   }
 
@@ -178,7 +186,7 @@ const GalleryViewerModal = ({
     if (!newComment.trim()) return;
     setCommentLoading(true);
     try {
-      await fetch(`${import.meta.env.VITE_API_BASE_URL}/gallery/comment`, {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/gallery/comment`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${authToken}`,
@@ -189,17 +197,23 @@ const GalleryViewerModal = ({
           comments: newComment.trim(),
         }),
       });
+      await throwIfNotOk(res, { fallback: "Unable to post your comment." });
       setNewComment("");
       setShowEmojiPicker(false);
       await fetchComments();
     } catch (err) {
       console.error("Post failed", err);
+      Swal.fire({
+        icon: "error",
+        title: "Can’t post comment",
+        text: err?.message || "Unable to post your comment right now.",
+      });
     }
     setCommentLoading(false);
   };
 
   const handleEditComment = async (commentId, newText) => {
-    await fetch(
+    const res = await fetch(
       `${import.meta.env.VITE_API_BASE_URL}/gallery/comment/${commentId}`,
       {
         method: "PUT",
@@ -210,17 +224,19 @@ const GalleryViewerModal = ({
         body: JSON.stringify({ comment: newText }),
       }
     );
+    await throwIfNotOk(res, { fallback: "Unable to update your comment." });
     fetchComments();
   };
   const handleDeleteComment = async (commentId) => {
-    await fetch(
+    const res = await fetch(
       `${import.meta.env.VITE_API_BASE_URL}/gallery/comment/${commentId}`,
       { method: "DELETE", headers: { Authorization: `Bearer ${authToken}` } }
     );
+    await throwIfNotOk(res, { fallback: "Unable to delete your comment." });
     fetchComments();
   };
   const handleReplyComment = async (parentCommentId, replyText) => {
-    await fetch(`${import.meta.env.VITE_API_BASE_URL}/gallery/comment/reply`, {
+    const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/gallery/comment/reply`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${authToken}`,
@@ -232,6 +248,7 @@ const GalleryViewerModal = ({
         comment: replyText,
       }),
     });
+    await throwIfNotOk(res, { fallback: "Unable to post your reply." });
     fetchComments();
   };
 

@@ -47,7 +47,17 @@ const MergeFamilyPreviewTreePage = () => {
           userInfo.approveStatus !== 'approved'
             ? 'Your family membership is pending approval. Please wait for admin approval.'
             : 'You need to create or join a family first.',
-      }).then(() => navigate('/my-family'));
+        showCloseButton: true,
+        showCancelButton: true,
+        confirmButtonText: 'Go to My Family',
+        cancelButtonText: 'Close',
+        allowOutsideClick: true,
+        allowEscapeKey: true,
+      }).then((res) => {
+        if (res.isConfirmed) {
+          navigate('/my-family');
+        }
+      });
     }
   }, [userInfo, userLoading, navigate]);
 
