@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import {
   FiAlertCircle,
@@ -27,6 +27,50 @@ const emptyAddress = {
   postal_code: '',
   country_code: 'in',
   phone: '',
+};
+
+const normalizeCountryCode = (value) => (value || '').toString().trim().toLowerCase();
+
+const digitsOnly = (value) => (value || '').toString().replace(/\D+/g, '');
+
+const validateAddressFields = (addr) => {
+  const errors = {};
+
+  const firstName = (addr?.first_name || '').toString().trim();
+  const lastName = (addr?.last_name || '').toString().trim();
+  const address1 = (addr?.address_1 || '').toString().trim();
+  const city = (addr?.city || '').toString().trim();
+  const province = (addr?.province || '').toString().trim();
+  const postal = (addr?.postal_code || '').toString().trim();
+  const country = normalizeCountryCode(addr?.country_code);
+  const phone = (addr?.phone || '').toString().trim();
+
+  const nameRegex = /^[a-zA-Z\s.'-]{2,}$/;
+
+  if (!firstName) errors.first_name = 'First name is required';
+  else if (!nameRegex.test(firstName)) errors.first_name = 'Enter a valid first name';
+
+  if (!lastName) errors.last_name = 'Last name is required';
+  else if (!nameRegex.test(lastName)) errors.last_name = 'Enter a valid last name';
+
+  if (!address1) errors.address_1 = 'Address is required';
+  if (!city) errors.city = 'City is required';
+  if (!province) errors.province = 'State / Province is required';
+
+  if (!postal) errors.postal_code = 'Postal code is required';
+  else if (country === 'in') {
+    if (!/^\d{6}$/.test(postal)) errors.postal_code = 'Enter a valid 6-digit pincode';
+  } else if (!/^[a-zA-Z0-9\-\s]{3,10}$/.test(postal)) {
+    errors.postal_code = 'Enter a valid postal code';
+  }
+
+  if (!country) errors.country_code = 'Country code is required';
+  else if (!/^[a-z]{2}$/.test(country)) errors.country_code = 'Use 2-letter country code (e.g., IN)';
+
+  if (!phone) errors.phone = 'Phone is required';
+  else if (!/^\d{6,14}$/.test(phone)) errors.phone = 'Enter a valid phone number';
+
+  return errors;
 };
 
 async function checkShiprocketServiceability(postalCode, token) {
@@ -82,9 +126,15 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
   const [completedOrder, setCompletedOrder] = useState(null);
   const [showGiftAddressConfirm, setShowGiftAddressConfirm] = useState(false);
   const [giftAddressSuggestion, setGiftAddressSuggestion] = useState(null);
+  const [shippingErrors, setShippingErrors] = useState({});
+  const [billingErrors, setBillingErrors] = useState({});
+  const [shippingTouched, setShippingTouched] = useState({});
+  const [billingTouched, setBillingTouched] = useState({});
 
   const displayTotals = completedOrder ? calculateCartTotals(completedOrder) : totals;
   const [giftAddressLoading, setGiftAddressLoading] = useState(false);
+
+  const lastShippingPostalRef = useRef('');
 
   const savedAddresses = Array.isArray(user?.addresses) ? user.addresses : [];
 
@@ -212,6 +262,34 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
   }, [selectedGiftEvent]);
 
   useEffect(() => {
+    const currentPostal = (shippingAddress?.postal_code || '').toString().trim();
+
+    if (!addressesUpdated) {
+      lastShippingPostalRef.current = currentPostal;
+      return;
+    }
+
+    const prevPostal = (lastShippingPostalRef.current || '').toString().trim();
+
+    if (prevPostal && currentPostal && prevPostal !== currentPostal) {
+      setAddressesUpdated(false);
+      setPaymentMethod('');
+      setShippingOptions([]);
+      setSelectedShippingId('');
+      setError(null);
+      setSuccess(null);
+
+      if (cart && cart.id) {
+        Promise.resolve(cartService.clearShippingMethods(cart.id, token || null)).catch(
+          () => {}
+        );
+      }
+    }
+
+    lastShippingPostalRef.current = currentPostal;
+  }, [addressesUpdated, shippingAddress?.postal_code, cart && cart.id, token]);
+
+  useEffect(() => {
     // No automatic shipping option fetch on mount; we now fetch after
     // setting both shipping and billing addresses on the cart.
   }, [cart && cart.id]);
@@ -266,6 +344,35 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
     setter((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handleAddressInputChange = (setter, setErrors, setTouched) => (e) => {
+    const { name, value } = e.target;
+    const nextValue =
+      name === 'country_code'
+        ? normalizeCountryCode(value)
+        : name === 'postal_code' || name === 'phone'
+        ? digitsOnly(value)
+        : value;
+
+    setter((prev) => {
+      const next = { ...prev, [name]: nextValue };
+      setErrors((curr) => {
+        const nextErrors = { ...curr };
+        delete nextErrors[name];
+        return nextErrors;
+      });
+      return next;
+    });
+
+    setTouched((prev) => ({ ...prev, [name]: true }));
+  };
+
+  const handleAddressInputBlur = (addr, setErrors, setTouched) => (e) => {
+    const { name } = e.target;
+    setTouched((prev) => ({ ...prev, [name]: true }));
+    const nextErrors = validateAddressFields(addr);
+    setErrors(nextErrors);
+  };
+
   const handleClearShipping = () => {
     setShippingAddress(emptyAddress);
     if (sameAsShipping) {
@@ -304,16 +411,8 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
   };
 
   const validateAddress = (addr) => {
-    return (
-      addr.first_name.trim() &&
-      addr.last_name.trim() &&
-      addr.address_1.trim() &&
-      addr.city.trim() &&
-      addr.province.trim() &&
-      addr.postal_code.trim() &&
-      addr.country_code.trim() &&
-      addr.phone.trim()
-    );
+    const errs = validateAddressFields(addr);
+    return Object.keys(errs).length === 0;
   };
 
   const handleSubmit = async (e) => {
@@ -323,12 +422,40 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
 
     const billing = sameAsShipping ? shippingAddress : billingAddress;
 
-    if (!validateAddress(shippingAddress)) {
+    const nextShippingErrors = validateAddressFields(shippingAddress);
+    const nextBillingErrors = sameAsShipping ? {} : validateAddressFields(billingAddress);
+
+    setShippingErrors(nextShippingErrors);
+    setBillingErrors(nextBillingErrors);
+    setShippingTouched({
+      first_name: true,
+      last_name: true,
+      address_1: true,
+      city: true,
+      province: true,
+      postal_code: true,
+      country_code: true,
+      phone: true,
+    });
+    if (!sameAsShipping) {
+      setBillingTouched({
+        first_name: true,
+        last_name: true,
+        address_1: true,
+        city: true,
+        province: true,
+        postal_code: true,
+        country_code: true,
+        phone: true,
+      });
+    }
+
+    if (Object.keys(nextShippingErrors).length > 0) {
       setError('Please complete all required shipping address fields.');
       return;
     }
 
-    if (!sameAsShipping && !validateAddress(billingAddress)) {
+    if (!sameAsShipping && Object.keys(nextBillingErrors).length > 0) {
       setError('Please complete all required billing address fields.');
       return;
     }
@@ -821,88 +948,158 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
               <input
                 name="first_name"
                 value={shippingAddress.first_name}
-                onChange={handleChange(setShippingAddress)}
+                onChange={handleAddressInputChange(setShippingAddress, setShippingErrors, setShippingTouched)}
+                onBlur={handleAddressInputBlur(shippingAddress, setShippingErrors, setShippingTouched)}
                 disabled={disabled}
                 required
-                className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${
+                  shippingTouched.first_name && shippingErrors.first_name
+                    ? 'border-red-300 focus:border-red-400 focus:ring-red-300'
+                    : 'border-gray-300 focus:border-blue-400 focus:ring-blue-400'
+                }`}
               />
+              {shippingTouched.first_name && shippingErrors.first_name && (
+                <p className="mt-1 text-[11px] text-red-600">{shippingErrors.first_name}</p>
+              )}
             </div>
             <div>
               <label className="block text-[11px] font-medium text-gray-700">Last name</label>
               <input
                 name="last_name"
                 value={shippingAddress.last_name}
-                onChange={handleChange(setShippingAddress)}
+                onChange={handleAddressInputChange(setShippingAddress, setShippingErrors, setShippingTouched)}
+                onBlur={handleAddressInputBlur(shippingAddress, setShippingErrors, setShippingTouched)}
                 disabled={disabled}
                 required
-                className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${
+                  shippingTouched.last_name && shippingErrors.last_name
+                    ? 'border-red-300 focus:border-red-400 focus:ring-red-300'
+                    : 'border-gray-300 focus:border-blue-400 focus:ring-blue-400'
+                }`}
               />
+              {shippingTouched.last_name && shippingErrors.last_name && (
+                <p className="mt-1 text-[11px] text-red-600">{shippingErrors.last_name}</p>
+              )}
             </div>
             <div className="sm:col-span-2">
               <label className="block text-[11px] font-medium text-gray-700">Address</label>
               <input
                 name="address_1"
                 value={shippingAddress.address_1}
-                onChange={handleChange(setShippingAddress)}
+                onChange={handleAddressInputChange(setShippingAddress, setShippingErrors, setShippingTouched)}
+                onBlur={handleAddressInputBlur(shippingAddress, setShippingErrors, setShippingTouched)}
                 disabled={disabled}
                 required
-                className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${
+                  shippingTouched.address_1 && shippingErrors.address_1
+                    ? 'border-red-300 focus:border-red-400 focus:ring-red-300'
+                    : 'border-gray-300 focus:border-blue-400 focus:ring-blue-400'
+                }`}
               />
+              {shippingTouched.address_1 && shippingErrors.address_1 && (
+                <p className="mt-1 text-[11px] text-red-600">{shippingErrors.address_1}</p>
+              )}
             </div>
             <div>
               <label className="block text-[11px] font-medium text-gray-700">City</label>
               <input
                 name="city"
                 value={shippingAddress.city}
-                onChange={handleChange(setShippingAddress)}
+                onChange={handleAddressInputChange(setShippingAddress, setShippingErrors, setShippingTouched)}
+                onBlur={handleAddressInputBlur(shippingAddress, setShippingErrors, setShippingTouched)}
                 disabled={disabled}
                 required
-                className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${
+                  shippingTouched.city && shippingErrors.city
+                    ? 'border-red-300 focus:border-red-400 focus:ring-red-300'
+                    : 'border-gray-300 focus:border-blue-400 focus:ring-blue-400'
+                }`}
               />
+              {shippingTouched.city && shippingErrors.city && (
+                <p className="mt-1 text-[11px] text-red-600">{shippingErrors.city}</p>
+              )}
             </div>
             <div>
               <label className="block text-[11px] font-medium text-gray-700">State / Province</label>
               <input
                 name="province"
                 value={shippingAddress.province}
-                onChange={handleChange(setShippingAddress)}
+                onChange={handleAddressInputChange(setShippingAddress, setShippingErrors, setShippingTouched)}
+                onBlur={handleAddressInputBlur(shippingAddress, setShippingErrors, setShippingTouched)}
                 disabled={disabled}
                 required
-                className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${
+                  shippingTouched.province && shippingErrors.province
+                    ? 'border-red-300 focus:border-red-400 focus:ring-red-300'
+                    : 'border-gray-300 focus:border-blue-400 focus:ring-blue-400'
+                }`}
               />
+              {shippingTouched.province && shippingErrors.province && (
+                <p className="mt-1 text-[11px] text-red-600">{shippingErrors.province}</p>
+              )}
             </div>
             <div>
               <label className="block text-[11px] font-medium text-gray-700">Postal code</label>
               <input
                 name="postal_code"
                 value={shippingAddress.postal_code}
-                onChange={handleChange(setShippingAddress)}
+                onChange={handleAddressInputChange(setShippingAddress, setShippingErrors, setShippingTouched)}
+                onBlur={handleAddressInputBlur(shippingAddress, setShippingErrors, setShippingTouched)}
                 disabled={disabled}
                 required
-                className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={10}
+                className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${
+                  shippingTouched.postal_code && shippingErrors.postal_code
+                    ? 'border-red-300 focus:border-red-400 focus:ring-red-300'
+                    : 'border-gray-300 focus:border-blue-400 focus:ring-blue-400'
+                }`}
               />
+              {shippingTouched.postal_code && shippingErrors.postal_code && (
+                <p className="mt-1 text-[11px] text-red-600">{shippingErrors.postal_code}</p>
+              )}
             </div>
             <div>
               <label className="block text-[11px] font-medium text-gray-700">Country code</label>
               <input
                 name="country_code"
                 value={shippingAddress.country_code}
-                onChange={handleChange(setShippingAddress)}
+                onChange={handleAddressInputChange(setShippingAddress, setShippingErrors, setShippingTouched)}
+                onBlur={handleAddressInputBlur(shippingAddress, setShippingErrors, setShippingTouched)}
                 disabled={disabled}
                 required
-                className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-xs uppercase focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs uppercase focus:outline-none focus:ring-1 ${
+                  shippingTouched.country_code && shippingErrors.country_code
+                    ? 'border-red-300 focus:border-red-400 focus:ring-red-300'
+                    : 'border-gray-300 focus:border-blue-400 focus:ring-blue-400'
+                }`}
               />
+              {shippingTouched.country_code && shippingErrors.country_code && (
+                <p className="mt-1 text-[11px] text-red-600">{shippingErrors.country_code}</p>
+              )}
             </div>
             <div className="sm:col-span-2">
               <label className="block text-[11px] font-medium text-gray-700">Phone</label>
               <input
                 name="phone"
                 value={shippingAddress.phone}
-                onChange={handleChange(setShippingAddress)}
+                onChange={handleAddressInputChange(setShippingAddress, setShippingErrors, setShippingTouched)}
+                onBlur={handleAddressInputBlur(shippingAddress, setShippingErrors, setShippingTouched)}
                 disabled={disabled}
                 required
-                className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={14}
+                className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${
+                  shippingTouched.phone && shippingErrors.phone
+                    ? 'border-red-300 focus:border-red-400 focus:ring-red-300'
+                    : 'border-gray-300 focus:border-blue-400 focus:ring-blue-400'
+                }`}
               />
+              {shippingTouched.phone && shippingErrors.phone && (
+                <p className="mt-1 text-[11px] text-red-600">{shippingErrors.phone}</p>
+              )}
             </div>
           </div>
 
@@ -958,88 +1155,158 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
                   <input
                     name="first_name"
                     value={billingAddress.first_name}
-                    onChange={handleChange(setBillingAddress)}
+                    onChange={handleAddressInputChange(setBillingAddress, setBillingErrors, setBillingTouched)}
+                    onBlur={handleAddressInputBlur(billingAddress, setBillingErrors, setBillingTouched)}
                     disabled={disabled}
                     required
-                    className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                    className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${
+                      billingTouched.first_name && billingErrors.first_name
+                        ? 'border-red-300 focus:border-red-400 focus:ring-red-300'
+                        : 'border-gray-300 focus:border-blue-400 focus:ring-blue-400'
+                    }`}
                   />
+                  {billingTouched.first_name && billingErrors.first_name && (
+                    <p className="mt-1 text-[11px] text-red-600">{billingErrors.first_name}</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-[11px] font-medium text-gray-700">Last name</label>
                   <input
                     name="last_name"
                     value={billingAddress.last_name}
-                    onChange={handleChange(setBillingAddress)}
+                    onChange={handleAddressInputChange(setBillingAddress, setBillingErrors, setBillingTouched)}
+                    onBlur={handleAddressInputBlur(billingAddress, setBillingErrors, setBillingTouched)}
                     disabled={disabled}
                     required
-                    className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                    className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${
+                      billingTouched.last_name && billingErrors.last_name
+                        ? 'border-red-300 focus:border-red-400 focus:ring-red-300'
+                        : 'border-gray-300 focus:border-blue-400 focus:ring-blue-400'
+                    }`}
                   />
+                  {billingTouched.last_name && billingErrors.last_name && (
+                    <p className="mt-1 text-[11px] text-red-600">{billingErrors.last_name}</p>
+                  )}
                 </div>
                 <div className="sm:col-span-2">
                   <label className="block text-[11px] font-medium text-gray-700">Address</label>
                   <input
                     name="address_1"
                     value={billingAddress.address_1}
-                    onChange={handleChange(setBillingAddress)}
+                    onChange={handleAddressInputChange(setBillingAddress, setBillingErrors, setBillingTouched)}
+                    onBlur={handleAddressInputBlur(billingAddress, setBillingErrors, setBillingTouched)}
                     disabled={disabled}
                     required
-                    className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                    className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${
+                      billingTouched.address_1 && billingErrors.address_1
+                        ? 'border-red-300 focus:border-red-400 focus:ring-red-300'
+                        : 'border-gray-300 focus:border-blue-400 focus:ring-blue-400'
+                    }`}
                   />
+                  {billingTouched.address_1 && billingErrors.address_1 && (
+                    <p className="mt-1 text-[11px] text-red-600">{billingErrors.address_1}</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-[11px] font-medium text-gray-700">City</label>
                   <input
                     name="city"
                     value={billingAddress.city}
-                    onChange={handleChange(setBillingAddress)}
+                    onChange={handleAddressInputChange(setBillingAddress, setBillingErrors, setBillingTouched)}
+                    onBlur={handleAddressInputBlur(billingAddress, setBillingErrors, setBillingTouched)}
                     disabled={disabled}
                     required
-                    className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                    className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${
+                      billingTouched.city && billingErrors.city
+                        ? 'border-red-300 focus:border-red-400 focus:ring-red-300'
+                        : 'border-gray-300 focus:border-blue-400 focus:ring-blue-400'
+                    }`}
                   />
+                  {billingTouched.city && billingErrors.city && (
+                    <p className="mt-1 text-[11px] text-red-600">{billingErrors.city}</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-[11px] font-medium text-gray-700">State / Province</label>
                   <input
                     name="province"
                     value={billingAddress.province}
-                    onChange={handleChange(setBillingAddress)}
+                    onChange={handleAddressInputChange(setBillingAddress, setBillingErrors, setBillingTouched)}
+                    onBlur={handleAddressInputBlur(billingAddress, setBillingErrors, setBillingTouched)}
                     disabled={disabled}
                     required
-                    className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                    className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${
+                      billingTouched.province && billingErrors.province
+                        ? 'border-red-300 focus:border-red-400 focus:ring-red-300'
+                        : 'border-gray-300 focus:border-blue-400 focus:ring-blue-400'
+                    }`}
                   />
+                  {billingTouched.province && billingErrors.province && (
+                    <p className="mt-1 text-[11px] text-red-600">{billingErrors.province}</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-[11px] font-medium text-gray-700">Postal code</label>
                   <input
                     name="postal_code"
                     value={billingAddress.postal_code}
-                    onChange={handleChange(setBillingAddress)}
+                    onChange={handleAddressInputChange(setBillingAddress, setBillingErrors, setBillingTouched)}
+                    onBlur={handleAddressInputBlur(billingAddress, setBillingErrors, setBillingTouched)}
                     disabled={disabled}
                     required
-                    className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={10}
+                    className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${
+                      billingTouched.postal_code && billingErrors.postal_code
+                        ? 'border-red-300 focus:border-red-400 focus:ring-red-300'
+                        : 'border-gray-300 focus:border-blue-400 focus:ring-blue-400'
+                    }`}
                   />
+                  {billingTouched.postal_code && billingErrors.postal_code && (
+                    <p className="mt-1 text-[11px] text-red-600">{billingErrors.postal_code}</p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-[11px] font-medium text-gray-700">Country code</label>
                   <input
                     name="country_code"
                     value={billingAddress.country_code}
-                    onChange={handleChange(setBillingAddress)}
+                    onChange={handleAddressInputChange(setBillingAddress, setBillingErrors, setBillingTouched)}
+                    onBlur={handleAddressInputBlur(billingAddress, setBillingErrors, setBillingTouched)}
                     disabled={disabled}
                     required
-                    className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-xs uppercase focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                    className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs uppercase focus:outline-none focus:ring-1 ${
+                      billingTouched.country_code && billingErrors.country_code
+                        ? 'border-red-300 focus:border-red-400 focus:ring-red-300'
+                        : 'border-gray-300 focus:border-blue-400 focus:ring-blue-400'
+                    }`}
                   />
+                  {billingTouched.country_code && billingErrors.country_code && (
+                    <p className="mt-1 text-[11px] text-red-600">{billingErrors.country_code}</p>
+                  )}
                 </div>
                 <div className="sm:col-span-2">
                   <label className="block text-[11px] font-medium text-gray-700">Phone</label>
                   <input
                     name="phone"
                     value={billingAddress.phone}
-                    onChange={handleChange(setBillingAddress)}
+                    onChange={handleAddressInputChange(setBillingAddress, setBillingErrors, setBillingTouched)}
+                    onBlur={handleAddressInputBlur(billingAddress, setBillingErrors, setBillingTouched)}
                     disabled={disabled}
                     required
-                    className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={14}
+                    className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${
+                      billingTouched.phone && billingErrors.phone
+                        ? 'border-red-300 focus:border-red-400 focus:ring-red-300'
+                        : 'border-gray-300 focus:border-blue-400 focus:ring-blue-400'
+                    }`}
                   />
+                  {billingTouched.phone && billingErrors.phone && (
+                    <p className="mt-1 text-[11px] text-red-600">{billingErrors.phone}</p>
+                  )}
                 </div>
               </div>
             </div>

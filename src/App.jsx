@@ -14,7 +14,7 @@ import { FamilyTreeProvider } from "./Contexts/FamilyTreeContext";
 import { GiftEventProvider } from "./Contexts/GiftEventContext";
 import { ThemeProvider } from "./Contexts/ThemeContext";
 
-import PrivateRoute, { RoleBasedRoute } from "./Routes/PrivateRoute";
+import PrivateRoute from "./Routes/PrivateRoute";
 import GuestRoute from "./Routes/GuestRoute";
 import Layout from "./Components/Layout";
 
@@ -37,7 +37,7 @@ const FamilyTreeHierarchical = lazy(() =>
 const PendingFamilyRequests = lazy(() =>
   import("./Pages/PendingFamilyRequests")
 );
-// const PostsAndFeedsPage = lazy(() => import("./Pages/PostsAndFeedsPage"));
+
 const FamilyGalleryPage = lazy(() => import("./Pages/FamilyGalleryPage"));
 const GiftListingPage = lazy(() => import("./Pages/GiftListingPage"));
 const EventsPage = lazy(() => import("./Pages/EventsPage"));

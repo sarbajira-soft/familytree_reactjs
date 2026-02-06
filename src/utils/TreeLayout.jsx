@@ -4,10 +4,10 @@ import dagre from 'dagre';
 function getAllDescendants(tree, personId, visited = new Set()) {
     if (visited.has(personId)) return [];
     visited.add(personId);
-    
+
     const person = tree.people.get(personId);
     if (!person) return [];
-    
+
     let descendants = [personId];
     person.children.forEach(childId => {
         descendants = [...descendants, ...getAllDescendants(tree, childId, visited)];
@@ -15,13 +15,10 @@ function getAllDescendants(tree, personId, visited = new Set()) {
     return descendants;
 }
 
-export function autoArrange(tree) {
-    const g = new dagre.graphlib.Graph({ compound: true });
-    
+function getSpacingConfig(memberCount) {
     // Dynamic spacing based on tree size only (use a fixed desktop-style canvas
     // on all devices so that line lengths and spacing are consistent between
     // mobile and desktop; viewport differences are handled via zoom/scroll).
-    const memberCount = tree.people.size;
     let nodesep, ranksep, marginx, marginy, coupleSpacing, nodeWidth, nodeHeight;
 
     // Desktop spacing values (previously used for non-mobile)
@@ -47,7 +44,7 @@ export function autoArrange(tree) {
     marginx = 50;
     marginy = 50;
 
-    return { isMobile, nodesep, ranksep, marginx, marginy, coupleSpacing, nodeWidth, nodeHeight };
+    return { nodesep, ranksep, marginx, marginy, coupleSpacing, nodeWidth, nodeHeight };
 }
 
 function applyGenerationSubgraphs(tree, g, memberCount) {
@@ -75,7 +72,7 @@ function applyGenerationSubgraphs(tree, g, memberCount) {
                     rank: 'same',
                     rankdir: 'LR'
                 });
-                
+
                 personIds.forEach(pid => {
                     if (!g.parent(pid.toString())) {  // Only if not already in a family cluster
                         g.setParent(pid.toString(), subgraphId);
@@ -173,7 +170,7 @@ function updatePeoplePositions(tree, g, dagreLayoutOffsetX, dagreLayoutOffsetY) 
 
 export function autoArrange(tree) {
     const g = new dagre.graphlib.Graph({ compound: true });
-    
+
     const memberCount = tree.people.size;
     const { isMobile, nodesep, ranksep, marginx, marginy, coupleSpacing, nodeWidth, nodeHeight } = getSpacingConfig(memberCount);
 
@@ -206,8 +203,8 @@ export function autoArrange(tree) {
 
     // Add all people as nodes with proper dimensions
     tree.people.forEach(p => {
-        g.setNode(p.id.toString(), { 
-            label: p.name, 
+        g.setNode(p.id.toString(), {
+            label: p.name,
             width: nodeWidth,  // Use actual card width
             height: nodeHeight, // Use actual card height
             // Add generation info for better clustering
@@ -217,7 +214,7 @@ export function autoArrange(tree) {
 
     // First pass: Create family units and parent-child relationships
     const familyGroups = new Map();
-    
+
     // Create family groups (parents + their children)
     tree.people.forEach(person => {
         if (person.children.size > 0) {
@@ -226,32 +223,32 @@ export function autoArrange(tree) {
             person.spouses.forEach(spouseId => {
                 const spouse = tree.people.get(spouseId);
                 if (!spouse) return;
-                const isCoParent = [...person.children].some(childId => 
+                const isCoParent = [...person.children].some(childId =>
                     spouse.children && spouse.children.has(childId));
                 if (isCoParent) parentIds.push(spouseId);
             });
-            
+
             const parentKey = parentIds.sort().join('-');
             if (!familyUnits.has(parentKey)) {
                 const familyId = `family-${parentKey}`;
                 familyUnits.set(parentKey, familyId);
-                g.setNode(familyId, { 
-                    width: familyNodeSize, 
+                g.setNode(familyId, {
+                    width: familyNodeSize,
                     height: familyNodeSize,
                     clusterLabelPos: 'top',
                     style: 'fill: #f0f0f0',
                     rx: 5,
                     ry: 5
                 });
-                
+
                 // Connect parents to family node with higher weight
                 parentIds.forEach(pid => {
-                    g.setEdge(pid.toString(), familyId, { 
+                    g.setEdge(pid.toString(), familyId, {
                         weight: 25,  // Higher weight to keep parents close to family node
                         minlen: 1
                     });
                 });
-                
+
                 // Connect family node to children
                 const children = [...person.children];
                 children.forEach((childId, index) => {
@@ -262,7 +259,7 @@ export function autoArrange(tree) {
                         ...(index > 0 && { weight: 15 - (index * 0.1) })
                     });
                 });
-                
+
                 // Store family group for clustering
                 const familyGroup = {
                     id: familyId,
@@ -274,17 +271,17 @@ export function autoArrange(tree) {
             }
         }
     });
-    
+
     // Second pass: Create clusters for each family unit
     familyGroups.forEach((family, familyId) => {
         // Create a cluster for this family
         const clusterId = `cluster-${familyId}`;
-        
+
         // Add all family members to this cluster
         family.allMembers.forEach(memberId => {
             g.setParent(memberId.toString(), clusterId);
         });
-        
+
         // Style the cluster
         g.setNode(clusterId, {
             cluster: true,
@@ -301,11 +298,11 @@ export function autoArrange(tree) {
             if (person.id < spouseId) {
                 const spouse = tree.people.get(spouseId);
                 if (!spouse) return;
-                
+
                 // Check if they have common children
-                const commonChildren = [...person.children].filter(c => 
+                const commonChildren = [...person.children].filter(c =>
                     spouse.children && spouse.children.has(c));
-                
+
                 // Connect spouses with a very high-weight edge to keep them close
                 g.setEdge(person.id.toString(), spouseId.toString(), {
                     weight: 1000,  // Very high weight to keep spouses together
@@ -331,7 +328,7 @@ export function autoArrange(tree) {
                     // Mark as spouse relationship for renderers
                     relationship: 'spouse'
                 });
-                
+
                 // If they have no common children, create a special cluster
                 if (commonChildren.length === 0) {
                     const clusterId = `spouse-cluster-${person.id}-${spouseId}`;
@@ -369,7 +366,7 @@ export function autoArrange(tree) {
         const coupleCluster = `couple_${id1}_${id2}`;
         g.setParent(id1.toString(), coupleCluster);
         g.setParent(id2.toString(), coupleCluster);
-        
+
         // Configure the couple cluster
         g.setNode(coupleCluster, {
             cluster: true,
@@ -379,7 +376,7 @@ export function autoArrange(tree) {
             rankdir: 'LR',  // Left to right for side-by-side
             margin: 30
         });
-        
+
         // Configure the edge between spouses
         g.setEdge(id1.toString(), id2.toString(), {
             weight: 1000,  // High weight to keep them together
@@ -391,7 +388,7 @@ export function autoArrange(tree) {
             // Mark as spouse relationship for renderers
             relationship: 'spouse'
         });
-        
+
         // Set node options for both spouses with increased spacing
         const nodeOptions = {
             width: nodeWidth,  // Use the dynamic width based on tree size
@@ -415,13 +412,13 @@ export function autoArrange(tree) {
             // Force node dimensions
             nodeDimensionsIncludeLabels: true
         };
-        
+
         // Apply to both nodes
         g.setNode(id1.toString(), {
             ...g.node(id1.toString()),
             ...nodeOptions
         });
-        
+
         g.setNode(id2.toString(), {
             ...g.node(id2.toString()),
             ...nodeOptions
@@ -454,7 +451,7 @@ export function autoArrange(tree) {
         edgeWeight: 2,
         labeloffset: 10
     };
-    
+
     // Apply the layout
     dagre.layout(g, layoutConfig);
 
@@ -465,4 +462,4 @@ export function autoArrange(tree) {
     updatePeoplePositions(tree, g, dagreLayoutOffsetX, dagreLayoutOffsetY);
 
     return { g, dagreLayoutOffsetX, dagreLayoutOffsetY };
-} 
+}

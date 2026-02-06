@@ -171,7 +171,7 @@ const Cart = ({ onContinueShopping, onViewOrders }) => {
           <button
             type="button"
             onClick={onContinueShopping}
-            className="mt-1 inline-flex text-white items-center justify-center rounded-full border border-gray-200 px-4 py-1.5 text-xs font-medium text-gray-600 hover:border-blue-400 hover:text-blue-700"
+            className="mt-1 inline-flex  items-center justify-center rounded-full border border-gray-200 px-4 py-1.5 text-xs font-medium text-gray-600 hover:border-blue-400 hover:text-blue-700"
           >
             <FiArrowLeft className="mr-1" /> Continue shopping
           </button>
