@@ -1,7 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 
-import { UserPlus, Users, Edit, Trash2, Plus, User, UserMinus } from 'lucide-react';
+import { UserPlus, Users, Edit, Trash2, Plus, User, UserMinus, Link2 } from 'lucide-react';
 
 
 
@@ -18,6 +18,8 @@ const iconMap = {
   'Add Sibling': { icon: UserMinus },
 
   'Edit': { icon: Edit },
+
+  'Link Tree': { icon: Link2 },
 
   'Delete': { icon: Trash2 },
 
@@ -45,17 +47,18 @@ const RadialMenu = ({
 
 
 
-    const itemWidth = 90;
-
-    const itemHeight = 60;
-
-    const gap = 12;
-
-    const menuWidth = items.length * (itemWidth + gap);
+    const isMobile = window.innerWidth < 600;
+    const isCompactDesktop = !isMobile && items.length > 3;
+    const itemWidth = isCompactDesktop ? 72 : 80;
+    const itemHeight = isCompactDesktop ? 50 : 56;
+    const gap = isCompactDesktop ? 8 : 10;
+    const desktopColumns = isCompactDesktop ? 3 : items.length;
+    const desktopRows = isCompactDesktop ? Math.ceil(items.length / desktopColumns) : 1;
+    const menuWidth = isCompactDesktop
+        ? (desktopColumns * itemWidth) + (gap * (desktopColumns + 1))
+        : (items.length * itemWidth) + (gap * (items.length + 1));
 
     const padding = 8;
-
-    const isMobile = window.innerWidth < 600;
 
     
 
@@ -67,7 +70,7 @@ const RadialMenu = ({
 
     const mobileMenuHeight = (mobileRows * (itemHeight + gap)) + (gap * 2) + 40; // Extra padding
 
-    const menuHeight = isMobile ? mobileMenuHeight : itemHeight + 24;
+    const menuHeight = isMobile ? mobileMenuHeight : (desktopRows * itemHeight) + (gap * (desktopRows + 1));
 
 
 
@@ -98,16 +101,24 @@ const RadialMenu = ({
         y = Math.max(minY, y);
 
     } else {
+        // Prefer showing above the click to avoid covering the card.
+        const offset = 76;
+        const aboveY = position.y - (menuHeight / 2) - offset;
+        const belowY = position.y + (menuHeight / 2) + offset;
+        const canFitAbove = aboveY - (menuHeight / 2) >= padding;
+        const canFitBelow = belowY + (menuHeight / 2) <= window.innerHeight - padding;
+        y = canFitAbove ? aboveY : (canFitBelow ? belowY : position.y);
 
         // Clamp to viewport
-
         x = Math.max(padding + menuWidth / 2, Math.min(x, window.innerWidth - menuWidth / 2 - padding));
-
         y = Math.max(padding + menuHeight / 2, Math.min(y, window.innerHeight - menuHeight / 2 - padding));
 
     }
 
 
+
+    const showArrow = !isMobile;
+    const placedAbove = !isMobile && y < position.y;
 
     return (
 
@@ -151,7 +162,7 @@ const RadialMenu = ({
 
             <div
 
-                className={isMobile ? 'radial-menu-mobile-sheet' : 'radial-menu-horizontal'}
+                className={isMobile ? 'radial-menu-mobile-sheet' : 'radial-menu-compact'}
 
                 style={{
 
@@ -163,21 +174,25 @@ const RadialMenu = ({
 
                     zIndex: 1000,
 
-                    background: 'rgba(255,255,255,0.98)',
+                    background: 'rgba(255,255,255,0.97)',
 
-                    border: '1.5px solid #e5e7eb',
+                    border: '1px solid #e5e7eb',
 
-                    borderRadius: isMobile ? 24 : 18,
+                    borderRadius: isMobile ? 22 : 14,
 
-                    boxShadow: '0 6px 32px rgba(60,60,90,0.13)',
+                    boxShadow: '0 10px 26px rgba(15,23,42,0.16)',
 
-                    padding: isMobile ? '20px 16px' : `12px ${gap}px`,
+                    padding: isMobile ? '18px 14px' : `${gap}px`,
 
-                    display: isMobile ? 'grid' : 'flex',
+                    display: 'grid',
 
-                    gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'none',
+                    gridTemplateColumns: isMobile
 
-                    flexDirection: isMobile ? 'none' : 'row',
+                        ? 'repeat(2, 1fr)'
+
+                        : `repeat(${desktopColumns}, minmax(${itemWidth}px, 1fr))`,
+
+                    flexDirection: 'row',
 
                     alignItems: 'center',
 
@@ -185,9 +200,9 @@ const RadialMenu = ({
 
                     pointerEvents: 'auto',
 
-                    minWidth: isMobile ? '85vw' : `${menuWidth}px`,
+                    minWidth: isMobile ? '82vw' : `${menuWidth}px`,
 
-                    maxWidth: isMobile ? '90vw' : 'none',
+                    maxWidth: isMobile ? '92vw' : `${menuWidth}px`,
 
                     minHeight: `${menuHeight}px`,
 
@@ -199,9 +214,29 @@ const RadialMenu = ({
 
                     overflowY: isMobile ? 'auto' : 'visible',
 
+                    backdropFilter: 'blur(6px)',
+
                 }}
 
             >
+
+                {showArrow && (
+                    <div
+                        aria-hidden="true"
+                        style={{
+                            position: 'absolute',
+                            left: '50%',
+                            width: 12,
+                            height: 12,
+                            background: '#dbeafe',
+                            border: '1px solid #93c5fd',
+                            transform: 'translateX(-50%) rotate(45deg)',
+                            boxShadow: '0 6px 14px rgba(15,23,42,0.12)',
+                            bottom: placedAbove ? -6 : 'auto',
+                            top: placedAbove ? 'auto' : -6,
+                        }}
+                    />
+                )}
 
                 {items.map((item, i) => {
 
@@ -211,15 +246,15 @@ const RadialMenu = ({
 
                     let itemStyle = {
 
-                        width: isMobile ? 'auto' : itemWidth,
+                        width: '100%',
 
-                        height: isMobile ? 65 : itemHeight,
+                        height: isMobile ? 62 : itemHeight,
 
                         minWidth: isMobile ? 120 : itemWidth,
 
-                        background: '#f4f7fa',
+                        background: '#f8fafc',
 
-                        borderRadius: 14,
+                        borderRadius: 12,
 
                         display: 'flex',
 
@@ -229,9 +264,9 @@ const RadialMenu = ({
 
                         justifyContent: 'center',
 
-                        boxShadow: '0 1px 4px rgba(60,60,90,0.06)',
+                        boxShadow: '0 1px 3px rgba(15,23,42,0.08)',
 
-                        border: '1px solid #e5e7eb',
+                        border: '1px solid #e6edf3',
 
                         cursor: isDisabled ? 'not-allowed' : 'pointer',
 
@@ -241,7 +276,7 @@ const RadialMenu = ({
 
                         margin: 0,
 
-                        padding: isMobile ? '8px 12px' : '4px 6px',
+                        padding: isMobile ? '8px 10px' : '4px 6px',
 
                         position: 'relative',
 
@@ -283,7 +318,7 @@ const RadialMenu = ({
 
                                 e.currentTarget.style.background = '#e0f2fe';
 
-                                e.currentTarget.style.boxShadow = '0 2px 8px rgba(60,60,90,0.13)';
+                                e.currentTarget.style.boxShadow = '0 2px 8px rgba(15,23,42,0.14)';
 
                                 e.currentTarget.style.border = '1.5px solid #2563eb';
 
@@ -293,23 +328,23 @@ const RadialMenu = ({
 
                                 if (isDisabled) return;
 
-                                e.currentTarget.style.background = '#f4f7fa';
+                                e.currentTarget.style.background = '#f8fafc';
 
-                                e.currentTarget.style.boxShadow = '0 1px 4px rgba(60,60,90,0.06)';
+                                e.currentTarget.style.boxShadow = '0 1px 3px rgba(15,23,42,0.08)';
 
-                                e.currentTarget.style.border = '1px solid #e5e7eb';
+                                e.currentTarget.style.border = '1px solid #e6edf3';
 
                             }}
 
                         >
 
-                            <Icon size={isMobile ? 24 : 22} color={isDisabled ? "#6b7280" : "#2563eb"} style={{ marginBottom: isMobile ? 4 : 2 }} />
+                            <Icon size={isMobile ? 22 : 18} color={isDisabled ? "#6b7280" : "#2563eb"} style={{ marginBottom: isMobile ? 4 : 2 }} />
 
                             <span style={{
 
-                                fontSize: isMobile ? 12 : 13,
+                                fontSize: isMobile ? 11 : 11,
 
-                                fontWeight: 600,
+                                fontWeight: 700,
 
                                 color: '#222',
 
@@ -335,7 +370,7 @@ const RadialMenu = ({
 
                                 WebkitBoxOrient: 'vertical',
 
-                                minHeight: isMobile ? 24 : 28,
+                                minHeight: isMobile ? 22 : 24,
 
                                 padding: '0 2px',
 

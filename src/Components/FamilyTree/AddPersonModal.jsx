@@ -785,6 +785,9 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
 
     // Tab switch handler
     const handleTabSwitch = (formKey, tab) => {
+        // Link Tree was moved out to a dedicated toolbar action (single icon).
+        // Keep the old wiring from accidentally activating.
+        if (tab === 'link' || tab === "link") return;
         setActiveTabs(prev => ({ ...prev, [formKey]: tab }));
         if (action.type === 'parents') {
             setParentSelections(prev => ({
@@ -1123,23 +1126,6 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                     disabled={eligible.length === 0}
                                 >
                                     Select Existing
-                                </button>
-                                <button 
-                                    type="button" 
-                                    onClick={() => handleTabSwitch(form.type, 'link')} 
-                                    style={{ 
-                                        padding: '10px 24px', 
-                                        background: tab === 'link' ? PRIMARY_COLOR : 'transparent', 
-                                        color: tab === 'link' ? '#fff' : PRIMARY_COLOR, 
-                                        border: 'none', 
-                                        outline: 'none', 
-                                        cursor: 'pointer', 
-                                        transition: 'all 0.3s ease',
-                                        fontWeight: 600
-                                    }} 
-                                    disabled={!String(action?.person?.nodeUid || '').trim()}
-                                >
-                                    Link Family Tree
                                 </button>
                             </div>
 
@@ -1970,26 +1956,6 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                 disabled={eligible.length === 0}
                               >
                                 Select Existing
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleTabSwitch(form.index, "link")
-                                }
-                                style={{
-                                  padding: "10px 24px",
-                                  background:
-                                    tab === "link" ? PRIMARY_COLOR : "transparent",
-                                  color: tab === "link" ? "#fff" : PRIMARY_COLOR,
-                                  border: "none",
-                                  outline: "none",
-                                  cursor: "pointer",
-                                  transition: "all 0.3s ease",
-                                  fontWeight: 600,
-                                }}
-                                disabled={!String(action?.person?.nodeUid || '').trim()}
-                              >
-                                Link Family Tree
                               </button>
                             </div>
 

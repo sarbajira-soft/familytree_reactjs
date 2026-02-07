@@ -18,7 +18,7 @@ import { useTheme } from '../../Contexts/ThemeContext';
 
 
 
-import { FiEye, FiEyeOff, FiShare2, FiMoreVertical, FiUserX, FiUserCheck, FiCopy, FiLink } from 'react-icons/fi';
+import { FiEye, FiShare2, FiMoreVertical, FiUserX, FiUserCheck, FiCopy, FiLink, FiUser } from 'react-icons/fi';
 
 
 
@@ -39,6 +39,7 @@ import { Mars, Venus } from 'lucide-react';
 
 
 import { FaFemale, FaMale } from 'react-icons/fa';
+import { getTreeCardDimensions } from '../../utils/treeCardDimensions';
 
 
 
@@ -502,38 +503,6 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
 
 
 
-    const [showNodeUid, setShowNodeUid] = useState(() => {
-
-        try {
-
-            return localStorage.getItem('ft_show_node_uid') === '1';
-
-        } catch (_) {
-
-            return false;
-
-        }
-
-    });
-
-
-
-    const toggleShowNodeUid = () => {
-
-        const next = !showNodeUid;
-
-        setShowNodeUid(next);
-
-        try {
-
-            localStorage.setItem('ft_show_node_uid', next ? '1' : '0');
-
-        } catch (_) {}
-
-    };
-
-
-
     const handleCopyNodeUid = async () => {
 
         if (!person?.nodeUid) return;
@@ -674,167 +643,10 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
 
 
 
-    const cardDimensions = useMemo(() => {
-
-
-
-        const isMobile = window.innerWidth <= 640; // Tailwind sm breakpoint
-
-
-
-        
-
-
-
-        if (memberCount > 100) {
-
-
-
-            // Compact for very large trees
-
-
-
-            return {
-
-
-
-                width: isMobile ? 120 : 170,
-
-
-
-                height: isMobile ? 125 : 165,
-
-
-
-                fontSizeName: isMobile ? 12 : 14,
-
-
-
-                fontSizeDetails: isMobile ? 10 : 11,
-
-
-
-                fontSizeRelationship: isMobile ? 10 : 11,
-
-
-
-                profileSize: isMobile ? 70 : 90,
-
-
-
-                padding: '0px',
-
-
-
-                margin: '2px'
-
-
-
-            };
-
-
-
-        } else if (memberCount > 50) {
-
-
-
-            // Medium trees
-
-
-
-            return {
-
-
-
-                width: isMobile ? 130 : 180,
-
-
-
-                height: isMobile ? 135 : 175,
-
-
-
-                fontSizeName: isMobile ? 13 : 15,
-
-
-
-                fontSizeDetails: isMobile ? 11 : 12,
-
-
-
-                fontSizeRelationship: isMobile ? 11 : 12,
-
-
-
-                profileSize: isMobile ? 75 : 95,
-
-
-
-                padding: '0px',
-
-
-
-                margin: '3px'
-
-
-
-            };
-
-
-
-        } else {
-
-
-
-            // Small trees - Premium
-
-
-
-            return {
-
-
-
-                width: isMobile ? 140 : 190,
-
-
-
-                height: isMobile ? 145 : 185,
-
-
-
-                fontSizeName: isMobile ? 12 : 14,
-
-
-
-                fontSizeDetails: isMobile ? 12 : 13,
-
-
-
-                fontSizeRelationship: isMobile ? 12 : 14,
-
-
-
-                profileSize: isMobile ? 80 : 100,
-
-
-
-                padding: '0px',
-
-
-
-                margin: isMobile ? '3px' : '5px'
-
-
-
-            };
-
-
-
-        }
-
-
-
-    }, [memberCount]);
+    const cardDimensions = useMemo(
+        () => getTreeCardDimensions(memberCount, undefined, true),
+        [memberCount],
+    );
 
 
 
@@ -2954,7 +2766,7 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
 
 
 
-                  className="w-6 h-6 mb-1 bg-gradient-to-br from-slate-50 to-slate-100 hover:from-slate-100 hover:to-slate-200 text-slate-700 rounded-full flex items-center justify-center shadow-md transition-all duration-200 border-2 border-slate-400 dark:from-slate-900 dark:to-slate-800 dark:hover:from-slate-800 dark:hover:to-slate-700 dark:text-slate-100 dark:border-slate-600"
+                  className="w-5 h-5 mb-1 bg-gradient-to-br from-slate-50 to-slate-100 hover:from-slate-100 hover:to-slate-200 text-slate-700 rounded-full flex items-center justify-center shadow-md transition-all duration-200 border-2 border-slate-400 dark:from-slate-900 dark:to-slate-800 dark:hover:from-slate-800 dark:hover:to-slate-700 dark:text-slate-100 dark:border-slate-600"
 
 
 
@@ -2970,11 +2782,11 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
 
 
 
-                    width: "24px",
+                    width: "20px",
 
 
 
-                    height: "24px",
+                    height: "20px",
 
 
 
@@ -2994,7 +2806,7 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
 
 
 
-                  <FiLink size={16} />
+                  <FiLink size={12} />
 
 
 
@@ -3014,7 +2826,7 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
 
 
 
-                className="w-6 h-6 bg-gradient-to-br from-cyan-50 to-sky-50 hover:from-cyan-100 hover:to-sky-100 text-sky-700 rounded-full flex items-center justify-center shadow-md transition-all duration-200 border-2 border-cyan-400 dark:from-slate-900 dark:to-slate-800 dark:hover:from-slate-800 dark:hover:to-slate-700 dark:text-slate-100 dark:border-slate-600"
+                className="w-5 h-5 bg-gradient-to-br from-cyan-50 to-sky-50 hover:from-cyan-100 hover:to-sky-100 text-sky-700 rounded-full flex items-center justify-center shadow-md transition-all duration-200 border-2 border-cyan-400 dark:from-slate-900 dark:to-slate-800 dark:hover:from-slate-800 dark:hover:to-slate-700 dark:text-slate-100 dark:border-slate-600"
 
 
 
@@ -3030,11 +2842,11 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
 
 
 
-                  width: "24px",
+                  width: "20px",
 
 
 
-                  height: "24px",
+                  height: "20px",
 
 
 
@@ -3054,7 +2866,7 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
 
 
 
-                <FiEye size={16} />
+                <FiEye size={12} />
 
 
 
@@ -3126,7 +2938,7 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
 
 
 
-                    className="w-5 h-5 md:w-6 md:h-6 bg-white/90 hover:bg-white text-gray-700 hover:text-gray-900 rounded-full flex items-center justify-center shadow-md border border-gray-200 dark:bg-slate-900/90 dark:hover:bg-slate-900 dark:text-slate-200 dark:hover:text-slate-100 dark:border-slate-700"
+                    className="w-4 h-4 md:w-5 md:h-5 bg-white/90 hover:bg-white text-gray-700 hover:text-gray-900 rounded-full flex items-center justify-center shadow-md border border-gray-200 dark:bg-slate-900/90 dark:hover:bg-slate-900 dark:text-slate-200 dark:hover:text-slate-100 dark:border-slate-700"
 
 
 
@@ -3138,7 +2950,7 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
 
 
 
-                    <FiMoreVertical size={14} />
+                    <FiMoreVertical size={12} />
 
 
 
@@ -3230,39 +3042,7 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
 
 
 
-              {person?.nodeUid && (
-
-
-
-                <button
-
-
-
-                  onClick={toggleShowNodeUid}
-
-
-
-                  className="w-5 h-5 md:w-6 md:h-6 bg-white/90 hover:bg-white text-gray-700 hover:text-gray-900 rounded-full flex items-center justify-center shadow-md border border-gray-200 dark:bg-slate-900/90 dark:hover:bg-slate-900 dark:text-slate-200 dark:hover:text-slate-100 dark:border-slate-700"
-
-
-
-                  title={showNodeUid ? 'Hide UID' : 'Show UID'}
-
-
-
-                >
-
-
-
-                  {showNodeUid ? <FiEyeOff size={14} /> : <FiEye size={14} />}
-
-
-
-                </button>
-
-
-
-              )}
+              {person?.nodeUid && null}
 
 
 
@@ -3302,7 +3082,7 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
 
 
 
-                  className="w-5 h-5 md:w-6 md:h-6 bg-white/90 hover:bg-white text-sky-600 hover:text-sky-700 rounded-full flex items-center justify-center shadow-md border border-cyan-300 dark:bg-slate-900/90 dark:hover:bg-slate-900 dark:text-sky-300 dark:hover:text-sky-200 dark:border-slate-700"
+                  className="w-4 h-4 md:w-5 md:h-5 bg-white/90 hover:bg-white text-sky-600 hover:text-sky-700 rounded-full flex items-center justify-center shadow-md border border-cyan-300 dark:bg-slate-900/90 dark:hover:bg-slate-900 dark:text-sky-300 dark:hover:text-sky-200 dark:border-slate-700"
 
 
 
@@ -3314,7 +3094,7 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
 
 
 
-                  <FiShare2 size={14} />
+                  <FiShare2 size={12} />
 
 
 
@@ -3330,7 +3110,7 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
 
 
 
-                className="radial-menu-button w-5 h-5 md:w-6 md:h-6 bg-gradient-to-br from-cyan-500 to-sky-600 hover:from-cyan-600 hover:to-sky-700 text-white rounded-full flex items-center justify-center font-bold text-xs shadow-lg hover:shadow-xl border-2 border-white"
+                className="radial-menu-button w-4 h-4 md:w-5 md:h-5 bg-gradient-to-br from-cyan-500 to-sky-600 hover:from-cyan-600 hover:to-sky-700 text-white rounded-full flex items-center justify-center font-bold text-[9px] shadow-lg hover:shadow-xl border-2 border-white"
 
 
 
@@ -3346,11 +3126,11 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
 
 
 
-                  width: memberCount > 50 ? "16px" : "24px",
+                  width: memberCount > 50 ? "12px" : "18px",
 
 
 
-                  height: memberCount > 50 ? "16px" : "24px",
+                  height: memberCount > 50 ? "12px" : "18px",
 
 
 
@@ -3654,38 +3434,6 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
 
 
 
-              {isSelected && !isNew && !effectiveViewOnly && !isHighlighted && (
-
-
-
-                <span
-
-
-
-                  className="absolute -bottom-1 -right-1 bg-gradient-to-br from-pink-500 to-fuchsia-600 text-white rounded-full w-5 h-5 flex items-center justify-center font-bold text-xs shadow-lg"
-
-
-
-                  style={{ boxShadow: "0 4px 14px rgba(236, 72, 153, 0.45)" }}
-
-
-
-                >
-
-
-
-                  ✓
-
-
-
-                </span>
-
-
-
-              )}
-
-
-
               {isHighlighted && (
 
 
@@ -3769,237 +3517,88 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
             )}
 
 
+                {/* 3-Column Grid for Age | Selected | Gender */}
 
 
-
-
-
-            {/* 2-Column Grid for Age & Gender */}
-
-
-
-            <div className="grid grid-cols-2 gap-1 px-2 mb-1">
-
-
-
-              {person.age && (
-
-
-
-                <div className="text-center">
-
-
-
-                  <div
-
-
-
-                    className="text-sky-600 font-extrabold"
-
-
-
-                    style={{ fontSize: `${fontSizeDetails}px` }}
-
-
-
-                  >
-
-
-
-                    {person.age} Yrs
-
-
-
+                <div className="grid grid-cols-3 gap-1 pl-2 pr-8 mb-1 items-center">
+                  <div className="text-center">
+                    {person.age && (
+                      <div
+                        className="text-sky-600 font-extrabold whitespace-nowrap"
+                        style={{ fontSize: `${fontSizeDetails}px` }}
+                      >
+                        {person.age} Y
+                      </div>
+                    )}
                   </div>
 
+                  <div className="flex items-center justify-center">
+                    {isSelected && !isNew && !effectiveViewOnly && !isHighlighted && (
+                      <span
+                        className="bg-gradient-to-br from-pink-500 to-fuchsia-600 text-white rounded-full w-4 h-4 flex items-center justify-center font-bold text-[10px] shadow-lg"
+                        style={{ boxShadow: "0 4px 14px rgba(236, 72, 153, 0.45)" }}
+                        title="Selected"
+                      >
+                        ✓
+                      </span>
+                    )}
+                  </div>
 
-
-                  {/* <div className="text-cyan-500 text-[8px] font-bold uppercase tracking-wider">AGE</div> */}
-
-
-
+                  <div className="text-center">
+                    <div
+                      className="text-pink-600 font-extrabold flex justify-center"
+                      style={{ fontSize: `${fontSizeDetails}px` }}
+                    >
+                      {['M', 'H'].includes(getGenderLabel(person, tree, currentUserId)) ? (
+                        <FaMale className="mx-auto text-sky-600 text-lg" />
+                      ) : ['F', 'W'].includes(getGenderLabel(person, tree, currentUserId)) ? (
+                        <FaFemale className="mx-auto text-pink-500 text-lg" />
+                      ) : (
+                        <FiUser className="mx-auto text-slate-500 text-[18px]" />
+                      )}
+                    </div>
+                  </div>
                 </div>
 
 
-
-              )}
-
+                {/* Name - Clean, No Background - AFTER Age/Gender */}
 
 
-              {getGenderLabel(person, tree, currentUserId) && (
+                <div className="text-center px-2 mb-1">
 
 
-
-                <div className="text-center">
-
-
-
-                  <div className="text-pink-600 font-extrabold  flex justify-center" style={{ fontSize: `${fontSizeDetails}px` }}>
-
-
-
-                                {['M', 'H'].includes(getGenderLabel(person, tree, currentUserId)) ? <FaMale className="mx-auto text-sky-600 text-2xl" /> : 
-
-
-
-                                            ['F', 'W'].includes(getGenderLabel(person, tree, currentUserId)) ? <FaFemale className="mx-auto text-pink-500 text-2xl" /> : null}
-
-
-
-
-
-
-
-                            </div>
-
-
-
-                  {/* <div className="text-fuchsia-500 text-[8px] font-bold uppercase tracking-wider">GENDER</div> */}
-
+                  <h3
+                    className="font-black text-gray-900 leading-tight dark:text-slate-100"
+                    style={{
+                      fontSize: `${fontSizeName}px`,
+                      lineHeight: "1.2",
+                      display: "-webkit-box",
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: "vertical",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                    title={
+                      person.name ||
+                      [person.firstName, person.lastName]
+                        .filter(Boolean)
+                        .join(" ")
+                        .trim() || "Unnamed"
+                    }
+                  >
+                    {person.name ||
+                      [person.firstName, person.lastName]
+                        .filter(Boolean)
+                        .join(" ")
+                        .trim() ||
+                      (language === "tamil" ? "" : "Member")}
+                  </h3>
 
 
                 </div>
-
-
-
-              )}
-
-
-
-            </div>
-
-
-
-
-
-
-
-            {/* Name - Clean, No Background - AFTER Age/Gender */}
-
-
-
-            <div className="text-center px-2 mb-1">
-
-
-
-              <h3
-
-
-
-                className="font-black text-gray-900 leading-tight dark:text-slate-100"
-
-
-
-                style={{
-
-
-
-                  fontSize: `${fontSizeName}px`,
-
-
-
-                  lineHeight: "1.2",
-
-
-
-                  display: "-webkit-box",
-
-
-
-                  WebkitLineClamp: 2,
-
-
-
-                  WebkitBoxOrient: "vertical",
-
-
-
-                  overflow: "hidden",
-
-
-
-                  textOverflow: "ellipsis",
-
-
-
-                }}
-
-
-
-                title={
-
-
-
-                  person.name ||
-
-
-
-                  [person.firstName, person.lastName]
-
-
-
-                    .filter(Boolean)
-
-
-
-                    .join(" ")
-
-
-
-                    .trim() ||
-
-
-
-                  "Unnamed"
-
-
-
-                }
-
-
-
-              >
-
-
-
-                {person.name ||
-
-
-
-                  [person.firstName, person.lastName]
-
-
-
-                    .filter(Boolean)
-
-
-
-                    .join(" ")
-
-
-
-                    .trim() ||
-
-
-
-                  (language === "tamil" ? "பெயரில்லாத" : "Member")}
-
-
-
-              </h3>
-
-
-
-            </div>
-
-
-
-
-
 
 
                 {/* Relationship Label - Clean with Border (viewOnly shows label without editing) */}
-
 
 
                 {relationshipText && !isEditingLabel && (
@@ -4138,7 +3737,7 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
 
 
 
-                        {person?.nodeUid && showNodeUid && (
+                        {person?.nodeUid && false && (
 
 
 
@@ -4250,7 +3849,7 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
 
 
 
-                <div className="flex items-center gap-1">
+                <div className="flex flex-col gap-1">
 
 
 
@@ -4262,7 +3861,7 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
 
 
 
-                    className="flex-1 px-2 py-1 rounded border-2 border-blue-300 text-blue-700 font-semibold text-center focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    className="w-full px-2 py-1.5 rounded-md border-2 border-blue-300 text-blue-700 font-semibold text-center focus:outline-none focus:ring-2 focus:ring-blue-400"
 
 
 
@@ -4282,51 +3881,25 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
 
 
 
-                  <button
+                  <div className="flex items-center justify-center gap-1.5">
+                    <button
+                      type="button"
+                      className="w-7 h-7 rounded-full bg-blue-600 text-white font-bold text-[10px] shadow-sm hover:bg-blue-700 active:scale-95 transition-transform"
+                      onClick={handleSaveLabel}
+                      title="Save"
+                    >
+                      ✓
+                    </button>
 
-
-
-                    className="px-2 py-1 rounded bg-blue-500 text-white font-bold text-xs"
-
-
-
-                    onClick={handleSaveLabel}
-
-
-
-                  >
-
-
-
-                    ✓
-
-
-
-                  </button>
-
-
-
-                  <button
-
-
-
-                    className="px-2 py-1 rounded bg-gray-300 text-gray-700 font-bold text-xs"
-
-
-
-                    onClick={handleCancelEdit}
-
-
-
-                  >
-
-
-
-                    ✕
-
-
-
-                  </button>
+                    <button
+                      type="button"
+                      className="w-7 h-7 rounded-full bg-gray-200 text-gray-800 font-bold text-[10px] shadow-sm hover:bg-gray-300 active:scale-95 transition-transform dark:bg-slate-700 dark:text-slate-100 dark:hover:bg-slate-600"
+                      onClick={handleCancelEdit}
+                      title="Cancel"
+                    >
+                      ✕
+                    </button>
+                  </div>
 
 
 

@@ -1,4 +1,5 @@
 import dagre from 'dagre';
+import { getTreeCardDimensions } from './treeCardDimensions';
 
 // Helpers function to find all descendants of a person
 function getAllDescendants(tree, personId, visited = new Set()) {
@@ -16,33 +17,27 @@ function getAllDescendants(tree, personId, visited = new Set()) {
 }
 
 function getSpacingConfig(memberCount) {
-    // Dynamic spacing based on tree size only (use a fixed desktop-style canvas
-    // on all devices so that line lengths and spacing are consistent between
-    // mobile and desktop; viewport differences are handled via zoom/scroll).
-    let nodesep, ranksep, marginx, marginy, coupleSpacing, nodeWidth, nodeHeight;
+    // Keep spacing stable by tree size, but match the actual card size
+    // so connectors touch card edges in the UI.
+    let nodesep, ranksep, marginx, marginy, coupleSpacing;
 
-    // Desktop spacing values (previously used for non-mobile)
     if (memberCount > 100) {
         nodesep = 250;
         ranksep = 220;
         coupleSpacing = 80;
-        nodeWidth = 200;
-        nodeHeight = 80;
     } else if (memberCount > 50) {
         nodesep = 220;
         ranksep = 200;
         coupleSpacing = 70;
-        nodeWidth = 180;
-        nodeHeight = 75;
     } else {
         nodesep = 200;
         ranksep = 180;
         coupleSpacing = 60;
-        nodeWidth = 160;
-        nodeHeight = 70;
     }
     marginx = 50;
     marginy = 50;
+
+    const { width: nodeWidth, height: nodeHeight } = getTreeCardDimensions(memberCount, undefined, true);
 
     return { nodesep, ranksep, marginx, marginy, coupleSpacing, nodeWidth, nodeHeight };
 }

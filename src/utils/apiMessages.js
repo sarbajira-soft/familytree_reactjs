@@ -31,6 +31,7 @@ export function toUserFacingMessage({
   if (status === 403) {
     // Avoid exposing internal/bypass-y wording like "Not allowed" to end users.
     if (msgLower.includes("not allowed")) return "This action isn’t available.";
+    if (msg) return msg;
     return "You don’t have permission to do that.";
   }
   if (status === 404) return "This content isn’t available.";

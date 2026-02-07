@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
+import { throwIfNotOk } from "../utils/apiMessages";
 
 const LinkedFamilyTreesPage = () => {
   const navigate = useNavigate();
   const [linkedFamilies, setLinkedFamilies] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [pendingRequests, setPendingRequests] = useState([]);
+  const [pendingLoading, setPendingLoading] = useState(false);
 
   const fetchLinkedFamilies = async () => {
     try {
@@ -27,11 +30,8 @@ const LinkedFamilyTreesPage = () => {
         },
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data?.message || "Failed to fetch linked families");
-      }
-
+      await throwIfNotOk(res, { fallback: "We couldn’t load linked families right now." });
+      const data = await res.json().catch(() => null);
       setLinkedFamilies(Array.isArray(data) ? data : []);
     } catch (e) {
       setError(e?.message || "Failed to fetch linked families");
@@ -40,8 +40,35 @@ const LinkedFamilyTreesPage = () => {
     }
   };
 
+  const fetchPendingRequests = async () => {
+    try {
+      setPendingLoading(true);
+      const token = localStorage.getItem("access_token");
+      if (!token) throw new Error("Your session has expired. Please log in again.");
+
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001";
+      const res = await fetch(`${baseUrl}/family/tree-link-requests/sent`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
+      });
+
+      await throwIfNotOk(res, { fallback: "We couldn’t load your pending link requests." });
+      const data = await res.json().catch(() => null);
+      const list = Array.isArray(data?.data) ? data.data : [];
+      setPendingRequests(list);
+    } catch (e) {
+      setPendingRequests([]);
+    } finally {
+      setPendingLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchLinkedFamilies();
+    fetchPendingRequests();
   }, []);
 
   const handleUnlinkFamily = async (otherFamilyCode) => {
@@ -76,16 +103,7 @@ const LinkedFamilyTreesPage = () => {
       },
       body: JSON.stringify({ otherFamilyCode }),
     });
-
-    const data = await res.json().catch(() => null);
-    if (!res.ok) {
-      await Swal.fire({
-        icon: "error",
-        title: "Unlink Failed",
-        text: data?.message || "Failed to unlink",
-      });
-      return;
-    }
+    await throwIfNotOk(res, { fallback: "We couldn’t unlink this family right now." });
 
     await Swal.fire({
       icon: "success",
@@ -93,6 +111,47 @@ const LinkedFamilyTreesPage = () => {
       text: "Linked family removed successfully",
     });
     await fetchLinkedFamilies();
+  };
+
+  const handleRevokeRequest = async (requestId) => {
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+      await Swal.fire({
+        icon: "error",
+        title: "Session expired",
+        text: "Please log in again.",
+      });
+      return;
+    }
+
+    const confirm = await Swal.fire({
+      icon: "warning",
+      title: "Revoke this request?",
+      text: "This will cancel the pending link request.",
+      showCancelButton: true,
+      confirmButtonText: "Yes, revoke",
+      cancelButtonText: "Cancel",
+    });
+    if (!confirm.isConfirmed) return;
+
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001";
+    const res = await fetch(`${baseUrl}/family/revoke-tree-link-request`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ treeLinkRequestId: Number(requestId) }),
+    });
+    await throwIfNotOk(res, { fallback: "We couldn’t revoke this request right now." });
+
+    await Swal.fire({
+      icon: "success",
+      title: "Request revoked",
+      text: "Your link request has been cancelled.",
+    });
+    await fetchPendingRequests();
   };
 
   return (
@@ -111,6 +170,63 @@ const LinkedFamilyTreesPage = () => {
         >
           My Birth Family Tree
         </button>
+      </div>
+
+      <div className="mb-6">
+        <div className="text-lg font-semibold text-gray-900 dark:text-slate-100">
+          Pending Link Requests
+        </div>
+        <div className="text-sm text-gray-600 dark:text-slate-300">
+          These are the link requests you’ve sent and are still waiting for approval.
+        </div>
+
+        {pendingLoading ? (
+          <div className="flex items-center justify-center py-10">
+            <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-blue-600" />
+          </div>
+        ) : pendingRequests.length === 0 ? (
+          <div className="mt-3 p-4 rounded-lg bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800">
+            <div className="text-gray-700 dark:text-slate-200 font-semibold">
+              No pending link requests
+            </div>
+            <div className="text-sm text-gray-600 dark:text-slate-300">
+              When you send a Link Tree request, it will appear here until it’s accepted or rejected.
+            </div>
+          </div>
+        ) : (
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+            {pendingRequests.map((req) => (
+              <div
+                key={req.id}
+                className="p-4 rounded-xl bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 shadow-sm"
+              >
+                <div className="text-sm font-semibold text-gray-900 dark:text-slate-100">
+                  {req.receiverFamilyCode}
+                </div>
+                <div className="text-xs text-gray-500 dark:text-slate-400 mt-1">
+                  Relationship: {String(req.relationshipType || "").toUpperCase()}
+                  {req.parentRole ? ` • ${String(req.parentRole).toUpperCase()}` : ""}
+                </div>
+                <div className="text-xs text-gray-500 dark:text-slate-400 mt-1">
+                  Receiver: {req.receiverPerson?.name || "Unknown"} •{" "}
+                  {String(req.receiverPerson?.nodeUid || "").slice(0, 8)}…
+                </div>
+                <div className="text-xs text-gray-500 dark:text-slate-400 mt-1">
+                  Sent: {req.createdAt ? new Date(req.createdAt).toLocaleString() : "—"}
+                </div>
+                <div className="mt-4 flex justify-end">
+                  <button
+                    type="button"
+                    className="px-3 py-2 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700"
+                    onClick={() => handleRevokeRequest(req.id)}
+                  >
+                    Revoke
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {loading ? (
