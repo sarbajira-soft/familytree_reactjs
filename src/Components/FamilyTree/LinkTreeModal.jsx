@@ -8,6 +8,15 @@ function normalizeFamilyCode(val) {
   return String(val || "").trim().toUpperCase();
 }
 
+function extractDigits(val) {
+  return String(val || "").replace(/\D+/g, "");
+}
+
+function formatFamilyCodeFromDigits(digits) {
+  const d = extractDigits(digits).slice(0, 6);
+  return d.length ? `FAM${d}` : "";
+}
+
 export default function LinkTreeModal({
   isOpen,
   onClose,
@@ -51,7 +60,7 @@ export default function LinkTreeModal({
       .filter(Boolean);
   };
 
-  const [receiverFamilyCode, setReceiverFamilyCode] = useState("");
+  const [receiverFamilyCodeDigits, setReceiverFamilyCodeDigits] = useState("");
   const [relationshipType, setRelationshipType] = useState("parent");
 
   const [loading, setLoading] = useState(false);
@@ -63,7 +72,6 @@ export default function LinkTreeModal({
   const [receiverSearchMessage, setReceiverSearchMessage] = useState("");
 
   const [phoneLookup, setPhoneLookup] = useState({ phone: "", loading: false, result: null });
-  const phoneRegex = /^[+]?\d[\d\s-]{8,}$/;
 
   const receiverNodeUid = String(selectedPerson?.nodeUid || "").trim();
   const receiverIsAppUser = Boolean(selectedPerson?.isAppUser || selectedPerson?.memberId);
@@ -137,27 +145,26 @@ export default function LinkTreeModal({
     });
   }, [relationshipOptions, siblingAllowed, parentAllowed, senderHasParents]);
 
+  const formattedReceiverFamilyCode = formatFamilyCodeFromDigits(receiverFamilyCodeDigits);
   const canSubmit = Boolean(
     senderNodeUid &&
-      normalizeFamilyCode(receiverFamilyCode) &&
+      formattedReceiverFamilyCode &&
       receiverNodeUid &&
       ["parent", "child", "sibling"].includes(relationshipType) &&
       receiverIsAppUser &&
       (!needsParentRole || Boolean(derivedParentRole)),
   );
 
-  const normalizedReceiverFamilyCode = normalizeFamilyCode(receiverFamilyCode);
-  const receiverFamilyCodeTooShort = Boolean(normalizedReceiverFamilyCode) && normalizedReceiverFamilyCode.length < 3;
-  const canSearchReceiverFamily = Boolean(normalizedReceiverFamilyCode) && !receiverFamilyCodeTooShort;
-  const searchDisabledReason = !normalizedReceiverFamilyCode
+  const canSearchReceiverFamily = extractDigits(receiverFamilyCodeDigits).length === 6;
+  const searchDisabledReason = !receiverFamilyCodeDigits
     ? "Enter receiver family code"
-    : receiverFamilyCodeTooShort
-    ? "Family code must be at least 3 characters"
+    : extractDigits(receiverFamilyCodeDigits).length !== 6
+    ? "Family code must be 6 digits"
     : "";
 
   const submitDisabledReason = !senderNodeUid
     ? "Select a valid sender card"
-    : !normalizedReceiverFamilyCode
+    : !formattedReceiverFamilyCode
     ? "Enter receiver family code"
     : !hasSearched
     ? "Search receiver family first"
@@ -176,7 +183,7 @@ export default function LinkTreeModal({
   useEffect(() => {
     if (!isOpen) return;
     // Reset form every time modal opens (prevents stale values).
-    setReceiverFamilyCode("");
+    setReceiverFamilyCodeDigits("");
     setRelationshipType(asList(senderPerson?.parents).length > 0 ? "child" : "parent");
     setPeople([]);
     setPersonSearch("");
@@ -278,35 +285,14 @@ export default function LinkTreeModal({
     }
   }, [selectedPerson, existingMemberIds, existingCanonicalKeys]);
 
-  const fetchReceiverFamilyPeople = async (codeOverride) => {
-    const code = normalizeFamilyCode(codeOverride ?? receiverFamilyCode);
-    if (!code) {
+  const fetchReceiverFamilyPeople = async (digitsOverride) => {
+    const digits = extractDigits(digitsOverride ?? receiverFamilyCodeDigits).slice(0, 6);
+    const code = formatFamilyCodeFromDigits(digits);
+    if (!digits || digits.length !== 6 || !code) {
       await Swal.fire({
         icon: "warning",
         title: "Receiver family code required",
-        text: "Please enter a valid family code to search.",
-        confirmButtonColor: primaryColor,
-      });
-      return [];
-    }
-
-    // Basic UX validation (avoid accidental 1-2 char searches)
-    if (code.length < 3) {
-      await Swal.fire({
-        icon: "warning",
-        title: "Family code looks too short",
-        text: "Please enter the full receiver family code and try again.",
-        confirmButtonColor: primaryColor,
-      });
-      return [];
-    }
-
-    // Boundary: avoid absurdly long inputs that can lead to slow queries / bad UX.
-    if (code.length > 30) {
-      await Swal.fire({
-        icon: "warning",
-        title: "Family code looks invalid",
-        text: "Please check the family code and try again.",
+        text: "Please enter a valid 6-digit family code to search.",
         confirmButtonColor: primaryColor,
       });
       return [];
@@ -357,26 +343,24 @@ export default function LinkTreeModal({
   };
 
   const handlePhoneLookup = async () => {
-    if (!phoneRegex.test(phoneLookup.phone)) return;
-    const cleaned = String(phoneLookup.phone).replace(/\D/g, "");
-    const last10 = cleaned.slice(-10);
-    if (last10.length < 10) return;
+    const cleaned = extractDigits(phoneLookup.phone).slice(0, 10);
+    if (cleaned.length !== 10) return;
 
     setPhoneLookup((p) => ({ ...p, loading: true, result: null }));
     try {
       const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
-      const res = await fetch(`${API_BASE}/user/lookup?phone=${encodeURIComponent(last10)}`);
+      const res = await fetch(`${API_BASE}/user/lookup?phone=${encodeURIComponent(cleaned)}`);
       const data = await res.json().catch(() => ({}));
       const famCode = normalizeFamilyCode(data?.user?.familyCode);
       const sameFamily = Boolean(famCode) && famCode === normalizeFamilyCode(currentFamilyCode);
       const alreadyInTree = Boolean(data?.user?.id) && existingMemberIds?.includes?.(Number(data.user.id));
 
-      const nextResult = { ...data, sameFamily, alreadyInTree, cleaned: last10 };
+      const nextResult = { ...data, sameFamily, alreadyInTree, cleaned };
       setPhoneLookup((p) => ({ ...p, loading: false, result: nextResult }));
 
       if (data?.exists && famCode && !sameFamily && !alreadyInTree) {
-        setReceiverFamilyCode(famCode);
-        const loaded = await fetchReceiverFamilyPeople(famCode);
+        setReceiverFamilyCodeDigits(extractDigits(famCode));
+        const loaded = await fetchReceiverFamilyPeople(extractDigits(famCode));
         const uid = Number(data?.user?.id);
         const match = Array.isArray(loaded)
           ? loaded.find((pp) => Number(pp?.memberId || pp?.userId) === uid)
@@ -407,7 +391,7 @@ export default function LinkTreeModal({
       return;
     }
 
-    const code = normalizeFamilyCode(receiverFamilyCode);
+    const code = formatFamilyCodeFromDigits(receiverFamilyCodeDigits);
     if (!code || !receiverNodeUid) {
       await Swal.fire({
         icon: "warning",
@@ -615,9 +599,6 @@ export default function LinkTreeModal({
         >
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ fontSize: 18 }}>Link Tree</span>
-            <span style={{ fontSize: 12, opacity: 0.9, fontWeight: 600 }}>
-              (Admin only)
-            </span>
           </div>
           <button
             type="button"
@@ -645,8 +626,14 @@ export default function LinkTreeModal({
                 type="text"
                 placeholder="10-digit mobile"
                 value={phoneLookup.phone}
-                maxLength={15}
-                onChange={(e) => setPhoneLookup((p) => ({ ...p, phone: e.target.value }))}
+                maxLength={10}
+                inputMode="numeric"
+                onChange={(e) =>
+                  setPhoneLookup((p) => ({
+                    ...p,
+                    phone: extractDigits(e.target.value).slice(0, 10),
+                  }))
+                }
                 style={{
                   flex: 1,
                   borderRadius: 12,
@@ -659,14 +646,17 @@ export default function LinkTreeModal({
               <button
                 type="button"
                 onClick={handlePhoneLookup}
-                disabled={!phoneRegex.test(phoneLookup.phone) || phoneLookup.loading}
+                disabled={extractDigits(phoneLookup.phone).length !== 10 || phoneLookup.loading}
                 style={{
                   borderRadius: 12,
                   padding: "12px 14px",
                   border: `2px solid ${primaryColor}`,
                   background: primaryColor,
                   color: "#fff",
-                  cursor: !phoneRegex.test(phoneLookup.phone) || phoneLookup.loading ? "not-allowed" : "pointer",
+                  cursor:
+                    extractDigits(phoneLookup.phone).length !== 10 || phoneLookup.loading
+                      ? "not-allowed"
+                      : "pointer",
                   fontWeight: 900,
                 }}
               >
@@ -703,25 +693,59 @@ export default function LinkTreeModal({
             )}
           </div>
 
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              margin: "12px 0 16px",
+            }}
+          >
+            <div style={{ flex: 1, height: 1, background: `${primaryColor}22` }} />
+            <div
+              style={{
+                fontSize: 12,
+                fontWeight: 900,
+                color: "#6b7280",
+                letterSpacing: 0.6,
+              }}
+            >
+              OR
+            </div>
+            <div style={{ flex: 1, height: 1, background: `${primaryColor}22` }} />
+          </div>
+
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
             <div style={{ flex: 1, minWidth: 220 }}>
               <div style={{ fontWeight: 700, marginBottom: 6 }}>Receiver family code</div>
               <div style={{ display: "flex", gap: 10 }}>
-                <input
-                  value={receiverFamilyCode}
-                  onChange={(e) => setReceiverFamilyCode(e.target.value)}
-                  placeholder="Enter receiver family code"
-                  maxLength={30}
+                <div
                   style={{
                     flex: 1,
+                    display: "flex",
+                    alignItems: "center",
                     borderRadius: 12,
                     border: `2px solid ${primaryColor}22`,
                     padding: "12px 14px",
-                    outline: "none",
-                    textTransform: "uppercase",
-                    fontWeight: 700,
+                    background: "#fff",
                   }}
-                />
+                >
+                  <div style={{ fontWeight: 900, color: "#111", marginRight: 10 }}>FAM</div>
+                  <input
+                    value={receiverFamilyCodeDigits}
+                    onChange={(e) => setReceiverFamilyCodeDigits(extractDigits(e.target.value).slice(0, 6))}
+                    placeholder="Enter family code"
+                    maxLength={6}
+                    inputMode="numeric"
+                    style={{
+                      flex: 1,
+                      border: "none",
+                      outline: "none",
+                      fontWeight: 700,
+                      minWidth: 0,
+                    }}
+                  />
+                </div>
                 <button
                   type="button"
                   onClick={() => fetchReceiverFamilyPeople()}
@@ -994,13 +1018,14 @@ export default function LinkTreeModal({
               onClick={sendLinkRequest}
               disabled={!canSubmit || loading}
               style={{
+                opacity: loading ? 0.85 : 1,
                 borderRadius: 12,
                 padding: "12px 14px",
-                border: `2px solid ${primaryColor}`,
-                background: canSubmit && !loading ? primaryColor : "rgba(0,0,0,0.25)",
+                border: `2px solid ${canSubmit && !loading ? primaryColor : "rgba(0,0,0,0.18)"}`,
+                background: canSubmit && !loading ? primaryColor : "rgba(0,0,0,0.18)",
                 cursor: canSubmit && !loading ? "pointer" : "not-allowed",
                 fontWeight: 900,
-                color: "#fff",
+                color: canSubmit && !loading ? "#fff" : "rgba(255,255,255,0.9)",
               }}
             >
               {loading ? "Sending..." : "Send Link Request"}
