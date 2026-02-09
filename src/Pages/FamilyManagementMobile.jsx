@@ -267,154 +267,154 @@ const FamilyManagementMobile = () => {
             {accessView}
           </div>
         </div>
-        <div className="md:hidden mb-4">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-50">
-            Family Management
-          </h1>
-          <p className="mt-1 text-sm text-gray-600 dark:text-slate-300">
-            Quickly access all family-related tools from a single place.
-          </p>
-        </div>
-
-        {accessView}
+      ) : (
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-24">
+          <div className="md:hidden mb-4">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-50">
+              Family Management
+            </h1>
+            <p className="mt-1 text-sm text-gray-600 dark:text-slate-300">
+              Quickly access all family-related tools from a single place.
+            </p>
+          </div>
 
           {hasFamily && (
             <div className="mb-5 space-y-3">
-            {familyLoading ? (
-              <div className="h-40 rounded-3xl bg-white/60 dark:bg-slate-900/40 border border-gray-100 dark:border-slate-800 animate-pulse" />
-            ) : (
-              familyData && (
-                <>
-                  <FamilyView
-                    familyData={familyData}
-                    totalMembers={totalMembers}
-                    males={males}
-                    females={females}
-                    averageAge={averageAge}
-                    onManageMembers={handleManageMembers}
-                    onManageEvents={handleManageEvents}
-                    onManageGifts={handleManageGifts}
-                    onEditFamily={handleEditFamily}
-                    onShareFamilyCode={handleShareFamilyCode}
-                  />
-                  {showCopyMessage && (
-                    <div className="mt-2 text-xs text-green-600 dark:text-green-400">
-                      Family code copied to clipboard
+              {familyLoading ? (
+                <div className="h-40 rounded-3xl bg-white/60 dark:bg-slate-900/40 border border-gray-100 dark:border-slate-800 animate-pulse" />
+              ) : (
+                familyData && (
+                  <>
+                    <FamilyView
+                      familyData={familyData}
+                      totalMembers={totalMembers}
+                      males={males}
+                      females={females}
+                      averageAge={averageAge}
+                      onManageMembers={handleManageMembers}
+                      onManageEvents={handleManageEvents}
+                      onManageGifts={handleManageGifts}
+                      onEditFamily={handleEditFamily}
+                      onShareFamilyCode={handleShareFamilyCode}
+                    />
+                    {showCopyMessage && (
+                      <div className="mt-2 text-xs text-green-600 dark:text-green-400">
+                        Family code copied to clipboard
+                      </div>
+                    )}
+                  </>
+                )
+              )}
+
+              <FamilyOverView
+                familyCode={userInfo.familyCode}
+                token={localStorage.getItem("access_token")}
+              />
+
+              {membersLoading ? (
+                <div className="h-16 rounded-2xl bg-white/60 dark:bg-slate-900/40 border border-gray-100 dark:border-slate-800 animate-pulse" />
+              ) : (
+                membersPreview.length > 0 && (
+                  <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 px-4 py-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wide">
+                          Members
+                        </div>
+                        <div className="mt-1 flex -space-x-2">
+                          {membersPreview.map((m) => (
+                            <div
+                              key={m.id}
+                              className="w-8 h-8 rounded-full border-2 border-white dark:border-slate-900 overflow-hidden bg-gray-100 flex items-center justify-center text-[10px] font-semibold text-gray-600"
+                            >
+                              {m.profilePic ? (
+                                <img
+                                  src={m.profilePic}
+                                  alt={m.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                m.name
+                                  .split(" ")
+                                  .map((part) => part[0])
+                                  .join("")
+                                  .slice(0, 2)
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-0.5 text-[11px] text-gray-600 dark:text-slate-300">
+                          A quick snapshot of your family.
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => navigate("/my-family-member")}
+                        className="ml-3 text-xs bg-white font-semibold text-primary-600 dark:text-primary-400"
+                      >
+                        Manage
+                      </button>
                     </div>
-                  )}
-                </>
-              )
-            )}
 
-            <FamilyOverView
-              familyCode={userInfo.familyCode}
-              token={localStorage.getItem("access_token")}
-            />
-
-            {membersLoading ? (
-              <div className="h-16 rounded-2xl bg-white/60 dark:bg-slate-900/40 border border-gray-100 dark:border-slate-800 animate-pulse" />
-            ) : (
-              membersPreview.length > 0 && (
-                <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 px-4 py-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wide">
-                        Members
-                      </div>
-                      <div className="mt-1 flex -space-x-2">
-                        {membersPreview.map((m) => (
-                          <div
-                            key={m.id}
-                            className="w-8 h-8 rounded-full border-2 border-white dark:border-slate-900 overflow-hidden bg-gray-100 flex items-center justify-center text-[10px] font-semibold text-gray-600"
-                          >
-                            {m.profilePic ? (
-                              <img
-                                src={m.profilePic}
-                                alt={m.name}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              m.name
-                                .split(" ")
-                                .map((part) => part[0])
-                                .join("")
-                                .slice(0, 2)
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                      <div className="mt-0.5 text-[11px] text-gray-600 dark:text-slate-300">
-                        A quick snapshot of your family.
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => navigate("/my-family-member")}
-                      className="ml-3 text-xs bg-white font-semibold text-primary-600 dark:text-primary-400"
-                    >
-                      Manage
-                    </button>
-                  </div>
-
-                  {membersList.length > 0 && (
-                    <div className="mt-3 border-t border-gray-100 dark:border-slate-800 pt-2">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wide">
-                          Members list
-                        </span>
-                        <span className="text-[11px] text-gray-500 dark:text-slate-400">
-                          Showing {Math.min(membersList.length, 5)} of {membersList.length}
-                        </span>
-                      </div>
-                      <div className="space-y-1 max-h-40 overflow-y-auto">
-                        {membersList.slice(0, 5).map((m) => (
-                          <div
-                            key={m.id}
-                            className="flex items-center justify-between py-1.5"
-                          >
-                            <div className="flex items-center space-x-2 min-w-0">
-                              <div className="w-7 h-7 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center text-[10px] font-semibold text-gray-600 flex-shrink-0">
-                                {m.profilePic ? (
-                                  <img
-                                    src={m.profilePic}
-                                    alt={m.name}
-                                    className="w-full h-full object-cover"
-                                  />
-                                ) : (
-                                  m.name
-                                    .split(" ")
-                                    .map((part) => part[0])
-                                    .join("")
-                                    .slice(0, 2)
-                                )}
+                    {membersList.length > 0 && (
+                      <div className="mt-3 border-t border-gray-100 dark:border-slate-800 pt-2">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wide">
+                            Members list
+                          </span>
+                          <span className="text-[11px] text-gray-500 dark:text-slate-400">
+                            Showing {Math.min(membersList.length, 5)} of {membersList.length}
+                          </span>
+                        </div>
+                        <div className="space-y-1 max-h-40 overflow-y-auto">
+                          {membersList.slice(0, 5).map((m) => (
+                            <div
+                              key={m.id}
+                              className="flex items-center justify-between py-1.5"
+                            >
+                              <div className="flex items-center space-x-2 min-w-0">
+                                <div className="w-7 h-7 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center text-[10px] font-semibold text-gray-600 flex-shrink-0">
+                                  {m.profilePic ? (
+                                    <img
+                                      src={m.profilePic}
+                                      alt={m.name}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    m.name
+                                      .split(" ")
+                                      .map((part) => part[0])
+                                      .join("")
+                                      .slice(0, 2)
+                                  )}
+                                </div>
+                                <span className="text-xs font-medium text-gray-800 dark:text-slate-100 truncate">
+                                  {m.name}
+                                </span>
                               </div>
-                              <span className="text-xs font-medium text-gray-800 dark:text-slate-100 truncate">
-                                {m.name}
+                              <span
+                                className={`ml-2 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                                  m.status === "approved"
+                                    ? "bg-green-50 text-green-700 border border-green-100"
+                                    : m.status === "pending"
+                                    ? "bg-amber-50 text-amber-700 border border-amber-100"
+                                    : "bg-gray-50 text-gray-600 border border-gray-100"
+                                }`}
+                              >
+                                {m.status}
                               </span>
                             </div>
-                            <span
-                              className={`ml-2 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                                m.status === "approved"
-                                  ? "bg-green-50 text-green-700 border border-green-100"
-                                  : m.status === "pending"
-                                  ? "bg-amber-50 text-amber-700 border border-amber-100"
-                                  : "bg-gray-50 text-gray-600 border border-gray-100"
-                              }`}
-                            >
-                              {m.status}
-                            </span>
-                          </div>
-                        ))}
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
-              )
-            )}
+                    )}
+                  </div>
+                )
+              )}
 
-            {/* Invite Links */}
-            {isApproved && (
-              <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 px-4 py-3">
+              {/* Invite Links */}
+              {isApproved && (
+                <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 px-4 py-3">
                 <div className="flex items-start justify-between gap-3 flex-col sm:flex-row sm:items-center">
                   <div className="flex-1">
                     <div className="text-xs font-medium text-gray-500 dark:text-slate-400 uppercase tracking-wide">
@@ -468,8 +468,8 @@ const FamilyManagementMobile = () => {
                     )}
                   </div>
                 </div>
-              </div>
-            )}
+                </div>
+              )}
 
             {isAdmin && !pendingLoading && pendingRequestsCount != null && (
               <button
@@ -508,6 +508,7 @@ const FamilyManagementMobile = () => {
             />
           )}
         </div>
+      )}
 
       <CreateFamilyModal
         isOpen={isCreateFamilyModalOpen}
