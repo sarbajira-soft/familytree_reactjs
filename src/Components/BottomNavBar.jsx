@@ -68,16 +68,16 @@ const BottomNavBar = ({ activeTab, setActiveTab }) => {
           "var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))",
       }}
     >
-      <div className="flex justify-between items-center px-2 py-0.5">
+      <div className="flex justify-between items-center px-2 py-0">
         {tabs.map((item) => {
           const isActive = activeTab === item.id;
           return (
             <div
               key={item.id}
               onClick={() => handleItemClick(item)}
-              className="flex flex-col items-center justify-center flex-1 py-0.5 cursor-pointer"
+              className="flex flex-col items-center justify-center flex-1 py-0 cursor-pointer"
             >
-              <div className={`p-0.5 ${isActive ? 'text-white' : 'text-white/80'}`}>
+              <div className={`p-0 ${isActive ? 'text-white' : 'text-white/80'}`}>
                 {item.icon}
               </div>
               <span className={`text-xs mt-0 ${isActive ? 'text-white font-semibold' : 'text-white/80'}`}>

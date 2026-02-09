@@ -261,14 +261,11 @@ const FamilyManagementMobile = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white dark:from-slate-950 dark:to-slate-900">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-24">
-        <div className="hidden md:block mb-4">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-50">
-            Family Management
-          </h1>
-          <p className="mt-1 text-sm text-gray-600 dark:text-slate-300">
-            Quickly access all family-related tools from a single place.
-          </p>
+      {accessView ? (
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-24">
+          <div className="min-h-[calc(100vh-10rem)] flex items-center justify-center">
+            {accessView}
+          </div>
         </div>
         <div className="md:hidden mb-4">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-50">
@@ -282,7 +279,7 @@ const FamilyManagementMobile = () => {
         {accessView}
 
           {hasFamily && (
-          <div className="mb-5 space-y-3">
+            <div className="mb-5 space-y-3">
             {familyLoading ? (
               <div className="h-40 rounded-3xl bg-white/60 dark:bg-slate-900/40 border border-gray-100 dark:border-slate-800 animate-pulse" />
             ) : (
@@ -497,8 +494,8 @@ const FamilyManagementMobile = () => {
                 </span>
               </button>
             )}
-          </div>
-        )}
+            </div>
+          )}
 
           {isEditModalOpen && (
             <CreateFamilyModal

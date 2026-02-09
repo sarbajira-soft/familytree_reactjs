@@ -247,52 +247,19 @@ const FamilyMemberListing = () => {
     );
   }
 
-  // Show NoFamilyView if user has no family code
-  if (!userInfo.familyCode) {
-    return (
-      <>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <button
-            type="button"
-            onClick={() => navigate('/family-management')}
-            className="mb-4 inline-flex items-center text-sm text-primary-600 hover:text-primary-700"
-          >
-            <FiArrowLeft className="mr-1.5" />
-            <span>Back to Family Management</span>
-          </button>
-          <NoFamilyView 
-            onCreateFamily={handleCreateFamily}
-            onJoinFamily={handleJoinFamily}
-          />
-        </div>
-      </>
-    );
-  }
-
-  // Show PendingApprovalView if user is not approved
-  if (userInfo.approveStatus !== 'approved') {
-    return (
-      <>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <button
-            type="button"
-            onClick={() => navigate('/family-management')}
-            className="mb-4 inline-flex items-center text-sm text-primary-600 hover:text-primary-700"
-          >
-            <FiArrowLeft className="mr-1.5" />
-            <span>Back to Family Management</span>
-          </button>
-          <PendingApprovalView 
-            familyCode={userInfo.familyCode}
-            onJoinFamily={() => {
-              // Handle join family logic here
-              console.log('Join family clicked');
-            }}
-          />
-        </div>
-      </>
-    );
-  }
+  // Bug 54: Don't early-return on "no family" / "pending approval" views,
+  // otherwise Create/Join modals never mount and buttons appear unresponsive.
+  const accessView = !userInfo.familyCode ? (
+    <NoFamilyView
+      onCreateFamily={handleCreateFamily}
+      onJoinFamily={handleJoinFamily}
+    />
+  ) : userInfo.approveStatus !== 'approved' ? (
+    <PendingApprovalView
+      familyCode={userInfo.familyCode}
+      onJoinFamily={handleJoinFamily}
+    />
+  ) : null;
 
   return (
     <>
@@ -305,69 +272,66 @@ const FamilyMemberListing = () => {
           <FiArrowLeft className="mr-1.5" />
           <span>Back to Family Management</span>
         </button>
-        <h1 className="text-3xl font-extrabold mb-4">My Family Tree</h1>
 
-        <FamilyOverView familyCode={userInfo?.familyCode} token={token} />
-
-        {/* Show Add New Member button only for Admin (role 2) and Superadmin (role 3) */}
-        {/* {(userInfo?.role === 2 || userInfo?.role === 3) && (
-          <div className="flex justify-end mb-4">
-            <button
-              onClick={handleOpenModal}
-              className="flex items-center bg-primary-DEFAULT text-white px-4 py-2 rounded-md hover:bg-primary-700"
-            >
-              <FiPlus className="mr-2" /> Add New Member
-            </button>
+        {accessView ? (
+          <div className="min-h-[calc(100vh-10rem)] flex items-center justify-center">
+            {accessView}
           </div>
-        )} */}
+        ) : (
+          <>
+            <h1 className="text-3xl font-extrabold mb-4">My Family Tree</h1>
 
-        <FamilyMemberCard 
-          familyCode={userInfo?.familyCode} 
-          token={token} 
-          onEditMember={handleEditMember}
-          onViewMember={handleViewMember}
-          currentUser={currentUser}
-        />
+            <FamilyOverView familyCode={userInfo?.familyCode} token={token} />
 
-        <ProfileFormModal
-          isOpen={isModalOpen}
-          onClose={handleCloseModal}
-          onAddMember={(newMember) => {
-            handleCloseModal();
-          }}
-          mode="add"
-        />
-         {/* Edit Member Modal */}
-          <ProfileFormModal
-            isOpen={isEditModalOpen}
-            onClose={handleCloseEditModal}
-            mode="edit-member"
-            memberData={editMemberData}
-          />
+            <FamilyMemberCard 
+              familyCode={userInfo?.familyCode} 
+              token={token} 
+              onEditMember={handleEditMember}
+              onViewMember={handleViewMember}
+              currentUser={currentUser}
+            />
 
-          {viewMember && (
-          <ViewFamilyMemberModal
-            isOpen={!!viewMember}
-            onClose={() => setViewMember(null)}
-            member={viewMember}
-            isLoading={viewLoading}
-          />
+            <ProfileFormModal
+              isOpen={isModalOpen}
+              onClose={handleCloseModal}
+              onAddMember={(newMember) => {
+                handleCloseModal();
+              }}
+              mode="add"
+            />
+            {/* Edit Member Modal */}
+            <ProfileFormModal
+              isOpen={isEditModalOpen}
+              onClose={handleCloseEditModal}
+              mode="edit-member"
+              memberData={editMemberData}
+            />
+
+            {viewMember && (
+              <ViewFamilyMemberModal
+                isOpen={!!viewMember}
+                onClose={() => setViewMember(null)}
+                member={viewMember}
+                isLoading={viewLoading}
+              />
+            )}
+          </>
         )}
-
-        <CreateFamilyModal
-          isOpen={isCreateFamilyModalOpen}
-          onClose={() => setIsCreateFamilyModalOpen(false)}
-          onFamilyCreated={handleFamilyCreated}
-          token={token}
-        />
-
-        <JoinFamilyModal
-          isOpen={isJoinFamilyModalOpen}
-          onClose={() => setIsJoinFamilyModalOpen(false)}
-          onFamilyJoined={handleFamilyJoined}
-          token={token}
-        />
       </div>
+
+      <CreateFamilyModal
+        isOpen={isCreateFamilyModalOpen}
+        onClose={() => setIsCreateFamilyModalOpen(false)}
+        onFamilyCreated={handleFamilyCreated}
+        token={token}
+      />
+
+      <JoinFamilyModal
+        isOpen={isJoinFamilyModalOpen}
+        onClose={() => setIsJoinFamilyModalOpen(false)}
+        onFamilyJoined={handleFamilyJoined}
+        token={token}
+      />
     </>
   );
 };

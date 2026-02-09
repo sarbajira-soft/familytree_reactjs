@@ -31,6 +31,7 @@ import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { fetchFile, toBlobURL } from "@ffmpeg/util";
 
 import SparkMD5 from "spark-md5";
+import { throwIfNotOk } from "../utils/apiMessages";
 
 
 
@@ -247,6 +248,18 @@ const CreatePostModal = ({
     }
 
   }, [isOpen, mode, postData, currentUser, userInfo]);
+
+
+  // When editing a public post and switching privacy to Family, the post itself has no familyCode yet.
+  // Auto-fill from the current user so the backend can store it correctly.
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const defaultCode = (currentUser?.familyCode || userInfo?.familyCode || "").trim();
+    if (privacy === "family" && !String(familyCode || "").trim() && defaultCode) {
+      setFamilyCode(defaultCode);
+    }
+  }, [privacy, isOpen, currentUser?.familyCode, userInfo?.familyCode, familyCode]);
 
 
 
@@ -1291,8 +1304,17 @@ const CreatePostModal = ({
 
 
     if (privacy === "family") {
+      const effectiveFamilyCode =
+        String(familyCode || "").trim() ||
+        String(currentUser?.familyCode || userInfo?.familyCode || "").trim();
 
-      formData.append("familyCode", familyCode);
+      if (!effectiveFamilyCode) {
+        setIsLoading(false);
+        setMessage("Join a family to post with Family privacy.");
+        return;
+      }
+
+      formData.append("familyCode", effectiveFamilyCode);
 
     }
 
@@ -1392,13 +1414,9 @@ const CreatePostModal = ({
 
 
 
-      if (!response.ok) {
-
-        const errorData = await response.json();
-
-        throw new Error(errorData.message || `Failed to ${mode} post`);
-
-      }
+      await throwIfNotOk(response, {
+        fallback: `Unable to ${mode === "edit" ? "update" : "create"} the post. Please try again.`,
+      });
 
 
 
@@ -1422,7 +1440,7 @@ const CreatePostModal = ({
 
       console.error(`Error ${mode}ing post:`, error);
 
-      setMessage(`Error: ${error.message || `Could not ${mode} post.`}`);
+      setMessage(error?.message || `Unable to ${mode === "edit" ? "update" : "create"} the post.`);
 
     } finally {
 

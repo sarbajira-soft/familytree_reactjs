@@ -638,16 +638,25 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
             
             parentForms.forEach(form => {
                 const sel = parentSelections[form.type];
-                
+
                 // Check if user has made a selection for this parent
                 if (sel) {
                     if (sel.selectedMemberId && !sel.showManualEntry) {
                         // Existing member selected
                         const member = familyMembers.find(m => m.user?.id === parseInt(sel.selectedMemberId));
                         if (member) {
+                            const rawGender = String(member.user?.userProfile?.gender || '').trim().toLowerCase();
+                            const normalizedGender =
+                                rawGender === 'male' || rawGender === 'm' || rawGender === 'man'
+                                    ? 'male'
+                                    : rawGender === 'female' || rawGender === 'f' || rawGender === 'woman'
+                                      ? 'female'
+                                      : null;
+                            const roleGender = form.type === 'father' ? 'male' : 'female';
+
                             parentPersons.push({
                                 name: member.user.fullName,
-                                gender: member.user.userProfile.gender === 'Male' ? 'male' : 'female',
+                                gender: normalizedGender || roleGender,
                                 age: member.user.userProfile.dob ? (new Date().getFullYear() - new Date(member.user.userProfile.dob).getFullYear()) : '',
                                 img: member.user.profileImage,
                                 imgPreview: imagePreview[form.index] || '',
@@ -698,6 +707,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
             onClose();
             return;
         }
+
         // For other types: spouse, child, sibling, etc.
         const persons = [];
         let hasValidPerson = false;
@@ -708,9 +718,17 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                 // Existing member selected
                 const member = familyMembers.find(m => m.user?.id === parseInt(sel.selectedMemberId));
                 if (member) {
+                    const rawGender = String(member.user?.userProfile?.gender || '').trim().toLowerCase();
+                    const normalizedGender =
+                        rawGender === 'male' || rawGender === 'm' || rawGender === 'man'
+                            ? 'male'
+                            : rawGender === 'female' || rawGender === 'f' || rawGender === 'woman'
+                              ? 'female'
+                              : 'male';
+
                     persons.push({
                         name: member.user.fullName,
-                        gender: member.user.userProfile.gender === 'Male' ? 'male' : 'female',
+                        gender: normalizedGender,
                         age: member.user.userProfile.dob ? (new Date().getFullYear() - new Date(member.user.userProfile.dob).getFullYear()) : '',
                         img: member.user.profileImage,
                         imgPreview: imagePreview[form.index] || '',
@@ -785,6 +803,9 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
 
     // Tab switch handler
     const handleTabSwitch = (formKey, tab) => {
+        // Link Tree was moved out to a dedicated toolbar action (single icon).
+        // Keep the old wiring from accidentally activating.
+        if (tab === 'link' || tab === "link") return;
         setActiveTabs(prev => ({ ...prev, [formKey]: tab }));
         if (action.type === 'parents') {
             setParentSelections(prev => ({
@@ -1123,23 +1144,6 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                     disabled={eligible.length === 0}
                                 >
                                     Select Existing
-                                </button>
-                                <button 
-                                    type="button" 
-                                    onClick={() => handleTabSwitch(form.type, 'link')} 
-                                    style={{ 
-                                        padding: '10px 24px', 
-                                        background: tab === 'link' ? PRIMARY_COLOR : 'transparent', 
-                                        color: tab === 'link' ? '#fff' : PRIMARY_COLOR, 
-                                        border: 'none', 
-                                        outline: 'none', 
-                                        cursor: 'pointer', 
-                                        transition: 'all 0.3s ease',
-                                        fontWeight: 600
-                                    }} 
-                                    disabled={!String(action?.person?.nodeUid || '').trim()}
-                                >
-                                    Link Family Tree
                                 </button>
                             </div>
 
@@ -1970,26 +1974,6 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                 disabled={eligible.length === 0}
                               >
                                 Select Existing
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleTabSwitch(form.index, "link")
-                                }
-                                style={{
-                                  padding: "10px 24px",
-                                  background:
-                                    tab === "link" ? PRIMARY_COLOR : "transparent",
-                                  color: tab === "link" ? "#fff" : PRIMARY_COLOR,
-                                  border: "none",
-                                  outline: "none",
-                                  cursor: "pointer",
-                                  transition: "all 0.3s ease",
-                                  fontWeight: 600,
-                                }}
-                                disabled={!String(action?.person?.nodeUid || '').trim()}
-                              >
-                                Link Family Tree
                               </button>
                             </div>
 

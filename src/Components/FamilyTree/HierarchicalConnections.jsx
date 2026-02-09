@@ -38,7 +38,7 @@ const HierarchicalConnections = ({ positions = new Map(), connections = [] } = {
         // Calculate actual card edge positions
         // Cards are now 160px wide (from Person.jsx)
         // So use 80px (half of 160) to touch actual card edges
-        const ACTUAL_CARD_HALF_WIDTH = 80; // Half of actual rendered card width (160px / 2 = 80px)
+        const ACTUAL_CARD_HALF_WIDTH = 70;
         const fromX = fromPos.x + ACTUAL_CARD_HALF_WIDTH; // Right edge of left card
         const toX = toPos.x - ACTUAL_CARD_HALF_WIDTH; // Left edge of right card
         const y = fromPos.y; // Same Y level (middle of cards)
@@ -116,7 +116,7 @@ const HierarchicalConnections = ({ positions = new Map(), connections = [] } = {
       // Must match the ACTUAL rendered card height from Person.jsx
       // Cards are now 140px tall with 4px border radius (compact display)
       // Lines should stop AT the card edge, not go inside
-      const ACTUAL_CARD_HALF_HEIGHT = 70; // Exact: 140/2 = 70px (stops at card edge)
+      const ACTUAL_CARD_HALF_HEIGHT = 73;
 
       // Calculate connection start point from CENTER of spouse line
       let connectionStartX, connectionStartY;
@@ -207,16 +207,61 @@ const HierarchicalConnections = ({ positions = new Map(), connections = [] } = {
             }
           );
         } else {
-          // Child is single - direct vertical line
-          allPaths.push({
-            id: `parent-child-direct-${coupleKey}`,
-            path: `M ${connectionStartX} ${connectionStartY} L ${childX} ${childTopY}`,
-            type: "parent-child",
-            from: parentIds[0],
-            to: child.id,
-            fromPos: firstParentPos,
-            toPos: child.pos,
-          });
+          // Child is single - if not vertically aligned, use an L-shaped connector (no diagonal)
+          if (Math.abs(connectionStartX - childX) > 1) {
+            const midY = (connectionStartY + childTopY) / 2;
+
+            allPaths.push(
+              {
+                id: `parent-vertical-${coupleKey}`,
+                path: `M ${connectionStartX} ${connectionStartY} L ${connectionStartX} ${midY}`,
+                type: "parent-child",
+                from: parentIds[0],
+                to: "mid",
+                fromPos: firstParentPos,
+                toPos: null,
+              },
+              {
+                id: `parent-horizontal-${coupleKey}`,
+                path: `M ${connectionStartX} ${midY} L ${childX} ${midY}`,
+                type: "parent-child",
+                from: "mid",
+                to: child.id,
+                fromPos: null,
+                toPos: null,
+              },
+              {
+                id: `child-vertical-${child.id}`,
+                path: `M ${childX} ${midY} L ${childX} ${childTopY}`,
+                type: "parent-child",
+                from: "mid",
+                to: child.id,
+                fromPos: null,
+                toPos: child.pos,
+              },
+              {
+                id: `junction-mid-${coupleKey}`,
+                type: "junction",
+                point: { x: connectionStartX, y: midY },
+              },
+              {
+                id: `junction-child-${child.id}`,
+                type: "junction",
+                point: { x: childX, y: midY },
+              },
+            );
+          } else {
+            // Already aligned - direct vertical line
+            allPaths.push({
+              id: `parent-child-direct-${coupleKey}`,
+              path: `M ${connectionStartX} ${connectionStartY} L ${childX} ${childTopY}`,
+              type: "parent-child",
+              from: parentIds[0],
+              to: child.id,
+              fromPos: firstParentPos,
+              toPos: child.pos,
+            });
+          }
         }
       } else {
         // MULTIPLE CHILDREN - Use T-shaped connection with horizontal bar

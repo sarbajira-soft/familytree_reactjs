@@ -23,6 +23,7 @@ import HierarchicalConnections from "../Components/FamilyTree/HierarchicalConnec
 import RadialMenu from "../Components/FamilyTree/RadialMenu";
 
 import AddPersonModal from "../Components/FamilyTree/AddPersonModal";
+import LinkTreeModal from "../Components/FamilyTree/LinkTreeModal";
 
 import SearchBar from "../Components/FamilyTree/SearchBar";
 
@@ -101,6 +102,12 @@ const normalizeExternalLinked = (value) =>
 
 const FamilyTreePage = () => {
   const [tree, setTree] = useState(null);
+
+  // Bug 58: don't show "Family tree is not created yet" after a blocked user closes the popup.
+  const [blockedAccess, setBlockedAccess] = useState({
+    active: false,
+    message: "",
+  });
 
   const [stats, setStats] = useState({
     total: 1,
@@ -228,6 +235,11 @@ const FamilyTreePage = () => {
     isOpen: false,
 
     action: { type: "", person: null },
+  });
+
+  const [linkTreeModal, setLinkTreeModal] = useState({
+    isOpen: false,
+    person: null,
   });
 
   const [isCreateFamilyModalOpen, setIsCreateFamilyModalOpen] = useState(false);
@@ -440,7 +452,11 @@ const FamilyTreePage = () => {
   const showFullScreenLoading = showAccessLoading || (!tree && treeLoading);
 
   const showWaitForAdmin =
-    !showAccessLoading && !accessView && !canEdit && (!tree || tree.people.size === 0);
+    !showAccessLoading &&
+    !blockedAccess.active &&
+    !accessView &&
+    !canEdit &&
+    (!tree || tree.people.size === 0);
 
   // Search handlers - memoized to prevent infinite re-renders
 
@@ -620,6 +636,7 @@ const FamilyTreePage = () => {
       }
 
       setTreeLoading(true);
+      setBlockedAccess({ active: false, message: "" });
 
       let data = null;
 
@@ -657,14 +674,24 @@ const FamilyTreePage = () => {
             // ignore JSON parse errors
           }
 
-          await Swal.fire({
+          const result = await Swal.fire({
             icon: "error",
-
             title: "Access Restricted",
-
             text: message,
+            showCloseButton: true,
+            showCancelButton: true,
+            confirmButtonText: "Go to My Family",
+            cancelButtonText: "Close",
+            allowOutsideClick: true,
+            allowEscapeKey: true,
           });
 
+          if (result.isConfirmed) {
+            navigate("/my-family");
+          }
+
+          setTree(null);
+          setBlockedAccess({ active: true, message });
           setTreeLoading(false);
 
           return;
@@ -1131,6 +1158,8 @@ const FamilyTreePage = () => {
 
       "Add Sibling": `<svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14zM12 10h-2v2H8v-2H6V8h2V6h2v2h2v2z"/></svg>`,
 
+      "Link Tree": `<svg viewBox="0 0 24 24"><path d="M3.9 12a5 5 0 015-5h3v2h-3a3 3 0 000 6h3v2h-3a5 5 0 01-5-5zm7.1 1h2v-2h-2v2zm4-6h3a5 5 0 010 10h-3v-2h3a3 3 0 000-6h-3V7z"/></svg>`,
+
       Edit: `<svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>`,
 
       Delete: `<svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>`,
@@ -1223,6 +1252,20 @@ const FamilyTreePage = () => {
       }
     }
 
+    // Link Tree (admin only): request a cross-family link from this local card.
+    if (
+      canEdit &&
+      !isExternalLinkedCard &&
+      !isSpouseCard &&
+      String(person?.nodeUid || "").trim()
+    ) {
+      items.push({
+        label: "Link Tree",
+        action: () => setLinkTreeModal({ isOpen: true, person }),
+        icon: icons["Link Tree"],
+      });
+    }
+
     if (person.id !== tree?.rootId) {
       if (isExternalLinkedCard) {
         if (canEdit) {
@@ -1262,7 +1305,10 @@ const FamilyTreePage = () => {
     );
 
     if (personElement) {
-      const rect = personElement.getBoundingClientRect();
+      const actionButton = personElement.querySelector(".radial-menu-button");
+      const rect = actionButton
+        ? actionButton.getBoundingClientRect()
+        : personElement.getBoundingClientRect();
 
       setRadialMenu({
         isActive: true,
@@ -1667,6 +1713,14 @@ const FamilyTreePage = () => {
     });
 
     if (result.isConfirmed) {
+      // Ensure New Tree starts in normal editable mode (not linked mode)
+      // by clearing any query params like ?mode=linked&source=...
+      try {
+        navigate({ pathname: location.pathname, search: "" }, { replace: true });
+      } catch (_) {
+        // no-op
+      }
+
       const newTree = new FamilyTree();
 
       newTree.addPerson({
@@ -1690,6 +1744,13 @@ const FamilyTreePage = () => {
       arrangeTree(newTree);
 
       setSelectedPersonId(null);
+
+      setRadialMenu({
+        isActive: false,
+        position: { x: 0, y: 0 },
+        items: [],
+        activePersonId: null,
+      });
 
       setHasUnsavedChanges(true); // 🚀 Mark as changed - new tree needs to be saved!
     }
@@ -1907,7 +1968,10 @@ const FamilyTreePage = () => {
       );
 
       if (personElement) {
-        const rect = personElement.getBoundingClientRect();
+        const actionButton = personElement.querySelector(".radial-menu-button");
+        const rect = actionButton
+          ? actionButton.getBoundingClientRect()
+          : personElement.getBoundingClientRect();
 
         setRadialMenu((prev) => ({
           ...prev,
@@ -2313,6 +2377,26 @@ const FamilyTreePage = () => {
               <p className="text-gray-600 dark:text-slate-300">
                 Loading family tree...
               </p>
+            </div>
+          </div>
+        ) : blockedAccess.active ? (
+          <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-slate-950 px-4">
+            <div className="text-center max-w-xl bg-white dark:bg-slate-900 rounded-xl shadow p-6 border border-gray-200 dark:border-slate-800">
+              <div className="text-lg font-semibold text-gray-900 dark:text-slate-100 mb-2">
+                Access Restricted
+              </div>
+
+              <div className="text-gray-600 dark:text-slate-300">
+                {blockedAccess.message || "You have been blocked from this family."}
+              </div>
+
+              <button
+                type="button"
+                className="mt-5 bg-blue-600 text-white px-4 py-2 rounded-lg"
+                onClick={() => navigate("/my-family")}
+              >
+                Go to My Family
+              </button>
             </div>
           </div>
         ) : accessView ? (
@@ -2832,11 +2916,44 @@ const FamilyTreePage = () => {
                 </>
               )}
 
+              <div className="hidden sm:flex fixed bottom-5 right-5 z-50 bg-white dark:bg-slate-900 text-gray-700 dark:text-slate-200 rounded-full shadow-lg border border-gray-200 dark:border-slate-700 items-center gap-2 px-3 py-2">
+                <button
+                  type="button"
+                  onClick={zoomOut}
+                  className="w-9 h-9 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-full flex items-center justify-center active:scale-95 transition-transform"
+                  title="Zoom Out"
+                >
+                  <FaMinus className="text-sm" />
+                </button>
+
+                <div className="min-w-[52px] text-center text-xs font-bold">
+                  {Math.round(zoom * 100)}%
+                </div>
+
+                <button
+                  type="button"
+                  onClick={zoomIn}
+                  className="w-9 h-9 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-full flex items-center justify-center active:scale-95 transition-transform"
+                  title="Zoom In"
+                >
+                  <FaPlus className="text-sm" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={resetZoom}
+                  className="px-3 h-9 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-full flex items-center justify-center text-xs font-semibold active:scale-95 transition-transform"
+                  title="Reset"
+                >
+                  Reset
+                </button>
+              </div>
+
               {/* Tree visualization area */}
 
               <div
                 ref={containerRef}
-                className={`flex-1 w-full h-full min-h-0 min-w-0 overflow-auto touch-pan-x touch-pan-y ${
+                className={`custom-scrollbar flex-1 w-full h-full min-h-0 min-w-0 overflow-auto touch-pan-x touch-pan-y ${
                   needsPlacementBanner ? "pt-28" : "pt-14"
                 } sm:pt-0`}
                 onTouchStart={handleTouchStart}
@@ -3001,6 +3118,30 @@ const FamilyTreePage = () => {
 
                       .map((p) => p.memberId)
 
+                      .filter(Boolean)
+                  : []
+              }
+            />
+
+            <LinkTreeModal
+              isOpen={canEdit && linkTreeModal.isOpen}
+              onClose={() => setLinkTreeModal({ isOpen: false, person: null })}
+              senderPerson={linkTreeModal.person}
+              token={localStorage.getItem("access_token")}
+              primaryColor="#1976D2"
+              currentFamilyCode={userInfo?.familyCode}
+              existingMemberIds={
+                tree
+                  ? Array.from(tree.people.values())
+                      .map((p) => p.memberId)
+                      .filter(Boolean)
+                  : []
+              }
+              existingCanonicalKeys={
+                tree
+                  ? Array.from(tree.people.values())
+                      .filter((p) => p?.canonicalFamilyCode && p?.canonicalNodeUid)
+                      .map((p) => `${String(p.canonicalFamilyCode).trim()}|${String(p.canonicalNodeUid).trim()}`)
                       .filter(Boolean)
                   : []
               }

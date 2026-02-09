@@ -3,6 +3,7 @@ import { getToken } from "../utils/auth";
 import { useUser } from "../Contexts/UserContext";
 import Swal from "sweetalert2";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { throwIfNotOk } from "../utils/apiMessages";
 
 import {
   FiCalendar,
@@ -169,17 +170,9 @@ const EventsPage = () => {
         },
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("❌ Delete event API error:", errorText);
-        Swal.fire({
-          icon: "error",
-          title: "Delete Event Error",
-          text: `Delete Event Error: ${response.status} - ${errorText}`,
-          confirmButtonColor: "#d33",
-        });
-        return;
-      }
+      await throwIfNotOk(response, {
+        fallback: "We couldn’t delete this event. Please try again.",
+      });
 
       console.log("✅ Event deleted successfully");
 
@@ -297,17 +290,9 @@ const EventsPage = () => {
         },
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("❌ Delete event API error:", errorText);
-        Swal.fire({
-          icon: "error",
-          title: "Delete Event Error",
-          text: `Delete Event Error: ${response.status} - ${errorText}`,
-          confirmButtonColor: "#d33",
-        });
-        return;
-      }
+      await throwIfNotOk(response, {
+        fallback: "We couldn’t delete this event. Please try again.",
+      });
 
       console.log("✅ Event deleted successfully");
       await Swal.fire({
@@ -543,7 +528,7 @@ const EventsPage = () => {
                 return (
                   <div
                     key={event.id}
-                    className={`group bg-white dark:bg-slate-900 rounded-2xl shadow-lg transition-all duration-300 border ${
+                    className={`group bg-white dark:bg-slate-900 rounded-2xl shadow-lg transition-all duration-300 border h-full flex flex-col ${
                       eventStyle.borderColor
                     } dark:border-slate-800 overflow-hidden ${
                       event.eventType === "custom"
@@ -617,55 +602,61 @@ const EventsPage = () => {
                     </div>
 
                     {/* Event Content */}
-                    <div className="p-3 space-y-2">
-                      <h3
-                        className={`text-base font-bold text-gray-900 dark:text-slate-100 line-clamp-2 group-hover:${eventStyle.textColor} transition-colors duration-300`}
-                      >
-                        {event.title}
-                      </h3>
-
-                      {event.message && (
-                        <p className="text-xs text-gray-600 dark:text-slate-300 italic bg-gray-50 dark:bg-slate-800 p-2 rounded-lg line-clamp-2">
-                          "{event.message}"
-                        </p>
-                      )}
-
+                    <div className="p-3 flex-1 flex flex-col">
                       <div className="space-y-2">
-                        <div className="flex items-center gap-2 text-gray-700 dark:text-slate-200">
-                          <div
-                            className={`w-6 h-6 ${eventStyle.bgColor} rounded flex items-center justify-center flex-shrink-0`}
-                          >
-                            <FiCalendar size={14} className="text-white" />
-                          </div>
-                          <div>
-                            <p className="text-xs text-gray-500 dark:text-slate-400">Date & Time</p>
-                            <p className="text-sm font-semibold">
-                              {event.date} {event.time && `• ${event.time}`}
-                            </p>
-                          </div>
-                        </div>
+                        <h3
+                          className={`text-base font-bold text-gray-900 dark:text-slate-100 line-clamp-2 group-hover:${eventStyle.textColor} transition-colors duration-300`}
+                        >
+                          {event.title}
+                        </h3>
 
-                        {event.location && (
+                        {event.message && (
+                          <p className="text-xs text-gray-600 dark:text-slate-300 italic bg-gray-50 dark:bg-slate-800 p-2 rounded-lg line-clamp-2">
+                            "{event.message}"
+                          </p>
+                        )}
+
+                        {/* Keep info rows a consistent height so icons/footers align in grid rows */}
+                        <div className="space-y-2 min-h-[64px]">
                           <div className="flex items-center gap-2 text-gray-700 dark:text-slate-200">
+                            <div
+                              className={`w-6 h-6 ${eventStyle.bgColor} rounded flex items-center justify-center flex-shrink-0`}
+                            >
+                              <FiCalendar size={14} className="text-white" />
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-500 dark:text-slate-400">Date & Time</p>
+                              <p className="text-sm font-semibold">
+                                {event.date} {event.time && `• ${event.time}`}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div
+                            className={`flex items-center gap-2 text-gray-700 dark:text-slate-200 ${
+                              event.location ? "" : "opacity-0 pointer-events-none"
+                            }`}
+                            aria-hidden={!event.location}
+                          >
                             <div
                               className={`w-6 h-6 ${eventStyle.bgColor} rounded flex items-center justify-center flex-shrink-0`}
                             >
                               <FiMapPin size={14} className="text-white" />
                             </div>
                             <p className="text-sm font-semibold line-clamp-1">
-                              {event.location}
+                              {event.location || "—"}
                             </p>
                           </div>
+                        </div>
+
+                        {event.description && (
+                          <p className="text-gray-600 dark:text-slate-300 text-xs leading-relaxed line-clamp-2">
+                            {event.description}
+                          </p>
                         )}
                       </div>
 
-                      {event.description && (
-                        <p className="text-gray-600 dark:text-slate-300 text-xs leading-relaxed line-clamp-2">
-                          {event.description}
-                        </p>
-                      )}
-
-                      <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-slate-800">
+                      <div className="flex items-center justify-between pt-2 mt-auto border-t border-gray-100 dark:border-slate-800">
                         <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-slate-300">
                           {event.attendeesCount && (
                             <div className="flex items-center gap-2">

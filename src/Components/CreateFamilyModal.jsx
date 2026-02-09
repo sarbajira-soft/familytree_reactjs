@@ -113,13 +113,14 @@ const CreateFamilyModal = ({ isOpen, onClose, token, onFamilyCreated, mode = "cr
               }
              
               // If creating (not editing), update localStorage userInfo with new familyCode
-              if (data && data.familyCode) {
+              const createdFamilyCode = data?.data?.familyCode || data?.familyCode || null;
+              if (createdFamilyCode) {
                 let userInfo = null;
                 try {
                   userInfo = JSON.parse(localStorage.getItem('userInfo'));
                 } catch {}
                 if (userInfo) {
-                  userInfo.familyCode = data.familyCode;
+                  userInfo.familyCode = createdFamilyCode;
                   localStorage.setItem('userInfo', JSON.stringify(userInfo));
                 }
               }

@@ -5,6 +5,40 @@ export class FamilyTree {
         this.rootId = null;
     }
 
+    sortIdSetByBirthOrder(idSet) {
+        // Sets preserve insertion order, which is why we rebuild the Set in the desired order.
+        // We keep the sort stable: unknown/0 birthOrder keeps the existing relative order.
+        const current = Array.from(idSet || []);
+        const indexById = new Map(current.map((id, idx) => [Number(id), idx]));
+
+        const getBirthOrder = (id) => {
+            const p = this.people.get(Number(id));
+            const n = Number(p?.birthOrder || 0);
+            return Number.isFinite(n) ? n : 0;
+        };
+
+        const cmp = (aRaw, bRaw) => {
+            const a = Number(aRaw);
+            const b = Number(bRaw);
+            const aOrder = getBirthOrder(a);
+            const bOrder = getBirthOrder(b);
+            const aHas = aOrder > 0;
+            const bHas = bOrder > 0;
+
+            if (aHas !== bHas) return aHas ? -1 : 1;
+            if (aHas && bHas && aOrder !== bOrder) return aOrder - bOrder;
+
+            // Stable fallback: preserve existing order, then by id.
+            const aIdx = indexById.get(a) ?? 0;
+            const bIdx = indexById.get(b) ?? 0;
+            if (aIdx !== bIdx) return aIdx - bIdx;
+            return a - b;
+        };
+
+        const sorted = current.slice().sort(cmp);
+        return new Set(sorted);
+    }
+
     addPerson(data) {
         // Prevent duplicate memberId
         if (data.memberId) {
@@ -48,6 +82,8 @@ export class FamilyTree {
         switch(relationType) {
             case 'parent-child':
                 p1.children.add(p2.id);
+                // Bug 61: keep children ordered by birthOrder for consistent sibling rendering.
+                p1.children = this.sortIdSetByBirthOrder(p1.children);
                 p2.parents.add(p1.id);
                 this.updateGenerations(p2.id, p1.generation + 1);
                 this.updateSiblings(p2.id);
@@ -96,11 +132,12 @@ export class FamilyTree {
             }
         });
 
-        person.siblings = allSiblings;
+        person.siblings = this.sortIdSetByBirthOrder(allSiblings);
         allSiblings.forEach(sibId => {
             const sibling = this.people.get(sibId);
             if(sibling) {
                 sibling.siblings.add(personId);
+                sibling.siblings = this.sortIdSetByBirthOrder(sibling.siblings);
                 person.parents.forEach(p => sibling.parents.add(p));
             }
         });

@@ -24,6 +24,11 @@ const FamilyMemberCard = ({ familyCode, token, onEditMember, onViewMember, curre
   const [deletedMemberIds, setDeletedMemberIds] = useState(() => new Set());
 
   const BASE_URL = import.meta.env.VITE_API_BASE_URL;
+  const normalizeFamilyCode = (code) => String(code || '').trim().toUpperCase();
+  const currentUserFamilyCode = currentUser?.userProfile?.familyCode || currentUser?.familyCode;
+  const currentUserIsFamilyAdmin =
+    (currentUser?.role === 2 || currentUser?.role === 3) &&
+    normalizeFamilyCode(currentUserFamilyCode) === normalizeFamilyCode(familyCode);
 
   const fetchMembers = async () => {
     try {
@@ -56,6 +61,7 @@ const FamilyMemberCard = ({ familyCode, token, onEditMember, onViewMember, curre
         id: item.id,
         memberId: item.memberId,
         userId: item.user.id,
+        membershipType: item.membershipType || 'member',
         name: (item.user.fullName && !/\bnull\b|\bundefined\b/i.test(item.user.fullName))
           ? item.user.fullName.replace(/\bnull\b|\bundefined\b/gi, '').replace(/\s+/g, ' ').trim()
           : (
@@ -64,13 +70,13 @@ const FamilyMemberCard = ({ familyCode, token, onEditMember, onViewMember, curre
                 .join(' ') || 'Unknown Name'
             ),
         gender: item.user.userProfile?.gender || 'N/A',
-        role: roleMapping[item.user.role] || 'Member',
+        role: item.familyRole || roleMapping[item.user.role] || 'Member',
         contact: item.user.userProfile?.contactNumber,
         address: item.user.userProfile?.address || '',
         dob: item.user.userProfile?.dob || '',
         age: item.user.userProfile?.age || '',
         profilePic: item.user.profileImage,
-        isAdmin: item.user.role > 1,
+        isAdmin: item.isFamilyAdmin ?? item.user.role > 1,
         isBlocked: item.isBlocked,
         lastUpdated: new Date(item.updatedAt).toLocaleDateString('en-IN'),
       }));
@@ -289,12 +295,12 @@ const FamilyMemberCard = ({ familyCode, token, onEditMember, onViewMember, curre
     <div
       onClick={() => {
         // Only allow viewing if user has Admin (role 2) or Superadmin (role 3) role
-        if (!deletedMemberIds.has(member.memberId) && (currentUser?.role === 2 || currentUser?.role === 3)) {
+        if (!deletedMemberIds.has(member.memberId) && currentUserIsFamilyAdmin) {
           handleViewMember(member.userId, { stopPropagation: () => {} });
         }
       }}
       className={`relative bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-md transition-all duration-300 ease-in-out group transform hover:-translate-y-1 ${
-        (currentUser?.role === 2 || currentUser?.role === 3) 
+        currentUserIsFamilyAdmin 
           ? 'hover:shadow-lg cursor-pointer' 
           : 'cursor-default'
       } ${deletedMemberIds.has(member.memberId) ? 'opacity-20 grayscale pointer-events-none' : ''}`}
@@ -319,9 +325,14 @@ const FamilyMemberCard = ({ familyCode, token, onEditMember, onViewMember, curre
         <div className="ml-4 flex-1 min-w-0">
           <div className="flex items-center space-x-2">
             <h3 className="text-xl font-extrabold text-gray-900 truncate pr-2">{member.name}</h3>
-            {member.isBlocked && (
+            {currentUserIsFamilyAdmin && member.isBlocked && (
               <span className="inline-block text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700">
                 Blocked
+              </span>
+            )}
+            {member.membershipType !== 'member' && (
+              <span className="inline-block text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
+                Linked
               </span>
             )}
           </div>
@@ -366,20 +377,22 @@ const FamilyMemberCard = ({ familyCode, token, onEditMember, onViewMember, curre
         <span className="text-xs text-gray-500">Last updated: {member.lastUpdated}</span>
         <div className="flex space-x-2">
           {/* Show view, edit, delete buttons only for Admin (role 2) and Superadmin (role 3) */}
-          {(currentUser?.role === 2 || currentUser?.role === 3) && (
+          {currentUserIsFamilyAdmin && (
             <>
               {/* Share profile invite link */}
-              <button
-                onClick={(e) => handleShareInvite(member, e)}
-                disabled={deletedMemberIds.has(member.memberId)}
-                className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-blue-100 hover:text-blue-700 transition-colors tooltip"
-                title="Share profile invite link"
-              >
-                <FiShare2 size={18} />
-              </button>
+              {member.membershipType === 'member' && (
+                <button
+                  onClick={(e) => handleShareInvite(member, e)}
+                  disabled={deletedMemberIds.has(member.memberId)}
+                  className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-blue-100 hover:text-blue-700 transition-colors tooltip"
+                  title="Share profile invite link"
+                >
+                  <FiShare2 size={18} />
+                </button>
+              )}
 
               {/* Block / Unblock (cannot block yourself; backend also protects owner) */}
-              {currentUser?.userId !== member.userId && (
+              {member.membershipType === 'member' && currentUser?.userId !== member.userId && (
                 member.isBlocked ? (
                   <button
                     onClick={(e) => handleToggleBlock(member, false, e)}
@@ -399,7 +412,7 @@ const FamilyMemberCard = ({ familyCode, token, onEditMember, onViewMember, curre
                 )
               )}
 
-              {currentUser?.userId !== member.userId && (
+              {member.membershipType === 'member' && currentUser?.userId !== member.userId && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();

@@ -12,6 +12,7 @@ import {
 } from "react-icons/fi";
 import { jwtDecode } from "jwt-decode";
 import Swal from "sweetalert2";
+import { throwIfNotOk } from "../utils/apiMessages";
 
 const EditEventModal = ({
   isOpen,
@@ -95,17 +96,9 @@ const EditEventModal = ({
           headers: { Authorization: `Bearer ${token}` },
         });
 
-        if (!res.ok) {
-          const errorText = await res.text();
-          console.error("❌ User API failed:", errorText);
-          Swal.fire({
-            icon: "error",
-            title: "API Error",
-            text: `API Error: ${res.status} - ${errorText}`,
-            confirmButtonColor: "#10b981",
-          });
-          return;
-        }
+        await throwIfNotOk(res, {
+          fallback: "Unable to load your profile. Please sign in again.",
+        });
 
         const userData = await res.json();
         const fc =
@@ -327,7 +320,7 @@ const EditEventModal = ({
         const errText = await response.text().catch(() => "");
         Swal.fire({
           icon: "error",
-          title: "Update Event Failed",
+          title: "Can’t update event",
           text: getFriendlyError(response.status, errText),
           confirmButtonColor: "#10b981",
         });
@@ -337,6 +330,13 @@ const EditEventModal = ({
 
       const resData = await response.json();
       console.log("✅ Event updated successfully:", resData);
+
+      Swal.fire({
+        icon: "success",
+        title: "Event updated",
+        text: "Your changes have been saved.",
+        confirmButtonColor: "#10b981",
+      });
 
       // Call the callback to refresh events
       if (onEventUpdated) {
@@ -348,8 +348,8 @@ const EditEventModal = ({
       console.error("💥 Error updating event:", err);
       Swal.fire({
         icon: "error",
-        title: "Error",
-        text: `Something went wrong: ${err.message}`,
+        title: "Can’t update event",
+        text: err?.message || "Something went wrong. Please try again.",
         confirmButtonColor: "#10b981",
       });
     } finally {

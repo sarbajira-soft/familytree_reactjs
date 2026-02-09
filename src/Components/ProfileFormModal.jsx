@@ -1900,9 +1900,10 @@ const ProfileFormModal = ({
                     type="text"
                     value={formData.familyCode || userInfo?.familyCode || ''} // FIXED: Ensure never undefined
                     onChange={handleChange}
-                    className={inputClassName('familyCode')}
+                    className={`${inputClassName('familyCode')} bg-gray-100 cursor-not-allowed`}
                     placeholder="FAM000123"
                     maxLength={50}
+                    disabled={mode !== 'add'}
                   />
                 </div>
               </div>

@@ -515,7 +515,7 @@ const Layout = ({ noScroll = false }) => {
           className={`flex-1 bg-gray-50 ${
             shouldLockScroll
               ? "overflow-hidden"
-              : "overflow-y-auto pt-0 px-1 pb-20 md:px-2 md:pb-16 lg:pb-6"
+              : "overflow-y-auto pt-0 px-1 pb-16 md:px-2 md:pb-12 lg:pb-4"
           }`}
         >
           <Outlet />
