@@ -1110,8 +1110,8 @@ const PostPage = () => {
                     </div>
                   </div>
                   <span className="text-secondary-600 flex items-center gap-1 text-xs sm:text-sm">
-                    {post.privacy === "Public" ?   <FiGlobe /> : <FiUsers />}
-                    {post.privacy === "Public}" ? "Public" : "Family"}
+                    {post.privacy === "public" ?   <FiGlobe /> : <FiUsers />}
+                    {post.privacy === "public" ? "Public" : "Family"}
                   </span>
                 </div>
 

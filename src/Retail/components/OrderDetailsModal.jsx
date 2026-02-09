@@ -59,6 +59,8 @@ const OrderDetailsModal = ({ open, orderId, onClose }) => {
   }, [open]);
 
   const items = useMemo(() => (Array.isArray(order?.items) ? order.items : []), [order]);
+  const primaryTitle = items[0]?.title || 'Order details';
+  const headerTitle = items.length > 1 ? `${primaryTitle} + ${items.length - 1} more` : primaryTitle;
 
   if (!open) return null;
 
@@ -357,9 +359,9 @@ const OrderDetailsModal = ({ open, orderId, onClose }) => {
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
             <div>
-              <h3 className="text-base font-semibold text-gray-900">Order details</h3>
+              <h3 className="text-base font-semibold text-gray-900">{headerTitle}</h3>
               <p className="text-[11px] text-gray-500">
-                {order?.display_id || order?.id ? `Order ${order.display_id || order.id}` : 'Loading order'}
+                {order ? 'Order details' : 'Loading order'}
                 {dateLabel ? ` · ${dateLabel}` : ''}
               </p>
             </div>
