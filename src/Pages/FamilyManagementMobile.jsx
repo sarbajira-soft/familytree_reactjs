@@ -267,16 +267,16 @@ const FamilyManagementMobile = () => {
             {accessView}
           </div>
         </div>
-      ) : (
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-24">
-          <div className="mb-4">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-50">
-              Family Management
-            </h1>
-            <p className="mt-1 text-sm text-gray-600 dark:text-slate-300">
-              Quickly access all family-related tools from a single place.
-            </p>
-          </div>
+        <div className="md:hidden mb-4">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-50">
+            Family Management
+          </h1>
+          <p className="mt-1 text-sm text-gray-600 dark:text-slate-300">
+            Quickly access all family-related tools from a single place.
+          </p>
+        </div>
+
+        {accessView}
 
           {hasFamily && (
             <div className="mb-5 space-y-3">
@@ -508,7 +508,6 @@ const FamilyManagementMobile = () => {
             />
           )}
         </div>
-      )}
 
       <CreateFamilyModal
         isOpen={isCreateFamilyModalOpen}

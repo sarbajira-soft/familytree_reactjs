@@ -457,4 +457,4 @@ export function autoArrange(tree) {
     updatePeoplePositions(tree, g, dagreLayoutOffsetX, dagreLayoutOffsetY);
 
     return { g, dagreLayoutOffsetX, dagreLayoutOffsetY };
-} 
+}

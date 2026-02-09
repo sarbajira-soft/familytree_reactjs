@@ -941,7 +941,7 @@ const ProfilePage = () => {
               className={`flex-1 flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-lg font-semibold text-sm transition-all duration-300 ${
                 !showPosts
                   ? "bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow"
-                  : "text-white hover:bg-primary-700"
+                  : "bg-primary-700 text-white hover:bg-primary-800"
               }`}
             >
               <FiImage size={20} />
