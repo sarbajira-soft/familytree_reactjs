@@ -33,6 +33,30 @@ const normalizeCountryCode = (value) => (value || '').toString().trim().toLowerC
 
 const digitsOnly = (value) => (value || '').toString().replace(/\D+/g, '');
 
+const formatDeliveryEstimate = (opt) => {
+  const rawDays = opt?.metadata?.eta_days;
+  const eta = opt?.metadata?.eta;
+
+  const days =
+    typeof rawDays === 'number' && Number.isFinite(rawDays)
+      ? rawDays
+      : typeof eta === 'number' && Number.isFinite(eta)
+      ? eta
+      : typeof eta === 'string'
+      ? Number(String(eta).trim())
+      : null;
+
+  if (typeof days === 'number' && Number.isFinite(days) && days > 0) {
+    return `Delivers in ${days} day${days === 1 ? '' : 's'}`;
+  }
+
+  if (typeof eta === 'string' && eta.trim()) {
+    return `Delivery estimate: ${eta.trim()}`;
+  }
+
+  return '';
+};
+
 const validateAddressFields = (addr) => {
   const errors = {};
 
@@ -50,8 +74,7 @@ const validateAddressFields = (addr) => {
   if (!firstName) errors.first_name = 'First name is required';
   else if (!nameRegex.test(firstName)) errors.first_name = 'Enter a valid first name';
 
-  if (!lastName) errors.last_name = 'Last name is required';
-  else if (!nameRegex.test(lastName)) errors.last_name = 'Enter a valid last name';
+  if (lastName && !nameRegex.test(lastName)) errors.last_name = 'Enter a valid last name';
 
   if (!address1) errors.address_1 = 'Address is required';
   if (!city) errors.city = 'City is required';
@@ -970,7 +993,6 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
                 onChange={handleAddressInputChange(setShippingAddress, setShippingErrors, setShippingTouched)}
                 onBlur={handleAddressInputBlur(shippingAddress, setShippingErrors, setShippingTouched)}
                 disabled={disabled}
-                required
                 className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${
                   shippingTouched.last_name && shippingErrors.last_name
                     ? 'border-red-300 focus:border-red-400 focus:ring-red-300'
@@ -1177,7 +1199,6 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
                     onChange={handleAddressInputChange(setBillingAddress, setBillingErrors, setBillingTouched)}
                     onBlur={handleAddressInputBlur(billingAddress, setBillingErrors, setBillingTouched)}
                     disabled={disabled}
-                    required
                     className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${
                       billingTouched.last_name && billingErrors.last_name
                         ? 'border-red-300 focus:border-red-400 focus:ring-red-300'
@@ -1385,11 +1406,11 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
                           <p className="font-semibold text-gray-800">
                             {opt.label || opt.name || 'Shipping'}
                           </p>
-                          {opt.metadata && opt.metadata.eta && (
-                            <p className="text-[11px] text-gray-500">
-                              ETA: {opt.metadata.eta}
-                            </p>
-                          )}
+                          {formatDeliveryEstimate(opt) ? (
+                            <div className="mt-1 inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+                              {formatDeliveryEstimate(opt)}
+                            </div>
+                          ) : null}
                         </div>
                       </div>
                       <div className="text-right text-xs font-semibold text-gray-900">

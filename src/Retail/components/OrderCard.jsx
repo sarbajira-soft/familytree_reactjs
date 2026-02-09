@@ -32,6 +32,8 @@ const OrderCard = ({ order, onViewDetails }) => {
   const items = Array.isArray(order.items) ? order.items : [];
   const itemSummary = items.slice(0, 2).map((i) => i.title).join(', ');
   const remainingCount = items.length > 2 ? items.length - 2 : 0;
+  const primaryTitle = items[0]?.title || 'Order';
+  const headerTitle = items.length > 1 ? `${primaryTitle} + ${items.length - 1} more` : primaryTitle;
 
   const total = typeof order.total === 'number' ? order.total : 0;
   const paymentStatus = order.payment_status || order.paymentStatus;
@@ -107,15 +109,12 @@ const OrderCard = ({ order, onViewDetails }) => {
         <div className="space-y-0.5">
           <div className="flex items-center gap-1.5">
             <FiPackage className="text-blue-500" />
-            <span className="font-semibold text-gray-900">Order {order.display_id || order.id}</span>
+            <span className="font-semibold text-gray-900">{headerTitle}</span>
           </div>
           <p className="text-[11px] text-gray-500">Placed on {dateLabel}</p>
-          {itemSummary && (
-            <p className="truncate text-[11px] text-gray-600">
-              {itemSummary}
-              {remainingCount > 0 && ` + ${remainingCount} more`}
-            </p>
-          )}
+          <p className="truncate text-[11px] text-gray-600">
+            Order ID: {order.display_id || order.id}
+          </p>
         </div>
         <div className="text-right space-y-1">
           <p className="text-sm font-semibold text-gray-900">{formatAmount(total)}</p>

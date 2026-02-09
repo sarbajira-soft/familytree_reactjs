@@ -273,9 +273,9 @@ const HierarchicalConnections = ({ positions = new Map(), connections = [] } = {
         const horizontalBarY = (connectionStartY + childTopY) / 2;
 
         // Horizontal bar spans children with padding
-        const barPadding = 10;
-        const adjustedMinX = minChildX - barPadding;
-        const adjustedMaxX = maxChildX + barPadding;
+    
+        const adjustedMinX = minChildX ;
+        const adjustedMaxX = maxChildX ;
 
         const childVerticalPaths = children.map((child) => {
           const childTopY = child.pos.y - ACTUAL_CARD_HALF_HEIGHT;
