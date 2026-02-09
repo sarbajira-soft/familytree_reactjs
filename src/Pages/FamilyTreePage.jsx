@@ -1713,6 +1713,14 @@ const FamilyTreePage = () => {
     });
 
     if (result.isConfirmed) {
+      // Ensure New Tree starts in normal editable mode (not linked mode)
+      // by clearing any query params like ?mode=linked&source=...
+      try {
+        navigate({ pathname: location.pathname, search: "" }, { replace: true });
+      } catch (_) {
+        // no-op
+      }
+
       const newTree = new FamilyTree();
 
       newTree.addPerson({
@@ -1736,6 +1744,13 @@ const FamilyTreePage = () => {
       arrangeTree(newTree);
 
       setSelectedPersonId(null);
+
+      setRadialMenu({
+        isActive: false,
+        position: { x: 0, y: 0 },
+        items: [],
+        activePersonId: null,
+      });
 
       setHasUnsavedChanges(true); // 🚀 Mark as changed - new tree needs to be saved!
     }
@@ -1953,7 +1968,10 @@ const FamilyTreePage = () => {
       );
 
       if (personElement) {
-        const rect = personElement.getBoundingClientRect();
+        const actionButton = personElement.querySelector(".radial-menu-button");
+        const rect = actionButton
+          ? actionButton.getBoundingClientRect()
+          : personElement.getBoundingClientRect();
 
         setRadialMenu((prev) => ({
           ...prev,
@@ -2935,7 +2953,7 @@ const FamilyTreePage = () => {
 
               <div
                 ref={containerRef}
-                className={`flex-1 w-full h-full min-h-0 min-w-0 overflow-auto touch-pan-x touch-pan-y ${
+                className={`custom-scrollbar flex-1 w-full h-full min-h-0 min-w-0 overflow-auto touch-pan-x touch-pan-y ${
                   needsPlacementBanner ? "pt-28" : "pt-14"
                 } sm:pt-0`}
                 onTouchStart={handleTouchStart}
@@ -3111,6 +3129,22 @@ const FamilyTreePage = () => {
               senderPerson={linkTreeModal.person}
               token={localStorage.getItem("access_token")}
               primaryColor="#1976D2"
+              currentFamilyCode={userInfo?.familyCode}
+              existingMemberIds={
+                tree
+                  ? Array.from(tree.people.values())
+                      .map((p) => p.memberId)
+                      .filter(Boolean)
+                  : []
+              }
+              existingCanonicalKeys={
+                tree
+                  ? Array.from(tree.people.values())
+                      .filter((p) => p?.canonicalFamilyCode && p?.canonicalNodeUid)
+                      .map((p) => `${String(p.canonicalFamilyCode).trim()}|${String(p.canonicalNodeUid).trim()}`)
+                      .filter(Boolean)
+                  : []
+              }
             />
 
             {/* Debug Panel */}

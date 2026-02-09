@@ -638,16 +638,25 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
             
             parentForms.forEach(form => {
                 const sel = parentSelections[form.type];
-                
+
                 // Check if user has made a selection for this parent
                 if (sel) {
                     if (sel.selectedMemberId && !sel.showManualEntry) {
                         // Existing member selected
                         const member = familyMembers.find(m => m.user?.id === parseInt(sel.selectedMemberId));
                         if (member) {
+                            const rawGender = String(member.user?.userProfile?.gender || '').trim().toLowerCase();
+                            const normalizedGender =
+                                rawGender === 'male' || rawGender === 'm' || rawGender === 'man'
+                                    ? 'male'
+                                    : rawGender === 'female' || rawGender === 'f' || rawGender === 'woman'
+                                      ? 'female'
+                                      : null;
+                            const roleGender = form.type === 'father' ? 'male' : 'female';
+
                             parentPersons.push({
                                 name: member.user.fullName,
-                                gender: member.user.userProfile.gender === 'Male' ? 'male' : 'female',
+                                gender: normalizedGender || roleGender,
                                 age: member.user.userProfile.dob ? (new Date().getFullYear() - new Date(member.user.userProfile.dob).getFullYear()) : '',
                                 img: member.user.profileImage,
                                 imgPreview: imagePreview[form.index] || '',
@@ -698,6 +707,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
             onClose();
             return;
         }
+
         // For other types: spouse, child, sibling, etc.
         const persons = [];
         let hasValidPerson = false;
@@ -708,9 +718,17 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                 // Existing member selected
                 const member = familyMembers.find(m => m.user?.id === parseInt(sel.selectedMemberId));
                 if (member) {
+                    const rawGender = String(member.user?.userProfile?.gender || '').trim().toLowerCase();
+                    const normalizedGender =
+                        rawGender === 'male' || rawGender === 'm' || rawGender === 'man'
+                            ? 'male'
+                            : rawGender === 'female' || rawGender === 'f' || rawGender === 'woman'
+                              ? 'female'
+                              : 'male';
+
                     persons.push({
                         name: member.user.fullName,
-                        gender: member.user.userProfile.gender === 'Male' ? 'male' : 'female',
+                        gender: normalizedGender,
                         age: member.user.userProfile.dob ? (new Date().getFullYear() - new Date(member.user.userProfile.dob).getFullYear()) : '',
                         img: member.user.profileImage,
                         imgPreview: imagePreview[form.index] || '',

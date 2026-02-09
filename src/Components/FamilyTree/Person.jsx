@@ -501,6 +501,8 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
 
     const { theme } = useTheme();
 
+    const [isUidCopied, setIsUidCopied] = useState(false);
+
 
 
     const handleCopyNodeUid = async () => {
@@ -511,31 +513,12 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
 
             await navigator.clipboard.writeText(String(person.nodeUid));
 
-            Swal.fire({
-
-                icon: 'success',
-
-                title: 'Copied',
-
-                text: 'UID copied to clipboard',
-
-                timer: 1200,
-
-                showConfirmButton: false,
-
-            });
+            setIsUidCopied(true);
+            window.setTimeout(() => setIsUidCopied(false), 1000);
 
         } catch (e) {
 
-            Swal.fire({
-
-                icon: 'error',
-
-                title: 'Copy Failed',
-
-                text: 'Unable to copy UID',
-
-            });
+            setIsUidCopied(false);
 
         }
 
@@ -2962,7 +2945,7 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
 
 
 
-                    <div ref={menuRef} className="absolute right-0 mt-1 w-40 bg-white rounded-md shadow-lg border border-gray-200 z-20 dark:bg-slate-900 dark:border-slate-700">
+                    <div ref={menuRef} className="absolute right-0 mt-1 w-32 bg-white rounded-md shadow-lg border border-gray-200 z-20 dark:bg-slate-900 dark:border-slate-700">
 
 
 
@@ -2978,7 +2961,7 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
 
 
 
-                          className="w-full px-3 py-2 text-left text-sm text-gray-700 bg-white flex items-center space-x-2 dark:bg-slate-900 dark:text-slate-200"
+                          className="w-full px-2 py-1.5 text-left text-xs text-gray-700 bg-white flex items-center space-x-2 dark:bg-slate-900 dark:text-slate-200"
 
 
 
@@ -2998,7 +2981,7 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
 
 
 
-                                size={14}
+                                size={12}
 
 
 
@@ -3026,7 +3009,7 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
 
 
 
-                              <FiUserX size={14} className="text-red-600" />
+                              <FiUserX size={12} className="text-red-600" />
 
 
 
@@ -3042,11 +3025,103 @@ const Person = ({ person, isRoot, onClick, rootId, tree, language, isNew, isSele
 
 
 
-              {person?.nodeUid && null}
-
-
-
                         </button>
+
+
+
+                      )}
+
+
+
+                      {person?.nodeUid && (
+
+
+
+                        <div className="px-2 pb-1.5">
+
+
+
+                          <div className="w-full px-2 py-1 text-left text-[11px] text-gray-600 bg-gray-50 rounded-md border border-gray-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700">
+
+
+
+                            <div className="text-[10px] font-semibold text-gray-500 dark:text-slate-300 leading-tight">
+
+                              Uid
+
+                            </div>
+
+                            <div className="flex items-center justify-between gap-2">
+
+                              <span className="min-w-0 truncate whitespace-nowrap overflow-hidden text-ellipsis">
+
+                                {String(person.nodeUid)}
+
+                              </span>
+
+
+
+                              <div className="flex items-center gap-1 flex-shrink-0">
+
+                                {isUidCopied && (
+                                  <span className="text-[10px] font-semibold text-green-600 dark:text-green-400">
+                                    Copied
+                                  </span>
+                                )}
+
+                                <button
+
+
+
+                                type="button"
+
+
+
+                                className="flex-shrink-0 text-gray-500 hover:text-gray-700 dark:text-slate-300 dark:hover:text-slate-100"
+
+
+
+                                title="Copy Uid"
+
+
+
+                                onClick={(e) => {
+
+
+
+                                  e.stopPropagation();
+
+
+
+                                  handleCopyNodeUid();
+
+
+
+                                }}
+
+
+
+                              >
+
+
+
+                                <FiCopy size={12} />
+
+
+
+                                </button>
+
+                              </div>
+
+                            </div>
+
+
+
+                          </div>
+
+
+
+                        </div>
 
 
 

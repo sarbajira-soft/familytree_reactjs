@@ -15,20 +15,72 @@ export default function LinkTreeModal({
   token,
   primaryColor = DEFAULT_PRIMARY,
   onSent,
+  currentFamilyCode,
+  existingMemberIds = [],
+  existingCanonicalKeys = [],
 }) {
   const senderNodeUid = String(senderPerson?.nodeUid || "").trim();
 
+  const asList = (val) => {
+    if (!val) return [];
+    if (Array.isArray(val)) return val;
+    if (val instanceof Set) return Array.from(val);
+    return [];
+  };
+
+  const getPersonImage = (p) => {
+    const img = p?.img ?? p?.profileImage ?? p?.image ?? null;
+    return typeof img === "string" && img.trim() ? img.trim() : "";
+  };
+
+  const normalizePhone = (val) => String(val || "").replace(/\D+/g, "");
+
+  const getPersonPhones = (p) => {
+    const candidates = [
+      p?.phone,
+      p?.phoneNumber,
+      p?.mobile,
+      p?.mobileNumber,
+      p?.contact,
+      p?.contactNumber,
+      p?.whatsapp,
+      p?.whatsappNumber,
+    ];
+    return candidates
+      .map((x) => normalizePhone(x))
+      .filter(Boolean);
+  };
+
   const [receiverFamilyCode, setReceiverFamilyCode] = useState("");
-  const [relationshipType, setRelationshipType] = useState("sibling");
+  const [relationshipType, setRelationshipType] = useState("parent");
 
   const [loading, setLoading] = useState(false);
   const [peopleLoading, setPeopleLoading] = useState(false);
   const [people, setPeople] = useState([]);
   const [personSearch, setPersonSearch] = useState("");
   const [selectedPerson, setSelectedPerson] = useState(null);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [receiverSearchMessage, setReceiverSearchMessage] = useState("");
+
+  const [phoneLookup, setPhoneLookup] = useState({ phone: "", loading: false, result: null });
+  const phoneRegex = /^[+]?\d[\d\s-]{8,}$/;
 
   const receiverNodeUid = String(selectedPerson?.nodeUid || "").trim();
   const receiverIsAppUser = Boolean(selectedPerson?.isAppUser || selectedPerson?.memberId);
+
+  const senderParents = asList(senderPerson?.parents);
+  const receiverParents = asList(selectedPerson?.parents);
+  const senderHasParents = senderParents.length > 0;
+  const receiverHasParents = receiverParents.length > 0;
+  const parentAllowed = !senderHasParents;
+  const siblingAllowed = senderHasParents && receiverHasParents;
+
+  const relationshipOptions = React.useMemo(() => {
+    if (senderHasParents) {
+      return ["sibling", "child"];
+    }
+    return ["parent", "child"];
+  }, [senderHasParents]);
 
   const normalizeGender = (g) => {
     const s = String(g || "").toLowerCase().trim();
@@ -62,6 +114,29 @@ export default function LinkTreeModal({
   const childParentRoleMissing =
     relationshipType === "child" && receiverNodeUid && !derivedParentRole;
 
+  React.useEffect(() => {
+    // Keep the selected relationship valid as sender/receiver changes.
+    // This mirrors the radial menu behavior:
+    // - sender has no parents => allow parent + child
+    // - sender has parents    => allow sibling + child
+    setRelationshipType((prev) => {
+      // If current selection is still valid, keep it.
+      if (relationshipOptions.includes(prev)) {
+        // Extra safety: if sibling is selected but receiver doesn't have parents, fallback to child.
+        if (prev === "sibling" && !siblingAllowed) return "child";
+        // If parent is selected but sender already has parents, fallback to child.
+        if (prev === "parent" && !parentAllowed) return "child";
+        return prev;
+      }
+
+      // Otherwise choose a sensible default.
+      if (senderHasParents) {
+        return siblingAllowed ? "sibling" : "child";
+      }
+      return "parent";
+    });
+  }, [relationshipOptions, siblingAllowed, parentAllowed, senderHasParents]);
+
   const canSubmit = Boolean(
     senderNodeUid &&
       normalizeFamilyCode(receiverFamilyCode) &&
@@ -71,34 +146,140 @@ export default function LinkTreeModal({
       (!needsParentRole || Boolean(derivedParentRole)),
   );
 
+  const normalizedReceiverFamilyCode = normalizeFamilyCode(receiverFamilyCode);
+  const receiverFamilyCodeTooShort = Boolean(normalizedReceiverFamilyCode) && normalizedReceiverFamilyCode.length < 3;
+  const canSearchReceiverFamily = Boolean(normalizedReceiverFamilyCode) && !receiverFamilyCodeTooShort;
+  const searchDisabledReason = !normalizedReceiverFamilyCode
+    ? "Enter receiver family code"
+    : receiverFamilyCodeTooShort
+    ? "Family code must be at least 3 characters"
+    : "";
+
+  const submitDisabledReason = !senderNodeUid
+    ? "Select a valid sender card"
+    : !normalizedReceiverFamilyCode
+    ? "Enter receiver family code"
+    : !hasSearched
+    ? "Search receiver family first"
+    : !receiverNodeUid
+    ? "Select a receiver person"
+    : !receiverIsAppUser
+    ? "Receiver must be an app user"
+    : needsParentRole && !derivedParentRole
+    ? "Set gender for the selected card"
+    : relationshipType === "parent" && !parentAllowed
+    ? "Sender already has parents"
+    : relationshipType === "sibling" && !siblingAllowed
+    ? "Sibling requires parents on both sides"
+    : "";
+
   useEffect(() => {
     if (!isOpen) return;
     // Reset form every time modal opens (prevents stale values).
     setReceiverFamilyCode("");
-    setRelationshipType("sibling");
+    setRelationshipType(asList(senderPerson?.parents).length > 0 ? "child" : "parent");
     setPeople([]);
     setPersonSearch("");
     setSelectedPerson(null);
     setLoading(false);
     setPeopleLoading(false);
+    setHasSearched(false);
+    setReceiverSearchMessage("");
+    setPhoneLookup({ phone: "", loading: false, result: null });
   }, [isOpen]);
 
   const filteredPeople = useMemo(() => {
     const q = String(personSearch || "").trim().toLowerCase();
     const base = Array.isArray(people) ? people : [];
-    if (!q) return base.slice(0, 30);
 
-    return base
-      .filter((p) => {
+    // Receiver list should show app users only and exclude spouse/associated members.
+    // Heuristic:
+    // - app user: `isAppUser` true
+    // - primary-in-this-family: person.primaryFamilyCode (preferred) must match person.treeFamilyCode (the tree being viewed)
+    //   (fallback to person.familyCode when primaryFamilyCode is missing)
+    const normalizeCode = (val) => String(val || "").trim().toUpperCase();
+    const eligible = base.filter((p) => {
+      const isApp = Boolean(p?.isAppUser);
+      if (!isApp) return false;
+
+      const primary = normalizeCode(p?.primaryFamilyCode || p?.familyCode);
+      const tree = normalizeCode(p?.treeFamilyCode);
+      if (primary && tree && primary !== tree) return false;
+      return true;
+    });
+
+    const existingMemberSet = new Set(
+      (Array.isArray(existingMemberIds) ? existingMemberIds : [])
+        .map((x) => Number(x))
+        .filter((x) => Number.isFinite(x) && x > 0),
+    );
+    const existingCanonicalSet = new Set(
+      (Array.isArray(existingCanonicalKeys) ? existingCanonicalKeys : [])
+        .map((x) => String(x || "").trim())
+        .filter(Boolean),
+    );
+
+    const notAlreadyInTree = (p) => {
+      const mid = Number(p?.memberId || p?.userId || 0);
+      if (mid && existingMemberSet.has(mid)) return false;
+      const key = `${String(p?.canonicalFamilyCode || "").trim()}|${String(p?.canonicalNodeUid || "").trim()}`;
+      if (String(p?.canonicalFamilyCode || "").trim() && String(p?.canonicalNodeUid || "").trim()) {
+        if (existingCanonicalSet.has(key)) return false;
+      }
+      return true;
+    };
+
+    const withDisabledState = eligible.map((p) => {
+      const isSelectable = notAlreadyInTree(p);
+      return {
+        person: p,
+        disabled: !isSelectable,
+        disabledReason: !isSelectable ? "Already in tree" : "",
+      };
+    });
+
+    if (!q) return withDisabledState.slice(0, 30);
+
+    return withDisabledState
+      .filter(({ person: p }) => {
         const name = String(p?.name || "").toLowerCase();
         const id = String(p?.personId ?? "").toLowerCase();
-        return name.includes(q) || id.includes(q);
+        const qPhone = normalizePhone(q);
+        const phones = getPersonPhones(p);
+        const phoneMatch = qPhone ? phones.some((ph) => ph.includes(qPhone)) : false;
+        return name.includes(q) || id.includes(q) || phoneMatch;
       })
       .slice(0, 30);
-  }, [people, personSearch]);
+  }, [people, personSearch, existingMemberIds, existingCanonicalKeys]);
 
-  const fetchReceiverFamilyPeople = async () => {
-    const code = normalizeFamilyCode(receiverFamilyCode);
+  React.useEffect(() => {
+    // If the current selection becomes disallowed (already in tree), clear it.
+    if (!selectedPerson) return;
+    const existingMemberSet = new Set(
+      (Array.isArray(existingMemberIds) ? existingMemberIds : [])
+        .map((x) => Number(x))
+        .filter((x) => Number.isFinite(x) && x > 0),
+    );
+    const existingCanonicalSet = new Set(
+      (Array.isArray(existingCanonicalKeys) ? existingCanonicalKeys : [])
+        .map((x) => String(x || "").trim())
+        .filter(Boolean),
+    );
+    const mid = Number(selectedPerson?.memberId || selectedPerson?.userId || 0);
+    const key = `${String(selectedPerson?.canonicalFamilyCode || "").trim()}|${String(selectedPerson?.canonicalNodeUid || "").trim()}`;
+    const alreadyInTree =
+      (mid && existingMemberSet.has(mid)) ||
+      (String(selectedPerson?.canonicalFamilyCode || "").trim() &&
+        String(selectedPerson?.canonicalNodeUid || "").trim() &&
+        existingCanonicalSet.has(key));
+
+    if (alreadyInTree) {
+      setSelectedPerson(null);
+    }
+  }, [selectedPerson, existingMemberIds, existingCanonicalKeys]);
+
+  const fetchReceiverFamilyPeople = async (codeOverride) => {
+    const code = normalizeFamilyCode(codeOverride ?? receiverFamilyCode);
     if (!code) {
       await Swal.fire({
         icon: "warning",
@@ -106,7 +287,18 @@ export default function LinkTreeModal({
         text: "Please enter a valid family code to search.",
         confirmButtonColor: primaryColor,
       });
-      return;
+      return [];
+    }
+
+    // Basic UX validation (avoid accidental 1-2 char searches)
+    if (code.length < 3) {
+      await Swal.fire({
+        icon: "warning",
+        title: "Family code looks too short",
+        text: "Please enter the full receiver family code and try again.",
+        confirmButtonColor: primaryColor,
+      });
+      return [];
     }
 
     // Boundary: avoid absurdly long inputs that can lead to slow queries / bad UX.
@@ -117,15 +309,17 @@ export default function LinkTreeModal({
         text: "Please check the family code and try again.",
         confirmButtonColor: primaryColor,
       });
-      return;
+      return [];
     }
 
     try {
+      setHasSearched(true);
+      setReceiverSearchMessage("");
       setPeopleLoading(true);
       const authToken = token || localStorage.getItem("access_token");
       if (!authToken) throw new Error("Your session has expired. Please log in again.");
 
-      const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001";
+      const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
       const res = await fetch(`${API_BASE}/family/tree/${encodeURIComponent(code)}`, {
         headers: {
           Authorization: `Bearer ${authToken}`,
@@ -138,15 +332,67 @@ export default function LinkTreeModal({
       setPeople(nextPeople);
       setPersonSearch("");
       setSelectedPerson(null);
+
+      if (!nextPeople.length) {
+        setReceiverSearchMessage(
+          data?.message ||
+            "No members are available to link from this family. Ask the admin to create/save the family tree first.",
+        );
+      }
+
+      return nextPeople;
     } catch (e) {
+      setHasSearched(true);
+      setReceiverSearchMessage("");
       await Swal.fire({
         icon: "error",
         title: "Search failed",
         text: e?.message || "Unable to load the target family members.",
         confirmButtonColor: primaryColor,
       });
+      return [];
     } finally {
       setPeopleLoading(false);
+    }
+  };
+
+  const handlePhoneLookup = async () => {
+    if (!phoneRegex.test(phoneLookup.phone)) return;
+    const cleaned = String(phoneLookup.phone).replace(/\D/g, "");
+    const last10 = cleaned.slice(-10);
+    if (last10.length < 10) return;
+
+    setPhoneLookup((p) => ({ ...p, loading: true, result: null }));
+    try {
+      const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
+      const res = await fetch(`${API_BASE}/user/lookup?phone=${encodeURIComponent(last10)}`);
+      const data = await res.json().catch(() => ({}));
+      const famCode = normalizeFamilyCode(data?.user?.familyCode);
+      const sameFamily = Boolean(famCode) && famCode === normalizeFamilyCode(currentFamilyCode);
+      const alreadyInTree = Boolean(data?.user?.id) && existingMemberIds?.includes?.(Number(data.user.id));
+
+      const nextResult = { ...data, sameFamily, alreadyInTree, cleaned: last10 };
+      setPhoneLookup((p) => ({ ...p, loading: false, result: nextResult }));
+
+      if (data?.exists && famCode && !sameFamily && !alreadyInTree) {
+        setReceiverFamilyCode(famCode);
+        const loaded = await fetchReceiverFamilyPeople(famCode);
+        const uid = Number(data?.user?.id);
+        const match = Array.isArray(loaded)
+          ? loaded.find((pp) => Number(pp?.memberId || pp?.userId) === uid)
+          : null;
+        if (match) {
+          setSelectedPerson(match);
+        }
+      }
+    } catch (e) {
+      setPhoneLookup((p) => ({ ...p, loading: false }));
+      await Swal.fire({
+        icon: "error",
+        title: "Lookup failed",
+        text: e?.message || "Please try again.",
+        confirmButtonColor: primaryColor,
+      });
     }
   };
 
@@ -180,6 +426,44 @@ export default function LinkTreeModal({
         confirmButtonColor: primaryColor,
       });
       return;
+    }
+
+    // Mirror radial menu rule: cannot add parents if the sender already has parents.
+    if (relationshipType === "parent" && !parentAllowed) {
+      await Swal.fire({
+        icon: "info",
+        title: "Parents already added",
+        text: "This card already has parents. You can’t add another parent link.",
+        confirmButtonColor: primaryColor,
+      });
+      return;
+    }
+
+    if (relationshipType === "sibling" && !siblingAllowed) {
+      await Swal.fire({
+        icon: "info",
+        title: "Sibling link not available",
+        text: "Sibling relationship needs parents on both sides. Please add parents first, then try again.",
+        confirmButtonColor: primaryColor,
+      });
+      return;
+    }
+
+    // Override warning: in link-tree flow, the risky overwrite case is adding a child link
+    // when the receiver already has parents.
+    if (relationshipType === "child" && receiverHasParents) {
+      const { isConfirmed } = await Swal.fire({
+        icon: "warning",
+        title: "Override existing cards?",
+        text: "This person already has parents/relationships in their tree. If you proceed, the link may override existing parent cards after approval. Continue?",
+        showCancelButton: true,
+        confirmButtonColor: primaryColor,
+        confirmButtonText: "Yes, override",
+        cancelButtonText: "No",
+      });
+      if (!isConfirmed) {
+        return;
+      }
     }
 
     if (needsParentRole && !derivedParentRole) {
@@ -216,6 +500,51 @@ export default function LinkTreeModal({
 
       await throwIfNotOk(res, { fallback: "We couldn’t send the link request. Please try again." });
       const data = await res.json().catch(() => ({}));
+
+      const requestId = Number(data?.requestId);
+      const message = String(data?.message || "");
+
+      if (message.toLowerCase().includes("already pending") && requestId > 0) {
+        const pendingChoice = await Swal.fire({
+          icon: "info",
+          title: "Link request already pending",
+          text: "A link request for these families is already pending. Do you want to revoke (cancel) it?",
+          showCancelButton: true,
+          confirmButtonColor: primaryColor,
+          confirmButtonText: "Revoke request",
+          cancelButtonText: "Keep pending",
+        });
+
+        if (pendingChoice.isConfirmed) {
+          try {
+            const revokeRes = await fetch(`${API_BASE}/family/revoke-tree-link-request`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${authToken}`,
+                accept: "application/json",
+              },
+              body: JSON.stringify({ treeLinkRequestId: requestId }),
+            });
+            await throwIfNotOk(revokeRes, { fallback: "We couldn’t revoke that request." });
+            const revokeData = await revokeRes.json().catch(() => ({}));
+            await Swal.fire({
+              icon: "success",
+              title: "Request revoked",
+              text: revokeData?.message || "Link request revoked.",
+              confirmButtonColor: primaryColor,
+            });
+          } catch (e) {
+            await Swal.fire({
+              icon: "error",
+              title: "Revoke failed",
+              text: e?.message || "Unable to revoke the request.",
+              confirmButtonColor: primaryColor,
+            });
+          }
+        }
+        return;
+      }
 
       await Swal.fire({
         icon: "success",
@@ -261,11 +590,15 @@ export default function LinkTreeModal({
         style={{
           width: "100%",
           maxWidth: 680,
+          maxHeight: "calc(100vh - 24px)",
+          height: "auto",
           background: "rgba(255,255,255,0.98)",
           borderRadius: 18,
           boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
           overflow: "hidden",
           border: `1px solid ${primaryColor}20`,
+          display: "flex",
+          flexDirection: "column",
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -304,22 +637,70 @@ export default function LinkTreeModal({
           </button>
         </div>
 
-        <div style={{ padding: 18 }}>
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ fontWeight: 700, marginBottom: 6 }}>Sender nodeUid</div>
-            <div
-              style={{
-                padding: "10px 12px",
-                borderRadius: 12,
-                border: `2px solid ${primaryColor}22`,
-                background: "rgba(255,255,255,0.9)",
-                fontFamily: "monospace",
-                fontSize: 12,
-                wordBreak: "break-all",
-              }}
-            >
-              {senderNodeUid || "—"}
+        <div style={{ padding: 18, overflowY: "auto", flex: 1 }}>
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontWeight: 700, marginBottom: 6 }}>Search by mobile number</div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <input
+                type="text"
+                placeholder="10-digit mobile"
+                value={phoneLookup.phone}
+                maxLength={15}
+                onChange={(e) => setPhoneLookup((p) => ({ ...p, phone: e.target.value }))}
+                style={{
+                  flex: 1,
+                  borderRadius: 12,
+                  border: `2px solid ${primaryColor}22`,
+                  padding: "12px 14px",
+                  outline: "none",
+                  fontWeight: 700,
+                }}
+              />
+              <button
+                type="button"
+                onClick={handlePhoneLookup}
+                disabled={!phoneRegex.test(phoneLookup.phone) || phoneLookup.loading}
+                style={{
+                  borderRadius: 12,
+                  padding: "12px 14px",
+                  border: `2px solid ${primaryColor}`,
+                  background: primaryColor,
+                  color: "#fff",
+                  cursor: !phoneRegex.test(phoneLookup.phone) || phoneLookup.loading ? "not-allowed" : "pointer",
+                  fontWeight: 900,
+                }}
+              >
+                {phoneLookup.loading ? "Searching..." : "Search"}
+              </button>
             </div>
+
+            {phoneLookup.result && (
+              <div style={{ marginTop: 10, fontSize: 13, fontWeight: 700, color: "#111" }}>
+                {phoneLookup.result.exists ? (
+                  <>
+                    <div style={{ marginBottom: 6 }}>
+                      <span style={{ fontWeight: 900 }}>User:</span> {phoneLookup.result.user?.fullName || "Unknown"}
+                    </div>
+                    <div style={{ marginBottom: 6 }}>
+                      <span style={{ fontWeight: 900 }}>Family Code:</span> {phoneLookup.result.user?.familyCode || "N/A"}
+                    </div>
+                    {phoneLookup.result.sameFamily && (
+                      <div style={{ color: primaryColor, fontWeight: 900 }}>Already in same family</div>
+                    )}
+                    {phoneLookup.result.alreadyInTree && (
+                      <div style={{ color: "#b45309", fontWeight: 900 }}>Already in your tree</div>
+                    )}
+                    {!phoneLookup.result.user?.familyCode && (
+                      <div style={{ color: "#b45309", fontWeight: 900 }}>This user has no family code</div>
+                    )}
+                  </>
+                ) : (
+                  <div style={{ color: "#6b7280", fontWeight: 800 }}>
+                    {phoneLookup.result.message || "User not found"}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
@@ -329,7 +710,7 @@ export default function LinkTreeModal({
                 <input
                   value={receiverFamilyCode}
                   onChange={(e) => setReceiverFamilyCode(e.target.value)}
-                  placeholder="Enter family code"
+                  placeholder="Enter receiver family code"
                   maxLength={30}
                   style={{
                     flex: 1,
@@ -343,14 +724,14 @@ export default function LinkTreeModal({
                 />
                 <button
                   type="button"
-                  onClick={fetchReceiverFamilyPeople}
-                  disabled={peopleLoading}
+                  onClick={() => fetchReceiverFamilyPeople()}
+                  disabled={peopleLoading || !canSearchReceiverFamily}
                   style={{
                     borderRadius: 12,
                     padding: "12px 14px",
                     border: `2px solid ${primaryColor}33`,
                     background: "#fff",
-                    cursor: peopleLoading ? "not-allowed" : "pointer",
+                    cursor: peopleLoading || !canSearchReceiverFamily ? "not-allowed" : "pointer",
                     fontWeight: 900,
                     color: primaryColor,
                   }}
@@ -358,6 +739,16 @@ export default function LinkTreeModal({
                   {peopleLoading ? "Searching..." : "Search"}
                 </button>
               </div>
+              {!peopleLoading && !hasSearched && searchDisabledReason && (
+                <div style={{ marginTop: 8, fontSize: 12, color: "#6b7280", fontWeight: 700 }}>
+                  {searchDisabledReason}
+                </div>
+              )}
+              {!peopleLoading && hasSearched && receiverSearchMessage && (
+                <div style={{ marginTop: 8, fontSize: 12, color: "#b45309", fontWeight: 700 }}>
+                  {receiverSearchMessage}
+                </div>
+              )}
             </div>
 
             <div style={{ width: 200, minWidth: 200 }}>
@@ -378,10 +769,23 @@ export default function LinkTreeModal({
                   background: "#fff",
                 }}
               >
-                <option value="sibling">sibling</option>
-                <option value="parent">parent</option>
-                <option value="child">child</option>
+                {relationshipOptions.includes("sibling") && (
+                  <option value="sibling" disabled={!siblingAllowed}>
+                    sibling
+                  </option>
+                )}
+                {relationshipOptions.includes("parent") && (
+                  <option value="parent" disabled={!parentAllowed}>
+                    parent
+                  </option>
+                )}
+                {relationshipOptions.includes("child") && <option value="child">child</option>}
               </select>
+              {relationshipOptions.includes("sibling") && !siblingAllowed && (
+                <div style={{ marginTop: 6, fontSize: 12, color: "#b45309", fontWeight: 600 }}>
+                  Sibling is enabled only when both sender and receiver have parents.
+                </div>
+              )}
             </div>
           </div>
 
@@ -420,7 +824,13 @@ export default function LinkTreeModal({
               value={personSearch}
               onChange={(e) => setPersonSearch(e.target.value)}
               placeholder={
-                people?.length ? "Search by name/personId" : "Search after loading the receiver family"
+                peopleLoading
+                  ? "Loading receiver family..."
+                  : people?.length
+                  ? "Search by name / personId / phone"
+                  : hasSearched
+                  ? "No members found"
+                  : "Enter family code and click Search"
               }
               disabled={!people?.length}
               style={{
@@ -433,7 +843,7 @@ export default function LinkTreeModal({
                 background: people?.length ? "#fff" : "rgba(0,0,0,0.03)",
               }}
             />
-            {Boolean(people?.length) && (
+            {(Boolean(people?.length) || hasSearched) && (
               <div
                 style={{
                   marginTop: 10,
@@ -444,34 +854,80 @@ export default function LinkTreeModal({
                   background: "#fff",
                 }}
               >
-                {filteredPeople.length === 0 ? (
+                {!people?.length ? (
+                  <div style={{ padding: 12, color: "#666", fontWeight: 700 }}>
+                    {receiverSearchMessage || "No members available."}
+                  </div>
+                ) : filteredPeople.length === 0 ? (
                   <div style={{ padding: 12, color: "#666", fontWeight: 600 }}>
-                    No matches.
+                    No matches. Try name, personId, or phone digits.
                   </div>
                 ) : (
-                  filteredPeople.map((p) => {
+                  filteredPeople.map(({ person: p, disabled, disabledReason }) => {
                     const isSelected = String(selectedPerson?.nodeUid || "") === String(p?.nodeUid || "");
+                    const avatarUrl = getPersonImage(p);
                     return (
                       <button
                         key={String(p?.nodeUid || p?.personId || Math.random())}
                         type="button"
-                        onClick={() => setSelectedPerson(p)}
+                        onClick={() => {
+                          if (disabled) return;
+                          setSelectedPerson(p);
+                        }}
+                        disabled={disabled}
                         style={{
                           width: "100%",
                           textAlign: "left",
                           padding: "10px 12px",
                           border: "none",
                           background: isSelected ? `${primaryColor}12` : "transparent",
-                          cursor: "pointer",
+                          cursor: disabled ? "not-allowed" : "pointer",
                           display: "flex",
                           justifyContent: "space-between",
                           gap: 10,
+                          opacity: disabled ? 0.55 : 1,
                         }}
                       >
-                        <div style={{ fontWeight: 800, color: "#222" }}>
-                          {p?.name || "Unnamed"}
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                          {avatarUrl ? (
+                            <img
+                              src={avatarUrl}
+                              alt=""
+                              style={{ width: 34, height: 34, borderRadius: "50%", objectFit: "cover", flex: "0 0 auto" }}
+                              onError={(e) => {
+                                e.currentTarget.style.display = "none";
+                              }}
+                            />
+                          ) : (
+                            <div
+                              style={{
+                                width: 34,
+                                height: 34,
+                                borderRadius: "50%",
+                                background: "rgba(0,0,0,0.08)",
+                                flex: "0 0 auto",
+                              }}
+                            />
+                          )}
+                          <div style={{ fontWeight: 800, color: "#222", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {p?.name || "Unnamed"}
+                          </div>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          {disabled && (
+                            <span
+                              style={{
+                                fontSize: 10,
+                                fontWeight: 800,
+                                color: "#6b7280",
+                                background: "rgba(107,114,128,0.12)",
+                                padding: "2px 6px",
+                                borderRadius: 999,
+                              }}
+                            >
+                              {disabledReason || "Disabled"}
+                            </span>
+                          )}
                           {!p?.isAppUser && !p?.memberId && (
                             <span
                               style={{
@@ -510,23 +966,11 @@ export default function LinkTreeModal({
             </div>
           )}
 
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontWeight: 700, marginBottom: 6 }}>Receiver nodeUid</div>
-            <div
-              style={{
-                padding: "10px 12px",
-                borderRadius: 12,
-                border: `2px solid ${primaryColor}22`,
-                background: "rgba(255,255,255,0.9)",
-                fontFamily: "monospace",
-                fontSize: 12,
-                wordBreak: "break-all",
-                minHeight: 42,
-              }}
-            >
-              {receiverNodeUid || "—"}
+          {!canSubmit && submitDisabledReason && (
+            <div style={{ marginBottom: 12, fontSize: 12, color: "#6b7280", fontWeight: 800 }}>
+              {submitDisabledReason}
             </div>
-          </div>
+          )}
 
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
             <button
@@ -544,19 +988,19 @@ export default function LinkTreeModal({
             >
               Cancel
             </button>
+
             <button
               type="button"
               onClick={sendLinkRequest}
-              disabled={loading || !canSubmit}
+              disabled={!canSubmit || loading}
               style={{
                 borderRadius: 12,
                 padding: "12px 14px",
-                border: "none",
-                background: loading || !canSubmit ? "rgba(0,0,0,0.2)" : primaryColor,
-                color: "#fff",
-                cursor: loading || !canSubmit ? "not-allowed" : "pointer",
+                border: `2px solid ${primaryColor}`,
+                background: canSubmit && !loading ? primaryColor : "rgba(0,0,0,0.25)",
+                cursor: canSubmit && !loading ? "pointer" : "not-allowed",
                 fontWeight: 900,
-                minWidth: 160,
+                color: "#fff",
               }}
             >
               {loading ? "Sending..." : "Send Link Request"}
