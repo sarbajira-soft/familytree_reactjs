@@ -2,6 +2,49 @@ import React, { useEffect, useState } from 'react';
 import { FiUser, FiMapPin, FiPhone, FiMail, FiPlus, FiEdit2, FiTrash2 } from 'react-icons/fi';
 import { useRetail } from '../context/RetailContext';
 
+const normalizeCountryCode = (value) => (value || '').toString().trim().toLowerCase();
+
+const digitsOnly = (value) => (value || '').toString().replace(/\D+/g, '');
+
+const validateAddressFields = (addr) => {
+  const errors = {};
+
+  const firstName = (addr?.first_name || '').toString().trim();
+  const lastName = (addr?.last_name || '').toString().trim();
+  const address1 = (addr?.address_1 || '').toString().trim();
+  const city = (addr?.city || '').toString().trim();
+  const province = (addr?.province || '').toString().trim();
+  const postal = (addr?.postal_code || '').toString().trim();
+  const country = normalizeCountryCode(addr?.country_code);
+  const phone = (addr?.phone || '').toString().trim();
+
+  const nameRegex = /^[a-zA-Z\s.'-]{2,}$/;
+
+  if (!firstName) errors.first_name = 'First name is required';
+  else if (!nameRegex.test(firstName)) errors.first_name = 'Enter a valid first name';
+
+  if (lastName && !nameRegex.test(lastName)) errors.last_name = 'Enter a valid last name';
+
+  if (!address1) errors.address_1 = 'Address is required';
+  if (!city) errors.city = 'City is required';
+  if (!province) errors.province = 'State / Province is required';
+
+  if (!postal) errors.postal_code = 'Postal code is required';
+  else if (country === 'in') {
+    if (!/^\d{6}$/.test(postal)) errors.postal_code = 'Enter a valid 6-digit pincode';
+  } else if (!/^[a-zA-Z0-9\-\s]{3,10}$/.test(postal)) {
+    errors.postal_code = 'Enter a valid postal code';
+  }
+
+  if (!country) errors.country_code = 'Country code is required';
+  else if (!/^[a-z]{2}$/.test(country)) errors.country_code = 'Use 2-letter country code (e.g., IN)';
+
+  if (!phone) errors.phone = 'Phone is required';
+  else if (!/^\d{6,14}$/.test(phone)) errors.phone = 'Enter a valid phone number';
+
+  return errors;
+};
+
 const emptyAddress = {
   first_name: '',
   last_name: '',
@@ -37,6 +80,8 @@ const Profile = () => {
   const [addressSaving, setAddressSaving] = useState(false);
   const [addressError, setAddressError] = useState(null);
   const [isAddingAddress, setIsAddingAddress] = useState(false);
+  const [addressErrors, setAddressErrors] = useState({});
+  const [addressTouched, setAddressTouched] = useState({});
 
   useEffect(() => {
     if (!user) return;
@@ -107,11 +152,32 @@ const Profile = () => {
 
   const handleAddressChange = (e) => {
     const { name, value } = e.target;
-    setAddressForm((prev) => ({ ...prev, [name]: value }));
+    const nextValue =
+      name === 'country_code'
+        ? normalizeCountryCode(value)
+        : name === 'postal_code' || name === 'phone'
+        ? digitsOnly(value)
+        : value;
+
+    setAddressForm((prev) => ({ ...prev, [name]: nextValue }));
+    setAddressTouched((prev) => ({ ...prev, [name]: true }));
+    setAddressErrors((curr) => {
+      const next = { ...curr };
+      delete next[name];
+      return next;
+    });
+  };
+
+  const handleAddressBlur = (e) => {
+    const { name } = e.target;
+    setAddressTouched((prev) => ({ ...prev, [name]: true }));
+    setAddressErrors(validateAddressFields(addressForm));
   };
 
   const handleAddressClear = () => {
     setAddressForm(emptyAddress);
+    setAddressErrors({});
+    setAddressTouched({});
   };
 
   const handleEditAddress = (addr) => {
@@ -134,6 +200,8 @@ const Profile = () => {
     setEditingAddressId(null);
     setAddressForm(emptyAddress);
     setIsAddingAddress(false);
+    setAddressErrors({});
+    setAddressTouched({});
   };
 
   const handleAddressCancel = () => {
@@ -143,6 +211,22 @@ const Profile = () => {
   const handleAddressSubmit = async (e) => {
     e.preventDefault();
     if (!user) return;
+
+    const nextErrors = validateAddressFields(addressForm);
+    if (Object.keys(nextErrors).length > 0) {
+      setAddressErrors(nextErrors);
+      setAddressTouched({
+        first_name: true,
+        last_name: true,
+        address_1: true,
+        city: true,
+        province: true,
+        postal_code: true,
+        country_code: true,
+        phone: true,
+      });
+      return;
+    }
 
     setAddressSaving(true);
     setAddressError(null);
@@ -303,9 +387,13 @@ const Profile = () => {
                       name="first_name"
                       value={addressForm.first_name}
                       onChange={handleAddressChange}
+                      onBlur={handleAddressBlur}
                       disabled={addressSaving}
-                      className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-400"
+                      className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${addressTouched.first_name && addressErrors.first_name ? 'border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-gray-300 focus:border-orange-400 focus:ring-orange-400'}`}
                     />
+                    {addressTouched.first_name && addressErrors.first_name && (
+                      <p className="mt-1 text-[10px] text-red-600">{addressErrors.first_name}</p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-[11px] font-medium text-gray-700">Last name</label>
@@ -313,17 +401,36 @@ const Profile = () => {
                       name="last_name"
                       value={addressForm.last_name}
                       onChange={handleAddressChange}
+                      onBlur={handleAddressBlur}
                       disabled={addressSaving}
-                      className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-400"
+                      className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${addressTouched.last_name && addressErrors.last_name ? 'border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-gray-300 focus:border-orange-400 focus:ring-orange-400'}`}
                     />
+                    {addressTouched.last_name && addressErrors.last_name && (
+                      <p className="mt-1 text-[10px] text-red-600">{addressErrors.last_name}</p>
+                    )}
                   </div>
                   <div className="sm:col-span-2">
-                    <label className="block text-[11px] font-medium text-gray-700">Address</label>
+                    <label className="block text-[11px] font-medium text-gray-700">Address Line 1</label>
                     <input
                       name="address_1"
                       value={addressForm.address_1}
                       onChange={handleAddressChange}
+                      onBlur={handleAddressBlur}
                       disabled={addressSaving}
+                      className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${addressTouched.address_1 && addressErrors.address_1 ? 'border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-gray-300 focus:border-orange-400 focus:ring-orange-400'}`}
+                    />
+                    {addressTouched.address_1 && addressErrors.address_1 && (
+                      <p className="mt-1 text-[10px] text-red-600">{addressErrors.address_1}</p>
+                    )}
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block text-[11px] font-medium text-gray-700">Address line 2</label>
+                    <input
+                      name="address_2"
+                      value={addressForm.address_2}
+                      onChange={handleAddressChange}
+                      disabled={addressSaving}
+                      placeholder="Landmark / Apartment / Floor (optional)"
                       className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-400"
                     />
                   </div>
@@ -333,9 +440,13 @@ const Profile = () => {
                       name="city"
                       value={addressForm.city}
                       onChange={handleAddressChange}
+                      onBlur={handleAddressBlur}
                       disabled={addressSaving}
-                      className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-400"
+                      className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${addressTouched.city && addressErrors.city ? 'border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-gray-300 focus:border-orange-400 focus:ring-orange-400'}`}
                     />
+                    {addressTouched.city && addressErrors.city && (
+                      <p className="mt-1 text-[10px] text-red-600">{addressErrors.city}</p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-[11px] font-medium text-gray-700">State / Province</label>
@@ -343,9 +454,13 @@ const Profile = () => {
                       name="province"
                       value={addressForm.province}
                       onChange={handleAddressChange}
+                      onBlur={handleAddressBlur}
                       disabled={addressSaving}
-                      className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-400"
+                      className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${addressTouched.province && addressErrors.province ? 'border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-gray-300 focus:border-orange-400 focus:ring-orange-400'}`}
                     />
+                    {addressTouched.province && addressErrors.province && (
+                      <p className="mt-1 text-[10px] text-red-600">{addressErrors.province}</p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-[11px] font-medium text-gray-700">Postal code</label>
@@ -353,9 +468,16 @@ const Profile = () => {
                       name="postal_code"
                       value={addressForm.postal_code}
                       onChange={handleAddressChange}
+                      onBlur={handleAddressBlur}
                       disabled={addressSaving}
-                      className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-400"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={10}
+                      className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${addressTouched.postal_code && addressErrors.postal_code ? 'border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-gray-300 focus:border-orange-400 focus:ring-orange-400'}`}
                     />
+                    {addressTouched.postal_code && addressErrors.postal_code && (
+                      <p className="mt-1 text-[10px] text-red-600">{addressErrors.postal_code}</p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-[11px] font-medium text-gray-700">Country code</label>
@@ -363,9 +485,14 @@ const Profile = () => {
                       name="country_code"
                       value={addressForm.country_code}
                       onChange={handleAddressChange}
+                      onBlur={handleAddressBlur}
                       disabled={addressSaving}
-                      className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-xs uppercase focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-400"
+                      maxLength={2}
+                      className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs uppercase focus:outline-none focus:ring-1 ${addressTouched.country_code && addressErrors.country_code ? 'border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-gray-300 focus:border-orange-400 focus:ring-orange-400'}`}
                     />
+                    {addressTouched.country_code && addressErrors.country_code && (
+                      <p className="mt-1 text-[10px] text-red-600">{addressErrors.country_code}</p>
+                    )}
                   </div>
                   <div className="sm:col-span-2">
                     <label className="block text-[11px] font-medium text-gray-700">Phone</label>
@@ -373,9 +500,16 @@ const Profile = () => {
                       name="phone"
                       value={addressForm.phone}
                       onChange={handleAddressChange}
+                      onBlur={handleAddressBlur}
                       disabled={addressSaving}
-                      className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-400"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={14}
+                      className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${addressTouched.phone && addressErrors.phone ? 'border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-gray-300 focus:border-orange-400 focus:ring-orange-400'}`}
                     />
+                    {addressTouched.phone && addressErrors.phone && (
+                      <p className="mt-1 text-[10px] text-red-600">{addressErrors.phone}</p>
+                    )}
                   </div>
                 </div>
 

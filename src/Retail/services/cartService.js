@@ -308,3 +308,24 @@ export async function completeCart(cartId, token) {
   const data = res.data;
   return data.order || data;
 }
+
+export async function verifyRazorpayPayment({
+  paymentCollectionId,
+  razorpay_order_id,
+  razorpay_payment_id,
+  razorpay_signature,
+  token,
+}) {
+  const res = await client.post(
+    '/store/payments/razorpay/verify',
+    {
+      payment_collection_id: paymentCollectionId,
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+    },
+    { headers: buildJsonHeaders(token) },
+  );
+
+  return res.data;
+}

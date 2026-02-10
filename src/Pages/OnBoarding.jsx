@@ -2854,7 +2854,10 @@ const OnBoarding = () => {
   const allMandatoryFilled = areAllMandatoryFieldsFilled(formData);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-6">
+    <div
+      className="flex items-center justify-center bg-gray-100 p-6 overflow-y-auto"
+      style={{ minHeight: '100dvh', paddingTop: 'env(safe-area-inset-top, 0px)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+    >
       <div className="flex flex-col lg:flex-row w-full max-w-6xl bg-white rounded-lg shadow-lg overflow-hidden">
         {userLoading && (
           <div className="fixed inset-0 bg-black bg-opacity-40 z-50 flex items-center justify-center">

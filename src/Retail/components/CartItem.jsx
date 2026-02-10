@@ -10,6 +10,93 @@ const CartItem = ({ item, onIncrease, onDecrease, onRemove, onViewDetails, isUpd
     item.variant?.product?.thumbnail ||
     'https://placehold.co/80x80?text=Item';
 
+  const variantTitle =
+    item.variant_title ||
+    item.variantTitle ||
+    item.variant?.title ||
+    item.variant_title;
+
+  const options = Array.isArray(item?.variant?.options)
+    ? item.variant.options
+    : Array.isArray(item?.options)
+    ? item.options
+    : [];
+
+  const productOptions = Array.isArray(item?.variant?.product?.options)
+    ? item.variant.product.options
+    : [];
+
+  const optionIdToTitle = productOptions.reduce((map, opt) => {
+    const id = opt?.id;
+    if (id) {
+      map[id] = opt?.title || opt?.name || '';
+    }
+    return map;
+  }, {});
+
+  const getOptionValue = (name) => {
+    const normalizedName = String(name || '').toLowerCase();
+    const found = options.find((o) => {
+      const fromOptionObj = o?.option?.title || o?.option_title || o?.title || '';
+      const fromProductMap = o?.option_id ? optionIdToTitle[o.option_id] : '';
+      const title = fromOptionObj || fromProductMap || '';
+      return String(title).toLowerCase() === normalizedName;
+    });
+    return found?.value || found?.option_value || '';
+  };
+
+  const color = getOptionValue('color') || getOptionValue('colour');
+  const size = getOptionValue('size');
+  const optionLabelParts = [
+    color ? `Color: ${color}` : null,
+    size ? `Size: ${size}` : null,
+  ].filter(Boolean);
+
+  const derivedFromVariantTitle = (() => {
+    if (!variantTitle) return null;
+    const parts = String(variantTitle)
+      .split('/')
+      .map((p) => p.trim())
+      .filter(Boolean);
+    if (parts.length < 2) return null;
+    const derivedSize = parts[0];
+    const derivedColor = parts.slice(1).join(' / ');
+    const derivedParts = [
+      derivedColor ? `Color: ${derivedColor}` : null,
+      derivedSize ? `Size: ${derivedSize}` : null,
+    ].filter(Boolean);
+    return derivedParts.length ? derivedParts : null;
+  })();
+
+  const genericOptionParts = optionLabelParts.length
+    ? []
+    : options
+        .map((o) => {
+          const fromOptionObj = o?.option?.title || o?.option_title || o?.title || '';
+          const fromProductMap = o?.option_id ? optionIdToTitle[o.option_id] : '';
+          const title = (fromOptionObj || fromProductMap || '').toString().trim();
+          const value = (o?.value || o?.option_value || '').toString().trim();
+          if (!title || !value) return null;
+          return `${title}: ${value}`;
+        })
+        .filter(Boolean);
+
+  const optionLabel = (
+    optionLabelParts.length
+      ? optionLabelParts
+      : derivedFromVariantTitle?.length
+      ? derivedFromVariantTitle
+      : genericOptionParts
+  )
+    .filter(Boolean)
+    .join(' | ');
+
+  const shouldShowOptionLabel =
+    Boolean(optionLabel) &&
+    // If variant title already conveys size/color (e.g. "S / Black"),
+    // avoid repeating it as an extra "Color/Size" line.
+    !(variantTitle && derivedFromVariantTitle?.length && optionLabel === derivedFromVariantTitle.join(' | '));
+
   const canDecrease = (item.quantity || 0) > 1;
 
   return (
@@ -38,8 +125,11 @@ const CartItem = ({ item, onIncrease, onDecrease, onRemove, onViewDetails, isUpd
             >
               {item.title}
             </p>
-            {item.variant?.title && (
-              <p className="line-clamp-1 break-words text-xs text-gray-500">{item.variant.title}</p>
+            {variantTitle && (
+              <p className="line-clamp-1 break-words text-xs text-gray-500">{variantTitle}</p>
+            )}
+            {shouldShowOptionLabel && (
+              <p className="line-clamp-1 break-words text-[11px] text-gray-500">{optionLabel}</p>
             )}
           </div>
           <button

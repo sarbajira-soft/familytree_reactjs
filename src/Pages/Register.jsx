@@ -218,7 +218,10 @@ const Register = () => {
   };
 
   return (
-    <div className="min-h-screen w-full bg-gray-50 flex items-center justify-center px-4">
+    <div
+      className="w-full bg-gray-50 flex items-center justify-center px-4 overflow-y-auto"
+      style={{ minHeight: '100dvh', paddingTop: 'env(safe-area-inset-top, 0px)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+    >
       <div className="w-full max-w-md px-4 sm:px-6 lg:px-8">
         {/* Logo */}
         <div className="flex justify-center mb-1">

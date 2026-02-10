@@ -982,13 +982,18 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                 top: 0, 
                 left: 0, 
                 width: '100vw', 
-                height: '100vh', 
+                height: '100dvh', 
                 background: 'rgba(0, 0, 0, 0.6)', 
                 backdropFilter: 'blur(8px)',
                 zIndex: 1000, 
                 display: 'flex', 
                 alignItems: 'center', 
                 justifyContent: 'center', 
+                paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)',
+                paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 96px)',
+                paddingLeft: 8,
+                paddingRight: 8,
+                boxSizing: 'border-box',
                 fontFamily: 'Poppins, Arial, sans-serif',
                 animation: 'modalFadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
             }} 
@@ -1004,7 +1009,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                     boxShadow: '0 25px 80px rgba(0, 0, 0, 0.25), 0 8px 32px rgba(0, 0, 0, 0.15)', 
                     maxWidth: 500, 
                     width: '95vw', 
-                    maxHeight: '90vh', 
+                    maxHeight: 'calc(100dvh - 140px)', 
                     display: 'flex', 
                     flexDirection: 'column', 
                     padding: 0,
@@ -3241,6 +3246,30 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                         to { 
                             opacity: 1; 
                             transform: scale(1) translateY(0);
+                        }
+                    }
+
+                    @media (max-width: 640px) {
+                        .modal-content-upgraded {
+                            width: 100% !important;
+                            max-width: 520px !important;
+                            border-radius: 20px !important;
+                        }
+
+                        .form-row-upgraded {
+                            flex-direction: column !important;
+                            gap: 12px !important;
+                        }
+
+                        .modal-buttons-upgraded {
+                            justify-content: space-between !important;
+                            padding: 16px 0 16px 0 !important;
+                        }
+
+                        .btn-cancel-upgraded,
+                        .btn-success-upgraded {
+                            flex: 1 !important;
+                            justify-content: center !important;
                         }
                     }
                 `}</style>

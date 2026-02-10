@@ -177,7 +177,7 @@ const Header = ({
                 : 'text-gray-600 hover:bg-gray-100 dark:text-slate-300 dark:hover:bg-slate-800'
             }`}
           >
-            <FiUser className="text-sm" /> Addresses
+            <FiUser className="text-sm" /> Address
           </button>
         </nav>
 

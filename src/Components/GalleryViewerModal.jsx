@@ -289,7 +289,7 @@ const GalleryViewerModal = ({
         >
           <motion.div
             className="relative bg-white rounded-3xl m-2 shadow-2xl w-full max-w-5xl flex flex-col overflow-hidden"
-            style={{ maxHeight: "calc(100vh - 140px)" }}
+            style={{ height: "calc(100dvh - 140px)", maxHeight: "calc(100dvh - 140px)" }}
             variants={modalVariants}
             onClick={(e) => e.stopPropagation()}
           >
@@ -354,7 +354,7 @@ const GalleryViewerModal = ({
               </div>
 
               {/* RIGHT PANEL - info/comments */}
-              <div className="flex-1 flex flex-col h-full bg-gray-50 border-t md:border-t-0 md:border-l border-gray-200 min-h-0">
+              <div className="flex-1 flex flex-col h-full bg-gray-50 border-t md:border-t-0 md:border-l border-gray-200 min-h-0 overflow-hidden">
                 {/* Likes & comments */}
                 <div className="p-4 pb-2 border-b flex-shrink-0">
                   <div className="flex items-center gap-3 mb-3">
@@ -385,25 +385,27 @@ const GalleryViewerModal = ({
                 </div>
 
                 {/* Comments */}
-                <div className="flex-1 flex flex-col min-h-0">
+                <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
                   <h4 className="px-4 pt-4 pb-2 font-semibold text-base text-gray-800 flex-shrink-0">
                     Comments ({countComments(buildCommentTree(comments))})
                   </h4>
                   <div
                     ref={commentsRef}
-                    className="flex-1 overflow-y-auto px-4 pb-4 space-y-3 custom-scrollbar min-h-0"
+                    className="flex-1 overflow-y-auto overflow-x-auto px-4 pb-4 custom-scrollbar no-scrollbar min-h-0 overscroll-contain"
                   >
                     {comments.length > 0 ? (
-                      buildCommentTree(comments).map((comment) => (
-                        <CommentItem
-                          key={comment.id}
-                          comment={comment}
-                          currentUserId={currentUser?.userId}
-                          onEdit={handleEditComment}
-                          onDelete={handleDeleteComment}
-                          onReply={handleReplyComment}
-                        />
-                      ))
+                      <div className="min-w-max space-y-3">
+                        {buildCommentTree(comments).map((comment) => (
+                          <CommentItem
+                            key={comment.id}
+                            comment={comment}
+                            currentUserId={currentUser?.userId}
+                            onEdit={handleEditComment}
+                            onDelete={handleDeleteComment}
+                            onReply={handleReplyComment}
+                          />
+                        ))}
+                      </div>
                     ) : (
                       <p className="text-gray-500 italic p-3 bg-gray-100 rounded-lg text-center">
                         Be the first to leave a comment!
