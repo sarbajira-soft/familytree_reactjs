@@ -90,12 +90,47 @@ export function calculateCartTotals(cart) {
 export function getErrorMessage(error) {
   if (!error) return 'Something went wrong';
   if (typeof error === 'string') return error;
+
+  const sanitize = (raw) => {
+    if (!raw) return 'Something went wrong';
+    const msg = String(raw);
+    const normalized = msg.toLowerCase();
+
+    if (
+      normalized.includes('sales channel') ||
+      normalized.includes('stock location') ||
+      normalized.includes('is not associated with any stock location')
+    ) {
+      return 'This item is currently unavailable. Please try again later or choose a different variant.';
+    }
+
+    if (normalized.includes('variant') && normalized.includes('not found')) {
+      return 'This item is currently unavailable. Please refresh and try again.';
+    }
+
+    if (normalized.includes('insufficient inventory') || normalized.includes('out of stock')) {
+      return 'This item is out of stock.';
+    }
+
+    if (normalized.includes('cart') && normalized.includes('completed')) {
+      return 'Your cart is already completed. Please refresh and try again.';
+    }
+
+    if (msg.length > 160) {
+      return 'Something went wrong. Please try again.';
+    }
+
+    return msg;
+  };
+
   if (error.response && error.response.data) {
     const data = error.response.data;
     if (typeof data === 'string') return data;
-    if (data.message) return data.message;
-    if (Array.isArray(data.errors) && data.errors.length > 0) return data.errors[0].message || data.errors[0];
+    if (data.message) return sanitize(data.message);
+    if (Array.isArray(data.errors) && data.errors.length > 0) {
+      return sanitize(data.errors[0].message || data.errors[0]);
+    }
   }
-  if (error.message) return error.message;
+  if (error.message) return sanitize(error.message);
   return 'Something went wrong';
 }

@@ -350,13 +350,25 @@ export const RetailProvider = ({ children }) => {
         const storedToken = state.token || localStorage.getItem(MEDUSA_TOKEN_KEY) || null;
         const cart = await ensureCart();
 
+        const items = Array.isArray(cart?.items) ? cart.items : [];
+        const existing = items.find(
+          (i) => (i?.variant_id || i?.variant?.id) === variantId
+        );
+
         try {
-          const updatedCart = await cartService.addLineItem({
-            cartId: cart.id,
-            variantId,
-            quantity,
-            token: storedToken,
-          });
+          const updatedCart = existing?.id
+            ? await cartService.updateLineItemQuantity({
+                cartId: cart.id,
+                lineItemId: existing.id,
+                quantity: (existing.quantity || 0) + quantity,
+                token: storedToken,
+              })
+            : await cartService.addLineItem({
+                cartId: cart.id,
+                variantId,
+                quantity,
+                token: storedToken,
+              });
           setCartPersistent(updatedCart);
         } catch (err) {
           const status = err?.response?.status;
@@ -371,12 +383,24 @@ export const RetailProvider = ({ children }) => {
           }
           setCartPersistent(newCart);
 
-          const retriedCart = await cartService.addLineItem({
-            cartId: newCart.id,
-            variantId,
-            quantity,
-            token: storedToken,
-          });
+          const newItems = Array.isArray(newCart?.items) ? newCart.items : [];
+          const newExisting = newItems.find(
+            (i) => (i?.variant_id || i?.variant?.id) === variantId
+          );
+
+          const retriedCart = newExisting?.id
+            ? await cartService.updateLineItemQuantity({
+                cartId: newCart.id,
+                lineItemId: newExisting.id,
+                quantity: (newExisting.quantity || 0) + quantity,
+                token: storedToken,
+              })
+            : await cartService.addLineItem({
+                cartId: newCart.id,
+                variantId,
+                quantity,
+                token: storedToken,
+              });
           setCartPersistent(retriedCart);
         }
       } catch (err) {

@@ -83,6 +83,12 @@ const OrderDetailsModal = ({ open, orderId, onClose }) => {
   const orderStatusLower = String(orderStatusRaw || '').toLowerCase();
   const fulfillmentLower = String(fulfillmentStatus || '').toLowerCase();
 
+  const shiprocketStatusRaw =
+    order?.metadata?.shiprocket_status_normalized ||
+    order?.metadata?.shiprocketStatusNormalized ||
+    '';
+  const shiprocketStatusLower = String(shiprocketStatusRaw || '').toLowerCase();
+
   const isCancelled =
     orderStatusLower === 'canceled' ||
     orderStatusLower === 'cancelled' ||
@@ -102,6 +108,20 @@ const OrderDetailsModal = ({ open, orderId, onClose }) => {
   } else if (['delivered', 'partially_delivered'].includes(fulfillmentLower)) {
     progressStage = 4;
   }
+
+  // If the fulfillment status doesn't carry shipping progress (common when using
+  // external carriers), fall back to Shiprocket's normalized status stored on the order.
+  if (!isCancelled && shiprocketStatusLower) {
+    if (['in_transit', 'out_for_delivery'].includes(shiprocketStatusLower)) {
+      progressStage = Math.max(progressStage, 3);
+    } else if (shiprocketStatusLower === 'delivered') {
+      progressStage = Math.max(progressStage, 4);
+    }
+  }
+
+  const hasShipmentIssue =
+    !isCancelled &&
+    ['undelivered', 'rto_initiated', 'cancelled', 'canceled'].includes(shiprocketStatusLower);
 
   const stepPlaced = true;
   const stepFulfilled = progressStage >= 1;
@@ -394,6 +414,10 @@ const OrderDetailsModal = ({ open, orderId, onClose }) => {
                   <p className="text-[11px] font-semibold text-gray-900 mb-2">Order progress</p>
                   {isCancelled ? (
                     <p className="text-xs font-semibold text-red-600">This order has been cancelled.</p>
+                  ) : hasShipmentIssue ? (
+                    <p className="text-xs font-semibold text-red-600">
+                      Shipment update: {shiprocketStatusLower.replace(/_/g, ' ')}
+                    </p>
                   ) : (
                     <div className="flex items-center gap-2">
                       <div className="flex flex-col items-center text-center">

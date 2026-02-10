@@ -22,6 +22,7 @@ const emptyAddress = {
   first_name: '',
   last_name: '',
   address_1: '',
+  address_2: '',
   city: '',
   province: '',
   postal_code: '',
@@ -410,6 +411,7 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
       first_name: addr.first_name || '',
       last_name: addr.last_name || '',
       address_1: addr.address_1 || '',
+      address_2: addr.address_2 || '',
       city: addr.city || '',
       province: addr.province || '',
       postal_code: addr.postal_code || '',
@@ -425,6 +427,7 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
       first_name: addr.first_name || '',
       last_name: addr.last_name || '',
       address_1: addr.address_1 || '',
+      address_2: addr.address_2 || '',
       city: addr.city || '',
       province: addr.province || '',
       postal_code: addr.postal_code || '',
@@ -575,6 +578,11 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
         shippingMeta,
       );
 
+      // Fetch a fresh cart snapshot after applying shipping method so that
+      // shipping_methods and totals are up-to-date for Razorpay notes.
+      const cartForNotes = await cartService.getCart(cartId, token || null);
+      const totalsForNotes = calculateCartTotals(cartForNotes);
+
       const loadRazorpayScript = () =>
         new Promise((resolve, reject) => {
           if (window.Razorpay) {
@@ -599,7 +607,7 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
       const RazorpayConstructor = await loadRazorpayScript();
 
       await new Promise((resolve, reject) => {
-        const cartItems = Array.isArray(cart?.items) ? cart.items : [];
+        const cartItems = Array.isArray(cartForNotes?.items) ? cartForNotes.items : [];
         const notesItems = cartItems.slice(0, 10).map((item) => ({
           product_id: item.product_id || item.product?.id || '',
           title: item.title || '',
@@ -611,6 +619,57 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
             item.original_item_price ||
             0,
         }));
+
+        const shippingTotalFromTotals =
+          typeof totalsForNotes?.shipping === 'number'
+            ? totalsForNotes.shipping
+            : null;
+
+        const shippingMethods = Array.isArray(cartForNotes?.shipping_methods)
+          ? cartForNotes.shipping_methods
+          : Array.isArray(cartForNotes?.shippingMethods)
+          ? cartForNotes.shippingMethods
+          : [];
+
+        const shippingTotalFromCart = shippingMethods.reduce((sum, sm) => {
+          const amount =
+            sm?.amount ?? sm?.price ?? sm?.total ?? sm?.original_total ?? null;
+          const num = typeof amount === 'number' ? amount : Number(amount);
+          return Number.isFinite(num) ? sum + num : sum;
+        }, 0);
+
+        const shippingTotalValue =
+          typeof shippingTotalFromTotals === 'number'
+            ? shippingTotalFromTotals
+            : shippingTotalFromCart > 0
+            ? shippingTotalFromCart
+            : null;
+
+        const totalFromTotals =
+          typeof totalsForNotes?.total === 'number'
+            ? totalsForNotes.total
+            : null;
+
+        const itemsTotal = cartItems.reduce((sum, item) => {
+          const qty = typeof item?.quantity === 'number' ? item.quantity : Number(item?.quantity || 0);
+          const unit =
+            item?.unit_price ??
+            item?.unit_price_incl_tax ??
+            item?.original_item_price ??
+            0;
+          const unitNum = typeof unit === 'number' ? unit : Number(unit);
+          if (!Number.isFinite(qty) || !Number.isFinite(unitNum)) {
+            return sum;
+          }
+          return sum + qty * unitNum;
+        }, 0);
+
+        const totalAmountValue =
+          typeof totalFromTotals === 'number'
+            ? totalFromTotals
+            : typeof shippingTotalValue === 'number'
+            ? itemsTotal + shippingTotalValue
+            : itemsTotal;
 
         const options = {
           key: razorpaySession.razorpay_key_id,
@@ -629,7 +688,10 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
             customer_phone: shippingAddress.phone || undefined,
             customer_email: user?.email || undefined,
             cart_id: cartId,
-            cart_total: typeof totals?.total === 'number' ? String(totals.total) : undefined,
+            cart_total:
+              typeof totalsForNotes?.total === 'number' ? String(totalsForNotes.total) : undefined,
+            shipping_total:
+              typeof shippingTotalValue === 'number' ? String(shippingTotalValue) : undefined,
             items: notesItems.length ? JSON.stringify(notesItems) : undefined,
           },
           handler: async function () {
@@ -638,6 +700,25 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
               // to confirm the payment on the payment collection before
               // completing the cart.
               setWaitingForPayment(true);
+
+              const paymentArgs = arguments && arguments.length ? arguments[0] : null;
+              const razorpay_payment_id = paymentArgs?.razorpay_payment_id;
+              const razorpay_order_id = paymentArgs?.razorpay_order_id;
+              const razorpay_signature = paymentArgs?.razorpay_signature;
+
+              if (razorpay_payment_id && razorpay_order_id && razorpay_signature && paymentCollectionId) {
+                try {
+                  await cartService.verifyRazorpayPayment({
+                    paymentCollectionId,
+                    razorpay_order_id,
+                    razorpay_payment_id,
+                    razorpay_signature,
+                    token: token || null,
+                  });
+                } catch (e) {
+                  // Ignore verify failures and fall back to polling.
+                }
+              }
 
               const maxAttempts = 20;
               const delayMs = 1500;
@@ -713,12 +794,42 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
               }
 
               // Webhook has confirmed payment, now complete the cart.
-              const order = await cartService.completeCart(cartId, token || null);
-              await fetchOrders();
-              await createFreshCart();
-              setCompletedOrder(order || null);
-              setSuccess('Payment successful! Your order has been placed.');
-              resolve();
+              const isCartAlreadyCompletedError = (e) => {
+                const msg =
+                  e?.response?.data?.message ||
+                  e?.response?.data?.error ||
+                  e?.message ||
+                  '';
+
+                const status = e?.response?.status;
+
+                const normalized = String(msg).toLowerCase();
+                return (
+                  status === 409 ||
+                  normalized.includes('already completed') ||
+                  normalized.includes('cart is completed') ||
+                  normalized.includes('cart completed')
+                );
+              };
+
+              try {
+                const order = await cartService.completeCart(cartId, token || null);
+                await fetchOrders();
+                await createFreshCart();
+                setCompletedOrder(order || null);
+                setSuccess('Payment successful! Your order has been placed.');
+                resolve();
+              } catch (completeErr) {
+                if (isCartAlreadyCompletedError(completeErr)) {
+                  await fetchOrders();
+                  await createFreshCart();
+                  setCompletedOrder(null);
+                  setSuccess('Payment successful! Your order has been placed.');
+                  resolve();
+                }
+
+                throw completeErr;
+              }
             } catch (err) {
               setError(getErrorMessage(err));
               refreshCart();
@@ -945,15 +1056,11 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
                     key={addr.id}
                     type="button"
                     onClick={() => applyAddressToShipping(addr)}
-                    className="max-w-[14rem] rounded-xl border border-gray-200 bg-gray-50 px-3 py-1.5 text-left text-[11px] text-gray-700 hover:border-blue-400 hover:bg-white"
+                    className="w-56 h-16 rounded-xl border border-gray-200 bg-gray-50 px-3 py-1.5 text-left text-[11px] leading-4 text-gray-700 hover:border-blue-400 hover:bg-white overflow-hidden flex flex-col justify-center"
                     disabled={disabled}
                   >
                     <span className="block font-semibold text-gray-900 truncate">
-                      {(addr.first_name || addr.last_name) && (
-                        <>
-                          {addr.first_name} {addr.last_name}
-                        </>
-                      )}
+                      {addr.first_name} {addr.last_name}
                     </span>
                     <span className="block truncate">{addr.address_1}</span>
                     <span className="block truncate">
@@ -1004,7 +1111,7 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
               )}
             </div>
             <div className="sm:col-span-2">
-              <label className="block text-[11px] font-medium text-gray-700">Address</label>
+              <label className="block text-[11px] font-medium text-gray-700">Address Line 1</label>
               <input
                 name="address_1"
                 value={shippingAddress.address_1}
@@ -1021,6 +1128,17 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
               {shippingTouched.address_1 && shippingErrors.address_1 && (
                 <p className="mt-1 text-[11px] text-red-600">{shippingErrors.address_1}</p>
               )}
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-[11px] font-medium text-gray-700">Address line 2</label>
+              <input
+                name="address_2"
+                value={shippingAddress.address_2}
+                onChange={handleAddressInputChange(setShippingAddress, setShippingErrors, setShippingTouched)}
+                disabled={disabled}
+                placeholder="Landmark / Apartment / Floor (optional)"
+                className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+              />
             </div>
             <div>
               <label className="block text-[11px] font-medium text-gray-700">City</label>
@@ -1152,15 +1270,11 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
                         key={addr.id}
                         type="button"
                         onClick={() => applyAddressToBilling(addr)}
-                        className="max-w-[14rem] rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-left text-[11px] text-gray-700 hover:border-blue-400"
+                        className="w-56 h-16 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-left text-[11px] leading-4 text-gray-700 hover:border-blue-400 overflow-hidden flex flex-col justify-center"
                         disabled={disabled}
                       >
                         <span className="block font-semibold text-gray-900 truncate">
-                          {(addr.first_name || addr.last_name) && (
-                            <>
-                              {addr.first_name} {addr.last_name}
-                            </>
-                          )}
+                          {addr.first_name} {addr.last_name}
                         </span>
                         <span className="block truncate">{addr.address_1}</span>
                         <span className="block truncate">
@@ -1227,6 +1341,17 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
                   {billingTouched.address_1 && billingErrors.address_1 && (
                     <p className="mt-1 text-[11px] text-red-600">{billingErrors.address_1}</p>
                   )}
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-[11px] font-medium text-gray-700">Address line 2</label>
+                  <input
+                    name="address_2"
+                    value={billingAddress.address_2}
+                    onChange={handleAddressInputChange(setBillingAddress, setBillingErrors, setBillingTouched)}
+                    disabled={disabled}
+                    placeholder="Landmark / Apartment / Floor (optional)"
+                    className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                  />
                 </div>
                 <div>
                   <label className="block text-[11px] font-medium text-gray-700">City</label>

@@ -65,8 +65,8 @@ const renderPostsContent = ({ loadingPosts, userPosts, handleViewPost }) => {
         {SHIMMER_CARD_KEYS.map((k) => (
           <ShimmerImageCard
             key={`shimmer-post-${k}`}
-            width={380}
-            height={280}
+            width={320}
+            height={220}
           />
         ))}
       </div>
@@ -111,8 +111,8 @@ const renderGalleriesContent = ({ loadingGalleries, userGalleries, handleViewAlb
         {SHIMMER_CARD_KEYS.map((k) => (
           <ShimmerImageCard
             key={`shimmer-gallery-${k}`}
-            width={380}
-            height={280}
+            width={320}
+            height={220}
           />
         ))}
       </div>

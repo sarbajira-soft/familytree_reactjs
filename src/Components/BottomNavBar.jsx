@@ -75,12 +75,12 @@ const BottomNavBar = ({ activeTab, setActiveTab }) => {
             <div
               key={item.id}
               onClick={() => handleItemClick(item)}
-              className="flex flex-col items-center justify-center flex-1 py-0 cursor-pointer"
+              className="flex flex-col items-center justify-center flex-1 py-1 cursor-pointer"
             >
               <div className={`p-0 ${isActive ? 'text-white' : 'text-white/80'}`}>
                 {item.icon}
               </div>
-              <span className={`text-xs mt-0 ${isActive ? 'text-white font-semibold' : 'text-white/80'}`}>
+              <span className={`text-xs mt-1 ${isActive ? 'text-white font-semibold' : 'text-white/80'}`}>
                 {item.label}
               </span>
             </div>

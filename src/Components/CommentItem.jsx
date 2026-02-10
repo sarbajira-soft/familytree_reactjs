@@ -195,48 +195,47 @@ const CommentItem = ({
                 </button>
                 <span className="text-gray-700">{commentText}</span>
               </div>
-              <div className="text-[11px] text-gray-500 mt-1">
-                {new Date(comment.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                {comment.updatedAt && 
-                 new Date(comment.updatedAt).getTime() - new Date(comment.createdAt).getTime() > 1000 && (
-                  <span className="ml-1 italic">(edited)</span>
+              <div className="flex items-center gap-4 mt-1 text-[12px] text-gray-500 flex-nowrap whitespace-nowrap">
+                <span className="text-[11px]">
+                  {new Date(comment.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  {comment.updatedAt &&
+                   new Date(comment.updatedAt).getTime() - new Date(comment.createdAt).getTime() > 1000 && (
+                    <span className="ml-1 italic">(edited)</span>
+                  )}
+                </span>
+
+                {canReply && (
+                  <button
+                    onClick={() => setIsReplying(!isReplying)}
+                    disabled={isLoading}
+                    className="font-medium hover:text-gray-700 bg-transparent"
+                  >
+                    Reply
+                  </button>
+                )}
+                {isOwner && (
+                  <>
+                    <button
+                      onClick={() => setIsEditing(true)}
+                      disabled={isLoading}
+                      className="font-medium hover:text-gray-700 bg-transparent"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={handleDelete}
+                      disabled={isLoading}
+                      className="font-medium text-red-500 hover:text-red-700 bg-transparent"
+                    >
+                      Delete
+                    </button>
+                  </>
                 )}
               </div>
             </>
           )}
 
           {/* Action Buttons - Instagram Style */}
-          {!isEditing && (
-            <div className="flex gap-4 mt-2 text-[12px] text-gray-500">
-              {canReply && (
-                <button
-                  onClick={() => setIsReplying(!isReplying)}
-                  disabled={isLoading}
-                  className="font-medium hover:text-gray-700 bg-transparent"
-                >
-                  Reply
-                </button>
-              )}
-              {isOwner && (
-                <>
-                  <button
-                    onClick={() => setIsEditing(true)}
-                    disabled={isLoading}
-                    className="font-medium hover:text-gray-700 bg-transparent"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={handleDelete}
-                    disabled={isLoading}
-                    className="font-medium text-red-500 hover:text-red-700 bg-transparent"
-                  >
-                    Delete
-                  </button>
-                </>
-              )}
-            </div>
-          )}
         </div>
 
         {/* Reply Input */}

@@ -963,7 +963,7 @@ const ProfilePage = () => {
           loadingPosts ? (
             <div className="flex flex-col sm:flex-row gap-4">
               {Array.from({ length: 3 }).map((_, i) => (
-                <ShimmerImageCard key={i} width={380} height={280} />
+                <ShimmerImageCard key={i} width={320} height={220} />
               ))}
             </div>
           ) : (
@@ -1060,7 +1060,7 @@ const ProfilePage = () => {
         ) : loadingGalleries ? (
           <div className="flex flex-col sm:flex-row gap-4">
             {Array.from({ length: 3 }).map((_, i) => (
-              <ShimmerImageCard key={i} width={380} height={280} />
+              <ShimmerImageCard key={i} width={320} height={220} />
             ))}
           </div>
         ) : (
