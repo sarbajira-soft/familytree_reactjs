@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
+import { App as CapacitorApp } from "@capacitor/app";
 import Sidebar from "./Sidebar";
 import BottomNavBar from "./BottomNavBar";
 import { useNotificationSocket } from "../hooks/useNotificationSocket";
@@ -25,10 +26,121 @@ import { useTheme } from "../Contexts/ThemeContext";
 import { MEDUSA_TOKEN_KEY, MEDUSA_CART_ID_KEY } from "../Retail/utils/constants";
 import NotificationPanel from "./NotificationPanel";
 
+const PullToRefresh = ({ children, onRefresh, disabled }) => {
+  const containerRef = useRef(null);
+  const startYRef = useRef(0);
+  const pullingRef = useRef(false);
+  const refreshingRef = useRef(false);
+
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const maxPull = 110;
+  const threshold = 70;
+
+  const canStartPull = () => {
+    const el = containerRef.current;
+    if (!el) return false;
+    return el.scrollTop <= 0;
+  };
+
+  const handleTouchStart = (e) => {
+    if (disabled || isRefreshing) return;
+    if (!e.touches || e.touches.length !== 1) return;
+    startYRef.current = e.touches[0].clientY;
+    pullingRef.current = false;
+    setPullDistance(0);
+  };
+
+  const handleTouchMove = (e) => {
+    if (disabled || isRefreshing) return;
+    if (!e.touches || e.touches.length !== 1) return;
+
+    const currentY = e.touches[0].clientY;
+    const dy = currentY - startYRef.current;
+
+    if (dy <= 0) {
+      if (pullingRef.current) {
+        pullingRef.current = false;
+        setPullDistance(0);
+      }
+      return;
+    }
+
+    if (!pullingRef.current) {
+      if (!canStartPull()) return;
+      pullingRef.current = true;
+    }
+
+    e.preventDefault();
+    const eased = Math.min(maxPull, dy * 0.55);
+    setPullDistance(eased);
+  };
+
+  const handleTouchEnd = async () => {
+    if (disabled || isRefreshing) {
+      setPullDistance(0);
+      pullingRef.current = false;
+      return;
+    }
+
+    const shouldRefresh = pullingRef.current && pullDistance >= threshold;
+    pullingRef.current = false;
+
+    if (!shouldRefresh || typeof onRefresh !== "function") {
+      setPullDistance(0);
+      return;
+    }
+
+    if (refreshingRef.current) return;
+    refreshingRef.current = true;
+    setIsRefreshing(true);
+    setPullDistance(threshold);
+
+    try {
+      await onRefresh();
+    } finally {
+      refreshingRef.current = false;
+      setIsRefreshing(false);
+      setPullDistance(0);
+    }
+  };
+
+  const indicatorText = isRefreshing
+    ? "Refreshing..."
+    : pullDistance >= threshold
+      ? "Release to refresh"
+      : "Pull to refresh";
+
+  return (
+    <div
+      ref={containerRef}
+      className="h-full w-full overflow-y-auto"
+      style={{ WebkitOverflowScrolling: "touch" }}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      <div className="flex items-end justify-center" style={{ height: pullDistance }}>
+        <div className="pb-2 text-[11px] font-medium text-gray-500 dark:text-slate-300">
+          {indicatorText}
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+};
+
 const Layout = ({ noScroll = false }) => {
   const [activeTab, setActiveTab] = useState("profile");
   const location = useLocation();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!window.__appModalBackStack) {
+      window.__appModalBackStack = [];
+    }
+  }, []);
 
   // Update active tab based on current route
   useEffect(() => {
@@ -62,6 +174,120 @@ const Layout = ({ noScroll = false }) => {
   const familyMenuButtonRef = useRef(null);
   const familyMenuRef = useRef(null);
   const profileRef = useRef(null);
+  const notificationRef = useRef(null);
+
+  const overlayStateRef = useRef({
+    sidebarOpen: false,
+    notificationOpen: false,
+    profileOpen: false,
+    familyMenuOpen: false,
+  });
+
+  useEffect(() => {
+    overlayStateRef.current = {
+      sidebarOpen,
+      notificationOpen,
+      profileOpen,
+      familyMenuOpen,
+    };
+  }, [sidebarOpen, notificationOpen, profileOpen, familyMenuOpen]);
+
+  const handleGlobalBack = useCallback(() => {
+    try {
+      const stack = window.__appModalBackStack;
+      if (Array.isArray(stack) && stack.length > 0) {
+        const handler = stack[stack.length - 1];
+        if (typeof handler === 'function') {
+          handler();
+          return true;
+        }
+      }
+    } catch {}
+
+    try {
+      const reactModalOverlay = document.querySelector(
+        '.ReactModal__Overlay.ReactModal__Overlay--after-open'
+      );
+      if (reactModalOverlay) {
+        const escEvent = new KeyboardEvent('keydown', {
+          key: 'Escape',
+          code: 'Escape',
+          keyCode: 27,
+          which: 27,
+          bubbles: true,
+        });
+        document.dispatchEvent(escEvent);
+
+        if (typeof reactModalOverlay.click === 'function') {
+          reactModalOverlay.click();
+        }
+        return true;
+      }
+    } catch {}
+
+    const current = overlayStateRef.current;
+    if (current.notificationOpen) {
+      setNotificationOpen(false);
+      return true;
+    }
+    if (current.profileOpen) {
+      setProfileOpen(false);
+      return true;
+    }
+    if (current.familyMenuOpen) {
+      setFamilyMenuOpen(false);
+      return true;
+    }
+    if (current.sidebarOpen) {
+      setSidebarOpen(false);
+      return true;
+    }
+
+    if (location.pathname !== '/dashboard') {
+      navigate('/dashboard');
+      return true;
+    }
+
+    try {
+      if (CapacitorApp?.exitApp) {
+        CapacitorApp.exitApp();
+        return true;
+      }
+    } catch {}
+
+    return false;
+  }, [location.pathname, navigate]);
+
+  useEffect(() => {
+    let removeCapacitorListener = null;
+    try {
+      const maybePromise = CapacitorApp.addListener("backButton", () => {
+        handleGlobalBack();
+      });
+      if (maybePromise && typeof maybePromise.then === "function") {
+        maybePromise.then((handle) => {
+          removeCapacitorListener = () => handle && handle.remove && handle.remove();
+        });
+      } else {
+        removeCapacitorListener = () => maybePromise && maybePromise.remove && maybePromise.remove();
+      }
+    } catch {
+      // ignore
+    }
+
+    const onCordovaBack = (e) => {
+      const handled = handleGlobalBack();
+      if (handled && e && typeof e.preventDefault === "function") {
+        e.preventDefault();
+      }
+    };
+    document.addEventListener("backbutton", onCordovaBack, false);
+
+    return () => {
+      document.removeEventListener("backbutton", onCordovaBack, false);
+      if (removeCapacitorListener) removeCapacitorListener();
+    };
+  }, [handleGlobalBack]);
 
   const { userInfo, userLoading, logout } = useUser();
   const { theme, toggleTheme } = useTheme();
@@ -110,16 +336,37 @@ const Layout = ({ noScroll = false }) => {
 
   const isAdmin = userInfo && userInfo.role === 3;
   const isApproved = userInfo && userInfo.approveStatus === "approved";
-  const isRestrictedFamilyRoute =
-    location.pathname === "/events" ||
-    location.pathname === "/my-family" ||
-    location.pathname === "/family-management" ||
-    location.pathname.startsWith("/family-tree");
-  const shouldLockScroll =
-    noScroll ||
-    (isRestrictedFamilyRoute &&
-      userInfo &&
-      (!userInfo.familyCode || userInfo.approveStatus !== "approved"));
+
+  const isRestrictedUser = useMemo(() => {
+    if (!userInfo) return false;
+    return !userInfo.familyCode || userInfo.approveStatus !== "approved";
+  }, [userInfo]);
+
+  const shouldLockScroll = useMemo(
+    () => noScroll,
+    [noScroll]
+  );
+
+  const isGiftsRoute =
+    location.pathname === "/gifts" || location.pathname === "/gifts-memories";
+
+  const isTreeRoute =
+    location.pathname.startsWith("/family-tree") ||
+    location.pathname.startsWith("/associated-family-tree") ||
+    location.pathname.startsWith("/associated-family-tree-user") ||
+    location.pathname.startsWith("/linked-family-trees") ||
+    location.pathname.startsWith("/family-tree-hierarchical");
+
+  const pullDisabled = useMemo(() => {
+    if (shouldLockScroll) return true;
+    if (isGiftsRoute) return true;
+    if (isRestrictedUser) return true;
+    return sidebarOpen || notificationOpen;
+  }, [shouldLockScroll, isGiftsRoute, isRestrictedUser, sidebarOpen, notificationOpen]);
+
+  const handlePullRefresh = useCallback(async () => {
+    window.location.reload();
+  }, []);
 
   const headerNavItems = [
     {
@@ -247,10 +494,11 @@ const Layout = ({ noScroll = false }) => {
 
   return (
     <div
-      className="h-screen bg-gray-50 text-gray-800 dark:bg-slate-950 dark:text-slate-100"
+      className="min-h-screen bg-gray-50 text-gray-800 dark:bg-slate-950 dark:text-slate-100"
       style={{
         paddingTop:
           "var(--safe-area-inset-top, env(safe-area-inset-top, 0px))",
+        height: "100dvh",
       }}
     >
       <main className="h-full flex flex-col overflow-hidden">
@@ -515,10 +763,22 @@ const Layout = ({ noScroll = false }) => {
           className={`flex-1 bg-gray-50 ${
             shouldLockScroll
               ? "overflow-hidden"
-              : "overflow-y-auto pt-0 px-1 pb-16 md:px-2 md:pb-12 lg:pb-4"
+              : isTreeRoute
+                ? "overflow-hidden pt-0 px-0 pb-0"
+                : "overflow-y-auto pt-0 px-1 pb-16 md:px-2 md:pb-12 lg:pb-4"
           }`}
         >
-          <Outlet />
+          {shouldLockScroll ? (
+            <Outlet />
+          ) : isGiftsRoute || isTreeRoute ? (
+            <Outlet />
+          ) : (
+            <PullToRefresh onRefresh={handlePullRefresh} disabled={pullDisabled}>
+              <div className="pt-0 px-1 md:px-2">
+                <Outlet />
+              </div>
+            </PullToRefresh>
+          )}
         </div>
 
         {/* Bottom Navbar for Mobile */}

@@ -961,9 +961,9 @@ const ProfilePage = () => {
         {/* Content Display Area */}
         {showPosts ? (
           loadingPosts ? (
-            <div className="flex flex-col sm:flex-row gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {Array.from({ length: 3 }).map((_, i) => (
-                <ShimmerImageCard key={i} width={320} height={220} />
+                <ShimmerImageCard key={i} height={256} />
               ))}
             </div>
           ) : (
@@ -973,8 +973,12 @@ const ProfilePage = () => {
                   <div
                     key={post.id}
                     className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100
-                                            transform hover:scale-[1.02] hover:shadow-lg transition-all duration-300 cursor-pointer group relative"
-                    onClick={() => handleViewPost(post)}
+                                            transform hover:scale-[1.02] hover:shadow-lg transition-all duration-300 group relative"
+                    onClick={() => {
+                      const hasMedia = Boolean(post?.postVideo || post?.fullImageUrl);
+                      if (!hasMedia) return;
+                      handleViewPost(post);
+                    }}
                   >
                     <div className="relative w-full h-64 overflow-hidden">
                       {post.postVideo ? (
@@ -991,8 +995,8 @@ const ProfilePage = () => {
                           className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
                         />
                       ) : (
-                        <div className="text-white text-center text-lg italic">
-                          No media available for this post.
+                        <div className="text-black text-center text-lg italic">
+                          No media available
                         </div>
                       )}
 
@@ -1058,9 +1062,9 @@ const ProfilePage = () => {
             </div>
           )
         ) : loadingGalleries ? (
-          <div className="flex flex-col sm:flex-row gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {Array.from({ length: 3 }).map((_, i) => (
-              <ShimmerImageCard key={i} width={320} height={220} />
+              <ShimmerImageCard key={i} height={256} />
             ))}
           </div>
         ) : (

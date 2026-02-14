@@ -87,6 +87,48 @@ export function calculateCartTotals(cart) {
   return { subtotal, tax, shipping, total };
 }
 
+export function isInsufficientInventoryError(error) {
+  const data = error?.response?.data;
+
+  const candidates = [
+    data,
+    data?.error,
+    data?.data,
+    Array.isArray(data?.errors) ? data.errors[0] : null,
+  ].filter(Boolean);
+
+  const matchByCode = (obj) => {
+    const code = obj?.code;
+    if (typeof code === 'string' && code.toLowerCase() === 'insufficient_inventory') {
+      return true;
+    }
+    return false;
+  };
+
+  if (candidates.some(matchByCode)) {
+    return true;
+  }
+
+  const msg =
+    data?.message ||
+    data?.error?.message ||
+    (Array.isArray(data?.errors) && data.errors.length ? data.errors[0]?.message : null) ||
+    error?.message ||
+    '';
+
+  const normalized = String(msg).toLowerCase();
+
+  if (normalized.includes('insufficient inventory')) return true;
+  if (normalized.includes('required inventory')) return true;
+  if (normalized.includes('out of stock')) return true;
+
+  if (typeof data?.type === 'string' && data.type.toLowerCase() === 'not_allowed') {
+    if (normalized.includes('variant') && normalized.includes('inventory')) return true;
+  }
+
+  return false;
+}
+
 export function getErrorMessage(error) {
   if (!error) return 'Something went wrong';
   if (typeof error === 'string') return error;

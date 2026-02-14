@@ -452,7 +452,7 @@ const EventsPage = () => {
                 {/* Upcoming */}
                 <button
                   onClick={() => setActiveTab("upcoming")}
-                  className={`flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-2 text-[11px] rounded-full font-semibold transition-all
+                  className={`flex-1 inline-flex items-center justify-center gap-1 py-1.5 px-1.5 text-[10px] rounded-full font-semibold transition-all
         ${
           activeTab === "upcoming"
             ? "bg-orange-500 text-white shadow-md"
@@ -460,13 +460,13 @@ const EventsPage = () => {
         }`}
                 >
                   <FiCalendar size={14} />
-                  <span>Upcoming</span>
+                  <span className="whitespace-nowrap">Upcoming</span>
                 </button>
 
                 {/* My Events */}
                 <button
                   onClick={() => setActiveTab("my-events")}
-                  className={`flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-2 text-[11px] rounded-full font-semibold transition-all
+                  className={`flex-1 inline-flex items-center justify-center gap-1 py-1.5 px-1.5 text-[10px] rounded-full font-semibold transition-all
         ${
           activeTab === "my-events"
             ? "bg-orange-500 text-white shadow-md"
@@ -474,13 +474,13 @@ const EventsPage = () => {
         }`}
                 >
                   <FiList size={14} />
-                  <span>My Events</span>
+                  <span className="whitespace-nowrap">My Events</span>
                 </button>
 
                 {/* All */}
                 <button
                   onClick={() => setActiveTab("all")}
-                  className={`flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-2 text-[11px] rounded-full font-semibold transition-all
+                  className={`flex-1 inline-flex items-center justify-center gap-1 py-1.5 px-1.5 text-[10px] rounded-full font-semibold transition-all
         ${
           activeTab === "all"
             ? "bg-orange-500 text-white shadow-md"
@@ -488,7 +488,7 @@ const EventsPage = () => {
         }`}
                 >
                   <FiGlobe size={14} />
-                  <span>All</span>
+                  <span className="whitespace-nowrap">All</span>
                 </button>
               </div>
             </div>

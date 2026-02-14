@@ -3,12 +3,31 @@ import { FiX, FiCheckCircle, FiPackage, FiTruck, FiMessageSquare, FiShoppingCart
 
 const OrderConfirmationModal = ({ isOpen, onClose, orderDetails, onContinueShopping }) => {
   console.log('🎯 OrderConfirmationModal props:', { isOpen, orderDetails: !!orderDetails, orderDetailsContent: orderDetails });
-  
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+    if (typeof onClose !== 'function') return;
+    if (!window.__appModalBackStack) window.__appModalBackStack = [];
+
+    const handler = () => {
+      onClose();
+    };
+
+    window.__appModalBackStack.push(handler);
+
+    return () => {
+      const stack = window.__appModalBackStack;
+      if (!Array.isArray(stack)) return;
+      const idx = stack.lastIndexOf(handler);
+      if (idx >= 0) stack.splice(idx, 1);
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen || !orderDetails) {
     console.log('❌ OrderConfirmationModal not showing because:', { isOpen, hasOrderDetails: !!orderDetails });
     return null;
   }
-  
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[80]">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-0 relative max-h-[95vh] overflow-hidden">

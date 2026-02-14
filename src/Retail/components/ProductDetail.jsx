@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { FiX, FiShoppingCart } from 'react-icons/fi';
 import { formatAmount, getProductDefaultVariant, getVariantPriceAmount } from '../utils/helpers';
 
-const ProductDetail = ({ product, isOpen, onClose, onAddToCart, mode = 'modal' }) => {
+const ProductDetail = ({ product, isOpen, onClose, onAddToCart, mode = 'modal', initialVariantId }) => {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [selectedOptions, setSelectedOptions] = useState({});
@@ -14,9 +14,16 @@ const ProductDetail = ({ product, isOpen, onClose, onAddToCart, mode = 'modal' }
 
   useEffect(() => {
     if (!product) return;
+
+    const initialVariant =
+      (initialVariantId && Array.isArray(product?.variants)
+        ? product.variants.find((v) => v?.id === initialVariantId)
+        : null) ||
+      defaultVariant;
+
     const initialOptions = {};
-    if (defaultVariant && Array.isArray(defaultVariant.options)) {
-      defaultVariant.options.forEach((opt) => {
+    if (initialVariant && Array.isArray(initialVariant.options)) {
+      initialVariant.options.forEach((opt) => {
         if (opt.option_id && opt.value) {
           initialOptions[opt.option_id] = opt.value;
         }
@@ -25,20 +32,7 @@ const ProductDetail = ({ product, isOpen, onClose, onAddToCart, mode = 'modal' }
     setSelectedOptions(initialOptions);
     setQuantity(1);
     setActiveImageIndex(0);
-  }, [product, defaultVariant]);
-
-  useEffect(() => {
-    if (!isOpen || !product || imageCount <= 1) return;
-
-    const intervalId = setInterval(() => {
-      setActiveImageIndex((prev) => {
-        if (imageCount === 0) return 0;
-        return (prev + 1) % imageCount;
-      });
-    }, 4000);
-
-    return () => clearInterval(intervalId);
-  }, [isOpen, product, imageCount]);
+  }, [product, defaultVariant, initialVariantId]);
 
   const currentVariant = useMemo(() => {
     if (!product || !Array.isArray(product.variants) || product.variants.length === 0) {

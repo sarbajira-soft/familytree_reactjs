@@ -25,9 +25,40 @@ export async function fetchProducts({ token, query = {}, regionId } = {}) {
   return res.data.products ?? [];
 }
 
+export async function fetchProductCategories(token) {
+  const res = await client.get('/store/product-categories', {
+    headers: buildBaseHeaders(token),
+  });
 
-export async function fetchProductById(id, token) {
+  const data = res.data;
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data.product_categories)) return data.product_categories;
+  if (Array.isArray(data.categories)) return data.categories;
+  if (Array.isArray(data.data)) return data.data;
+  return [];
+}
+
+export async function fetchRegions(token) {
+  const res = await client.get('/store/regions', {
+    headers: buildBaseHeaders(token),
+  });
+
+  const data = res.data;
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data.regions)) return data.regions;
+  if (Array.isArray(data.data)) return data.data;
+  return [];
+}
+
+
+export async function fetchProductById(id, token, regionId) {
+  const params = {};
+  if (regionId) {
+    params.region_id = regionId;
+  }
+
   const res = await client.get(`/store/products/${id}`, {
+    params,
     headers: buildBaseHeaders(token),
   });
 

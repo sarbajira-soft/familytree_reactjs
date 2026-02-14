@@ -5,20 +5,23 @@ import OrderCard from './OrderCard';
 import OrderDetailsModal from './OrderDetailsModal';
 
 const Orders = () => {
-  const { orders, fetchOrders, loading, error, user } = useRetail();
+  const { orders, fetchOrders, fetchOrdersPage, loading, error, user } = useRetail();
 
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedOrderId, setSelectedOrderId] = useState(null);
+  const [pageOffset, setPageOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const pageSize = 50;
 
   useEffect(() => {
-    fetchOrders();
-  }, [fetchOrders]);
+    (async () => {
+      setPageOffset(0);
+      const first = (await fetchOrdersPage({ limit: pageSize, offset: 0, append: false })) || [];
+      setHasMore(Array.isArray(first) && first.length === pageSize);
+    })();
+  }, [fetchOrdersPage]);
 
-  const sortedOrders = [...orders].sort((a, b) => {
-    const aDate = new Date(a.created_at || a.createdAt || a.created_at || 0).getTime();
-    const bDate = new Date(b.created_at || b.createdAt || b.created_at || 0).getTime();
-    return bDate - aDate;
-  });
+  const sortedOrders = [...orders];
 
   const filteredOrders = sortedOrders.filter((order) => {
     if (statusFilter === 'all') return true;
@@ -111,6 +114,24 @@ const Orders = () => {
               onViewDetails={() => setSelectedOrderId(order.id)}
             />
           ))}
+        </div>
+      )}
+
+      {user && orders.length > 0 && hasMore && (
+        <div className="flex justify-center pt-2">
+          <button
+            type="button"
+            onClick={async () => {
+              const nextOffset = pageOffset + pageSize;
+              const next = (await fetchOrdersPage({ limit: pageSize, offset: nextOffset, append: true })) || [];
+              setPageOffset(nextOffset);
+              setHasMore(Array.isArray(next) && next.length === pageSize);
+            }}
+            disabled={loading}
+            className="rounded-full border border-gray-200 bg-white px-4 py-2 text-xs font-semibold text-gray-700 hover:border-blue-400 hover:text-blue-700 disabled:opacity-50"
+          >
+            {loading ? 'Loading...' : 'Load more'}
+          </button>
         </div>
       )}
 

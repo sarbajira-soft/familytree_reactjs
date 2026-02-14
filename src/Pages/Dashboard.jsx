@@ -16,11 +16,12 @@ import DashboardGiftProductModal from "../Components/DashboardGiftProductModal";
 import GalleryViewerModal from "../Components/GalleryViewerModal";
 import { useGiftEvent } from "../Contexts/GiftEventContext";
 import { useUser } from "../Contexts/UserContext";
-import { fetchProducts as fetchMedusaProducts } from "../Retail/services/productService";
+import { fetchProducts as fetchMedusaProducts, fetchRegions } from "../Retail/services/productService";
 import { getProductThumbnail } from "../Retail/utils/helpers";
 import { getToken } from "../utils/auth";
 import DashboardShimmer from "./DashboardShimmer";
 import PostPage from "./PostPage";
+import { MEDUSA_REGION_ID_KEY } from "../Retail/utils/constants";
 
 const getLocalDateKey = (dateValue) => {
   if (!dateValue) return "";
@@ -319,7 +320,7 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       };
-      const [postsRes, statsRes, eventsRes, galleryRes, productsRes] =
+      const [postsRes, statsRes, eventsRes, galleryRes] =
         await Promise.all([
           fetch(
             // Bug 51: show family feed across linked families (spouse-connected families may have different codes)
@@ -334,17 +335,15 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
             `${apiBaseUrl}/gallery/by-options?privacy=public`,
             { headers }
           ),
-          fetch(`${apiBaseUrl}/product`, { headers: { accept: "*/*" } }),
         ]);
 
-      const [posts, stats, events, gallery, products] = await Promise.all([
+      const [posts, stats, events, gallery] = await Promise.all([
         postsRes.json(),
         statsRes.json(),
         eventsRes.json(),
         galleryRes.json(),
-        productsRes.json(),
       ]);
-      return { posts, stats, events, gallery, products };
+      return { posts, stats, events, gallery };
     },
     enabled: !!userInfo?.familyCode && !!token,
   });
@@ -412,7 +411,18 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
     let isMounted = true;
     (async () => {
       try {
-        const products = await fetchMedusaProducts();
+        let regionId = localStorage.getItem(MEDUSA_REGION_ID_KEY) || null;
+
+        if (!regionId) {
+          const regions = await fetchRegions();
+          const primaryRegionId =
+            (Array.isArray(regions) && regions.length > 0 && regions[0] && regions[0].id) || null;
+          if (!primaryRegionId) return;
+          localStorage.setItem(MEDUSA_REGION_ID_KEY, primaryRegionId);
+          regionId = primaryRegionId;
+        }
+
+        const products = await fetchMedusaProducts({ regionId });
         if (isMounted && Array.isArray(products)) {
           setMedusaProducts(products);
         }

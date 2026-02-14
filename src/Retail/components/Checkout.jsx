@@ -14,7 +14,12 @@ import {
 } from 'react-icons/fi';
 import { useRetail } from '../context/RetailContext';
 import { useGiftEvent } from '../../Contexts/GiftEventContext';
-import { formatAmount, getErrorMessage, calculateCartTotals } from '../utils/helpers';
+import {
+  formatAmount,
+  getErrorMessage,
+  calculateCartTotals,
+  isInsufficientInventoryError,
+} from '../utils/helpers';
 import { MEDUSA_BASE_URL, MEDUSA_PUBLISHABLE_KEY } from '../utils/constants';
 import * as cartService from '../services/cartService';
 
@@ -64,6 +69,7 @@ const validateAddressFields = (addr) => {
   const firstName = (addr?.first_name || '').toString().trim();
   const lastName = (addr?.last_name || '').toString().trim();
   const address1 = (addr?.address_1 || '').toString().trim();
+  const address2 = (addr?.address_2 || '').toString().trim();
   const city = (addr?.city || '').toString().trim();
   const province = (addr?.province || '').toString().trim();
   const postal = (addr?.postal_code || '').toString().trim();
@@ -73,11 +79,15 @@ const validateAddressFields = (addr) => {
   const nameRegex = /^[a-zA-Z\s.'-]{2,}$/;
 
   if (!firstName) errors.first_name = 'First name is required';
+  else if (firstName.length > 100) errors.first_name = 'First name must be 100 characters or less';
   else if (!nameRegex.test(firstName)) errors.first_name = 'Enter a valid first name';
 
-  if (lastName && !nameRegex.test(lastName)) errors.last_name = 'Enter a valid last name';
+  if (lastName && lastName.length > 100) errors.last_name = 'Last name must be 100 characters or less';
+  else if (lastName && !nameRegex.test(lastName)) errors.last_name = 'Enter a valid last name';
 
   if (!address1) errors.address_1 = 'Address is required';
+  else if (address1.length > 100) errors.address_1 = 'Address line 1 must be 100 characters or less';
+  if (address2 && address2.length > 100) errors.address_2 = 'Address line 2 must be 100 characters or less';
   if (!city) errors.city = 'City is required';
   if (!province) errors.province = 'State / Province is required';
 
@@ -87,9 +97,6 @@ const validateAddressFields = (addr) => {
   } else if (!/^[a-zA-Z0-9\-\s]{3,10}$/.test(postal)) {
     errors.postal_code = 'Enter a valid postal code';
   }
-
-  if (!country) errors.country_code = 'Country code is required';
-  else if (!/^[a-z]{2}$/.test(country)) errors.country_code = 'Use 2-letter country code (e.g., IN)';
 
   if (!phone) errors.phone = 'Phone is required';
   else if (!/^\d{6,14}$/.test(phone)) errors.phone = 'Enter a valid phone number';
@@ -131,6 +138,7 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
     refreshCart,
     createFreshCart,
     startOnlinePayment,
+    showToast,
   } = useRetail();
 
   const { selectedGiftEvent } = useGiftEvent();
@@ -460,7 +468,6 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
       city: true,
       province: true,
       postal_code: true,
-      country_code: true,
       phone: true,
     });
     if (!sameAsShipping) {
@@ -471,7 +478,6 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
         city: true,
         province: true,
         postal_code: true,
-        country_code: true,
         phone: true,
       });
     }
@@ -831,7 +837,12 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
                 throw completeErr;
               }
             } catch (err) {
-              setError(getErrorMessage(err));
+              if (isInsufficientInventoryError(err)) {
+                showToast && showToast('Out of stock');
+                setError(null);
+              } else {
+                setError(getErrorMessage(err));
+              }
               refreshCart();
               reject(err);
             } finally {
@@ -854,7 +865,12 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
         rzp.open();
       });
     } catch (err) {
-      setError(err.message || 'Checkout failed');
+      if (isInsufficientInventoryError(err)) {
+        showToast && showToast('Out of stock');
+        setError(null);
+      } else {
+        setError(err.message || 'Checkout failed');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -1050,13 +1066,13 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
           {savedAddresses.length > 0 && (
             <div className="mt-2 space-y-1">
               <p className="text-[11px] text-gray-500">Use a saved address:</p>
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:gap-2">
                 {savedAddresses.map((addr) => (
                   <button
                     key={addr.id}
                     type="button"
                     onClick={() => applyAddressToShipping(addr)}
-                    className="w-56 h-16 rounded-xl border border-gray-200 bg-gray-50 px-3 py-1.5 text-left text-[11px] leading-4 text-gray-700 hover:border-blue-400 hover:bg-white overflow-hidden flex flex-col justify-center"
+                    className="w-full sm:w-56 h-16 rounded-xl border border-gray-200 bg-gray-50 px-3 py-1.5 text-left text-[11px] leading-4 text-gray-700 hover:border-blue-400 hover:bg-white overflow-hidden flex flex-col justify-center"
                     disabled={disabled}
                   >
                     <span className="block font-semibold text-gray-900 truncate">
@@ -1082,6 +1098,7 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
                 onBlur={handleAddressInputBlur(shippingAddress, setShippingErrors, setShippingTouched)}
                 disabled={disabled}
                 required
+                maxLength={100}
                 className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${
                   shippingTouched.first_name && shippingErrors.first_name
                     ? 'border-red-300 focus:border-red-400 focus:ring-red-300'
@@ -1100,6 +1117,7 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
                 onChange={handleAddressInputChange(setShippingAddress, setShippingErrors, setShippingTouched)}
                 onBlur={handleAddressInputBlur(shippingAddress, setShippingErrors, setShippingTouched)}
                 disabled={disabled}
+                maxLength={100}
                 className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${
                   shippingTouched.last_name && shippingErrors.last_name
                     ? 'border-red-300 focus:border-red-400 focus:ring-red-300'
@@ -1119,6 +1137,7 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
                 onBlur={handleAddressInputBlur(shippingAddress, setShippingErrors, setShippingTouched)}
                 disabled={disabled}
                 required
+                maxLength={100}
                 className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${
                   shippingTouched.address_1 && shippingErrors.address_1
                     ? 'border-red-300 focus:border-red-400 focus:ring-red-300'
@@ -1136,6 +1155,7 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
                 value={shippingAddress.address_2}
                 onChange={handleAddressInputChange(setShippingAddress, setShippingErrors, setShippingTouched)}
                 disabled={disabled}
+                maxLength={100}
                 placeholder="Landmark / Apartment / Floor (optional)"
                 className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
               />
@@ -1201,25 +1221,6 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
               )}
             </div>
             <div>
-              <label className="block text-[11px] font-medium text-gray-700">Country code</label>
-              <input
-                name="country_code"
-                value={shippingAddress.country_code}
-                onChange={handleAddressInputChange(setShippingAddress, setShippingErrors, setShippingTouched)}
-                onBlur={handleAddressInputBlur(shippingAddress, setShippingErrors, setShippingTouched)}
-                disabled={disabled}
-                required
-                className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs uppercase focus:outline-none focus:ring-1 ${
-                  shippingTouched.country_code && shippingErrors.country_code
-                    ? 'border-red-300 focus:border-red-400 focus:ring-red-300'
-                    : 'border-gray-300 focus:border-blue-400 focus:ring-blue-400'
-                }`}
-              />
-              {shippingTouched.country_code && shippingErrors.country_code && (
-                <p className="mt-1 text-[11px] text-red-600">{shippingErrors.country_code}</p>
-              )}
-            </div>
-            <div className="sm:col-span-2">
               <label className="block text-[11px] font-medium text-gray-700">Phone</label>
               <input
                 name="phone"
@@ -1264,13 +1265,13 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
               {savedAddresses.length > 0 && (
                 <div className="space-y-1">
                   <p className="text-[11px] text-gray-500">Use a saved address:</p>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap sm:gap-2">
                     {savedAddresses.map((addr) => (
                       <button
                         key={addr.id}
                         type="button"
                         onClick={() => applyAddressToBilling(addr)}
-                        className="w-56 h-16 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-left text-[11px] leading-4 text-gray-700 hover:border-blue-400 overflow-hidden flex flex-col justify-center"
+                        className="w-full sm:w-56 h-16 rounded-xl border border-gray-200 bg-white px-3 py-1.5 text-left text-[11px] leading-4 text-gray-700 hover:border-blue-400 overflow-hidden flex flex-col justify-center"
                         disabled={disabled}
                       >
                         <span className="block font-semibold text-gray-900 truncate">
@@ -1295,6 +1296,7 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
                     onBlur={handleAddressInputBlur(billingAddress, setBillingErrors, setBillingTouched)}
                     disabled={disabled}
                     required
+                    maxLength={100}
                     className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${
                       billingTouched.first_name && billingErrors.first_name
                         ? 'border-red-300 focus:border-red-400 focus:ring-red-300'
@@ -1313,6 +1315,7 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
                     onChange={handleAddressInputChange(setBillingAddress, setBillingErrors, setBillingTouched)}
                     onBlur={handleAddressInputBlur(billingAddress, setBillingErrors, setBillingTouched)}
                     disabled={disabled}
+                    maxLength={100}
                     className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${
                       billingTouched.last_name && billingErrors.last_name
                         ? 'border-red-300 focus:border-red-400 focus:ring-red-300'
@@ -1332,6 +1335,7 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
                     onBlur={handleAddressInputBlur(billingAddress, setBillingErrors, setBillingTouched)}
                     disabled={disabled}
                     required
+                    maxLength={100}
                     className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${
                       billingTouched.address_1 && billingErrors.address_1
                         ? 'border-red-300 focus:border-red-400 focus:ring-red-300'
@@ -1349,6 +1353,7 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
                     value={billingAddress.address_2}
                     onChange={handleAddressInputChange(setBillingAddress, setBillingErrors, setBillingTouched)}
                     disabled={disabled}
+                    maxLength={100}
                     placeholder="Landmark / Apartment / Floor (optional)"
                     className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
                   />
@@ -1414,25 +1419,6 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
                   )}
                 </div>
                 <div>
-                  <label className="block text-[11px] font-medium text-gray-700">Country code</label>
-                  <input
-                    name="country_code"
-                    value={billingAddress.country_code}
-                    onChange={handleAddressInputChange(setBillingAddress, setBillingErrors, setBillingTouched)}
-                    onBlur={handleAddressInputBlur(billingAddress, setBillingErrors, setBillingTouched)}
-                    disabled={disabled}
-                    required
-                    className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs uppercase focus:outline-none focus:ring-1 ${
-                      billingTouched.country_code && billingErrors.country_code
-                        ? 'border-red-300 focus:border-red-400 focus:ring-red-300'
-                        : 'border-gray-300 focus:border-blue-400 focus:ring-blue-400'
-                    }`}
-                  />
-                  {billingTouched.country_code && billingErrors.country_code && (
-                    <p className="mt-1 text-[11px] text-red-600">{billingErrors.country_code}</p>
-                  )}
-                </div>
-                <div className="sm:col-span-2">
                   <label className="block text-[11px] font-medium text-gray-700">Phone</label>
                   <input
                     name="phone"

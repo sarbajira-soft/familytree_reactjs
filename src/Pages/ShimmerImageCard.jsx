@@ -1,9 +1,9 @@
 import React from "react";
 
-const ShimmerImageCard = ({ width = 340, height = 190 }) => (
+const ShimmerImageCard = ({ width, height = 190, className = "" }) => (
   <div
-    className="bg-white border border-gray-200 shadow-sm rounded-xl overflow-hidden"
-    style={{ width }}
+    className={`bg-white rounded-xl shadow-md overflow-hidden border border-gray-100 w-full ${className}`}
+    style={typeof width === "number" ? { width } : undefined}
   >
     <div
       className="w-full bg-gray-200 relative overflow-hidden"

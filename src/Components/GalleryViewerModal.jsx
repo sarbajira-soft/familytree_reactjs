@@ -24,6 +24,25 @@ const GalleryViewerModal = ({
   authToken,
 }) => {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (typeof onClose !== "function") return;
+    if (!window.__appModalBackStack) window.__appModalBackStack = [];
+
+    const handler = () => {
+      onClose();
+    };
+
+    window.__appModalBackStack.push(handler);
+
+    return () => {
+      const stack = window.__appModalBackStack;
+      if (!Array.isArray(stack)) return;
+      const idx = stack.lastIndexOf(handler);
+      if (idx >= 0) stack.splice(idx, 1);
+    };
+  }, [isOpen, onClose]);
   const [isLiked, setIsLiked] = useState(false);
   const [likeLoading, setLikeLoading] = useState(false);
   const [totalLikes, setTotalLikes] = useState(0);
@@ -38,6 +57,24 @@ const GalleryViewerModal = ({
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const textareaRef = useRef(null);
   const emojiPickerRef = useRef(null);
+
+  useEffect(() => {
+    if (!isFullScreen) return;
+    if (!window.__appModalBackStack) window.__appModalBackStack = [];
+
+    const handler = () => {
+      setIsFullScreen(false);
+    };
+
+    window.__appModalBackStack.push(handler);
+
+    return () => {
+      const stack = window.__appModalBackStack;
+      if (!Array.isArray(stack)) return;
+      const idx = stack.lastIndexOf(handler);
+      if (idx >= 0) stack.splice(idx, 1);
+    };
+  }, [isFullScreen]);
 
   const goToIndexFS = (i) => {
     if (fsCarouselRef.current) {

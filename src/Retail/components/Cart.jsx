@@ -11,6 +11,7 @@ const Cart = ({ onContinueShopping, onViewOrders }) => {
 
   const [showCheckout, setShowCheckout] = useState(false);
   const [selectedProductId, setSelectedProductId] = useState(null);
+  const [selectedVariantId, setSelectedVariantId] = useState(null);
   const [showProductDetail, setShowProductDetail] = useState(false);
   const [updatingItemId, setUpdatingItemId] = useState(null);
 
@@ -48,7 +49,9 @@ const Cart = ({ onContinueShopping, onViewOrders }) => {
   const handleViewItemDetails = (item) => {
     const productId = item.product_id || item.product?.id;
     if (!productId) return;
+    const variantId = item.variant_id || item.variant?.id;
     setSelectedProductId(productId);
+    setSelectedVariantId(variantId || null);
     setShowProductDetail(true);
   };
 
@@ -186,9 +189,11 @@ const Cart = ({ onContinueShopping, onViewOrders }) => {
       <CartProductDetailModal
         open={showProductDetail}
         productId={selectedProductId}
+        initialVariantId={selectedVariantId}
         onClose={() => {
           setShowProductDetail(false);
           setSelectedProductId(null);
+          setSelectedVariantId(null);
         }}
       />
     </section>

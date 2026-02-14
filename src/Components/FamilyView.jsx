@@ -22,14 +22,14 @@ const FamilyView = ({ familyData, totalMembers, males, females, averageAge, onMa
           </div>
           
           <div className="text-center md:text-left text-white">
-            <h1 className="text-2xl sm:text-4xl font-bold mb-2">{familyData.familyName}</h1>
-            <p className="text-sm sm:text-lg opacity-90 mb-4">{familyData.familyBio}</p>
+            <h1 className="text-xl sm:text-4xl font-bold mb-2">{familyData.familyName}</h1>
+            <p className="text-xs sm:text-lg opacity-90 mb-4">{familyData.familyBio}</p>
             
             <div className="flex flex-wrap justify-center md:justify-start gap-3">
               <button
                 type="button"
                 onClick={onShareFamilyCode}
-                className="flex items-center bg-white bg-opacity-20 hover:bg-opacity-30 backdrop-blur-sm px-4 py-2 rounded-full transition-all"
+                className="flex items-center bg-white bg-opacity-20 hover:bg-opacity-30 backdrop-blur-sm px-3 py-1.5 text-xs sm:text-sm rounded-full transition-all"
               >
                 <FiShare2 className="mr-2" />
                 Share Family Code: <span className="font-mono ml-1 ">{familyData.familyCode}</span>
@@ -37,7 +37,7 @@ const FamilyView = ({ familyData, totalMembers, males, females, averageAge, onMa
               <button
                 type="button"
                 onClick={onEditFamily}
-                className="flex items-center bg-white/90 text-primary-700 hover:bg-white rounded-full px-4 py-2 shadow-sm transition-all"
+                className="flex items-center bg-white/90 text-primary-700 hover:bg-white rounded-full px-3 py-1.5 text-xs sm:text-sm shadow-sm transition-all"
               >
                 <FiEdit className="mr-2" />
                 Edit family
