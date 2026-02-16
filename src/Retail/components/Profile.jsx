@@ -12,6 +12,7 @@ const validateAddressFields = (addr) => {
   const firstName = (addr?.first_name || '').toString().trim();
   const lastName = (addr?.last_name || '').toString().trim();
   const address1 = (addr?.address_1 || '').toString().trim();
+  const address2 = (addr?.address_2 || '').toString().trim();
   const city = (addr?.city || '').toString().trim();
   const province = (addr?.province || '').toString().trim();
   const postal = (addr?.postal_code || '').toString().trim();
@@ -21,11 +22,15 @@ const validateAddressFields = (addr) => {
   const nameRegex = /^[a-zA-Z\s.'-]{2,}$/;
 
   if (!firstName) errors.first_name = 'First name is required';
+  else if (firstName.length > 100) errors.first_name = 'First name must be 100 characters or less';
   else if (!nameRegex.test(firstName)) errors.first_name = 'Enter a valid first name';
 
-  if (lastName && !nameRegex.test(lastName)) errors.last_name = 'Enter a valid last name';
+  if (lastName && lastName.length > 100) errors.last_name = 'Last name must be 100 characters or less';
+  else if (lastName && !nameRegex.test(lastName)) errors.last_name = 'Enter a valid last name';
 
   if (!address1) errors.address_1 = 'Address is required';
+  else if (address1.length > 100) errors.address_1 = 'Address line 1 must be 100 characters or less';
+  if (address2 && address2.length > 100) errors.address_2 = 'Address line 2 must be 100 characters or less';
   if (!city) errors.city = 'City is required';
   if (!province) errors.province = 'State / Province is required';
 
@@ -35,9 +40,6 @@ const validateAddressFields = (addr) => {
   } else if (!/^[a-zA-Z0-9\-\s]{3,10}$/.test(postal)) {
     errors.postal_code = 'Enter a valid postal code';
   }
-
-  if (!country) errors.country_code = 'Country code is required';
-  else if (!/^[a-z]{2}$/.test(country)) errors.country_code = 'Use 2-letter country code (e.g., IN)';
 
   if (!phone) errors.phone = 'Phone is required';
   else if (!/^\d{6,14}$/.test(phone)) errors.phone = 'Enter a valid phone number';
@@ -222,7 +224,6 @@ const Profile = () => {
         city: true,
         province: true,
         postal_code: true,
-        country_code: true,
         phone: true,
       });
       return;
@@ -342,7 +343,6 @@ const Profile = () => {
                       <p>
                         {[addr.city, addr.province, addr.postal_code].filter(Boolean).join(', ')}
                       </p>
-                      {addr.country_code && <p className="uppercase">{addr.country_code}</p>}
                       {addr.phone && <p>{addr.phone}</p>}
                     </div>
                     <div className="flex flex-col items-end gap-1">
@@ -389,6 +389,7 @@ const Profile = () => {
                       onChange={handleAddressChange}
                       onBlur={handleAddressBlur}
                       disabled={addressSaving}
+                      maxLength={100}
                       className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${addressTouched.first_name && addressErrors.first_name ? 'border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-gray-300 focus:border-orange-400 focus:ring-orange-400'}`}
                     />
                     {addressTouched.first_name && addressErrors.first_name && (
@@ -403,6 +404,7 @@ const Profile = () => {
                       onChange={handleAddressChange}
                       onBlur={handleAddressBlur}
                       disabled={addressSaving}
+                      maxLength={100}
                       className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${addressTouched.last_name && addressErrors.last_name ? 'border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-gray-300 focus:border-orange-400 focus:ring-orange-400'}`}
                     />
                     {addressTouched.last_name && addressErrors.last_name && (
@@ -417,6 +419,7 @@ const Profile = () => {
                       onChange={handleAddressChange}
                       onBlur={handleAddressBlur}
                       disabled={addressSaving}
+                      maxLength={100}
                       className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${addressTouched.address_1 && addressErrors.address_1 ? 'border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-gray-300 focus:border-orange-400 focus:ring-orange-400'}`}
                     />
                     {addressTouched.address_1 && addressErrors.address_1 && (
@@ -430,6 +433,7 @@ const Profile = () => {
                       value={addressForm.address_2}
                       onChange={handleAddressChange}
                       disabled={addressSaving}
+                      maxLength={100}
                       placeholder="Landmark / Apartment / Floor (optional)"
                       className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-400"
                     />
@@ -480,21 +484,6 @@ const Profile = () => {
                     )}
                   </div>
                   <div>
-                    <label className="block text-[11px] font-medium text-gray-700">Country code</label>
-                    <input
-                      name="country_code"
-                      value={addressForm.country_code}
-                      onChange={handleAddressChange}
-                      onBlur={handleAddressBlur}
-                      disabled={addressSaving}
-                      maxLength={2}
-                      className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs uppercase focus:outline-none focus:ring-1 ${addressTouched.country_code && addressErrors.country_code ? 'border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-gray-300 focus:border-orange-400 focus:ring-orange-400'}`}
-                    />
-                    {addressTouched.country_code && addressErrors.country_code && (
-                      <p className="mt-1 text-[10px] text-red-600">{addressErrors.country_code}</p>
-                    )}
-                  </div>
-                  <div className="sm:col-span-2">
                     <label className="block text-[11px] font-medium text-gray-700">Phone</label>
                     <input
                       name="phone"

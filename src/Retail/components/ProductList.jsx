@@ -7,8 +7,8 @@ import { getVariantPriceAmount } from '../utils/helpers';
 import { ArrowLeft } from 'lucide-react';
 import * as productService from '../services/productService';
 
-const ProductList = ({ initialProductId, searchTerm, setSearchTerm, onDetailOpenChange }) => {
-  const { products, fetchProducts, loading, error, addToCart, token } = useRetail();
+const ProductList = ({ initialProductId, searchTerm, setSearchTerm, onDetailOpenChange, onProductIdChange }) => {
+  const { products, fetchProducts, loading, error, addToCart, token, cart, selectedCategoryId } = useRetail();
 
   const [sortBy, setSortBy] = useState('featured');
   const [collectionFilter, setCollectionFilter] = useState('all');
@@ -18,8 +18,8 @@ const ProductList = ({ initialProductId, searchTerm, setSearchTerm, onDetailOpen
   const [initialDetailLoading, setInitialDetailLoading] = useState(false);
 
   useEffect(() => {
-    fetchProducts();
-  }, [fetchProducts]);
+    fetchProducts({ categoryId: selectedCategoryId });
+  }, [fetchProducts, selectedCategoryId]);
 
   useEffect(() => {
     if (!initialProductId || initialSelectionDone) return;
@@ -29,11 +29,13 @@ const ProductList = ({ initialProductId, searchTerm, setSearchTerm, onDetailOpen
     const loadProduct = async () => {
       try {
         setInitialDetailLoading(true);
-        const product = await productService.fetchProductById(initialProductId, token || null);
+        const regionId = cart?.region_id || cart?.region?.id;
+        const product = await productService.fetchProductById(initialProductId, token || null, regionId);
         if (!cancelled && product) {
           setSelectedProduct(product);
           setDetailOpen(true);
           onDetailOpenChange && onDetailOpenChange(true);
+          onProductIdChange && onProductIdChange(initialProductId);
           setInitialSelectionDone(true);
           setInitialDetailLoading(false);
           return;
@@ -60,7 +62,7 @@ const ProductList = ({ initialProductId, searchTerm, setSearchTerm, onDetailOpen
     return () => {
       cancelled = true;
     };
-  }, [initialProductId, token, products, initialSelectionDone]);
+  }, [initialProductId, token, cart, products, initialSelectionDone]);
 
   const collections = useMemo(() => {
     const set = new Set();
@@ -72,6 +74,19 @@ const ProductList = ({ initialProductId, searchTerm, setSearchTerm, onDetailOpen
 
   const filteredProducts = useMemo(() => {
     let result = [...products];
+
+    if (selectedCategoryId && selectedCategoryId !== 'all') {
+      const desiredId = selectedCategoryId;
+      result = result.filter((p) => {
+        const cats =
+          p?.categories ||
+          p?.product_categories ||
+          p?.productCategories ||
+          [];
+        if (!Array.isArray(cats) || cats.length === 0) return true;
+        return cats.some((c) => (c?.id || c) === desiredId);
+      });
+    }
 
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
@@ -115,12 +130,13 @@ const ProductList = ({ initialProductId, searchTerm, setSearchTerm, onDetailOpen
     });
 
     return result;
-  }, [products, searchTerm, collectionFilter, sortBy]);
+  }, [products, selectedCategoryId, searchTerm, collectionFilter, sortBy]);
 
   const handleViewDetails = (product) => {
     setSelectedProduct(product);
     setDetailOpen(true);
     onDetailOpenChange && onDetailOpenChange(true);
+    onProductIdChange && onProductIdChange(product?.id);
   };
 
   const handleAddToCart = async (variantId, quantity) => {
@@ -183,6 +199,7 @@ const ProductList = ({ initialProductId, searchTerm, setSearchTerm, onDetailOpen
               setDetailOpen(false);
               setSelectedProduct(null);
               onDetailOpenChange && onDetailOpenChange(false);
+              onProductIdChange && onProductIdChange(null);
             }}
             className="inline-flex bg-white items-center rounded-full border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 hover:border-blue-400 hover:text-blue-700"
           >
@@ -197,6 +214,7 @@ const ProductList = ({ initialProductId, searchTerm, setSearchTerm, onDetailOpen
               setDetailOpen(false);
               setSelectedProduct(null);
               onDetailOpenChange && onDetailOpenChange(false);
+              onProductIdChange && onProductIdChange(null);
             }}
             onAddToCart={handleAddToCart}
             mode="page"

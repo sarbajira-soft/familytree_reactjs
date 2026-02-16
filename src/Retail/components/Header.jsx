@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FiShoppingCart,
@@ -21,7 +21,16 @@ const Header = ({
 }) => {
   const navigate = useNavigate();
   const { logout: appLogout } = useUser();
-  const { cart, cartCount, user, logout } = useRetail();
+  const {
+    cart,
+    cartCount,
+    user,
+    logout,
+    productCategories,
+    selectedCategoryId,
+    setSelectedCategoryId,
+    fetchProductCategories,
+  } = useRetail();
 
   const [showMiniCart, setShowMiniCart] = useState(false);
 
@@ -35,6 +44,11 @@ const Header = ({
 
   const shouldShowSearch =
     typeof showProductSearch === 'boolean' ? showProductSearch : activeTab === 'products';
+
+  useEffect(() => {
+    if (!shouldShowSearch) return;
+    fetchProductCategories && fetchProductCategories();
+  }, [shouldShowSearch, fetchProductCategories]);
 
   const handleLogout = () => {
     logout();
@@ -113,17 +127,35 @@ const Header = ({
   return (
     <header className="sticky top-0 z-30 border-b border-gray-200 bg-white/90 backdrop-blur dark:bg-slate-900/90 dark:border-slate-800">
       <div className="container mx-auto px-4 py-3 flex items-center justify-between gap-4">
-        <div className="flex-1 max-w-xs">
+        <div className="flex-1">
           {shouldShowSearch && (
-            <div className="relative w-full">
-              <FiSearch className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                type="search"
-                value={productSearchTerm || ''}
-                onChange={(e) => setProductSearchTerm && setProductSearchTerm(e.target.value)}
-                placeholder="Search products..."
-                className="w-full rounded-full border border-gray-200 bg-white py-1.5 pl-8 pr-3 text-xs text-gray-900 shadow-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
-              />
+            <div className="flex w-full max-w-xl items-center gap-2">
+              <div className="relative w-full">
+                <FiSearch className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="search"
+                  value={productSearchTerm || ''}
+                  onChange={(e) => setProductSearchTerm && setProductSearchTerm(e.target.value)}
+                  placeholder="Search products..."
+                  className="w-full rounded-full border border-gray-200 bg-white py-1.5 pl-8 pr-3 text-xs text-gray-900 shadow-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                />
+              </div>
+
+              <select
+                value={selectedCategoryId || 'all'}
+                onChange={(e) => {
+                  const next = e.target.value || 'all';
+                  setSelectedCategoryId && setSelectedCategoryId(next);
+                }}
+                className="h-[30px] min-w-[130px] rounded-full border border-gray-200 bg-white px-3 text-xs text-gray-700 shadow-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+              >
+                <option value="all">All categories</option>
+                {(productCategories || []).map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name || c.title || 'Category'}
+                  </option>
+                ))}
+              </select>
             </div>
           )}
         </div>
@@ -206,24 +238,24 @@ const Header = ({
 
       <div className="border-t border-gray-100 bg-gradient-to-r from-blue-50 via-white to-orange-50 md:hidden dark:border-slate-800 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
         <div className="container mx-auto px-4 py-2 flex items-center justify-between text-xs">
-          <nav className="flex items-center gap-2">
+          <nav className="grid w-full grid-cols-4 gap-2">
             <button
               type="button"
               onClick={handleProductsClick}
-              className={`inline-flex items-center bg-white gap-1 rounded-full px-2 py-1 ${
+              className={`inline-flex w-full items-center justify-center bg-white gap-1 rounded-full px-2 py-1 ${
                 activeTab === 'products' ? 'bg-secondary-100 text-secondary-600' : 'text-gray-600'
               }`}
             >
-              <FiList className="text-sm" /> Products
+              <span>Products</span>
             </button>
             <button
               type="button"
               onClick={() => setActiveTab('cart')}
-              className={`inline-flex items-center bg-white gap-1 rounded-full px-2 py-1 ${
+              className={`inline-flex w-full items-center justify-center bg-white gap-1 rounded-full px-2 py-1 ${
                 activeTab === 'cart' ? 'bg-secondary-100 text-secondary-600' : 'text-gray-600'
               }`}
             >
-              <FiShoppingCart className="text-sm" /> Cart
+              <span>Cart</span>
               {cartCount > 0 && (
                 <span className="ml-1 inline-flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-orange-500 px-1 text-[10px] font-semibold text-white">
                   {cartCount}
@@ -233,20 +265,20 @@ const Header = ({
             <button
               type="button"
               onClick={() => setActiveTab('orders')}
-              className={`inline-flex items-center gap-1 bg-white rounded-full px-2 py-1 ${
+              className={`inline-flex w-full items-center justify-center gap-1 bg-white rounded-full px-2 py-1 ${
                 activeTab === 'orders' ? 'bg-secondary-100 text-secondary-600' : 'text-gray-600'
               }`}
             >
-              <FiPackage className="text-sm" /> Orders
+              <span>Orders</span>
             </button>
             <button
               type="button"
               onClick={() => setActiveTab('profile')}
-              className={`inline-flex items-center bg-white  gap-1 rounded-full px-2 py-1 ${
+              className={`inline-flex w-full items-center justify-center bg-white gap-1 rounded-full px-2 py-1 ${
                 activeTab === 'profile' ? 'bg-secondary-100 text-secondary-600' : 'text-gray-600'
               }`}
             >
-              <FiUser className="text-sm" /> Address
+              <span>Address</span>
             </button>
           </nav>
         </div>

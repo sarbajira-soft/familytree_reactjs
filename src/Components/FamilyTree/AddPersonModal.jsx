@@ -21,6 +21,25 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
     const [parentSelections, setParentSelections] = useState({ father: { selectedMemberId: null, showManualEntry: false }, mother: { selectedMemberId: null, showManualEntry: false } });
     const [formSelections, setFormSelections] = useState({});
     const { language } = useLanguage();
+
+    useEffect(() => {
+        if (!isOpen) return;
+        if (typeof onClose !== 'function') return;
+        if (!window.__appModalBackStack) window.__appModalBackStack = [];
+
+        const handler = () => {
+            onClose();
+        };
+
+        window.__appModalBackStack.push(handler);
+
+        return () => {
+            const stack = window.__appModalBackStack;
+            if (!Array.isArray(stack)) return;
+            const idx = stack.lastIndexOf(handler);
+            if (idx >= 0) stack.splice(idx, 1);
+        };
+    }, [isOpen, onClose]);
     // Add state for relationships
     const [relationshipTypes, setRelationshipTypes] = useState([]);
 

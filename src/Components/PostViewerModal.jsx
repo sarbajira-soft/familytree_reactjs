@@ -36,6 +36,43 @@ const PostViewerModal = ({
   }, [isOpen, post]);
 
   useEffect(() => {
+    if (!isOpen) return;
+    if (typeof onClose !== "function") return;
+    if (!window.__appModalBackStack) window.__appModalBackStack = [];
+
+    const handler = () => {
+      onClose();
+    };
+
+    window.__appModalBackStack.push(handler);
+
+    return () => {
+      const stack = window.__appModalBackStack;
+      if (!Array.isArray(stack)) return;
+      const idx = stack.lastIndexOf(handler);
+      if (idx >= 0) stack.splice(idx, 1);
+    };
+  }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (!isFullScreen) return;
+    if (!window.__appModalBackStack) window.__appModalBackStack = [];
+
+    const handler = () => {
+      setIsFullScreen(false);
+    };
+
+    window.__appModalBackStack.push(handler);
+
+    return () => {
+      const stack = window.__appModalBackStack;
+      if (!Array.isArray(stack)) return;
+      const idx = stack.lastIndexOf(handler);
+      if (idx >= 0) stack.splice(idx, 1);
+    };
+  }, [isFullScreen]);
+
+  useEffect(() => {
     const handleClickOutsideEmoji = (event) => {
       if (
         emojiPickerRef.current &&
@@ -255,6 +292,7 @@ const PostViewerModal = ({
   };
 
   return (
+    
     <AnimatePresence>
       {isOpen && (
         <motion.div
@@ -475,6 +513,7 @@ const PostViewerModal = ({
         )}
       </AnimatePresence>
     </AnimatePresence>
+    
   );
 };
 

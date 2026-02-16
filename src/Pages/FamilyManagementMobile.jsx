@@ -273,7 +273,7 @@ const FamilyManagementMobile = () => {
             <h1 className="text-2xl font-bold text-gray-900 dark:text-slate-50">
               Family Management
             </h1>
-            <p className="mt-1 text-sm text-gray-600 dark:text-slate-300">
+            <p className="hidden md:block mt-1 text-sm text-gray-600 dark:text-slate-300">
               Quickly access all family-related tools from a single place.
             </p>
           </div>

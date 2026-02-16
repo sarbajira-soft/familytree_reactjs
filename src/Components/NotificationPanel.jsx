@@ -694,7 +694,13 @@ const NotificationPanel = ({ open, onClose, onNotificationCountUpdate , isConnec
 
       />
 
-      <div className="absolute right-0 top-0 h-full w-full max-w-md transform overflow-hidden bg-white shadow-xl transition-transform duration-300 ease-in-out dark:bg-slate-900">
+      <div
+        className="absolute right-0 top-0 h-full w-full max-w-md transform overflow-hidden bg-white shadow-xl transition-transform duration-300 ease-in-out dark:bg-slate-900"
+        style={{
+          paddingTop:
+            "var(--safe-area-inset-top, env(safe-area-inset-top, 0px))",
+        }}
+      >
 
         <div className="flex h-full flex-col">
 

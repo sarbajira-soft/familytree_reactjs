@@ -15,6 +15,26 @@ const BuyConfirmationModal = ({
   userInfo = null, // Add userInfo prop to check approval status
 }) => {
   const [quantity, setQuantity] = useState(initialQuantity);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (typeof onClose !== 'function') return;
+    if (!window.__appModalBackStack) window.__appModalBackStack = [];
+
+    const handler = () => {
+      onClose();
+    };
+
+    window.__appModalBackStack.push(handler);
+
+    return () => {
+      const stack = window.__appModalBackStack;
+      if (!Array.isArray(stack)) return;
+      const idx = stack.lastIndexOf(handler);
+      if (idx >= 0) stack.splice(idx, 1);
+    };
+  }, [isOpen, onClose]);
+
   const [receiverId, setReceiverId] = useState(null);
   const [receiverName, setReceiverName] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');

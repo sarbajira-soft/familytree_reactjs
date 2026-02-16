@@ -2,8 +2,15 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import {
   MEDUSA_TOKEN_KEY,
   MEDUSA_CART_ID_KEY,
+  MEDUSA_REGION_ID_KEY,
+  
 } from '../utils/constants';
-import { calculateCartCount, calculateCartTotals, getErrorMessage } from '../utils/helpers';
+import {
+  calculateCartCount,
+  calculateCartTotals,
+  getErrorMessage,
+  isInsufficientInventoryError,
+} from '../utils/helpers';
 import * as authService from '../services/authService';
 import * as productService from '../services/productService';
 import * as cartService from '../services/cartService';
@@ -17,9 +24,12 @@ const initialState = {
   cart: null,
   cartId: null,
   products: [],
+  productCategories: [],
+  selectedCategoryId: 'all',
   orders: [],
   loading: false,
   error: null,
+  toast: null,
 };
 
 function reducer(state, action) {
@@ -28,6 +38,10 @@ function reducer(state, action) {
       return { ...state, loading: action.payload };
     case 'SET_ERROR':
       return { ...state, error: action.payload };
+    case 'SET_TOAST':
+      return { ...state, toast: action.payload };
+    case 'CLEAR_TOAST':
+      return { ...state, toast: null };
     case 'SET_TOKEN':
       return { ...state, token: action.payload };
     case 'SET_USER':
@@ -38,8 +52,14 @@ function reducer(state, action) {
       return { ...state, cartId: action.payload };
     case 'SET_PRODUCTS':
       return { ...state, products: action.payload };
+    case 'SET_PRODUCT_CATEGORIES':
+      return { ...state, productCategories: action.payload };
+    case 'SET_SELECTED_CATEGORY_ID':
+      return { ...state, selectedCategoryId: action.payload };
     case 'SET_ORDERS':
       return { ...state, orders: action.payload };
+    case 'APPEND_ORDERS':
+      return { ...state, orders: [...(state.orders || []), ...(action.payload || [])] };
     case 'RESET':
       return { ...initialState };
     default:
@@ -49,6 +69,21 @@ function reducer(state, action) {
 
 export const RetailProvider = ({ children }) => {
   const [state, dispatch] = useReducer(reducer, initialState);
+
+  const showToast = useCallback((message, variant = 'error') => {
+    dispatch({
+      type: 'SET_TOAST',
+      payload: {
+        id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        message: message || 'Something went wrong',
+        variant,
+      },
+    });
+  }, []);
+
+  const clearToast = useCallback(() => {
+    dispatch({ type: 'CLEAR_TOAST' });
+  }, []);
 
   const setToken = useCallback((token) => {
     if (token) {
@@ -62,6 +97,11 @@ export const RetailProvider = ({ children }) => {
   const setCartPersistent = useCallback((cart) => {
     if (cart && cart.id) {
       localStorage.setItem(MEDUSA_CART_ID_KEY, cart.id);
+
+      const regionId = cart?.region_id || cart?.region?.id || null;
+      if (regionId) {
+        localStorage.setItem(MEDUSA_REGION_ID_KEY, regionId);
+      }
       dispatch({ type: 'SET_CART', payload: cart });
     } else {
       localStorage.removeItem(MEDUSA_CART_ID_KEY);
@@ -312,15 +352,22 @@ export const RetailProvider = ({ children }) => {
     return newCart;
   }, [setCartPersistent, state.token]);
 
-  const fetchProducts = useCallback(async () => {
+  const fetchProducts = useCallback(async ({ categoryId: categoryIdOverride } = {}) => {
     dispatch({ type: 'SET_LOADING', payload: true });
     dispatch({ type: 'SET_ERROR', payload: null });
 
     try {
-      const regionId = state.cart?.region_id || state.cart?.region?.id;
+      const regionId =
+        state.cart?.region_id ||
+        state.cart?.region?.id ||
+        localStorage.getItem(MEDUSA_REGION_ID_KEY) ||
+        null;
+      const rawCategoryId = categoryIdOverride ?? state.selectedCategoryId;
+      const categoryId = rawCategoryId && rawCategoryId !== 'all' ? rawCategoryId : null;
       const products = await productService.fetchProducts({
         token: state.token || null,
         regionId,
+        query: categoryId ? { category_id: categoryId } : {},
       });
       dispatch({ type: 'SET_PRODUCTS', payload: products });
     } catch (err) {
@@ -328,7 +375,25 @@ export const RetailProvider = ({ children }) => {
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
-  }, [state.token, state.cart]);
+  }, [state.token, state.cart, state.selectedCategoryId]);
+
+  const fetchProductCategories = useCallback(async () => {
+    dispatch({ type: 'SET_ERROR', payload: null });
+
+    try {
+      const categories = await productService.fetchProductCategories(state.token || null);
+      dispatch({ type: 'SET_PRODUCT_CATEGORIES', payload: Array.isArray(categories) ? categories : [] });
+      return categories;
+    } catch (err) {
+      dispatch({ type: 'SET_ERROR', payload: getErrorMessage(err) });
+      dispatch({ type: 'SET_PRODUCT_CATEGORIES', payload: [] });
+      return [];
+    }
+  }, [state.token]);
+
+  const setSelectedCategoryId = useCallback((categoryId) => {
+    dispatch({ type: 'SET_SELECTED_CATEGORY_ID', payload: categoryId || 'all' });
+  }, []);
 
   const refreshCart = useCallback(async () => {
     try {
@@ -404,6 +469,11 @@ export const RetailProvider = ({ children }) => {
           setCartPersistent(retriedCart);
         }
       } catch (err) {
+        if (isInsufficientInventoryError(err)) {
+          showToast('Out of stock');
+          dispatch({ type: 'SET_ERROR', payload: null });
+          throw err;
+        }
         dispatch({ type: 'SET_ERROR', payload: getErrorMessage(err) });
         throw err;
       } finally {
@@ -430,6 +500,11 @@ export const RetailProvider = ({ children }) => {
         });
         setCartPersistent(updatedCart);
       } catch (err) {
+        if (isInsufficientInventoryError(err)) {
+          showToast('Out of stock');
+          dispatch({ type: 'SET_ERROR', payload: null });
+          return;
+        }
         dispatch({ type: 'SET_ERROR', payload: getErrorMessage(err) });
       } finally {
         dispatch({ type: 'SET_LOADING', payload: false });
@@ -519,14 +594,54 @@ export const RetailProvider = ({ children }) => {
     dispatch({ type: 'SET_ERROR', payload: null });
 
     try {
-      const orders = await orderService.fetchOrders(state.token);
+      const orders = await orderService.fetchOrdersPaged(state.token, {
+        limit: 50,
+        offset: 0,
+        order: '-created_at',
+      });
       dispatch({ type: 'SET_ORDERS', payload: orders });
+      return orders;
     } catch (err) {
       dispatch({ type: 'SET_ERROR', payload: getErrorMessage(err) });
+      return [];
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
   }, [state.token]);
+
+  const fetchOrdersPage = useCallback(
+    async ({ limit = 50, offset = 0, append = false } = {}) => {
+      if (!state.token) {
+        if (!append) dispatch({ type: 'SET_ORDERS', payload: [] });
+        return [];
+      }
+
+      dispatch({ type: 'SET_LOADING', payload: true });
+      dispatch({ type: 'SET_ERROR', payload: null });
+
+      try {
+        const orders = await orderService.fetchOrdersPaged(state.token, {
+          limit,
+          offset,
+          order: '-created_at',
+        });
+
+        if (append) {
+          dispatch({ type: 'APPEND_ORDERS', payload: orders });
+        } else {
+          dispatch({ type: 'SET_ORDERS', payload: orders });
+        }
+
+        return orders;
+      } catch (err) {
+        dispatch({ type: 'SET_ERROR', payload: getErrorMessage(err) });
+        return [];
+      } finally {
+        dispatch({ type: 'SET_LOADING', payload: false });
+      }
+    },
+    [state.token],
+  );
 
   const retrieveOrder = useCallback(
     async (orderId) => {
@@ -558,6 +673,11 @@ export const RetailProvider = ({ children }) => {
         await fetchOrders();
         return createdReturn;
       } catch (err) {
+        if (isInsufficientInventoryError(err)) {
+          showToast('Out of stock');
+          dispatch({ type: 'SET_ERROR', payload: null });
+          throw err;
+        }
         const message = getErrorMessage(err);
         dispatch({ type: 'SET_ERROR', payload: message });
         throw new Error(message);
@@ -678,6 +798,11 @@ export const RetailProvider = ({ children }) => {
 
         return order;
       } catch (err) {
+        if (isInsufficientInventoryError(err)) {
+          showToast('Out of stock');
+          dispatch({ type: 'SET_ERROR', payload: null });
+          throw err;
+        }
         const message = getErrorMessage(err);
         dispatch({ type: 'SET_ERROR', payload: message });
         throw new Error(message);
@@ -749,6 +874,11 @@ export const RetailProvider = ({ children }) => {
           razorpaySession: primarySession?.data || {},
         };
       } catch (err) {
+        if (isInsufficientInventoryError(err)) {
+          showToast('Out of stock');
+          dispatch({ type: 'SET_ERROR', payload: null });
+          throw err;
+        }
         const message = getErrorMessage(err);
         dispatch({ type: 'SET_ERROR', payload: message });
         throw new Error(message);
@@ -764,6 +894,8 @@ export const RetailProvider = ({ children }) => {
       ...state,
       cartCount: calculateCartCount(state.cart),
       totals: calculateCartTotals(state.cart),
+      productCategories: state.productCategories,
+      selectedCategoryId: state.selectedCategoryId,
     }),
     [state],
   );
@@ -771,6 +903,9 @@ export const RetailProvider = ({ children }) => {
   const value = useMemo(
     () => ({
       ...derived,
+      toast: state.toast,
+      showToast,
+      clearToast,
       login,
       logout,
       refreshCustomerProfile,
@@ -779,10 +914,12 @@ export const RetailProvider = ({ children }) => {
       updateCustomerAddress,
       deleteCustomerAddress,
       fetchProducts,
+      fetchProductCategories,
       addToCart,
       removeFromCart,
       updateCartQuantity,
       fetchOrders,
+      fetchOrdersPage,
       retrieveOrder,
       createReturn,
       refreshCart,
@@ -791,16 +928,22 @@ export const RetailProvider = ({ children }) => {
       getShippingOptionsForCart,
       updateCartAddressesForCheckout,
       startOnlinePayment,
+      setSelectedCategoryId,
     }),
     [
       derived,
+      state.toast,
+      showToast,
+      clearToast,
       login,
       logout,
       fetchProducts,
+      fetchProductCategories,
       addToCart,
       removeFromCart,
       updateCartQuantity,
       fetchOrders,
+      fetchOrdersPage,
       retrieveOrder,
       refreshCart,
       createFreshCart,
@@ -808,6 +951,7 @@ export const RetailProvider = ({ children }) => {
       getShippingOptionsForCart,
       updateCartAddressesForCheckout,
       startOnlinePayment,
+      setSelectedCategoryId,
     ],
   );
 

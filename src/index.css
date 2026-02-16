@@ -1244,5 +1244,10 @@ h6 { font-size: 0.9rem; }
 
 /* Hide scrollbar for Firefox */
 .no-scrollbar {
+  -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+.swal2-high-z {
+  z-index: 99999 !important;
 }

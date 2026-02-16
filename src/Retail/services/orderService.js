@@ -26,6 +26,24 @@ export async function fetchOrders(token) {
   return [];
 }
 
+export async function fetchOrdersPaged(token, { limit = 50, offset = 0, order = '-created_at' } = {}) {
+  const res = await client.get('/store/orders', {
+    headers: buildBaseHeaders(token),
+    params: {
+      limit,
+      offset,
+      order,
+    },
+  });
+
+  const data = res.data;
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data.orders)) return data.orders;
+  if (data && data.orders && Array.isArray(data.orders)) return data.orders;
+  if (Array.isArray(data.data)) return data.data;
+  return [];
+}
+
 export async function retrieveOrder(orderId, token) {
   const res = await client.get(`/store/orders/${orderId}`, {
     headers: buildBaseHeaders(token),

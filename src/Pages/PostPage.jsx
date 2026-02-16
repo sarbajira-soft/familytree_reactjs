@@ -9,6 +9,10 @@ import {
   FiSmile,
   FiChevronDown,
   FiSend,
+  FiVolumeX,
+  FiVolume2,
+  FiPause,
+  FiPlay,
 } from "react-icons/fi";
 import { MdPeople, MdPublic } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
@@ -27,6 +31,13 @@ const PostPage = () => {
   const [user, setUser] = useState(null);
   const [activeFeed, setActiveFeed] = useState("public");
   const [posts, setPosts] = useState([]);
+  const videoRefs = useRef({});
+  const videoObserverRef = useRef(null);
+  const [isMuted, setIsMuted] = useState(true);
+  const [manualPausedIds, setManualPausedIds] = useState(() => new Set());
+  const manualPausedIdsRef = useRef(new Set());
+  const [centerIconPostId, setCenterIconPostId] = useState(null);
+  const centerIconTimeoutRef = useRef(null);
   const [likeLoadingIds, setLikeLoadingIds] = useState(new Set());
   const [loadingFeed, setLoadingFeed] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -169,6 +180,148 @@ const PostPage = () => {
   useEffect(() => {
     fetchPosts();
   }, [activeFeed]);
+
+  useEffect(() => {
+    if (!posts || posts.length === 0) return;
+
+    if (videoObserverRef.current) {
+      try {
+        videoObserverRef.current.disconnect();
+      } catch {}
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          const video = entry.target;
+          const postId = video?.dataset?.postid;
+          if (!video || !postId) return;
+
+          if (manualPausedIdsRef.current.has(String(postId))) {
+            try {
+              video.pause();
+            } catch {}
+            return;
+          }
+
+          const shouldPlay = entry.isIntersecting && entry.intersectionRatio >= 0.6;
+
+          if (shouldPlay) {
+            Object.entries(videoRefs.current || {}).forEach(([id, v]) => {
+              if (!v || id === String(postId)) return;
+              try {
+                v.pause();
+              } catch {}
+            });
+
+            setManualPausedIds((prev) => {
+              if (!prev || prev.size === 0) return prev;
+              const next = new Set(prev);
+              next.forEach((id) => {
+                if (id !== String(postId)) next.delete(id);
+              });
+              manualPausedIdsRef.current = next;
+              return next;
+            });
+
+            try {
+              const p = video.play();
+              if (p && typeof p.catch === 'function') p.catch(() => {});
+            } catch {}
+          } else {
+            try {
+              video.pause();
+              if (!entry.isIntersecting || entry.intersectionRatio === 0) {
+                video.currentTime = 0;
+              }
+            } catch {}
+          }
+        });
+      },
+      {
+        threshold: [0, 0.25, 0.6, 0.75, 1],
+      },
+    );
+
+    videoObserverRef.current = observer;
+
+    Object.values(videoRefs.current || {}).forEach((video) => {
+      if (!video) return;
+      observer.observe(video);
+    });
+
+    return () => {
+      try {
+        observer.disconnect();
+      } catch {}
+    };
+  }, [posts]);
+
+  useEffect(() => {
+    manualPausedIdsRef.current = new Set(manualPausedIds);
+  }, [manualPausedIds]);
+
+  useEffect(() => {
+    Object.values(videoRefs.current || {}).forEach((v) => {
+      if (!v) return;
+      try {
+        v.muted = Boolean(isMuted);
+      } catch {}
+    });
+  }, [isMuted]);
+
+  useEffect(() => {
+    return () => {
+      if (centerIconTimeoutRef.current) {
+        clearTimeout(centerIconTimeoutRef.current);
+        centerIconTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
+  const flashCenterIcon = (postId) => {
+    setCenterIconPostId(String(postId));
+    if (centerIconTimeoutRef.current) {
+      clearTimeout(centerIconTimeoutRef.current);
+    }
+    centerIconTimeoutRef.current = setTimeout(() => {
+      setCenterIconPostId(null);
+      centerIconTimeoutRef.current = null;
+    }, 800);
+  };
+
+  const toggleVideoPlayPause = (postId) => {
+    const video = videoRefs.current[String(postId)];
+    if (!video) return;
+
+    try {
+      if (video.paused) {
+        setManualPausedIds((prev) => {
+          const next = new Set();
+          manualPausedIdsRef.current = next;
+          return next;
+        });
+        setManualPausedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(String(postId));
+          manualPausedIdsRef.current = next;
+          return next;
+        });
+        const p = video.play();
+        if (p && typeof p.catch === 'function') p.catch(() => {});
+      } else {
+        video.pause();
+        setManualPausedIds((prev) => {
+          const next = new Set(prev);
+          next.add(String(postId));
+          manualPausedIdsRef.current = next;
+          return next;
+        });
+      }
+    } catch {}
+
+    flashCenterIcon(postId);
+  };
 
   const toggleLike = async (postId) => {
     // prevent multiple clicks during loading
@@ -843,7 +996,7 @@ const PostPage = () => {
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto px-0 sm:px-4 sm:py-3">
+    <div className="w-full sm:max-w-4xl sm:mx-auto px-0 sm:px-4 sm:py-3">
       {/* Post Creator */}
       {user && (
         <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-3 sm:p-4 flex items-center gap-3 mb-3 sm:mb-4 hover:shadow-md transition-all">
@@ -997,10 +1150,57 @@ const PostPage = () => {
                   <div className="relative w-full bg-black group overflow-hidden">
                     <video
                       src={post.postVideo}
+                      ref={(el) => {
+                        if (el) {
+                          videoRefs.current[String(post.id)] = el;
+                        } else {
+                          delete videoRefs.current[String(post.id)];
+                        }
+                      }}
+                      data-postid={post.id}
                       className="w-full h-auto  max-h-[60vh] sm:max-h-[65vh] lg:max-h-[600px] object-contain transition-transform duration-500"
-                      controls
+                      muted={isMuted}
+                      playsInline
+                      loop
+                      preload="metadata"
                       onClick={(e) => e.stopPropagation()}
                     />
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleVideoPlayPause(post.id);
+                      }}
+                      className="absolute inset-0 flex items-center justify-center bg-transparent"
+                      aria-label={manualPausedIds.has(String(post.id)) ? "Play video" : "Pause video"}
+                    >
+                      <span
+                        className={`inline-flex h-16 w-16 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur transition-opacity duration-200 ${
+                          centerIconPostId === String(post.id) ? "opacity-100" : "opacity-0"
+                        }`}
+                      >
+                        {manualPausedIds.has(String(post.id)) ? (
+                          <FiPlay size={30} />
+                        ) : (
+                          <FiPause size={30} />
+                        )}
+                      </span>
+                    </button>
+
+                    <div className="absolute right-3 top-3 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsMuted((prev) => !prev);
+                        }}
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur hover:bg-black/70"
+                        aria-label={isMuted ? "Unmute" : "Mute"}
+                      >
+                        {isMuted ? <FiVolumeX size={18} /> : <FiVolume2 size={18} />}
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   post.fullImageUrl && (
@@ -1053,7 +1253,7 @@ const PostPage = () => {
                 {post.showComments && (
                   <div className="px-4 pb-4 border-t border-gray-100 mt-2 animate-fadeIn">
                     <div className="w-full">
-                      <div className="flex flex-col h-[560px] min-h-0 overflow-hidden">
+                      <div className="flex flex-col">
                         <h4 className="text-sm font-semibold text-gray-800 mt-3 mb-2 flex items-center gap-2 flex-shrink-0">
                           <FaCommentDots size={19} className="text-gray-600" />
                           Comments (
@@ -1063,7 +1263,7 @@ const PostPage = () => {
                           )
                         </h4>
 
-                        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-auto custom-scrollbar overscroll-contain">
+                        <div className="max-h-[45vh] md:max-h-[560px] overflow-y-auto overflow-x-auto custom-scrollbar">
                           {renderCommentsBody(post)}
                         </div>
 
@@ -1175,7 +1375,11 @@ const PostPage = () => {
       {/* Floating Create Button */}
       <button
         onClick={() => setIsCreateModalOpen(true)}
-        className="fixed bottom-20 right-5 sm:right-6 bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 hover:scale-110 transition-all lg:hidden"
+        className="fixed right-5 sm:right-6 bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 hover:scale-110 transition-all lg:hidden"
+        style={{
+          bottom:
+            "calc(4.5rem + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px)) + 12px)",
+        }}
       >
         <FiPlusCircle size={26} />
       </button>

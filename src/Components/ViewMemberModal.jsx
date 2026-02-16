@@ -1,9 +1,28 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { FiX, FiMail, FiPhone, FiUser, FiCalendar, FiGlobe, FiMapPin, FiHeart, FiBookOpen, FiSmile, FiThumbsUp, FiThumbsDown, FiHome, FiUsers, FiUserCheck, FiUserPlus, FiClock, FiMapPin as FiLocation } from 'react-icons/fi';
 import { FaMale, FaFemale } from 'react-icons/fa';
 
 const ViewFamilyMemberModal = ({ isOpen, onClose, member, isLoading = false }) => {
   if (!isOpen) return null;
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (typeof onClose !== 'function') return;
+    if (!window.__appModalBackStack) window.__appModalBackStack = [];
+
+    const handler = () => {
+      onClose();
+    };
+
+    window.__appModalBackStack.push(handler);
+
+    return () => {
+      const stack = window.__appModalBackStack;
+      if (!Array.isArray(stack)) return;
+      const idx = stack.lastIndexOf(handler);
+      if (idx >= 0) stack.splice(idx, 1);
+    };
+  }, [isOpen, onClose]);
 
   const handleClose = () => {
     if (!isLoading) {

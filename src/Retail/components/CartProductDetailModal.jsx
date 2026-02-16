@@ -3,8 +3,8 @@ import { useRetail } from '../context/RetailContext';
 import * as productService from '../services/productService';
 import ProductDetail from './ProductDetail';
 
-const CartProductDetailModal = ({ open, productId, onClose }) => {
-  const { token, addToCart } = useRetail();
+const CartProductDetailModal = ({ open, productId, initialVariantId, onClose }) => {
+  const { token, addToCart, cart } = useRetail();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -18,8 +18,10 @@ const CartProductDetailModal = ({ open, productId, onClose }) => {
     let mounted = true;
     setLoading(true);
 
+    const regionId = cart?.region_id || cart?.region?.id;
+
     productService
-      .fetchProductById(productId, token || null)
+      .fetchProductById(productId, token || null, regionId)
       .then((data) => {
         if (!mounted) return;
         setProduct(data);
@@ -36,7 +38,7 @@ const CartProductDetailModal = ({ open, productId, onClose }) => {
     return () => {
       mounted = false;
     };
-  }, [open, productId, token]);
+  }, [open, productId, token, cart]);
 
   const handleAddToCart = async (variantId, quantity) => {
     await addToCart(variantId, quantity);
@@ -60,6 +62,7 @@ const CartProductDetailModal = ({ open, productId, onClose }) => {
       isOpen={open}
       onClose={onClose}
       onAddToCart={handleAddToCart}
+      initialVariantId={initialVariantId}
     />
   );
 };

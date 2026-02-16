@@ -30,6 +30,25 @@ export default function LinkTreeModal({
 }) {
   const senderNodeUid = String(senderPerson?.nodeUid || "").trim();
 
+  useEffect(() => {
+    if (!isOpen) return;
+    if (typeof onClose !== "function") return;
+    if (!window.__appModalBackStack) window.__appModalBackStack = [];
+
+    const handler = () => {
+      onClose();
+    };
+
+    window.__appModalBackStack.push(handler);
+
+    return () => {
+      const stack = window.__appModalBackStack;
+      if (!Array.isArray(stack)) return;
+      const idx = stack.lastIndexOf(handler);
+      if (idx >= 0) stack.splice(idx, 1);
+    };
+  }, [isOpen, onClose]);
+
   const asList = (val) => {
     if (!val) return [];
     if (Array.isArray(val)) return val;

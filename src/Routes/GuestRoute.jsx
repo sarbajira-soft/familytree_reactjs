@@ -22,7 +22,7 @@ const GuestRoute = ({ children }) => {
   // If token exists but userInfo is missing, allow the guest route to render.
   // (Prevents infinite redirect loops between PrivateRoute -> "/" and GuestRoute -> "/myprofile")
   if (userInfo) {
-    return <Navigate to="/myprofile" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   return children;

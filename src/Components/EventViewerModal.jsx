@@ -20,9 +20,46 @@ const EventViewerModal = ({
 }) => {
   const [activeIndex, setActiveIndex] = useState(0);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    if (typeof onClose !== "function") return;
+    if (!window.__appModalBackStack) window.__appModalBackStack = [];
+
+    const handler = () => {
+      onClose();
+    };
+
+    window.__appModalBackStack.push(handler);
+
+    return () => {
+      const stack = window.__appModalBackStack;
+      if (!Array.isArray(stack)) return;
+      const idx = stack.lastIndexOf(handler);
+      if (idx >= 0) stack.splice(idx, 1);
+    };
+  }, [isOpen, onClose]);
+
   // full screen
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [rotation, setRotation] = useState(0);
+
+  useEffect(() => {
+    if (!isFullScreen) return;
+    if (!window.__appModalBackStack) window.__appModalBackStack = [];
+
+    const handler = () => {
+      setIsFullScreen(false);
+    };
+
+    window.__appModalBackStack.push(handler);
+
+    return () => {
+      const stack = window.__appModalBackStack;
+      if (!Array.isArray(stack)) return;
+      const idx = stack.lastIndexOf(handler);
+      if (idx >= 0) stack.splice(idx, 1);
+    };
+  }, [isFullScreen]);
 
   const carouselRef = useRef(null);
   const fsCarouselRef = useRef(null);
