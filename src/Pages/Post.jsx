@@ -19,6 +19,9 @@ import { MdPublic, MdPeople } from "react-icons/md";
 import PostsShimmer from "./PostsShimmer";
 import EmojiPicker from "emoji-picker-react";
 
+import { authFetch, authFetchResponse } from "../utils/authFetch";
+import { getToken } from "../utils/auth";
+
 const EMPTY_VTT_TRACK_SRC = "data:text/vtt,WEBVTT";
 
 const PostPage = () => {
@@ -62,7 +65,7 @@ const PostPage = () => {
   };
 
   useEffect(() => {
-    const storedToken = localStorage.getItem("access_token");
+    const storedToken = getToken();
     if (storedToken) setToken(storedToken);
   }, []);
 
@@ -117,11 +120,6 @@ const PostPage = () => {
   const fetchPosts = async (captionSearch = "") => {
     setLoadingFeed(true);
     try {
-      const currentToken = localStorage.getItem("access_token");
-      const headers = currentToken
-        ? { Authorization: `Bearer ${currentToken}` }
-        : {};
-
       let url =
         activeFeed === "family"
           ? `${import.meta.env.VITE_API_BASE_URL}/post/by-options?familyCode=${
@@ -134,8 +132,7 @@ const PostPage = () => {
       if (captionSearch.trim())
         url += `&caption=${encodeURIComponent(captionSearch.trim())}`;
 
-      const res = await fetch(url, { headers });
-      const data = await res.json();
+      const data = await authFetch(url, { method: "GET" });
       setPosts(
         Array.isArray(data)
           ? data.map((p) => ({
@@ -171,19 +168,11 @@ const PostPage = () => {
     setLikeLoadingIds((prev) => new Set(prev).add(postId));
 
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/post/${postId}/like-toggle`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-      const data = await response.json();
+      const data = await authFetch(`/post/${postId}/like-toggle`, {
+        method: "POST",
+      });
 
-      if (response.ok) {
+      if (data) {
         // Update post like status and like count in posts array
         setPosts((prevPosts) =>
           prevPosts.map((post) =>
@@ -195,7 +184,7 @@ const PostPage = () => {
       } else {
         console.error(
           "Failed to toggle like:",
-          data.message || response.statusText
+          "No response"
         );
       }
     } catch (error) {
@@ -248,12 +237,6 @@ const PostPage = () => {
       const commentText = newComment[postId]?.trim();
       if (!commentText) return;
 
-      const authToken = localStorage.getItem("access_token");
-      if (!authToken) {
-        console.error("No auth token found");
-        return;
-      }
-
       // 🟢 Optimistic temporary comment
       const tempComment = {
         id: Date.now(),
@@ -278,20 +261,14 @@ const PostPage = () => {
       setPostingComment((prev) => new Set(prev).add(postId));
 
       try {
-        const res = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL}/post/${postId}/comment`,
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${authToken}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ comment: commentText }),
-          }
-        );
+        const response = await authFetchResponse(`/post/${postId}/comment`, {
+          method: "POST",
+          skipThrow: true,
+          body: JSON.stringify({ comment: commentText }),
+        });
 
-        if (res.ok) {
-          const newCommentData = await res.json(); // ✅ backend returns the same structure
+        if (response.ok) {
+          const newCommentData = await response.json();
           console.log("Received Comment:", newCommentData);
 
           // Replace temp comment with actual comment object from backend
@@ -349,17 +326,11 @@ const PostPage = () => {
     };
 
 
-   const fetchComments = async (postId, authToken) => {
+   const fetchComments = async (postId) => {
      try {
-       const response = await fetch(
-         `${import.meta.env.VITE_API_BASE_URL}/post/${postId}/comments`,
-         {
-           headers: {
-             Authorization: `Bearer ${authToken}`,
-           },
-         }
-       );
-       const data = await response.json();
+       const data = await authFetch(`/post/${postId}/comments`, {
+         method: "GET",
+       });
        return data?.comments || [];
      } catch (error) {
        console.error("Failed to fetch comments:", error);
@@ -395,17 +366,11 @@ const PostPage = () => {
      if (!newText) return;
 
      try {
-       const response = await fetch(
-         `${import.meta.env.VITE_API_BASE_URL}/post/comment/${commentId}`,
-         {
-           method: "PUT",
-           headers: {
-             Authorization: `Bearer ${token}`,
-             "Content-Type": "application/json",
-           },
-           body: JSON.stringify({ comment: newText }),
-         }
-       );
+       const response = await authFetchResponse(`/post/comment/${commentId}`, {
+         method: "PUT",
+         skipThrow: true,
+         body: JSON.stringify({ comment: newText }),
+       });
 
        if (response.ok) {
          const updatedComment = await response.json(); // ✅ use backend response directly
@@ -436,11 +401,9 @@ const PostPage = () => {
      if (!confirm('Are you sure you want to delete this comment?')) return;
 
      try {
-       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/post/comment/${commentId}`, {
-         method: 'DELETE',
-         headers: {
-           'Authorization': `Bearer ${token}`
-         }
+       const response = await authFetchResponse(`/post/comment/${commentId}`, {
+         method: "DELETE",
+         skipThrow: true,
        });
 
        if (!response.ok) {
@@ -479,21 +442,18 @@ const PostPage = () => {
      if (!replyContent) return;
 
      try {
-       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/post/comment/reply`, {
-         method: 'POST',
-         headers: {
-           'Authorization': `Bearer ${token}`,
-           'Content-Type': 'application/json'
-         },
+       const response = await authFetchResponse(`/post/comment/reply`, {
+         method: "POST",
+         skipThrow: true,
          body: JSON.stringify({
            postId,
            parentCommentId,
-           comment: replyContent
-         })
+           comment: replyContent,
+         }),
        });
        
        if (response.ok) {
-         const comments = await fetchComments(postId, token);
+         const comments = await fetchComments(postId);
          setPostComments(prev => ({ ...prev, [postId]: comments }));
          setReplyingToCommentId(null);
          setReplyText({});
@@ -518,7 +478,7 @@ const PostPage = () => {
      // Otherwise, fetch comments
      setLoadingComments((prev) => new Set(prev).add(postId));
 
-     const comments = await fetchComments(postId, token);
+     const comments = await fetchComments(postId);
      setPostComments((prev) => ({ ...prev, [postId]: comments }));
 
      setPosts((prev) =>

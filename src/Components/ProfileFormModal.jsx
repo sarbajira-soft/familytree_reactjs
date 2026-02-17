@@ -4,6 +4,9 @@ import Swal from 'sweetalert2';
 import { FiArrowLeft } from 'react-icons/fi';
 import { useUser } from '../Contexts/UserContext';
 
+import { clearAuthData, getToken } from '../utils/auth';
+import { authFetchResponse } from '../utils/authFetch';
+
 const INDIAN_RELIGIONS = [
   'Hindu',
   'Muslim',
@@ -367,11 +370,23 @@ const ProfileFormModal = ({
         `${import.meta.env.VITE_API_BASE_URL}/gothram`
       ];
 
+      const responseObjs = await Promise.all(
+        endpoints.map((url) =>
+          authFetchResponse(url, {
+            method: 'GET',
+            skipThrow: true,
+            headers: {
+              accept: 'application/json',
+            },
+          })
+        )
+      );
+
       const responses = await Promise.all(
-        endpoints.map(url => fetch(url).then(res => {
-          if (!res.ok) throw new Error(`Failed to fetch ${url}`);
+        responseObjs.map(async (res, idx) => {
+          if (!res.ok) throw new Error(`Failed to fetch ${endpoints[idx]}`);
           return res.json();
-        }))
+        })
       );
 
       // Extract data based on your API structure
@@ -728,8 +743,9 @@ const ProfileFormModal = ({
 
     try {
       setOtpSending(true);
-      const sendRes = await fetch(`${baseUrl}/user/forgot-password`, {
+      const sendRes = await authFetchResponse(`${baseUrl}/user/forgot-password`, {
         method: 'POST',
+        skipThrow: true,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username }),
       });
@@ -787,8 +803,9 @@ const ProfileFormModal = ({
 
     try {
       setPasswordUpdating(true);
-      const resetRes = await fetch(`${baseUrl}/user/reset-password`, {
+      const resetRes = await authFetchResponse(`${baseUrl}/user/reset-password`, {
         method: 'POST',
+        skipThrow: true,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, otp, newPassword, confirmPassword }),
       });
@@ -961,18 +978,15 @@ const ProfileFormModal = ({
     }
 
     try {
-      const token = localStorage.getItem('access_token');
-      
-      const headers = {};
-      
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
+      const token = getToken();
+      if (!token) {
+        throw new Error('Authentication token not found');
       }
-     
-      const response = await fetch(apiUrl, {
+
+      const response = await authFetchResponse(apiUrl, {
         method: httpMethod,
+        skipThrow: true,
         body: formDataToSend,
-        headers: headers
       });
 
       if (!response.ok) {
@@ -1072,17 +1086,17 @@ const ProfileFormModal = ({
       setIsDeleting(true);
       
       try {
-        const token = localStorage.getItem('access_token');
+        const token = getToken();
         if (!token) {
           throw new Error('Authentication token not found');
         }
 
         const userId = userInfo?.userId;
-        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/user/${userId}`, {
+        const response = await authFetchResponse(`/user/${userId}`, {
           method: 'DELETE',
+          skipThrow: true,
           headers: {
-            'Authorization': `Bearer ${token}`,
-            'accept': '*/*'
+            accept: '*/*'
           }
         });
 
@@ -1093,7 +1107,7 @@ const ProfileFormModal = ({
         }
 
         // Clear local storage and redirect to login
-        localStorage.removeItem('access_token');
+        clearAuthData();
         
         Swal.fire({
           icon: 'success',

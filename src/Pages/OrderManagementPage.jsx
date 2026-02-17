@@ -3,6 +3,9 @@ import { useUser } from '../Contexts/UserContext';
 import { FiPackage, FiTruck, FiCreditCard, FiCalendar, FiUser, FiMapPin, FiMessageSquare, FiEdit3, FiCheck, FiX, FiChevronDown, FiSearch } from 'react-icons/fi';
 import Swal from 'sweetalert2';
 
+import { getToken } from '../utils/auth';
+import { authFetchResponse } from '../utils/authFetch';
+
 const DELIVERY_STATUSES = [
   '', 'pending', 'confirmed', 'shipped', 'in_transit', 'out_for_delivery', 'delivered', 'cancelled', 'returned'
 ];
@@ -25,24 +28,22 @@ const OrderManagementPage = () => {
   const [paymentStatusFilter, setPaymentStatusFilter] = useState('');
 
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
-  const token = localStorage.getItem('access_token');
+  const token = getToken();
 
   // Fetch orders
   const fetchOrders = async () => {
     try {
       setLoading(true);
       setError('');
-      const response = await fetch(`${apiBaseUrl}/order`, {
+      const response = await authFetchResponse('/order', {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
+        skipThrow: true,
       });
       if (!response.ok) {
         throw new Error(`Failed to fetch orders: ${response.status}`);
       }
       const result = await response.json();
+
       if (result.success && result.data) {
         setOrders(result.data);
       } else {
@@ -66,19 +67,17 @@ const OrderManagementPage = () => {
   const handleStatusUpdate = async (orderId, deliveryStatus, paymentStatus) => {
     try {
       setUpdating(true);
-      const response = await fetch(`${apiBaseUrl}/order/${orderId}/status`, {
+      const response = await authFetchResponse(`/order/${orderId}/status`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ deliveryStatus, paymentStatus })
+        skipThrow: true,
+        body: JSON.stringify({ deliveryStatus, paymentStatus }),
       });
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.message || `Failed to update order: ${response.status}`);
       }
       setOrders(prevOrders => prevOrders.map(order => order.id === orderId ? { ...order, deliveryStatus, paymentStatus, updatedAt: new Date().toISOString() } : order));
+
       Swal.fire({ icon: 'success', title: 'Order Updated!', text: 'Order status has been updated successfully.', timer: 2000, showConfirmButton: false });
       setIsUpdateModalOpen(false);
       setSelectedOrder(null);

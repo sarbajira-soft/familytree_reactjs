@@ -12,6 +12,9 @@ import JoinFamilyModal from '../Components/JoinFamilyModal';
 import { FiPlus, FiLoader, FiArrowLeft } from 'react-icons/fi';
 import {jwtDecode} from 'jwt-decode';
 
+import { authFetch } from '../utils/authFetch';
+import { getToken } from '../utils/auth';
+
 const FamilyMemberListing = () => {
   const { userInfo, userLoading } = useUser();
   const navigate = useNavigate();
@@ -28,7 +31,7 @@ const FamilyMemberListing = () => {
   const [viewLoading, setViewLoading] = useState(false);
   
   useEffect(() => {
-    const storedToken = localStorage.getItem('access_token');
+    const storedToken = getToken();
     if (storedToken) {
       setToken(storedToken);
     }
@@ -36,7 +39,7 @@ const FamilyMemberListing = () => {
 
   useEffect(() => {
     // Get userId from token
-    const token = localStorage.getItem('access_token');
+    const token = getToken();
     if (!token) return;
     let userId;
     try {
@@ -45,17 +48,17 @@ const FamilyMemberListing = () => {
     } catch {
       return;
     }
-    fetch(`${import.meta.env.VITE_API_BASE_URL}/user/profile/${userId}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-      .then(res => res.json())
-      .then(data => {
-        const user = data.data;
+
+    authFetch(`/user/profile/${userId}`, { method: 'GET', skipThrow: true })
+      .then((data) => {
+        const user = data?.data;
+        if (!user) return;
         setCurrentUser({
           ...user,
-          userId: user.id // Ensures userId is always present
+          userId: user.id, // Ensures userId is always present
         });
-      });
+      })
+      .catch(() => {});
   }, []);
 
   const handleOpenModal = () => setIsModalOpen(true);
@@ -123,16 +126,11 @@ const FamilyMemberListing = () => {
 
   const fetchMemberDetails = async (userId) => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/user/profile/${userId}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+      const resJson = await authFetch(`/user/profile/${userId}`, {
+        method: 'GET',
+        skipThrow: true,
       });
-
-      if (!response.ok) throw new Error('Failed to fetch member details');
-
-      const resJson = await response.json();
+      if (!resJson || resJson?.message) throw new Error('Failed to fetch member details');
       const user = resJson.data;
       const profile = user.userProfile;
 

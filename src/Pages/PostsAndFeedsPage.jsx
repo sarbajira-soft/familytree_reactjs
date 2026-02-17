@@ -10,6 +10,9 @@ import {
 import { FaRegHeart, FaHeart, FaCommentDots } from 'react-icons/fa';
 import { MdPublic, MdPeople } from 'react-icons/md';
 
+import { authFetch } from '../utils/authFetch';
+import { getToken } from '../utils/auth';
+
 const EMPTY_VTT_TRACK_SRC = 'data:text/vtt,WEBVTT';
 
 const PostsAndFeedsPage = () => {
@@ -42,7 +45,7 @@ const PostsAndFeedsPage = () => {
     };
 
     useEffect(() => {
-        const storedToken = localStorage.getItem('access_token');
+        const storedToken = getToken();
         if (storedToken) {
             setToken(storedToken);
         }
@@ -92,9 +95,6 @@ const PostsAndFeedsPage = () => {
 
         setLoadingFeed(true);
         try {
-            const currentToken = localStorage.getItem('access_token');
-            const headers = currentToken ? { Authorization: `Bearer ${currentToken}` } : {};
-
             let url = activeFeed === 'family'
                 ? `${import.meta.env.VITE_API_BASE_URL}/post/by-options?familyCode=${userInfo.familyCode}&privacy=private`
                 : `${import.meta.env.VITE_API_BASE_URL}/post/by-options?privacy=public`;
@@ -103,14 +103,14 @@ const PostsAndFeedsPage = () => {
                 url += `&caption=${encodeURIComponent(captionSearch.trim())}`;
             }
 
-            const response = await fetch(url, { headers });
+            const response = await authFetch(url, { method: 'GET', skipThrow: true });
 
-            if (!response.ok) {
-                if (response.status === 401) {
+            if (!response?.ok) {
+                if (response?.status === 401) {
                     console.error('Unauthorized: Token might be expired or invalid');
                     setFeedError('Authentication failed. Please refresh the page or log in again.');
 
-                    if (retryCount === 0 && currentToken) {
+                    if (retryCount === 0 && getToken()) {
                         console.log('Attempting to refresh user info...');
 
                         setTimeout(() => {
@@ -122,7 +122,7 @@ const PostsAndFeedsPage = () => {
                     setPosts([]);
                     return;
                 }
-                throw new Error(`HTTP error! status: ${response.status}`);
+                throw new Error(`HTTP error! status: ${response?.status}`);
             }
 
             const data = await response.json();
@@ -177,16 +177,11 @@ const PostsAndFeedsPage = () => {
         setLikeLoadingIds(prev => new Set(prev).add(postId));
 
         try {
-            const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/post/${postId}/like-toggle`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                }
+            const data = await authFetch(`/post/${postId}/like-toggle`, {
+                method: 'POST'
             });
-            const data = await response.json();
 
-            if (response.ok) {
+            if (data) {
                 setPosts(prevPosts =>
                     prevPosts.map(post =>
                         post.id === postId
@@ -195,7 +190,7 @@ const PostsAndFeedsPage = () => {
                     )
                 );
             } else {
-                console.error('Failed to toggle like:', data.message || response.statusText);
+                console.error('Failed to toggle like:', 'No response');
             }
         } catch (error) {
             console.error('Error toggling like:', error);

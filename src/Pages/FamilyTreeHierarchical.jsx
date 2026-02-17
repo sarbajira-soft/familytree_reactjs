@@ -16,31 +16,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import { FaHome, FaSearchPlus, FaSearchMinus, FaExpand } from 'react-icons/fa';
 
-// Utility for authenticated fetch
-const authFetch = async (url, options = {}) => {
-    const token = localStorage.getItem('access_token');
-    const headers = {
-        ...options.headers,
-        Authorization: token ? `Bearer ${token}` : undefined,
-    };
-    
-    try {
-        const response = await fetch(url, { ...options, headers });
-        if (response.status === 401) {
-            localStorage.removeItem('access_token');
-            window.location.href = '/login';
-            return null;
-        }
-        return response;
-    } catch (err) {
-        Swal.fire({
-            icon: 'error',
-            title: 'Network Error',
-            text: 'Network error or server error. Please try again.',
-        });
-        return null;
-    }
-};
+import { authFetchResponse } from '../utils/authFetch';
+import { clearAuthData } from '../utils/auth';
 
 const FamilyTreeHierarchical = () => {
     const [tree, setTree] = useState(null);
@@ -97,9 +74,17 @@ const FamilyTreeHierarchical = () => {
             
             try {
                 const apiUrl = `${import.meta.env.VITE_API_BASE_URL}/family/tree/${familyCodeToUse}`;
-                const response = await authFetch(apiUrl, {
+                const response = await authFetchResponse(apiUrl, {
+                    method: 'GET',
+                    skipThrow: true,
                     headers: { 'accept': '*/*' }
                 });
+
+                if (response && response.status === 401) {
+                    clearAuthData();
+                    window.location.href = '/login';
+                    return;
+                }
 
                 if (response && response.ok) {
                     const data = await response.json();
@@ -173,6 +158,11 @@ const FamilyTreeHierarchical = () => {
                 }
             } catch (err) {
                 console.error('Error loading tree:', err);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Network Error',
+                    text: 'Network error or server error. Please try again.',
+                });
             } finally {
                 setTreeLoading(false);
             }

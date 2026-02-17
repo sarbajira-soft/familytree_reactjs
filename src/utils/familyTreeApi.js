@@ -1,28 +1,15 @@
 // API utility for family tree CRUD operations
 
+import { authFetch } from './authFetch';
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
 const API_BASE = `${API_BASE_URL}/family-tree`;
 
-function getToken() {
-  return localStorage.getItem('access_token');
-}
-
-function authHeaders() {
-  const token = getToken();
-  return {
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-}
-
 export async function fetchFamilyTree(familyCode) {
   if (!familyCode) throw new Error('familyCode is required');
-  const res = await fetch(`${API_BASE}?familyCode=${familyCode}`, {
+  const data = await authFetch(`${API_BASE}?familyCode=${familyCode}`, {
     method: 'GET',
-    headers: authHeaders(),
   });
-  if (!res.ok) throw new Error('Failed to fetch family tree');
-  const data = await res.json();
   return data.people;
 }
 
@@ -41,107 +28,79 @@ export async function addPerson(person, familyCode) {
     isDummy: typeof person.isDummy === 'boolean' ? person.isDummy : false,
   };
   delete payload.img;
-  const res = await fetch(`${API_BASE}/person`, {
+  return await authFetch(`${API_BASE}/person`, {
     method: 'POST',
-    headers: authHeaders(),
     body: JSON.stringify(payload),
   });
-  if (!res.ok) throw new Error('Failed to add person');
-  return await res.json();
 }
 
 export async function editPerson(id, person, familyCode) {
   if (!familyCode) throw new Error('familyCode is required');
-  const res = await fetch(`${API_BASE}/person/${id}`, {
+  return await authFetch(`${API_BASE}/person/${id}`, {
     method: 'PUT',
-    headers: authHeaders(),
     body: JSON.stringify({ ...person, familyCode }),
   });
-  if (!res.ok) throw new Error('Failed to edit person');
-  return await res.json();
 }
 
 export async function deletePerson(id, familyCode) {
   if (!familyCode) throw new Error('familyCode is required');
-  const res = await fetch(`${API_BASE}/person/${id}`, {
+  await authFetch(`${API_BASE}/person/${id}`, {
     method: 'DELETE',
-    headers: authHeaders(),
   });
-  if (!res.ok) throw new Error('Failed to delete person');
   return true;
 }
 
 export async function saveFamilyTree(people, familyCode) {
   if (!familyCode) throw new Error('familyCode is required');
-  const res = await fetch(`${API_BASE}/save`, {
+  await authFetch(`${API_BASE}/save`, {
     method: 'POST',
-    headers: authHeaders(),
     body: JSON.stringify({ people, familyCode }),
   });
-  if (!res.ok) throw new Error('Failed to save family tree');
   return true;
 }
 
 // Fetch all relationships with multilingual descriptions
 export async function fetchRelationships() {
-  const res = await fetch(`${API_BASE_URL}/relationships`, {
+  return await authFetch(`${API_BASE_URL}/relationships`, {
     method: 'GET',
-    headers: authHeaders(),
   });
-  if (!res.ok) throw new Error('Failed to fetch relationships');
-  return await res.json();
 }
 
 // Update a relationship label (and mark as curated)
 export async function updateRelationshipLabel(code, description, labels) {
-  const res = await fetch(`${API_BASE_URL}/relationships/edit/${code}`, {
+  return await authFetch(`${API_BASE_URL}/relationships/edit/${code}`, {
     method: 'PUT',
-    headers: authHeaders(),
     body: JSON.stringify({ description, labels }),
   });
-  if (!res.ok) throw new Error('Failed to update relationship label');
-  return await res.json();
 } 
 
 // Fetch associated family prefixes (spouse-connected)
 export async function fetchAssociatedFamilyPrefixes(userId) {
   if (!userId) throw new Error('userId is required');
-  const res = await fetch(`${API_BASE_URL}/family/user/${userId}/associated-prefixes`, {
+  return await authFetch(`${API_BASE_URL}/family/user/${userId}/associated-prefixes`, {
     method: 'GET',
-    headers: authHeaders(),
   });
-  if (!res.ok) throw new Error('Failed to fetch associated family prefixes');
-  return await res.json();
 }
 
 // Fetch all family codes (main + associated) for a user
 export async function fetchUserFamilyCodes(userId) {
-  const res = await fetch(`${API_BASE_URL}/family/user/${userId}/families`, {
+  return await authFetch(`${API_BASE_URL}/family/user/${userId}/families`, {
     method: 'GET',
-    headers: authHeaders(),
   });
-  if (!res.ok) throw new Error('Failed to fetch user family codes');
-  return await res.json();
 }
 
 // Fetch all relationships for a user
 export async function fetchUserRelationships(userId) {
-  const res = await fetch(`${API_BASE_URL}/family/user/${userId}/relationships`, {
+  return await authFetch(`${API_BASE_URL}/family/user/${userId}/relationships`, {
     method: 'GET',
-    headers: authHeaders(),
   });
-  if (!res.ok) throw new Error('Failed to fetch user relationships');
-  return await res.json();
 }
 
 // Add a spouse relationship
 export async function addSpouseRelationship(userId, spouseUserId) {
   // Preserve signature, but route to association request workflow
-  const res = await fetch(`${API_BASE_URL}/family/request-association`, {
+  return await authFetch(`${API_BASE_URL}/family/request-association`, {
     method: 'POST',
-    headers: authHeaders(),
     body: JSON.stringify({ targetUserId: spouseUserId }),
   });
-  if (!res.ok) throw new Error('Failed to send association request');
-  return await res.json();
 }

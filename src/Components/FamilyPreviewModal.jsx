@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from "react";
 
+import { getToken } from "../utils/auth";
+import { authFetchResponse } from "../utils/authFetch";
+
 const FamilyPreviewModal = ({ familyCode, familyName, onClose }) => {
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -8,21 +11,20 @@ const FamilyPreviewModal = ({ familyCode, familyName, onClose }) => {
     const fetchFamily = async () => {
       setLoading(true);
       try {
-        const token = localStorage.getItem("access_token");
-        const res = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL}/family/member/${familyCode}`,
-          {
-            headers: {
-              accept: "application/json",
-              ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            },
-          }
-        );
+        const token = getToken();
+        const res = await authFetchResponse(`/family/member/${familyCode}`, {
+          method: "GET",
+          skipThrow: true,
+          headers: {
+            accept: "application/json",
+          },
+        });
         const data = await res.json();
         setMembers(data.data || []);
       } catch {
         setMembers([]);
       }
+
       setLoading(false);
     };
     if (familyCode) fetchFamily();

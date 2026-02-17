@@ -51,31 +51,19 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { FamilyTreeProvider } from "../Contexts/FamilyTreeContext";
 
+import { authFetchResponse } from "../utils/authFetch";
+import { clearAuthData, getToken } from "../utils/auth";
+
 // Utility for authenticated fetch with logout on 401 or error
 
 const authFetch = async (url, options = {}) => {
-  const token = localStorage.getItem("access_token");
-
-  const headers = {
-    ...options.headers,
-
-    Authorization: token ? `Bearer ${token}` : undefined,
-
-    // Do not set Content-Type for FormData
-  };
-
-  // Debug: log token and headers
-
-  console.log("authFetch token:", token);
-
-  console.log("authFetch headers:", headers);
-
   try {
-    const response = await fetch(url, { ...options, headers });
-
+    const response = await authFetchResponse(url, {
+      ...options,
+      skipThrow: true,
+    });
     if (response.status === 401) {
-      localStorage.removeItem("access_token");
-
+      clearAuthData();
       window.location.href = "/login";
 
       return null;
@@ -1716,7 +1704,10 @@ const FamilyTreePage = () => {
       // Ensure New Tree starts in normal editable mode (not linked mode)
       // by clearing any query params like ?mode=linked&source=...
       try {
-        navigate({ pathname: location.pathname, search: "" }, { replace: true });
+        navigate(
+          { pathname: location.pathname, search: "" },
+          { replace: true },
+        );
       } catch (_) {
         // no-op
       }
@@ -2387,7 +2378,8 @@ const FamilyTreePage = () => {
               </div>
 
               <div className="text-gray-600 dark:text-slate-300">
-                {blockedAccess.message || "You have been blocked from this family."}
+                {blockedAccess.message ||
+                  "You have been blocked from this family."}
               </div>
 
               <button
@@ -2464,8 +2456,7 @@ const FamilyTreePage = () => {
                       // Position this header just below the global app header
                       // while also respecting any safe-area inset at the top
                       // (for devices with notches).
-                      top:
-                        "calc(3.5rem + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)))",
+                      top: "calc(3.5rem + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)))",
                     }}
                   >
                     <div className="flex items-center justify-between gap-2">
@@ -3104,20 +3095,16 @@ const FamilyTreePage = () => {
             />
 
             <AddPersonModal
-              isOpen={canEdit && modal.isOpen}
-              onClose={() =>
-                setModal({ isOpen: false, action: { type: "", person: null } })
-              }
+              isOpen={modal.isOpen}
+              onClose={() => setModal({ isOpen: false, action: null })}
               action={modal.action}
               onAddPersons={handleAddPersons}
               familyCode={userInfo?.familyCode}
-              token={localStorage.getItem("access_token")}
+              token={getToken()}
               existingMemberIds={
                 tree
                   ? Array.from(tree.people.values())
-
                       .map((p) => p.memberId)
-
                       .filter(Boolean)
                   : []
               }
@@ -3127,7 +3114,7 @@ const FamilyTreePage = () => {
               isOpen={canEdit && linkTreeModal.isOpen}
               onClose={() => setLinkTreeModal({ isOpen: false, person: null })}
               senderPerson={linkTreeModal.person}
-              token={localStorage.getItem("access_token")}
+              token={getToken()}
               primaryColor="#1976D2"
               currentFamilyCode={userInfo?.familyCode}
               existingMemberIds={
@@ -3140,8 +3127,13 @@ const FamilyTreePage = () => {
               existingCanonicalKeys={
                 tree
                   ? Array.from(tree.people.values())
-                      .filter((p) => p?.canonicalFamilyCode && p?.canonicalNodeUid)
-                      .map((p) => `${String(p.canonicalFamilyCode).trim()}|${String(p.canonicalNodeUid).trim()}`)
+                      .filter(
+                        (p) => p?.canonicalFamilyCode && p?.canonicalNodeUid,
+                      )
+                      .map(
+                        (p) =>
+                          `${String(p.canonicalFamilyCode).trim()}|${String(p.canonicalNodeUid).trim()}`,
+                      )
                       .filter(Boolean)
                   : []
               }
@@ -3198,14 +3190,14 @@ const FamilyTreePage = () => {
           isOpen={isCreateFamilyModalOpen}
           onClose={() => setIsCreateFamilyModalOpen(false)}
           onFamilyCreated={handleFamilyCreated}
-          token={localStorage.getItem("access_token")}
+          token={getToken()}
         />
 
         <JoinFamilyModal
           isOpen={isJoinFamilyModalOpen}
           onClose={() => setIsJoinFamilyModalOpen(false)}
           onFamilyJoined={handleFamilyJoined}
-          token={localStorage.getItem("access_token")}
+          token={getToken()}
         />
       </>
     </FamilyTreeProvider>

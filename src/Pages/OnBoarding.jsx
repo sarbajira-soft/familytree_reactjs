@@ -22,6 +22,9 @@ import Swal from "sweetalert2";
 
 import PropTypes from "prop-types";
 
+import { authFetchResponse } from "../utils/authFetch";
+import { getToken } from "../utils/auth";
+
 const SECTIONS = [
   {
     id: "basic",
@@ -439,7 +442,17 @@ const fetchDropdownDataForOnboarding = async (setDropdownData) => {
       `${import.meta.env.VITE_API_BASE_URL}` + "/gothram",
     ];
 
-    const responses = await Promise.all(endpoints.map((url) => fetch(url)));
+    const responses = await Promise.all(
+      endpoints.map((url) =>
+        authFetchResponse(url, {
+          method: "GET",
+          skipThrow: true,
+          headers: {
+            accept: "application/json",
+          },
+        })
+      )
+    );
     const data = await Promise.all(responses.map((res) => res.json()));
 
     const languages = data[0].data || data[0] || [];
@@ -487,17 +500,14 @@ const fetchAndApplyUserDetails = async ({
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-    const response = await fetch(
-      `${import.meta.env.VITE_API_BASE_URL}/user/profile/${userId}`,
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        signal: controller.signal,
+    const response = await authFetchResponse(`/user/profile/${userId}`, {
+      method: "GET",
+      skipThrow: true,
+      headers: {
+        "Content-Type": "application/json",
       },
-    );
+      signal: controller.signal,
+    });
 
     clearTimeout(timeoutId);
 
@@ -2579,7 +2589,7 @@ const OnBoarding = () => {
   // Initialize token and user ID
 
   useEffect(() => {
-    const storedToken = localStorage.getItem("access_token");
+    const storedToken = getToken();
 
     if (!storedToken) {
       setApiError("Authentication token not found. Please login again.");
@@ -2765,17 +2775,13 @@ const OnBoarding = () => {
 
       const formDataToSend = buildProfileUpdateFormData(formData);
 
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/user/profile/update/${userId}`,
+      const response = await authFetchResponse(
+        `/user/profile/update/${userId}`,
         {
           method: "PUT",
-
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-
+          skipThrow: true,
           body: formDataToSend,
-        },
+        }
       );
 
       if (!response.ok) {

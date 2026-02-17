@@ -19,6 +19,7 @@ import { useUser } from "../Contexts/UserContext";
 import { fetchProducts as fetchMedusaProducts, fetchRegions } from "../Retail/services/productService";
 import { getProductThumbnail } from "../Retail/utils/helpers";
 import { getToken } from "../utils/auth";
+import { authFetch } from "../utils/authFetch";
 import DashboardShimmer from "./DashboardShimmer";
 import PostPage from "./PostPage";
 import { MEDUSA_REGION_ID_KEY } from "../Retail/utils/constants";
@@ -316,32 +317,17 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: ["dashboardData", userInfo?.familyCode],
     queryFn: async () => {
-      const headers = {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      };
-      const [postsRes, statsRes, eventsRes, galleryRes] =
-        await Promise.all([
-          fetch(
-            // Bug 51: show family feed across linked families (spouse-connected families may have different codes)
-            `${apiBaseUrl}/post/by-options?privacy=private`,
-            { headers }
-          ),
-          fetch(`${apiBaseUrl}/family/member/${userInfo.familyCode}/stats`, {
-            headers,
-          }),
-          fetch(`${apiBaseUrl}/event/upcoming/all`, { headers }),
-          fetch(
-            `${apiBaseUrl}/gallery/by-options?privacy=public`,
-            { headers }
-          ),
-        ]);
-
       const [posts, stats, events, gallery] = await Promise.all([
-        postsRes.json(),
-        statsRes.json(),
-        eventsRes.json(),
-        galleryRes.json(),
+        authFetch(
+          // Bug 51: show family feed across linked families (spouse-connected families may have different codes)
+          `${apiBaseUrl}/post/by-options?privacy=private`,
+          { method: "GET" }
+        ),
+        authFetch(`${apiBaseUrl}/family/member/${userInfo.familyCode}/stats`, {
+          method: "GET",
+        }),
+        authFetch(`${apiBaseUrl}/event/upcoming/all`, { method: "GET" }),
+        authFetch(`${apiBaseUrl}/gallery/by-options?privacy=public`, { method: "GET" }),
       ]);
       return { posts, stats, events, gallery };
     },

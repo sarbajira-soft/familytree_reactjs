@@ -2,11 +2,14 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import GalleryViewerModal from '../Components/GalleryViewerModal';
-import { FiSearch, FiPlusCircle } from 'react-icons/fi';
+import {  FiPlusCircle } from 'react-icons/fi';
 import { MdPublic, MdPeople } from 'react-icons/md';
 import CreateAlbumModal from '../Components/CreateAlbumModal';
 import { useUser } from '../Contexts/UserContext'; // Import useUser context
 import GalleryPageShimmer from './GalleryPageShimmer';
+
+import { authFetch } from '../utils/authFetch';
+import { getToken } from '../utils/auth';
 
 const GalleryCollage = ({ photos = [], onOpenAlbum }) => {
   const [activeIndex, setActiveIndex] = useState(0);
@@ -146,7 +149,7 @@ const FamilyGalleryPage = () => {
 
   // Fetch token from localStorage on component mount
   useEffect(() => {
-    const storedToken = localStorage.getItem('access_token');
+    const storedToken = getToken();
     if (storedToken) {
       setToken(storedToken);
     }
@@ -168,25 +171,20 @@ const FamilyGalleryPage = () => {
 
     setLoadingAlbums(true);
     try {
-      const headers = { Authorization: `Bearer ${token}` };
-      let url = '';
+      let endpoint = '';
 
       // Determine the API URL based on the active feed
       if (activeFeed === 'family') {
-        url = `${import.meta.env.VITE_API_BASE_URL}/gallery/by-options?familyCode=${userInfo.familyCode}&privacy=private`;
+        endpoint = `/gallery/by-options?familyCode=${userInfo.familyCode}&privacy=private`;
       } else {
-        url = `${import.meta.env.VITE_API_BASE_URL}/gallery/by-options?privacy=public`;
+        endpoint = `/gallery/by-options?privacy=public`;
       }
 
       if (galleryTitleSearch.trim()) {
-        url += `&galleryTitle=${encodeURIComponent(galleryTitleSearch.trim())}`;
+        endpoint += `&galleryTitle=${encodeURIComponent(galleryTitleSearch.trim())}`;
       }
 
-      const response = await fetch(url, { headers });
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
+      const data = await authFetch(endpoint, { method: 'GET' });
 
       // Format the API response to match the expected structure
       const formattedGalleries = data.map(gallery => ({

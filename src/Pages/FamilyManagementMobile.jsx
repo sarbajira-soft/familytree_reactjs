@@ -8,6 +8,9 @@ import JoinFamilyModal from "../Components/JoinFamilyModal";
 import NoFamilyView from "../Components/NoFamilyView";
 import PendingApprovalView from "../Components/PendingApprovalView";
 
+import { authFetchResponse } from "../utils/authFetch";
+import { getToken } from "../utils/auth";
+
 const FamilyManagementMobile = () => {
   const navigate = useNavigate();
   const { userInfo } = useUser();
@@ -37,7 +40,7 @@ const FamilyManagementMobile = () => {
   const [inviteCopySuccess, setInviteCopySuccess] = useState(false);
 
   useEffect(() => {
-    const storedToken = localStorage.getItem("access_token");
+    const storedToken = getToken();
     if (storedToken) {
       setToken(storedToken);
     }
@@ -62,7 +65,9 @@ const FamilyManagementMobile = () => {
     const loadFamilyData = async () => {
       try {
         setFamilyLoading(true);
-        const res = await fetch(`${baseUrl}/family/code/${userInfo.familyCode}`, {
+        const res = await authFetchResponse(`${baseUrl}/family/code/${userInfo.familyCode}`, {
+          method: "GET",
+          skipThrow: true,
           headers: { accept: "application/json" },
           signal,
         });
@@ -93,16 +98,17 @@ const FamilyManagementMobile = () => {
     };
 
     const loadMembersPreview = async () => {
-      const token = localStorage.getItem("access_token");
+      const token = getToken();
       if (!token) {
         setMembersPreview([]);
         return;
       }
       try {
         setMembersLoading(true);
-        const res = await fetch(`${baseUrl}/family/member/${userInfo.familyCode}`, {
+        const res = await authFetchResponse(`${baseUrl}/family/member/${userInfo.familyCode}`, {
+          method: "GET",
+          skipThrow: true,
           headers: {
-            Authorization: `Bearer ${token}`,
             Accept: "application/json",
           },
           signal,
@@ -153,19 +159,20 @@ const FamilyManagementMobile = () => {
         setPendingRequestsCount(null);
         return;
       }
-      const token = localStorage.getItem("access_token");
+      const token = getToken();
       if (!token) {
         setPendingRequestsCount(null);
         return;
       }
       try {
         setPendingLoading(true);
-        const res = await fetch(
+        const res = await authFetchResponse(
           `${baseUrl}/notifications/${userInfo.familyCode}/join-requests`,
           {
+            method: "GET",
+            skipThrow: true,
             headers: {
               accept: "application/json",
-              Authorization: `Bearer ${token}`,
             },
             signal,
           }
@@ -308,7 +315,7 @@ const FamilyManagementMobile = () => {
 
               <FamilyOverView
                 familyCode={userInfo.familyCode}
-                token={localStorage.getItem("access_token")}
+                token={getToken()}
               />
 
               {membersLoading ? (

@@ -1,42 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getToken } from '../utils/auth';
-import { throwIfNotOk } from '../utils/apiMessages';
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
-
-// Generic fetch function with auth
-const fetchWithAuth = async (endpoint, options = {}) => {
-  const token = getToken();
-  const isFormData =
-    typeof FormData !== 'undefined' && options?.body instanceof FormData;
-
-  const headers = {
-    ...(!isFormData && { 'Content-Type': 'application/json' }),
-    ...(token && { Authorization: `Bearer ${token}` }),
-    ...options.headers,
-  };
-
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers,
-  });
-
-  await throwIfNotOk(response, {
-    fallback: 'We couldn’t complete your request right now. Please try again.',
-  });
-
-  try {
-    return await response.json();
-  } catch (_) {
-    return null;
-  }
-};
+import { authFetch } from '../utils/authFetch';
 
 // Hook for dashboard summary data
 export const useDashboardSummary = (familyCode, userId, enabled = true) => {
   return useQuery({
     queryKey: ['dashboardSummary', familyCode, userId],
-    queryFn: () => fetchWithAuth(`/dashboard/summary?familyCode=${familyCode}&userId=${userId}`),
+    queryFn: () => authFetch(`/dashboard/summary?familyCode=${familyCode}&userId=${userId}`),
     enabled: enabled && !!familyCode && !!userId,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
@@ -46,7 +15,7 @@ export const useDashboardSummary = (familyCode, userId, enabled = true) => {
 export const useFamilyStats = (familyCode, enabled = true) => {
   return useQuery({
     queryKey: ['familyStats', familyCode],
-    queryFn: () => fetchWithAuth(`/family/member/${familyCode}/stats`),
+    queryFn: () => authFetch(`/family/member/${familyCode}/stats`),
     enabled: enabled && !!familyCode,
     staleTime: 5 * 60 * 1000,
   });
@@ -56,7 +25,7 @@ export const useFamilyStats = (familyCode, enabled = true) => {
 export const useUserPosts = (userId, enabled = true) => {
   return useQuery({
     queryKey: ['userPosts', userId],
-    queryFn: () => fetchWithAuth(`/post/by-options?createdBy=${userId}`),
+    queryFn: () => authFetch(`/post/by-options?createdBy=${userId}`),
     enabled: enabled && !!userId,
     staleTime: 3 * 60 * 1000, // 3 minutes
   });
@@ -66,7 +35,7 @@ export const useUserPosts = (userId, enabled = true) => {
 export const useUserGalleries = (userId, enabled = true) => {
   return useQuery({
     queryKey: ['userGalleries', userId],
-    queryFn: () => fetchWithAuth(`/gallery/by-options?createdBy=${userId}`),
+    queryFn: () => authFetch(`/gallery/by-options?createdBy=${userId}`),
     enabled: enabled && !!userId,
     staleTime: 3 * 60 * 1000,
   });
@@ -83,7 +52,7 @@ export const useEvents = (activeTab, familyCode, approveStatus, enabled = true) 
 
   return useQuery({
     queryKey: ['events', activeTab, familyCode],
-    queryFn: () => fetchWithAuth(getEndpoint()),
+    queryFn: () => authFetch(getEndpoint()),
     enabled: enabled && !!familyCode && approveStatus === 'approved',
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
@@ -93,7 +62,7 @@ export const useEvents = (activeTab, familyCode, approveStatus, enabled = true) 
 export const useNotifications = (enabled = true) => {
   return useQuery({
     queryKey: ['notifications'],
-    queryFn: () => fetchWithAuth('/notifications?all=true'),
+    queryFn: () => authFetch('/notifications?all=true'),
     enabled,
     staleTime: 10 * 60 * 1000, // 10 minutes - WebSocket updates cache
     refetchInterval: false, // Disabled - WebSocket handles real-time updates
@@ -105,7 +74,7 @@ export const useNotifications = (enabled = true) => {
 export const useUnreadCount = (enabled = true) => {
   return useQuery({
     queryKey: ['unreadCount'],
-    queryFn: () => fetchWithAuth('/notifications/unread/count'),
+    queryFn: () => authFetch('/notifications/unread/count'),
     enabled,
     staleTime: 10 * 60 * 1000, // 10 minutes - WebSocket updates cache
     refetchInterval: false, // Disabled - WebSocket handles real-time updates
@@ -117,7 +86,7 @@ export const useUnreadCount = (enabled = true) => {
 export const useFamilyTreeComplete = (familyCode, userId, enabled = true) => {
   return useQuery({
     queryKey: ['familyTreeComplete', familyCode, userId],
-    queryFn: () => fetchWithAuth(`/family/tree/${familyCode}/complete?userId=${userId}`),
+    queryFn: () => authFetch(`/family/tree/${familyCode}/complete?userId=${userId}`),
     enabled: enabled && !!familyCode && !!userId,
     staleTime: 10 * 60 * 1000, // 10 minutes
   });
@@ -127,7 +96,7 @@ export const useFamilyTreeComplete = (familyCode, userId, enabled = true) => {
 export const useCustomLabels = (language = 'en', enabled = true) => {
   return useQuery({
     queryKey: ['customLabels', language],
-    queryFn: () => fetchWithAuth(`/custom-labels/all?language=${language}`),
+    queryFn: () => authFetch(`/custom-labels/all?language=${language}`),
     enabled,
     staleTime: 30 * 60 * 1000, // 30 minutes - labels don't change often
     cacheTime: 60 * 60 * 1000, // 1 hour
@@ -140,7 +109,7 @@ export const useAcceptAssociation = () => {
   
   return useMutation({
     mutationFn: (requestId) => 
-      fetchWithAuth('/family/accept-association', {
+      authFetch('/family/accept-association', {
         method: 'POST',
         body: JSON.stringify({ requestId }),
       }),
@@ -158,7 +127,7 @@ export const useRejectAssociation = () => {
   
   return useMutation({
     mutationFn: (requestId) => 
-      fetchWithAuth('/family/reject-association', {
+      authFetch('/family/reject-association', {
         method: 'POST',
         body: JSON.stringify({ requestId }),
       }),
@@ -175,7 +144,7 @@ export const useTogglePostLike = () => {
   
   return useMutation({
     mutationFn: ({ postId, isLiked }) => 
-      fetchWithAuth(`/post/${postId}/${isLiked ? 'unlike' : 'like'}` , {
+      authFetch(`/post/${postId}/${isLiked ? 'unlike' : 'like'}` , {
         method: 'POST',
       }),
     onSuccess: (data, variables) => {
@@ -191,7 +160,7 @@ export const useDeletePost = () => {
   
   return useMutation({
     mutationFn: (postId) => 
-      fetchWithAuth(`/post/delete/${postId}`, {
+      authFetch(`/post/delete/${postId}`, {
         method: 'DELETE',
       }),
     onSuccess: () => {

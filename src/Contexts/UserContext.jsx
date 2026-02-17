@@ -10,6 +10,8 @@ import {
   initializeAuth 
 } from '../utils/auth';
 
+import { authFetchResponse } from '../utils/authFetch';
+
 const UserContext = createContext();
 
 export const UserProvider = ({ children }) => {
@@ -124,12 +126,9 @@ export const UserProvider = ({ children }) => {
     try {
       setUserLoading(true);
 
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/user/myProfile`, {
+      const response = await authFetchResponse(`/user/myProfile`, {
         method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        skipThrow: true,
       });
       if (response.status === 401) {
         await handleUnauthorized(response);

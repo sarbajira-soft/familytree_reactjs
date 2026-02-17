@@ -4,12 +4,16 @@ import FamilyPreviewModal from "./FamilyPreviewModal";
 import {jwtDecode} from 'jwt-decode';
 import Swal from 'sweetalert2';
 
+import { getToken } from '../utils/auth';
+import { authFetchResponse } from '../utils/authFetch';
+
 // Helper to fetch user's first name from profile
 async function fetchUserFirstName(userId, accessToken) {
-  const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/user/profile/${userId}`, {
+  const res = await authFetchResponse(`/user/profile/${userId}`, {
+    method: 'GET',
+    skipThrow: true,
     headers: {
       accept: 'application/json',
-      Authorization: `Bearer ${accessToken}`,
     },
   });
   const data = await res.json();
@@ -29,7 +33,7 @@ const SuggestFamilyModal = ({
   // Handler to send join request notification to family admins
   const handleJoinFamily = async (familyCode) => {
     try {
-      const accessToken = localStorage.getItem('access_token');
+      const accessToken = getToken();
       let userId = null;
       let firstName = '';
       if (accessToken) {
@@ -40,24 +44,22 @@ const SuggestFamilyModal = ({
       }
       if (!userId) throw new Error('User ID not found');
       // 1. Get admin user IDs for the family
-      const adminRes = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/notifications/${familyCode}/admins`,
+      const adminRes = await authFetchResponse(
+        `/notifications/${familyCode}/admins`,
         {
+          method: 'GET',
+          skipThrow: true,
           headers: {
             accept: 'application/json',
-            Authorization: `Bearer ${accessToken}`,
           },
         }
       );
       const adminData = await adminRes.json();
       const adminIds = adminData.data || [];
       // 2. Send notification to admins
-      await fetch(`${import.meta.env.VITE_API_BASE_URL}/notifications`, {
+      await authFetchResponse(`/notifications`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-        },
+        skipThrow: true,
         body: JSON.stringify({
           type: 'FAMILY_JOIN_REQUEST',
           title: 'New Family Join Request',

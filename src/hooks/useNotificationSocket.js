@@ -3,6 +3,8 @@ import { io } from 'socket.io-client';
 import { getToken } from '../utils/auth';
 import { useQueryClient } from '@tanstack/react-query';
 
+import { authFetchResponse } from '../utils/authFetch';
+
 const SOCKET_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
 
 export const useNotificationSocket = (userInfo) => {
@@ -18,9 +20,10 @@ export const useNotificationSocket = (userInfo) => {
     if (!token || !userInfo?.userId) return;
 
     try {
-      const response = await fetch(`${SOCKET_URL}/notifications/unread/count`, {
+      const response = await authFetchResponse(`${SOCKET_URL}/notifications/unread/count`, {
+        method: 'GET',
+        skipThrow: true,
         headers: {
-          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });

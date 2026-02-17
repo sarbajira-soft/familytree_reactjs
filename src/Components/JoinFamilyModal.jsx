@@ -3,6 +3,9 @@ import { FiX, FiUsers } from 'react-icons/fi';
 import Swal from 'sweetalert2';
 import { jwtDecode } from 'jwt-decode';
 
+import { getToken } from '../utils/auth';
+import { authFetchResponse } from '../utils/authFetch';
+
 const JoinFamilyModal = ({ isOpen, onClose, token, onFamilyJoined }) => {
   const [familyCodeDigits, setFamilyCodeDigits] = useState('');
   const [loading, setLoading] = useState(false);
@@ -20,7 +23,8 @@ const JoinFamilyModal = ({ isOpen, onClose, token, onFamilyJoined }) => {
     [familyCodeDigits],
   );
 
-  const accessToken = useMemo(() => localStorage.getItem('access_token'), []);
+  const accessToken = useMemo(() => getToken(), []);
+
   const currentUserId = useMemo(() => {
     try {
       if (!accessToken) return null;
@@ -41,12 +45,13 @@ const JoinFamilyModal = ({ isOpen, onClose, token, onFamilyJoined }) => {
       if (!accessToken || !currentUserId) return;
       setSuggestionsLoading(true);
       try {
-        const res = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL}/family/member/suggest-family/${currentUserId}`,
+        const res = await authFetchResponse(
+          `/family/member/suggest-family/${currentUserId}`,
           {
+            method: 'GET',
+            skipThrow: true,
             headers: {
               accept: 'application/json',
-              Authorization: `Bearer ${accessToken}`,
             },
           }
         );
@@ -54,6 +59,7 @@ const JoinFamilyModal = ({ isOpen, onClose, token, onFamilyJoined }) => {
           setSuggestedFamilies([]);
           return;
         }
+
         const json = await res.json();
         const data = json?.data || [];
         const list = Array.isArray(data) ? data : [];
@@ -83,12 +89,9 @@ const JoinFamilyModal = ({ isOpen, onClose, token, onFamilyJoined }) => {
 
     const familyCodeNormalized = String(codeToJoin).trim().toUpperCase();
 
-    const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/family/member/request-join`, {
+    const res = await authFetchResponse(`/family/member/request-join`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-      },
+      skipThrow: true,
       body: JSON.stringify({
         memberId: currentUserId,
         familyCode: familyCodeNormalized,
