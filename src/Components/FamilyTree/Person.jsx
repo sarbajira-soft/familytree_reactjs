@@ -16,6 +16,7 @@ import {
 import Swal from "sweetalert2";
 import { useNavigate, useParams } from "react-router-dom";
 import { getToken } from "../../utils/auth";
+import { authFetchResponse } from "../../utils/authFetch";
 import { Mars, Venus } from "lucide-react";
 import { FaFemale, FaMale } from "react-icons/fa";
 import { getTreeCardDimensions } from "../../utils/treeCardDimensions";
@@ -321,10 +322,10 @@ const Person = ({
     }
 
     const apiLanguage = language === "tamil" ? "ta" : language;
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || "";
     try {
-      await fetch(`${baseUrl}/custom-labels`, {
+      await authFetchResponse(`/custom-labels`, {
         method: "POST",
+        skipThrow: true,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           relationshipKey: displayRelationshipCode,
@@ -466,10 +467,10 @@ const Person = ({
       const endpoint = shouldBlock ? "block" : "unblock";
       const apiUrl = `${import.meta.env.VITE_API_BASE_URL}/family/member/${endpoint}/${person.memberId}/${currentFamilyCode}`;
 
-      const res = await fetch(apiUrl, {
+      const res = await authFetchResponse(apiUrl, {
         method: "PUT",
+        skipThrow: true,
         headers: {
-          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
       });

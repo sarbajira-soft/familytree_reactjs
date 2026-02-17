@@ -5,6 +5,9 @@ import { useLanguage } from '../../Contexts/LanguageContext';
 import AssociationRequestItem from './AssociationRequestItem';
 import { getCurrentUserId } from '../../utils/auth';
 
+import { getToken } from '../../utils/auth';
+import { authFetchResponse } from '../../utils/authFetch';
+
 const AssociationRequests = () => {
   const navigate = useNavigate();
   const [requests, setRequests] = useState([]);
@@ -22,15 +25,19 @@ const AssociationRequests = () => {
   const fetchAssociationRequests = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('access_token');
+      const token = getToken();
       
       // Backend now filters by type and applies 15-day rule automatically
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}/notifications?all=true&type=FAMILY_ASSOCIATION_REQUEST`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'accept': 'application/json'
+      const response = await authFetchResponse(
+        `/notifications?all=true&type=FAMILY_ASSOCIATION_REQUEST`,
+        {
+          method: 'GET',
+          skipThrow: true,
+          headers: {
+            accept: 'application/json',
+          },
         }
-      });
+      );
       
       if (response.ok) {
         const data = await response.json();
@@ -71,7 +78,7 @@ const AssociationRequests = () => {
       setError(null);
       setSuccess(null);
       
-      const token = localStorage.getItem('access_token');
+      const token = getToken();
       const userId = getCurrentUserId();
       
       if (!token || !userId) {
@@ -101,12 +108,9 @@ const AssociationRequests = () => {
       }
       
       const endpoint = action === 'accept' ? 'family/accept-association' : 'family/reject-association';
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}/${endpoint}`, {
+      const response = await authFetchResponse(`/${endpoint}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
+        skipThrow: true,
         body: JSON.stringify(requestData),
       });
 

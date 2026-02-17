@@ -6,6 +6,9 @@ import { useNavigate } from 'react-router-dom';
 import JoinFamilyModal from '../Components/JoinFamilyModal';
 import { useUser } from '../Contexts/UserContext';
 
+import { authFetch } from '../utils/authFetch';
+import { getToken } from '../utils/auth';
+
 
 // ✅ WhatsApp Share Modal
 const WhatsAppShareModal = ({ onClose, familyCode, member }) => {
@@ -142,22 +145,19 @@ const FamilyMemberListing = () => {
   const fetchMembers = async () => {
     try {
       setIsLoading(true);
-      const token = localStorage.getItem('access_token');
-      const baseUrl = import.meta.env.VITE_API_BASE_URL;
       const familyCode = userInfo?.familyCode;
 
       if (!familyCode) throw new Error('No family code available');
 
-      const response = await fetch(`${baseUrl}/family/member/${familyCode}`, {
+      const result = await authFetch(`/family/member/${familyCode}`, {
+        method: 'GET',
+        skipThrow: true,
         headers: {
-          Authorization: `Bearer ${token}`,
           Accept: 'application/json',
         },
       });
 
-      if (!response.ok) throw new Error('Failed to fetch family members');
-
-      const result = await response.json();
+      if (!result || result?.message) throw new Error('Failed to fetch family members');
       const data = result.data || [];
 
       const formatted = data.map((item) => ({
@@ -202,7 +202,7 @@ const FamilyMemberListing = () => {
 
   if (userLoading) {
     return (
-      <div className="max-w-7xl mx-auto px-4 py-8 flex flex-col items-center justify-center py-20">
+      <div className="max-w-7xl mx-auto px-4 py-8 flex flex-col items-center justify-center ">
         <button
           type="button"
           onClick={() => navigate('/family-management')}
@@ -221,7 +221,7 @@ const FamilyMemberListing = () => {
   if (!hasValidFamilyAccess) {
     return (
       <>
-        <div className="max-w-7xl mx-auto px-4 py-8 flex flex-col items-center justify-center py-20">
+        <div className="max-w-7xl mx-auto px-4 py-8 flex flex-col items-center justify-center ">
           <button
             type="button"
             onClick={() => navigate('/family-management')}
@@ -248,7 +248,7 @@ const FamilyMemberListing = () => {
           <JoinFamilyModal
             isOpen={showJoinModal}
             onClose={() => setShowJoinModal(false)}
-            token={localStorage.getItem('access_token')}
+            token={getToken()}
             onFamilyJoined={() => {
               refetchUser();
               setShowJoinModal(false);
@@ -262,7 +262,7 @@ const FamilyMemberListing = () => {
 
   if (isLoading) {
     return (
-      <div className="max-w-7xl mx-auto px-4 py-8 flex flex-col items-center justify-center py-20">
+      <div className="max-w-7xl mx-auto px-4 py-8 flex flex-col items-center justify-center ">
         <button
           type="button"
           onClick={() => navigate('/family-management')}

@@ -5,6 +5,9 @@ import { X, UserPlus, Users, Edit, Plus, UserMinus, Camera, Save, ArrowLeft, Sen
 import { fetchRelationships } from '../../utils/familyTreeApi';
 import Swal from 'sweetalert2';
 
+import { getToken } from '../../utils/auth';
+import { authFetch, authFetchResponse } from '../../utils/authFetch';
+
 const PRIMARY_COLOR = "#1976D2";
 const SECONDARY_COLOR = "#f97316";
 
@@ -97,15 +100,13 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
         if (!phoneRegex.test(phoneInvite.phone)) return;
         setPhoneInvite(prev => ({ ...prev, loading: true, result: null }));
         try {
-            const token = localStorage.getItem('access_token');
             const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api');
             // Normalize to last 10 digits for lookup, backend also sanitizes
             const cleaned = String(phoneInvite.phone).replace(/\D/g, '');
             const last10 = cleaned.slice(-10);
-            const res = await fetch(`${API_BASE}/user/lookup?phone=${encodeURIComponent(last10)}`, {
-              headers: token ? { Authorization: `Bearer ${token}` } : {}
+            const data = await authFetch(`${API_BASE}/user/lookup?phone=${encodeURIComponent(last10)}`, {
+              method: 'GET',
             });
-            const data = await res.json();
             const sameFamily = Boolean(data?.user?.familyCode) && data.user.familyCode === familyCode;
             setPhoneInvite(prev => ({ ...prev, result: { ...data, sameFamily }, loading: false }));
         } catch (err) {
@@ -117,11 +118,10 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
     const handleSendInvite = async () => {
         try {
             setPhoneInvite(prev => ({ ...prev, sending: true }));
-            const token = localStorage.getItem('access_token');
             const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api');
-            const res = await fetch(`${API_BASE}/invites`, {
+            const res = await authFetchResponse(`${API_BASE}/invites`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+                skipThrow: true,
                 body: JSON.stringify({ phone: phoneInvite.phone, inviterId: action.person?.userId || null })
             });
             const data = await res.json();
@@ -143,9 +143,9 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
         
         try {
             setPhoneInvite(prev => ({ ...prev, requesting: true }));
-            const token = localStorage.getItem('access_token');
+            const authToken = getToken();
             
-            if (!token) {
+            if (!authToken) {
                 throw new Error('Authentication token not found');
             }
 
@@ -163,12 +163,11 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
 
             // Use association request endpoint (approval workflow)
             const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000');
-            const response = await fetch(`${API_BASE}/family/request-association`, {
+            const response = await authFetchResponse(`${API_BASE}/family/request-association`, {
                 method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json', 
-                    'Authorization': `Bearer ${token}`,
-                    'accept': 'application/json'
+                skipThrow: true,
+                headers: {
+                    accept: 'application/json',
                 },
                 body: JSON.stringify({ targetUserId, requesterUserId })
             });
@@ -249,18 +248,11 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
 
         try {
             setLinkRequestSending(true);
-            const authToken = token || localStorage.getItem('access_token');
-            if (!authToken) {
-                throw new Error('Authentication token not found');
-            }
-
-            const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
-            const res = await fetch(`${API_BASE}/family/request-tree-link`, {
+            const res = await authFetchResponse(`/family/request-tree-link`, {
                 method: 'POST',
+                skipThrow: true,
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${authToken}`,
-                    'accept': 'application/json',
+                    accept: 'application/json',
                 },
                 body: JSON.stringify({
                     senderNodeUid,
@@ -346,18 +338,11 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
 
         try {
             setLinkRequestSendingParents((p) => ({ ...p, [parentType]: true }));
-            const authToken = token || localStorage.getItem('access_token');
-            if (!authToken) {
-                throw new Error('Authentication token not found');
-            }
-
-            const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
-            const res = await fetch(`${API_BASE}/family/request-tree-link`, {
+            const res = await authFetchResponse(`/family/request-tree-link`, {
                 method: 'POST',
+                skipThrow: true,
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${authToken}`,
-                    'accept': 'application/json',
+                    accept: 'application/json',
                 },
                 body: JSON.stringify({
                     senderNodeUid,
@@ -422,14 +407,12 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
     useEffect(() => {
         if (isOpen && familyCode && token) {
             setLoadingMembers(true);
-            const API_BASE = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api');
-            fetch(`${API_BASE}/family/member/${familyCode}`, {
+            authFetch(`/family/member/${familyCode}`, {
+                method: 'GET',
                 headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'accept': '*/*',
+                    accept: '*/*',
                 },
             })
-                .then(res => res.json())
                 .then(data => {
                     console.log('Family members API response:', data);
                     if (data && data.data) {
@@ -860,20 +843,13 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
 
         try {
             setTargetFamilyLoading(true);
-            const authToken = token || localStorage.getItem('access_token');
-            if (!authToken) {
-                throw new Error('Authentication token not found');
-            }
-
-            const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
-            const res = await fetch(`${API_BASE}/family/tree/${encodeURIComponent(code)}`, {
+            const data = await authFetch(`/family/tree/${encodeURIComponent(code)}`, {
+                method: 'GET',
                 headers: {
-                    'Authorization': `Bearer ${authToken}`,
-                    'accept': 'application/json',
+                    accept: 'application/json',
                 },
             });
-            const data = await res.json();
-            if (!res.ok) {
+            if (!data || data?.success === false) {
                 throw new Error(data?.message || 'Failed to fetch target family tree');
             }
 
@@ -915,20 +891,18 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                 },
             }));
 
-            const authToken = token || localStorage.getItem('access_token');
+            const authToken = token || getToken();
             if (!authToken) {
                 throw new Error('Authentication token not found');
             }
 
-            const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
-            const res = await fetch(`${API_BASE}/family/tree/${encodeURIComponent(code)}`, {
+            const data = await authFetch(`/family/tree/${encodeURIComponent(code)}`, {
+                method: 'GET',
                 headers: {
-                    'Authorization': `Bearer ${authToken}`,
-                    'accept': 'application/json',
+                    accept: 'application/json',
                 },
             });
-            const data = await res.json();
-            if (!res.ok) {
+            if (!data || data?.success === false) {
                 throw new Error(data?.message || 'Failed to fetch target family tree');
             }
 

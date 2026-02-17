@@ -2,6 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import { FiX, FiShoppingCart, FiLoader, FiUser, FiMapPin, FiMessageSquare, FiPackage, FiMinus, FiPlus, FiGift, FiCalendar, FiTruck } from 'react-icons/fi';
 import OrderConfirmationModal from './OrderConfirmationModal';
 
+import { getToken } from '../utils/auth';
+import { authFetchResponse } from '../utils/authFetch';
+
 const BuyConfirmationModal = ({
   isOpen,
   onClose,
@@ -90,24 +93,27 @@ const BuyConfirmationModal = ({
         const fetchFamilyMembers = async () => {
           try {
             setIsLoading(true);
-            const token = localStorage.getItem('access_token');
-            
-            const response = await fetch(`${apiBaseUrl}/family/member/${familyCode}`, {
+            const token = getToken();
+            if (!token) {
+              throw new Error('Authentication token not found');
+            }
+
+            const response = await authFetchResponse(`/family/member/${familyCode}`, {
               method: 'GET',
+              skipThrow: true,
               headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-              }
+              },
             });
-            
+
             if (!response.ok) {
               const errorText = await response.text();
               console.error('❌ Response error:', errorText);
               throw new Error(`Failed to fetch family members: ${response.status}`);
             }
-            
+
             const responseData = await response.json();
-            
+
             const membersArray = responseData.data || responseData || [];
             
             const mappedMembers = membersArray.map(member => ({
@@ -268,16 +274,19 @@ const BuyConfirmationModal = ({
 
       console.log('🚀 Submitting order data:', orderData);
       
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`${apiBaseUrl}/order/create`, {
+      const token = getToken();
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      const response = await authFetchResponse(`/order/create`, {
         method: 'POST',
-        headers: { 
+        skipThrow: true,
+        headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(orderData)
       });
-
 
       console.log('📡 API Response status:', response.status);
       

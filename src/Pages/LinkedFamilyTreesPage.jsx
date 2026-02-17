@@ -3,6 +3,9 @@ import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import { throwIfNotOk } from "../utils/apiMessages";
 
+import { authFetchResponse } from "../utils/authFetch";
+import { getToken } from "../utils/auth";
+
 const LinkedFamilyTreesPage = () => {
   const navigate = useNavigate();
   const [linkedFamilies, setLinkedFamilies] = useState([]);
@@ -16,18 +19,16 @@ const LinkedFamilyTreesPage = () => {
       setLoading(true);
       setError(null);
 
-      const token = localStorage.getItem("access_token");
+      const token = getToken();
       if (!token) {
         throw new Error("Unauthorized");
       }
 
       const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001";
-      const res = await fetch(`${baseUrl}/family/linked-families`, {
+      const res = await authFetchResponse(`${baseUrl}/family/linked-families`, {
         method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-        },
+        skipThrow: true,
+        headers: { Accept: "application/json" },
       });
 
       await throwIfNotOk(res, { fallback: "We couldn’t load linked families right now." });
@@ -43,16 +44,14 @@ const LinkedFamilyTreesPage = () => {
   const fetchPendingRequests = async () => {
     try {
       setPendingLoading(true);
-      const token = localStorage.getItem("access_token");
+      const token = getToken();
       if (!token) throw new Error("Your session has expired. Please log in again.");
 
       const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001";
-      const res = await fetch(`${baseUrl}/family/tree-link-requests/sent`, {
+      const res = await authFetchResponse(`${baseUrl}/family/tree-link-requests/sent`, {
         method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-        },
+        skipThrow: true,
+        headers: { Accept: "application/json" },
       });
 
       await throwIfNotOk(res, { fallback: "We couldn’t load your pending link requests." });
@@ -72,7 +71,7 @@ const LinkedFamilyTreesPage = () => {
   }, []);
 
   const handleUnlinkFamily = async (otherFamilyCode) => {
-    const token = localStorage.getItem("access_token");
+    const token = getToken();
     if (!token) {
       await Swal.fire({
         icon: "error",
@@ -94,13 +93,13 @@ const LinkedFamilyTreesPage = () => {
     if (!result.isConfirmed) return;
 
     const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001";
-    const res = await fetch(`${baseUrl}/family/unlink-linked-family`, {
+    const res = await authFetchResponse(`${baseUrl}/family/unlink-linked-family`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${token}`,
         Accept: "application/json",
         "Content-Type": "application/json",
       },
+      skipThrow: true,
       body: JSON.stringify({ otherFamilyCode }),
     });
     await throwIfNotOk(res, { fallback: "We couldn’t unlink this family right now." });
@@ -114,7 +113,7 @@ const LinkedFamilyTreesPage = () => {
   };
 
   const handleRevokeRequest = async (requestId) => {
-    const token = localStorage.getItem("access_token");
+    const token = getToken();
     if (!token) {
       await Swal.fire({
         icon: "error",
@@ -135,13 +134,13 @@ const LinkedFamilyTreesPage = () => {
     if (!confirm.isConfirmed) return;
 
     const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001";
-    const res = await fetch(`${baseUrl}/family/revoke-tree-link-request`, {
+    const res = await authFetchResponse(`${baseUrl}/family/revoke-tree-link-request`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${token}`,
         Accept: "application/json",
         "Content-Type": "application/json",
       },
+      skipThrow: true,
       body: JSON.stringify({ treeLinkRequestId: Number(requestId) }),
     });
     await throwIfNotOk(res, { fallback: "We couldn’t revoke this request right now." });

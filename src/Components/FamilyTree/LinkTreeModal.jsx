@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Swal from "sweetalert2";
-import { throwIfNotOk } from "../../utils/apiMessages";
+import { getToken } from "../../utils/auth";
+import { authFetch, authFetchResponse } from "../../utils/authFetch";
 
 const DEFAULT_PRIMARY = "#1976D2";
 
@@ -321,17 +322,19 @@ export default function LinkTreeModal({
       setHasSearched(true);
       setReceiverSearchMessage("");
       setPeopleLoading(true);
-      const authToken = token || localStorage.getItem("access_token");
+      const authToken = token || getToken();
       if (!authToken) throw new Error("Your session has expired. Please log in again.");
 
-      const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
-      const res = await fetch(`${API_BASE}/family/tree/${encodeURIComponent(code)}`, {
+      const res = await authFetchResponse(`/family/tree/${encodeURIComponent(code)}`, {
+        method: "GET",
+        skipThrow: true,
         headers: {
-          Authorization: `Bearer ${authToken}`,
           accept: "application/json",
         },
       });
-      await throwIfNotOk(res, { fallback: "We couldn’t load that family right now." });
+      if (!res.ok) {
+        throw new Error("We couldn’t load that family right now.");
+      }
       const data = await res.json();
       const nextPeople = Array.isArray(data?.people) ? data.people : [];
       setPeople(nextPeople);
@@ -367,9 +370,9 @@ export default function LinkTreeModal({
 
     setPhoneLookup((p) => ({ ...p, loading: true, result: null }));
     try {
-      const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
-      const res = await fetch(`${API_BASE}/user/lookup?phone=${encodeURIComponent(cleaned)}`);
-      const data = await res.json().catch(() => ({}));
+      const data = await authFetch(`/user/lookup?phone=${encodeURIComponent(cleaned)}`, {
+        method: "GET",
+      });
       const famCode = normalizeFamilyCode(data?.user?.familyCode);
       const sameFamily = Boolean(famCode) && famCode === normalizeFamilyCode(currentFamilyCode);
       const alreadyInTree = Boolean(data?.user?.id) && existingMemberIds?.includes?.(Number(data.user.id));
@@ -481,15 +484,13 @@ export default function LinkTreeModal({
 
     try {
       setLoading(true);
-      const authToken = token || localStorage.getItem("access_token");
+      const authToken = token || getToken();
       if (!authToken) throw new Error("Your session has expired. Please log in again.");
 
-      const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:3001";
-      const res = await fetch(`${API_BASE}/family/request-tree-link`, {
+      const res = await authFetchResponse(`/family/request-tree-link`, {
         method: "POST",
+        skipThrow: true,
         headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${authToken}`,
           accept: "application/json",
         },
         body: JSON.stringify({
@@ -501,7 +502,9 @@ export default function LinkTreeModal({
         }),
       });
 
-      await throwIfNotOk(res, { fallback: "We couldn’t send the link request. Please try again." });
+      if (!res.ok) {
+        throw new Error("We couldn’t send the link request. Please try again.");
+      }
       const data = await res.json().catch(() => ({}));
 
       const requestId = Number(data?.requestId);
@@ -520,16 +523,17 @@ export default function LinkTreeModal({
 
         if (pendingChoice.isConfirmed) {
           try {
-            const revokeRes = await fetch(`${API_BASE}/family/revoke-tree-link-request`, {
+            const revokeRes = await authFetchResponse(`/family/revoke-tree-link-request`, {
               method: "POST",
+              skipThrow: true,
               headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${authToken}`,
                 accept: "application/json",
               },
               body: JSON.stringify({ treeLinkRequestId: requestId }),
             });
-            await throwIfNotOk(revokeRes, { fallback: "We couldn’t revoke that request." });
+            if (!revokeRes.ok) {
+              throw new Error("We couldn’t revoke that request.");
+            }
             const revokeData = await revokeRes.json().catch(() => ({}));
             await Swal.fire({
               icon: "success",

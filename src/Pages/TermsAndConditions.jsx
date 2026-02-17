@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import AuthLogo from '../Components/AuthLogo';
 import { useUser } from '../Contexts/UserContext';
 import { getToken } from '../utils/auth';
+import { authFetchResponse } from '../utils/authFetch';
 
 const TermsAndConditions = () => {
   const navigate = useNavigate();
@@ -30,11 +31,11 @@ const TermsAndConditions = () => {
       setIsSubmitting(true);
       const token = getToken();
 
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/user/accept-terms`, {
+      const response = await authFetchResponse('/user/accept-terms', {
         method: 'POST',
+        skipThrow: true,
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           accepted: true,

@@ -6,6 +6,8 @@ import EmojiPicker from "emoji-picker-react";
 import CommentItem from "./CommentItem";
 import { buildCommentTree, countComments } from "../utils/commentUtils";
 
+import { authFetchResponse } from "../utils/authFetch";
+
 const PostViewerModal = ({
   isOpen,
   onClose,
@@ -93,14 +95,10 @@ const PostViewerModal = ({
 
   const fetchComments = async () => {
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/post/${post.id}/comments`,
-        {
-          headers: {
-            Authorization: `Bearer ${authToken}`,
-          },
-        }
-      );
+      const response = await authFetchResponse(`/post/${post.id}/comments`, {
+        method: "GET",
+        skipThrow: true,
+      });
       const data = await response.json();
       if (data?.comments) {
         setComments(data.comments);
@@ -118,16 +116,13 @@ const PostViewerModal = ({
   const handleLikeClick = async () => {
     setIsLikeLoading(true);
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/post/${post.id}/like-toggle`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${authToken}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      const response = await authFetchResponse(`/post/${post.id}/like-toggle`, {
+        method: "POST",
+        skipThrow: true,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
       const data = await response.json();
       if (response.ok) {
         setIsLiked(data.liked);
@@ -176,17 +171,14 @@ const PostViewerModal = ({
     if (!newComment.trim()) return;
     setIsCommentLoading(true);
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/post/${post.id}/comment`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${authToken}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ comment: newComment.trim() }),
-        }
-      );
+      const response = await authFetchResponse(`/post/${post.id}/comment`, {
+        method: "POST",
+        skipThrow: true,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ comment: newComment.trim() }),
+      });
 
       if (response.ok) {
         setNewComment("");
@@ -207,17 +199,14 @@ const PostViewerModal = ({
 
   const handleEditComment = async (commentId, newText) => {
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/post/comment/${commentId}`,
-        {
-          method: "PUT",
-          headers: {
-            Authorization: `Bearer ${authToken}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ comment: newText }),
-        }
-      );
+      const response = await authFetchResponse(`/post/comment/${commentId}`, {
+        method: "PUT",
+        skipThrow: true,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ comment: newText }),
+      });
       if (response.ok) {
         await fetchComments();
       }
@@ -229,15 +218,10 @@ const PostViewerModal = ({
 
   const handleDeleteComment = async (commentId) => {
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/post/comment/${commentId}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${authToken}`,
-          },
-        }
-      );
+      const response = await authFetchResponse(`/post/comment/${commentId}`, {
+        method: "DELETE",
+        skipThrow: true,
+      });
       if (response.ok) {
         await fetchComments();
       }
@@ -249,21 +233,18 @@ const PostViewerModal = ({
 
   const handleReplyComment = async (parentCommentId, replyText) => {
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/post/comment/reply`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${authToken}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            postId: post.id,
-            parentCommentId,
-            comment: replyText,
-          }),
-        }
-      );
+      const response = await authFetchResponse(`/post/comment/reply`, {
+        method: "POST",
+        skipThrow: true,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          postId: post.id,
+          parentCommentId,
+          comment: replyText,
+        }),
+      });
       if (response.ok) {
         await fetchComments();
       }

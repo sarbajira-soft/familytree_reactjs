@@ -1,28 +1,24 @@
-import React, { useState, useEffect } from "react";
-import { getToken } from "../utils/auth";
+import React, { useState } from "react";
 import { useUser } from "../Contexts/UserContext";
 import Swal from "sweetalert2";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { throwIfNotOk } from "../utils/apiMessages";
+import { authFetch, authFetchResponse } from "../utils/authFetch";
+import { getToken } from "../utils/auth";
 
 import {
   FiCalendar,
-  FiClock,
   FiMapPin,
   FiUsers,
   FiPlusSquare,
   FiList,
   FiClock as FiUpcoming,
   FiLoader,
-  FiImage,
   FiArrowRight,
-  FiStar,
   FiGlobe,
   FiEdit3,
   FiTrash2,
   FiGift,
   FiHeart,
-  FiUser,
 } from "react-icons/fi";
 
 import CreateEventModal from "../Components/CreateEventModal";
@@ -60,19 +56,9 @@ const EventsPage = () => {
         endpoint = `${apiBaseUrl}/event/all`;
       }
 
-      const token = localStorage.getItem("access_token");
-      const response = await fetch(endpoint, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
+      const data = await authFetch(endpoint, {
+        method: "GET",
       });
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch events");
-      }
-
-      const data = await response.json();
       return data.map((item) => {
         let eventData = {
           id: item.id,
@@ -158,20 +144,11 @@ const EventsPage = () => {
     if (!result.isConfirmed) return;
 
     try {
-      const token = getToken();
       const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
       const deleteEndpoint = `${apiBaseUrl}/event/${selectedEvent.id}`;
 
-      const response = await fetch(deleteEndpoint, {
+      await authFetchResponse(deleteEndpoint, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      await throwIfNotOk(response, {
-        fallback: "We couldn’t delete this event. Please try again.",
       });
 
       console.log("✅ Event deleted successfully");
@@ -278,20 +255,11 @@ const EventsPage = () => {
     if (!result.isConfirmed) return;
 
     try {
-      const token = getToken();
       const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
       const deleteEndpoint = `${apiBaseUrl}/event/${event.id}`;
 
-      const response = await fetch(deleteEndpoint, {
+      await authFetchResponse(deleteEndpoint, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
-
-      await throwIfNotOk(response, {
-        fallback: "We couldn’t delete this event. Please try again.",
       });
 
       console.log("✅ Event deleted successfully");

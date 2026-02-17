@@ -22,6 +22,9 @@ import { UserProvider, useUser } from "../Contexts/UserContext";
 import { Phone, Mail } from "lucide-react";
 import ShimmerImageCard from "./ShimmerImageCard";
 
+import { authFetch, authFetchResponse } from "../utils/authFetch";
+import { getToken } from "../utils/auth";
+
 const ProfilePage = () => {
   const [token, setToken] = useState(null);
   const [user, setUser] = useState(null);
@@ -51,25 +54,15 @@ const ProfilePage = () => {
 
   const privacyMutation = useMutation({
     mutationFn: async (isPrivate) => {
-      if (!token) {
-        throw new Error('Not authenticated');
-      }
-
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/user/privacy`,
-        {
-          method: 'PATCH',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ isPrivate }),
-        },
-      );
+      const response = await authFetchResponse(`/user/privacy`, {
+        method: "PATCH",
+        skipThrow: true,
+        body: JSON.stringify({ isPrivate }),
+      });
 
       if (!response.ok) {
         const errText = await response.text();
-        throw new Error(errText || 'Failed to update privacy');
+        throw new Error(errText || "Failed to update privacy");
       }
 
       return response.json();
@@ -94,7 +87,7 @@ const ProfilePage = () => {
   });
 
   useEffect(() => {
-    const storedToken = localStorage.getItem("access_token");
+    const storedToken = getToken();
     if (storedToken) {
       setToken(storedToken);
     }
@@ -169,11 +162,6 @@ const ProfilePage = () => {
     if (!file) return;
 
     try {
-      const storedToken = token || localStorage.getItem("access_token");
-      if (!storedToken) {
-        throw new Error("Not authenticated");
-      }
-
       const userId = userInfo?.userId || userInfo?.id;
       if (!userId) {
         throw new Error("User ID not found");
@@ -188,13 +176,11 @@ const ProfilePage = () => {
         formData.append("familyCode", familyCode);
       }
 
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/user/profile/update/${userId}`,
+      const response = await authFetchResponse(
+        `/user/profile/update/${userId}`,
         {
           method: "PUT",
-          headers: {
-            Authorization: `Bearer ${storedToken}`,
-          },
+          skipThrow: true,
           body: formData,
         }
       );
@@ -258,11 +244,6 @@ const ProfilePage = () => {
     }
 
     try {
-      const storedToken = token || localStorage.getItem("access_token");
-      if (!storedToken) {
-        throw new Error("Not authenticated");
-      }
-
       const userId = userInfo?.userId || userInfo?.id;
       if (!userId) {
         throw new Error("User ID not found");
@@ -277,13 +258,11 @@ const ProfilePage = () => {
         formData.append("familyCode", familyCode);
       }
 
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/user/profile/update/${userId}`,
+      const response = await authFetchResponse(
+        `/user/profile/update/${userId}`,
         {
           method: "PUT",
-          headers: {
-            Authorization: `Bearer ${storedToken}`,
-          },
+          skipThrow: true,
           body: formData,
         }
       );
@@ -316,23 +295,10 @@ const ProfilePage = () => {
   const { data: userPosts = [], isLoading: loadingPosts } = useQuery({
     queryKey: ["userPosts", userInfo?.userId],
     queryFn: async () => {
-      const headers = {};
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/post/by-options?createdBy=${
-          userInfo.userId
-        }`,
-        { headers }
+      const json = await authFetch(
+        `/post/by-options?createdBy=${userInfo.userId}`,
+        { method: "GET" }
       );
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const json = await response.json();
       const list = Array.isArray(json)
         ? json
         : Array.isArray(json?.data)
@@ -362,23 +328,10 @@ const ProfilePage = () => {
   const { data: userGalleries = [], isLoading: loadingGalleries } = useQuery({
     queryKey: ["userGalleries", userInfo?.userId],
     queryFn: async () => {
-      const headers = {};
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/gallery/by-options?createdBy=${
-          userInfo.userId
-        }`,
-        { headers }
+      const json = await authFetch(
+        `/gallery/by-options?createdBy=${userInfo.userId}`,
+        { method: "GET" }
       );
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const json = await response.json();
       const list = Array.isArray(json)
         ? json
         : Array.isArray(json?.data)
@@ -493,13 +446,9 @@ const ProfilePage = () => {
   // Use mutation for like toggle with optimistic updates
   const likeMutation = useMutation({
     mutationFn: async ({ postId, currentIsLiked }) => {
-      const url = `${import.meta.env.VITE_API_BASE_URL}/post/${postId}/like-toggle`;
-      const response = await fetch(url, {
+      const response = await authFetchResponse(`/post/${postId}/like-toggle`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
+        skipThrow: true,
       });
 
       if (!response.ok) {
@@ -550,14 +499,10 @@ const ProfilePage = () => {
     // Now accepts postId directly
     e.stopPropagation();
     try {
-      const headers = {};
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/post/${postId}`,
-        { headers }
-      );
+      const response = await authFetchResponse(`/post/${postId}`, {
+        method: "GET",
+        skipThrow: true,
+      });
       if (!response.ok) {
         throw new Error(`Failed to fetch post details: ${response.statusText}`);
       }
@@ -599,15 +544,10 @@ const ProfilePage = () => {
 
     if (result.isConfirmed) {
       try {
-        const response = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL}/post/delete/${postId}`,
-          {
-            method: "DELETE",
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
+        const response = await authFetchResponse(`/post/delete/${postId}`, {
+          method: "DELETE",
+          skipThrow: true,
+        });
 
         if (!response.ok) {
           throw new Error(`Failed to delete post: ${response.statusText}`);
@@ -647,14 +587,11 @@ const ProfilePage = () => {
     e.stopPropagation();
     try {
       const viewerUserId = userInfo?.userId;
-      const response = await fetch(
-        `${
-          import.meta.env.VITE_API_BASE_URL
-        }/gallery/${albumId}?userId=${viewerUserId}`,
+      const response = await authFetchResponse(
+        `/gallery/${albumId}?userId=${viewerUserId}`,
         {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          method: "GET",
+          skipThrow: true,
         }
       );
 
@@ -714,15 +651,10 @@ const ProfilePage = () => {
 
     if (result.isConfirmed) {
       try {
-        const response = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL}/gallery/${albumId}`,
-          {
-            method: "DELETE",
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
+        const response = await authFetchResponse(`/gallery/${albumId}`, {
+          method: "DELETE",
+          skipThrow: true,
+        });
 
         if (!response.ok) {
           throw new Error(`Failed to delete gallery: ${response.statusText}`);

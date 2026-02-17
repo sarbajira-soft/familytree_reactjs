@@ -4,6 +4,9 @@ import { FiClock, FiArrowLeft } from 'react-icons/fi';
 import { useUser } from '../Contexts/UserContext';
 import RelationshipCalculator from '../utils/relationshipCalculator';
 
+import { authFetch, authFetchResponse } from '../utils/authFetch';
+import { getToken } from '../utils/auth';
+
 const Modal = ({ children, onClose }) => (
   <div className="fixed inset-0 bg-black bg-opacity-40 z-50 p-4 overflow-y-auto">
     <div className="min-h-full flex items-start justify-center">
@@ -20,7 +23,7 @@ const SuggestionApproving = () => {
   const [loading, setLoading] = useState(true);
   const [familyCode, setFamilyCode] = useState(null);
   const { userInfo: ctxUserInfo } = useUser();
-  const accessToken = localStorage.getItem('access_token');
+  const accessToken = getToken();
   const navigate = useNavigate();
 
   const DEFAULT_AVATAR = '/assets/user.png';
@@ -147,11 +150,9 @@ const SuggestionApproving = () => {
     let cancelled = false;
     const loadTree = async () => {
       try {
-        const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/family/tree/${familyCode}`, {
-          headers: {
-            accept: 'application/json',
-            Authorization: `Bearer ${accessToken}`,
-          },
+        const res = await authFetchResponse(`/family/tree/${familyCode}`, {
+          method: 'GET',
+          skipThrow: true,
         });
         const json = await res.json().catch(() => ({}));
         if (!res.ok) {
@@ -236,11 +237,9 @@ const SuggestionApproving = () => {
         url.searchParams.append('status', status);
       }
 
-      await fetch(url.toString(), {
+      await authFetchResponse(url.toString(), {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
+        skipThrow: true,
       });
     } catch (err) {
       console.error('Failed to mark notification as read:', err);
@@ -257,18 +256,11 @@ const SuggestionApproving = () => {
     const fetchFamilyCodeAndRequests = async () => {
       setLoading(true);
       try {
-        const userRes = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL}/user/profile/${effectiveUserId}`,
-          {
-            headers: {
-              accept: 'application/json',
-              Authorization: `Bearer ${accessToken}`,
-            },
-          }
+        const userData = await authFetch(
+          `/user/profile/${effectiveUserId}`,
+          { method: 'GET', skipThrow: true }
         );
-
-        const userData = await userRes.json().catch(() => ({}));
-        if (!userRes.ok) {
+        if (!userData || userData?.message) {
           throw new Error(userData?.message || 'Failed to load your profile');
         }
 
@@ -280,18 +272,11 @@ const SuggestionApproving = () => {
           return;
         }
 
-        const res = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL}/notifications/${code}/join-requests`,
-          {
-            headers: {
-              accept: 'application/json',
-              Authorization: `Bearer ${accessToken}`,
-            },
-          }
+        const data = await authFetch(
+          `/notifications/${code}/join-requests`,
+          { method: 'GET', skipThrow: true }
         );
-
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
+        if (!data || data?.message) {
           throw new Error(data?.message || 'Failed to load join requests');
         }
 
@@ -302,17 +287,11 @@ const SuggestionApproving = () => {
             let user = null;
             if (req.triggeredBy) {
               try {
-                const requesterRes = await fetch(
-                  `${import.meta.env.VITE_API_BASE_URL}/user/profile/${req.triggeredBy}`,
-                  {
-                    headers: {
-                      accept: 'application/json',
-                      Authorization: `Bearer ${accessToken}`,
-                    },
-                  }
+                const requesterData = await authFetch(
+                  `/user/profile/${req.triggeredBy}`,
+                  { method: 'GET', skipThrow: true }
                 );
-                const requesterData = await requesterRes.json().catch(() => ({}));
-                user = requesterRes.ok ? requesterData.data?.userProfile || null : null;
+                user = requesterData ? requesterData.data?.userProfile || null : null;
               } catch (_) {
                 user = null;
               }
@@ -336,14 +315,11 @@ const SuggestionApproving = () => {
   const handleApproveReplace = async () => {
     if (!familyCode || !replaceModal.request || !selectedMemberId) return;
     setReplaceLoading(true);
-    await fetch(
-      `${import.meta.env.VITE_API_BASE_URL}/family/${familyCode}/approve-replace`,
+    await authFetchResponse(
+      `/family/${familyCode}/approve-replace`,
       {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-        },
+        skipThrow: true,
         body: JSON.stringify({
           joinUserId: replaceModal.request.triggeredBy,
           replaceMemberId: selectedMemberId,
@@ -361,14 +337,11 @@ const SuggestionApproving = () => {
     if (!familyCode || !replaceModal.request) return;
     setAddNewMemberLoading(true);
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/family/member/add-user-to-family`,
+      const response = await authFetchResponse(
+        `/family/member/add-user-to-family`,
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${accessToken}`,
-          },
+          skipThrow: true,
           body: JSON.stringify({
             userId: replaceModal.request.triggeredBy,
             familyCode: familyCode,
@@ -403,17 +376,11 @@ const SuggestionApproving = () => {
     setSelectedMemberId(null);
     setViewMember(null);
     // Fetch family members (approved only)
-    const res = await fetch(
-      `${import.meta.env.VITE_API_BASE_URL}/family/member/${familyCode}`,
-      {
-        headers: {
-          accept: 'application/json',
-          Authorization: `Bearer ${accessToken}`,
-        },
-      }
+    const data = await authFetch(
+      `/family/member/${familyCode}`,
+      { method: 'GET', skipThrow: true }
     );
-    const data = await res.json();
-    setFamilyMembers(data.data || []);
+    setFamilyMembers(data?.data || []);
   };
 
   const filteredMembers = familyMembers.filter((member) => {
@@ -723,14 +690,11 @@ const SuggestionApproving = () => {
                       return;
                     }
                     setReplaceLoading(true);
-                    await fetch(
-                      `${import.meta.env.VITE_API_BASE_URL}/user/merge`,
+                    await authFetchResponse(
+                      `/user/merge`,
                       {
                         method: 'POST',
-                        headers: {
-                          'Content-Type': 'application/json',
-                          Authorization: `Bearer ${accessToken}`,
-                        },
+                        skipThrow: true,
                         body: JSON.stringify({
                           existingId: selectedMemberId,
                           currentId: replaceModal.request.triggeredBy,

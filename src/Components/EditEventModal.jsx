@@ -12,7 +12,8 @@ import {
 } from "react-icons/fi";
 import { jwtDecode } from "jwt-decode";
 import Swal from "sweetalert2";
-import { throwIfNotOk } from "../utils/apiMessages";
+import { getToken } from "../utils/auth";
+import { authFetchResponse } from "../utils/authFetch";
 
 const EditEventModal = ({
   isOpen,
@@ -85,7 +86,7 @@ const EditEventModal = ({
   useEffect(() => {
     const fetchUserData = async () => {
       try {
-        const token = localStorage.getItem("access_token");
+        const token = getToken();
 
         if (!token) {
           Swal.fire({
@@ -111,12 +112,8 @@ const EditEventModal = ({
         setUserId(uid);
 
         const userEndpoint = `${apiBaseUrl}/user/profile/${uid}`;
-        const res = await fetch(userEndpoint, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        await throwIfNotOk(res, {
-          fallback: "Unable to load your profile. Please sign in again.",
+        const res = await authFetchResponse(userEndpoint, {
+          method: "GET",
         });
 
         const userData = await res.json();
@@ -300,7 +297,17 @@ const EditEventModal = ({
     }
 
     try {
-      const token = localStorage.getItem("access_token");
+      const token = getToken();
+      if (!token) {
+        Swal.fire({
+          icon: "error",
+          title: "Authentication Error",
+          text: "No access token found.",
+          confirmButtonColor: "#10b981",
+        });
+        setIsLoading(false);
+        return;
+      }
 
       const formData = new FormData();
       formData.append("eventTitle", normalizedTitle);
@@ -327,11 +334,9 @@ const EditEventModal = ({
 
       const updateEndpoint = `${apiBaseUrl}/event/edit/${event.id}`;
 
-      const response = await fetch(updateEndpoint, {
+      const response = await authFetchResponse(updateEndpoint, {
         method: "PUT",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        skipThrow: true,
         body: formData,
       });
 

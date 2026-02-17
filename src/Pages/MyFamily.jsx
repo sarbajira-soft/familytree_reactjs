@@ -12,6 +12,9 @@ import SuggestFamilyModal from '../Components/SuggestFamilyModal';
 import {jwtDecode} from 'jwt-decode';
 import Swal from 'sweetalert2';
 
+import { authFetch, authFetchResponse } from '../utils/authFetch';
+import { getToken } from '../utils/auth';
+
 const FamilyHubPage = () => {
   const navigate = useNavigate();
   const [token, setToken] = useState(null);
@@ -31,7 +34,7 @@ const FamilyHubPage = () => {
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 
   useEffect(() => {
-      const storedToken = localStorage.getItem('access_token');
+      const storedToken = getToken();
       if (storedToken) {
           setToken(storedToken);
       }
@@ -49,12 +52,11 @@ const FamilyHubPage = () => {
       setError(null);
 
       try {
-        const response = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL}/family/code/${userInfo.familyCode}`,
-          {
-            headers: { accept: 'application/json' },
-          }
-        );
+        const response = await authFetchResponse(`/family/code/${userInfo.familyCode}`, {
+          method: 'GET',
+          skipThrow: true,
+          headers: { accept: 'application/json' },
+        });
 
         if (!response.ok) throw new Error('Failed to fetch family data');
         const data = await response.json();
@@ -88,21 +90,20 @@ const FamilyHubPage = () => {
     try {
       let userId = userInfo?.userId;
       if (!userId) {
-        const accessToken = localStorage.getItem('access_token');
+        const accessToken = getToken();
         if (accessToken) {
           const decoded = jwtDecode(accessToken);
           userId = decoded?.id || decoded?.userId || decoded?.sub;
         }
       }
       if (!userId) throw new Error('User ID not found');
-      const accessToken = localStorage.getItem('access_token');
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/family/member/suggest-family/${userId}`, {
+      const data = await authFetch(`/family/member/suggest-family/${userId}`, {
+        method: 'GET',
+        skipThrow: true,
         headers: {
-          'accept': 'application/json',
-          ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {})
-        }
+          accept: 'application/json',
+        },
       });
-      const data = await response.json();
       setSuggestedFamilies(data.data || []);
     } catch (err) {
       setSuggestedFamilies([]);

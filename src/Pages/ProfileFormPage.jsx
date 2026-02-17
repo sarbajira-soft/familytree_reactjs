@@ -4,6 +4,8 @@ import 'react-phone-input-2/lib/style.css';
 import Swal from 'sweetalert2';
 import PropTypes from 'prop-types';
 
+import { authFetchResponse } from '../utils/authFetch';
+
 const reconcileChildKeys = (prevKeys, desiredCount) => {
   const safeCount = Math.max(0, Number(desiredCount) || 0);
   const keys = Array.isArray(prevKeys) ? [...prevKeys] : [];
@@ -186,12 +188,16 @@ const ProfileFormPage = () => {
       const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
       // Simple validation call
-      const response = await fetch(`${baseUrl}/family/member/public/${familyCode}/member/${memberId}/exists`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      const response = await authFetchResponse(
+        `${baseUrl}/family/member/public/${familyCode}/member/${memberId}/exists`,
+        {
+          method: 'GET',
+          skipThrow: true,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`Member validation failed: ${response.status}`);
@@ -237,11 +243,23 @@ const ProfileFormPage = () => {
         `${baseUrl}/gothram`
       ];
 
+      const responseObjs = await Promise.all(
+        endpoints.map((url) =>
+          authFetchResponse(url, {
+            method: 'GET',
+            skipThrow: true,
+            headers: {
+              accept: 'application/json',
+            },
+          })
+        )
+      );
+
       const responses = await Promise.all(
-        endpoints.map(url => fetch(url).then(res => {
-          if (!res.ok) throw new Error(`Failed to fetch ${url}: ${res.status}`);
+        responseObjs.map(async (res, idx) => {
+          if (!res.ok) throw new Error(`Failed to fetch ${endpoints[idx]}: ${res.status}`);
           return res.json();
-        }))
+        })
       );
 
       // Extract data based on your API structure - handle both .data and direct response
@@ -489,8 +507,9 @@ const ProfileFormPage = () => {
       const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
       const apiUrl = `${baseUrl}/user/profile/update/public/${memberId}`;
 
-      const response = await fetch(apiUrl, {
+      const response = await authFetchResponse(apiUrl, {
         method: 'PUT',
+        skipThrow: true,
         body: formDataToSend,
       });
 
@@ -506,8 +525,9 @@ const ProfileFormPage = () => {
       // Mark the link as used after successful save
       try {
         const { familyCode, memberId } = getUrlParams();
-        await fetch(`${baseUrl}/family/member/public/${familyCode}/member/${memberId}/mark-used`, {
+        await authFetchResponse(`${baseUrl}/family/member/public/${familyCode}/member/${memberId}/mark-used`, {
           method: 'POST',
+          skipThrow: true,
           headers: {
             'Content-Type': 'application/json',
           },

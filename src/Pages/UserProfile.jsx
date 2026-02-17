@@ -9,6 +9,9 @@ import GalleryViewerModal from "../Components/GalleryViewerModal";
 import ShimmerImageCard from "./ShimmerImageCard";
 import { useUser } from "../Contexts/UserContext";
 
+import { authFetchResponse } from "../utils/authFetch";
+import { getToken } from "../utils/auth";
+
 const EMPTY_VTT_TRACK_SRC = "data:text/vtt,WEBVTT";
 const SHIMMER_CARD_KEYS = ["a", "b", "c"];
 
@@ -393,7 +396,7 @@ const UserProfile = () => {
   const [selectedPost, setSelectedPost] = useState(null);
 
   useEffect(() => {
-    const storedToken = localStorage.getItem("access_token");
+    const storedToken = getToken();
     if (storedToken) {
       setToken(storedToken);
     } else {
@@ -417,15 +420,10 @@ const UserProfile = () => {
         setLoadingProfile(true);
         setError(null);
 
-        const res = await fetch(
-          `${import.meta.env.VITE_API_BASE_URL}/user/profile/${userId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
+        const res = await authFetchResponse(`/user/profile/${userId}`, {
+          method: "GET",
+          skipThrow: true,
+        });
 
         if (!res.ok) {
           let msg = `Failed to load profile (${res.status})`;
@@ -470,14 +468,9 @@ const UserProfile = () => {
   const { data: userPosts = [], isLoading: loadingPosts } = useQuery({
     queryKey: ["userPosts", Number(userId)],
     queryFn: async () => {
-      const headers = {};
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/post/by-options?createdBy=${userId}`,
-        { headers }
+      const response = await authFetchResponse(
+        `/post/by-options?createdBy=${userId}`,
+        { method: "GET", skipThrow: true }
       );
 
       if (!response.ok) {
@@ -509,14 +502,9 @@ const UserProfile = () => {
   const { data: userGalleries = [], isLoading: loadingGalleries } = useQuery({
     queryKey: ["userGalleries", Number(userId)],
     queryFn: async () => {
-      const headers = {};
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/gallery/by-options?createdBy=${userId}`,
-        { headers }
+      const response = await authFetchResponse(
+        `/gallery/by-options?createdBy=${userId}`,
+        { method: "GET", skipThrow: true }
       );
 
       if (!response.ok) {
