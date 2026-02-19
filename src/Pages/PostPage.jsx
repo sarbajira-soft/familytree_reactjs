@@ -19,6 +19,7 @@ import { useNavigate } from "react-router-dom";
 import CreatePostModal from "../Components/CreatePostModal";
 import PostViewerModal from "../Components/PostViewerModal";
 import CommentItem from "../Components/CommentItem";
+import { BlockButton } from "../Components/block/BlockButton";
 import { useUser } from "../Contexts/UserContext";
 import PostsShimmer from "./PostsShimmer";
 import DeleteConfirmModal from "./DeleteConfirmModal";
@@ -61,6 +62,7 @@ const PostPage = () => {
     commentId: null,
     postId: null,
   });
+  const [blockedUserIds, setBlockedUserIds] = useState(() => new Set());
   const [activeEmojiPostId, setActiveEmojiPostId] = useState(null);
   const [feedMenuOpen, setFeedMenuOpen] = useState(false);
   const commentInputRefs = useRef({});
@@ -77,6 +79,61 @@ const PostPage = () => {
     } else {
       navigate(`/user/${targetUserId}`);
     }
+  };
+
+  const filterCommentsForBlockedUser = (comments, blockedUserId) => {
+    if (!Array.isArray(comments)) {
+      return [];
+    }
+
+    return comments
+      .filter((comment) => {
+        const commenterId = comment?.user?.userId ?? comment?.userId;
+        return Number(commenterId) !== Number(blockedUserId);
+      })
+      .map((comment) => ({
+        ...comment,
+        replies: filterCommentsForBlockedUser(comment?.replies || [], blockedUserId),
+      }));
+  };
+
+  const filterCommentsByBlockedSet = (comments) => {
+    let nextComments = Array.isArray(comments) ? comments : [];
+    blockedUserIds.forEach((blockedUserId) => {
+      nextComments = filterCommentsForBlockedUser(nextComments, blockedUserId);
+    });
+    return nextComments;
+  };
+
+  const removeBlockedUserContent = (blockedUserId) => {
+    if (!blockedUserId) {
+      return;
+    }
+
+    // BLOCK OVERRIDE: Optimistically hide blocked user's posts/comments immediately.
+    setBlockedUserIds((prev) => new Set(prev).add(Number(blockedUserId)));
+    setPosts((prevPosts) =>
+      prevPosts.filter((post) => Number(post.authorId) !== Number(blockedUserId)),
+    );
+    setPostComments((prevComments) => {
+      const nextComments = {};
+      Object.entries(prevComments).forEach(([postId, comments]) => {
+        nextComments[postId] = filterCommentsForBlockedUser(comments, blockedUserId);
+      });
+      return nextComments;
+    });
+  };
+
+  const handleBlockStatusFromFeed = (targetUserId, status) => {
+    if (status?.isBlockedByMe) {
+      removeBlockedUserContent(targetUserId);
+      return;
+    }
+    setBlockedUserIds((prev) => {
+      const next = new Set(prev);
+      next.delete(Number(targetUserId));
+      return next;
+    });
   };
 
   useEffect(() => {
@@ -149,26 +206,30 @@ const PostPage = () => {
 
       const res = await authFetchResponse(url, { method: "GET" });
       const data = await res.json();
+      const nextPosts = Array.isArray(data)
+        ? data.map((p) => ({
+            id: p.id,
+            author: p.user?.name || "Unknown",
+            authorId: p.user?.userId || p.createdBy || null,
+            avatar: p.user?.profile || "/assets/user.png",
+            time: new Date(p.createdAt).toLocaleString(),
+            caption: p.caption,
+            fullImageUrl: p.postImage,
+            postVideo: p.postVideo,
+            likes: p.likeCount,
+            comments: p.commentCount,
+            liked: p.isLiked,
+            privacy: p.privacy,
+          }))
+        : [];
+
       setPosts(
-        Array.isArray(data)
-          ? data.map((p) => ({
-              id: p.id,
-              author: p.user?.name || "Unknown",
-              authorId: p.user?.userId || p.createdBy || null,
-              avatar: p.user?.profile || "/assets/user.png",
-              time: new Date(p.createdAt).toLocaleString(),
-              caption: p.caption,
-              fullImageUrl: p.postImage,
-              postVideo: p.postVideo,
-              likes: p.likeCount,
-              comments: p.commentCount,
-              liked: p.isLiked,
-              privacy: p.privacy,
-            }))
-          : []
+        nextPosts.filter(
+          (post) => !blockedUserIds.has(Number(post.authorId)),
+        ),
       );
     } catch (e) {
-      console.error(e);
+      logger.error("BLOCK OVERRIDE: Failed to fetch posts", e);
     } finally {
       setLoadingFeed(false);
     }
@@ -340,13 +401,10 @@ const PostPage = () => {
           )
         );
       } else {
-        console.error(
-          "Failed to toggle like:",
-          "No response"
-        );
+        logger.error("BLOCK OVERRIDE: Failed to toggle like", "No response");
       }
     } catch (error) {
-      console.error("Error toggling like:", error);
+      logger.error("BLOCK OVERRIDE: Error toggling like", error);
     }
 
     // Remove postId from loading set
@@ -425,8 +483,6 @@ const PostPage = () => {
       });
 
       if (newCommentData) {
-        console.log("Received Comment:", newCommentData);
-
         // Replace temp comment with actual comment object from backend
         setPostComments((prev) => ({
           ...prev,
@@ -436,7 +492,7 @@ const PostPage = () => {
         }));
         setActiveEmojiPostId((prev) => (prev === postId ? null : prev));
       } else {
-        console.error("Failed to post comment");
+        logger.error("BLOCK OVERRIDE: Failed to post comment");
         // Rollback
         setPostComments((prev) => ({
           ...prev,
@@ -444,7 +500,7 @@ const PostPage = () => {
         }));
       }
     } catch (err) {
-      console.error("Error posting comment:", err);
+      logger.error("BLOCK OVERRIDE: Error posting comment", err);
       // Rollback
       setPostComments((prev) => ({
         ...prev,
@@ -466,7 +522,7 @@ const PostPage = () => {
 
   const handleLike = async (postId) => {
     if (likeLoadingIds.has(postId)) return;
-    console.log("Post ID liked:", postId);
+    logger.debug("BLOCK OVERRIDE: Like requested for post", postId);
     setShowHeart(postId);
     setTimeout(() => setShowHeart(null), 1000); // Hide heart after 0.8s
     await toggleLike(postId); // Your existing like toggle logic
@@ -486,7 +542,7 @@ const PostPage = () => {
       });
       return data?.comments || [];
     } catch (error) {
-      console.error("Failed to fetch comments:", error);
+      logger.error("BLOCK OVERRIDE: Failed to fetch comments", error);
       return [];
     }
   };
@@ -615,11 +671,11 @@ const PostPage = () => {
         setEditingCommentId(null);
         setEditCommentText({});
       } else {
-        console.error("Failed to edit comment");
+        logger.error("BLOCK OVERRIDE: Failed to edit comment");
         alert("Failed to edit comment");
       }
     } catch (error) {
-      console.error("Error editing comment:", error);
+      logger.error("BLOCK OVERRIDE: Error editing comment", error);
       alert("Error editing comment");
     }
   };
@@ -662,7 +718,7 @@ const PostPage = () => {
         });
       }
     } catch (error) {
-      console.error("Failed to delete comment:", error);
+      logger.error("BLOCK OVERRIDE: Failed to delete comment", error);
       alert("Failed to delete comment");
     }
   };
@@ -690,7 +746,7 @@ const PostPage = () => {
         setReplyText({});
       }
     } catch (error) {
-      console.error("Failed to reply to comment:", error);
+      logger.error("BLOCK OVERRIDE: Failed to reply to comment", error);
       alert("Failed to post reply");
     }
   };
@@ -901,6 +957,8 @@ const PostPage = () => {
               onReply={(id, text) =>
                 handleReplyToCommentFromItem(id, post.id, text)
               }
+              onBlockUser={removeBlockedUserContent}
+              blockedUserIds={blockedUserIds}
             />
           ))}
         </div>
@@ -913,6 +971,10 @@ const PostPage = () => {
       </div>
     );
   };
+
+  const visiblePosts = posts.filter(
+    (post) => !blockedUserIds.has(Number(post.authorId)),
+  );
 
   return (
     <div className="w-full sm:max-w-4xl sm:mx-auto px-0 sm:px-4 sm:py-3">
@@ -1024,9 +1086,9 @@ const PostPage = () => {
           <div className="space-y-5 animate-pulse">
             <PostsShimmer />
           </div>
-        ) : posts.length ? (
+        ) : visiblePosts.length ? (
           <>
-            {posts.map((post) => (
+            {visiblePosts.map((post) => (
               <div
                 key={post.id}
                 className="bg-white rounded-xl border pb-3 border-gray-200 shadow-sm hover:shadow-md transition-all overflow-hidden"
@@ -1050,10 +1112,23 @@ const PostPage = () => {
                       <p className="text-xs text-gray-500">{post.time}</p>
                     </div>
                   </div>
-                  <span className="text-secondary-600 flex items-center gap-1 text-xs sm:text-sm">
-                    {post.privacy === "public" ?   <FiGlobe /> : <FiUsers />}
-                    {post.privacy === "public" ? "Public" : "Family"}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    {post.authorId && Number(post.authorId) !== Number(userInfo?.userId) && (
+                      <BlockButton
+                        userId={post.authorId}
+                        isBlockedByMe={blockedUserIds.has(Number(post.authorId))}
+                        location="post"
+                        userName={post.author}
+                        onStatusChange={(status) =>
+                          handleBlockStatusFromFeed(post.authorId, status)
+                        }
+                      />
+                    )}
+                    <span className="text-secondary-600 flex items-center gap-1 text-xs sm:text-sm">
+                      {post.privacy === "public" ? <FiGlobe /> : <FiUsers />}
+                      {post.privacy === "public" ? "Public" : "Family"}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Caption */}

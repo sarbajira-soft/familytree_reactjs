@@ -11,9 +11,11 @@ import CreateFamilyModal from '../Components/CreateFamilyModal';
 import JoinFamilyModal from '../Components/JoinFamilyModal';
 import { FiPlus, FiLoader, FiArrowLeft } from 'react-icons/fi';
 import {jwtDecode} from 'jwt-decode';
+import Swal from 'sweetalert2';
 
-import { authFetch } from '../utils/authFetch';
+import { authFetch, authFetchResponse } from '../utils/authFetch';
 import { getToken } from '../utils/auth';
+import { logger } from '../utils/logger';
 
 const FamilyMemberListing = () => {
   const { userInfo, userLoading } = useUser();
@@ -71,7 +73,7 @@ const FamilyMemberListing = () => {
   const handleJoinFamily = (familyCode = null) => {
     if (familyCode) {
       // Handle joining with specific family code
-      console.log('Joining family with code:', familyCode);
+      logger.debug('BLOCK OVERRIDE: Joining family with code', familyCode);
       // TODO: Implement API call to join family with new code
       // For now, just show the modal
       setIsJoinFamilyModalOpen(true);
@@ -114,11 +116,10 @@ const FamilyMemberListing = () => {
     try {
       const fullDetails = await fetchMemberDetails(memberId);
       if (fullDetails) {
-        console.log(fullDetails);
         setViewMember(fullDetails);
       }
     } catch (error) {
-      console.error('Error viewing member:', error);
+      logger.error('BLOCK OVERRIDE: Error viewing member', error);
     } finally {
       setViewLoading(false);
     }
@@ -126,15 +127,31 @@ const FamilyMemberListing = () => {
 
   const fetchMemberDetails = async (userId) => {
     try {
-      const resJson = await authFetch(`/user/profile/${userId}`, {
+      const response = await authFetchResponse(`/user/profile/${userId}`, {
         method: 'GET',
         skipThrow: true,
       });
-      if (!resJson || resJson?.message) throw new Error('Failed to fetch member details');
-      const user = resJson.data;
-      const profile = user.userProfile;
+      const resJson = await response.json().catch(() => null);
+      if (!response?.ok || !resJson?.data) {
+        throw new Error(resJson?.message || 'Failed to fetch member details');
+      }
 
-      if (!profile) throw new Error('No user profile returned');
+      const user = resJson.data;
+      const blockStatus = user?.blockStatus || {};
+      if (blockStatus?.isBlockedByThem) {
+        await Swal.fire({
+          icon: 'warning',
+          title: 'Access Restricted',
+          text: 'You cannot view this member profile because of block restrictions.',
+        });
+        return null;
+      }
+
+      const profile = user.userProfile || {};
+
+      if (!user?.id && !profile?.userId) {
+        throw new Error('No user profile returned');
+      }
 
       // Parse children names
       let childrenArray = [];
@@ -186,8 +203,9 @@ const FamilyMemberListing = () => {
         contactNumber: profile.contactNumber || '',
         bio: profile.bio || '',
         profileUrl: profile.profile || '',
-        familyCode: profile.familyMember?.familyCode || '',
+        familyCode: profile.familyMember?.familyCode || profile.familyCode || '',
         name: `${profile.firstName || ''} ${profile.lastName || ''}`.trim(),
+        blockStatus,
 
         // From main user
         countryCode: user.countryCode || '',
@@ -205,7 +223,7 @@ const FamilyMemberListing = () => {
       return userInfo;
 
     } catch (error) {
-      console.error('Error fetching member details:', error);
+      logger.error('BLOCK OVERRIDE: Error fetching member details', error);
       return null;
     }
   };

@@ -7,19 +7,19 @@ import {
   FiEye,
   FiShare2,
   FiMoreVertical,
-  FiUserX,
-  FiUserCheck,
   FiCopy,
   FiLink,
   FiUser,
 } from "react-icons/fi";
 import Swal from "sweetalert2";
 import { useNavigate, useParams } from "react-router-dom";
-import { getToken } from "../../utils/auth";
 import { authFetchResponse } from "../../utils/authFetch";
 import { Mars, Venus } from "lucide-react";
 import { FaFemale, FaMale } from "react-icons/fa";
 import { getTreeCardDimensions } from "../../utils/treeCardDimensions";
+import { BlockButton } from "../block/BlockButton";
+import { BlockedBadge } from "../block/BlockedBadge";
+import { logger } from "../../utils/logger";
 
 // Helper function to get inverse/opposite relationship code
 
@@ -77,7 +77,7 @@ const getInverseRelationship = (relationshipCode) => {
 
   const result = inversedComponents.join("");
 
-  console.log(
+  logger.debug(
     ` Inverse relationship: ${relationshipCode} → ${result} (components: ${components.join(",")} → ${inversedComponents.join(",")})`,
   );
 
@@ -190,21 +190,34 @@ const Person = ({
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const effectiveViewOnly = viewOnly || typeof onClick !== "function";
   const isAdmin = !!(userInfo && (userInfo.role === 2 || userInfo.role === 3));
-  const canShare = !!person.memberId;
-  const canShowAdminMenu = isAdmin && !!person.memberId;
+  // BLOCK OVERRIDE: Normalize target user id from mixed tree payload keys.
+  const personUserId = person?.userId || person?.memberId || null;
+  const canShare = !!personUserId;
+  const canShowAdminMenu = isAdmin && !!personUserId;
   const currentFamilyCode =
     code || userInfo?.familyCode || person.familyCode || "";
   const isSelf = !!(
-    person.memberId &&
+    personUserId &&
     userInfo?.userId &&
-    person.memberId === userInfo.userId
+    Number(personUserId) === Number(userInfo.userId)
   );
 
-  const isBlocked = !!person.isBlocked;
+  const [blockStatus, setBlockStatus] = useState(() => ({
+    // BLOCK OVERRIDE: Consume new bidirectional block status payload from APIs.
+    isBlockedByMe: Boolean(person?.blockStatus?.isBlockedByMe),
+    isBlockedByThem: Boolean(person?.blockStatus?.isBlockedByThem),
+  }));
+  const isBlocked = Boolean(blockStatus?.isBlockedByMe);
   const isDeleted = !!person?.isDeleted;
   const canShowBlockAction = canShowAdminMenu && !isSelf && !isRoot;
   const canShowMoreActionsButton = canShowAdminMenu && canShowBlockAction;
   const menuRef = useRef(null);
+
+  // BLOCK OVERRIDE: Called by BlockButton with next status on block/unblock (optimistic update).
+  const handleBlockStatusChange = (nextStatus) => {
+    setBlockStatus((prev) => ({ ...prev, ...(nextStatus || {}) }));
+  };
+
   // Get source relationship from URL parameters
   const urlParams = new URLSearchParams(window.location.search);
   const urlSourceRelationship = urlParams.get("source");
@@ -214,6 +227,14 @@ const Person = ({
     () => getTreeCardDimensions(memberCount, undefined, true),
     [memberCount],
   );
+
+  useEffect(() => {
+    // BLOCK OVERRIDE: Keep local status in sync with refreshed API response.
+    setBlockStatus({
+      isBlockedByMe: Boolean(person?.blockStatus?.isBlockedByMe),
+      isBlockedByThem: Boolean(person?.blockStatus?.isBlockedByThem),
+    });
+  }, [person?.blockStatus?.isBlockedByMe, person?.blockStatus?.isBlockedByThem]);
 
   const {
     width,
@@ -233,7 +254,7 @@ const Person = ({
       const calculator = new RelationshipCalculator(tree);
       const rel = calculator.calculateRelationship(rootId, person.id);
       if (rel && rel.relationshipCode) {
-        console.log(
+        logger.debug(
           ` Relationship for ${person.name}: ${rel.relationshipCode}`,
         );
         return rel.relationshipCode;
@@ -362,6 +383,12 @@ const Person = ({
   useEffect(() => {
     if (!isMenuOpen) return;
     function handleClickOutside(event) {
+      const isBlockModalEvent = Boolean(
+        event?.target?.closest?.('[data-block-modal="true"]'),
+      );
+      if (isBlockModalEvent) {
+        return;
+      }
       if (menuRef.current && !menuRef.current.contains(event.target)) {
         setIsMenuOpen(false);
       }
@@ -416,7 +443,7 @@ const Person = ({
         });
       }
     } catch (err) {
-      console.error("Error sharing invite link from tree node:", err);
+      logger.error("BLOCK OVERRIDE: Error sharing invite link from tree node", err);
 
       await Swal.fire({
         icon: "error",
@@ -424,90 +451,6 @@ const Person = ({
         title: "Share Failed",
 
         text: "Unable to share the invite link. Please try again.",
-      });
-    }
-  };
-
-  const handleToggleBlock = async (e, shouldBlock) => {
-    e.stopPropagation();
-    if (!person.memberId || !currentFamilyCode) {
-      await Swal.fire({
-        icon: "warning",
-        title: "Cannot update member",
-        text: "Family or member information is missing for this person.",
-      });
-      return;
-    }
-    const token = getToken();
-
-    if (!token) {
-      await Swal.fire({
-        icon: "warning",
-        title: "Session expired",
-        text: "Please log in again to manage family members.",
-      });
-      return;
-    }
-
-    const actionLabel = shouldBlock ? "block" : "unblock";
-    const confirm = await Swal.fire({
-      icon: "warning",
-      title: `Are you sure you want to ${actionLabel} this member?`,
-      text: shouldBlock
-        ? "They will no longer be able to view or edit this family tree and members."
-        : "They will regain access to this family.",
-      showCancelButton: true,
-      confirmButtonText: `Yes, ${actionLabel}`,
-      cancelButtonText: "Cancel",
-      confirmButtonColor: shouldBlock ? "#e53e3e" : "#16a34a",
-    });
-
-    if (!confirm.isConfirmed) return;
-    try {
-      const endpoint = shouldBlock ? "block" : "unblock";
-      const apiUrl = `${import.meta.env.VITE_API_BASE_URL}/family/member/${endpoint}/${person.memberId}/${currentFamilyCode}`;
-
-      const res = await authFetchResponse(apiUrl, {
-        method: "PUT",
-        skipThrow: true,
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-
-      const json = await res.json().catch(() => null);
-      if (!res.ok) {
-        const msg = json?.message || `Failed to ${actionLabel} member`;
-        throw new Error(msg);
-      }
-
-      await Swal.fire({
-        icon: "success",
-
-        title: `Member ${shouldBlock ? "Blocked" : "Unblocked"}`,
-
-        text:
-          json?.message ||
-          `Family member has been ${shouldBlock ? "blocked" : "unblocked"} successfully.`,
-      });
-
-      setIsMenuOpen(false);
-
-      window.location.reload();
-    } catch (err) {
-      console.error(
-        `Error trying to ${actionLabel} member from tree node:`,
-        err,
-      );
-
-      await Swal.fire({
-        icon: "error",
-
-        title: "Action Failed",
-
-        text:
-          err.message ||
-          `Unable to ${actionLabel} this member. Please try again.`,
       });
     }
   };
@@ -587,13 +530,13 @@ const Person = ({
     : "";
   const linkedTargetFamilyCode =
     person?.isExternalLinked &&
-    rawCanonicalFamilyCode &&
-    rawCanonicalFamilyCode !== currentViewFamilyCode
+      rawCanonicalFamilyCode &&
+      rawCanonicalFamilyCode !== currentViewFamilyCode
       ? rawCanonicalFamilyCode
       : null;
   const associatedTargetFamilyCode =
     navigationTargetFamilyCode &&
-    navigationTargetFamilyCode !== currentViewFamilyCode
+      navigationTargetFamilyCode !== currentViewFamilyCode
       ? navigationTargetFamilyCode
       : null;
   const showLinkedTreeIcon = !!linkedTargetFamilyCode;
@@ -638,7 +581,7 @@ const Person = ({
 
     // All validations passed - proceed with navigation
 
-    console.log(
+    logger.debug(
       ` Navigation allowed: ${person.name} (${personFamilyCode}) → Current: ${code} → User: ${userInfo?.familyCode}`,
     );
 
@@ -794,13 +737,10 @@ const Person = ({
       {/* Main Person Card */}
 
       <div
-        className={`person ${person.gender} ${isRoot ? "root" : ""} ${
-          isNew ? "person-new" : ""
-        } ${isSelected ? "person-selected" : ""} ${
-          person.lifeStatus === "remembering" ? "remembering" : ""
-        } ${isHighlighted ? "person-highlighted" : ""} ${
-          isSearchResult ? "person-search-result" : ""
-        } group transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:ring-4 hover:ring-green-200`}
+        className={`person ${person.gender} ${isRoot ? "root" : ""} ${isNew ? "person-new" : ""
+          } ${isSelected ? "person-selected" : ""} ${person.lifeStatus === "remembering" ? "remembering" : ""
+          } ${isHighlighted ? "person-highlighted" : ""} ${isSearchResult ? "person-search-result" : ""
+          } group transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:ring-4 hover:ring-green-200`}
         style={{
           position: "relative",
 
@@ -922,6 +862,12 @@ const Person = ({
           </div>
         )}
 
+        {isBlocked && (
+          <div className="absolute top-1 right-8 z-20">
+            <BlockedBadge />
+          </div>
+        )}
+
         {/* Radial Menu Button - Top Right Corner (hide in viewOnly mode) */}
 
         {!effectiveViewOnly && (
@@ -946,27 +892,18 @@ const Person = ({
                 {isMenuOpen && (
                   <div
                     ref={menuRef}
-                    className="absolute right-0 mt-1 w-32 bg-white rounded-md shadow-lg border border-gray-200 z-20 dark:bg-slate-900 dark:border-slate-700"
+                    className="absolute right-0 mt-1 w-40 bg-white rounded-md shadow-lg border border-gray-200 z-20 dark:bg-slate-900 dark:border-slate-700"
                   >
                     {canShowBlockAction && (
-                      <button
-                        onClick={(e) => handleToggleBlock(e, !isBlocked)}
-                        className="w-full px-2 py-1.5 text-left text-xs text-gray-700 bg-white flex items-center space-x-2 dark:bg-slate-900 dark:text-slate-200"
-                      >
-                        {isBlocked ? (
-                          <>
-                            <FiUserCheck size={12} className="text-green-600" />
-
-                            <span>Unblock member</span>
-                          </>
-                        ) : (
-                          <>
-                            <FiUserX size={12} className="text-red-600" />
-
-                            <span>Block member</span>
-                          </>
-                        )}
-                      </button>
+                      <div className="px-1 py-1">
+                        <BlockButton
+                          userId={personUserId}
+                          isBlockedByMe={isBlocked}
+                          location="memberCard"
+                          userName={person?.name || 'this user'}
+                          onStatusChange={handleBlockStatusChange}
+                        />
+                      </div>
                     )}
 
                     {person?.nodeUid && (
@@ -1174,8 +1111,8 @@ const Person = ({
                 ) ? (
                   <FaMale className="mx-auto text-sky-600 text-lg" />
                 ) : ["F", "W"].includes(
-                    getGenderLabel(person, tree, currentUserId),
-                  ) ? (
+                  getGenderLabel(person, tree, currentUserId),
+                ) ? (
                   <FaFemale className="mx-auto text-pink-500 text-lg" />
                 ) : (
                   <FiUser className="mx-auto text-slate-500 text-[18px]" />
@@ -1221,11 +1158,10 @@ const Person = ({
           {relationshipText && !isEditingLabel && (
             <div className="px-2">
               <div
-                className={`text-center py-1 px-2 rounded-lg font-bold transition-all duration-200 border-2 shadow-sm ${
-                  isViewingBirthFamily
-                    ? "bg-gradient-to-r from-cyan-50 to-sky-50 text-sky-700 border-cyan-400 dark:from-slate-900 dark:to-slate-800 dark:text-slate-100 dark:border-slate-600"
-                    : "bg-gradient-to-r from-pink-50 to-fuchsia-50 text-pink-700 border-pink-400 dark:from-slate-900 dark:to-slate-800 dark:text-slate-100 dark:border-slate-600"
-                } ${!viewOnly ? "cursor-pointer hover:from-cyan-100 hover:to-sky-100 hover:shadow-md" : ""}`}
+                className={`text-center py-1 px-2 rounded-lg font-bold transition-all duration-200 border-2 shadow-sm ${isViewingBirthFamily
+                  ? "bg-gradient-to-r from-cyan-50 to-sky-50 text-sky-700 border-cyan-400 dark:from-slate-900 dark:to-slate-800 dark:text-slate-100 dark:border-slate-600"
+                  : "bg-gradient-to-r from-pink-50 to-fuchsia-50 text-pink-700 border-pink-400 dark:from-slate-900 dark:to-slate-800 dark:text-slate-100 dark:border-slate-600"
+                  } ${!viewOnly ? "cursor-pointer hover:from-cyan-100 hover:to-sky-100 hover:shadow-md" : ""}`}
                 style={{
                   fontSize: `${fontSizeRelationship}px`,
 
@@ -1241,10 +1177,10 @@ const Person = ({
                 }}
                 {...(!viewOnly
                   ? {
-                      title: "Click to edit label",
+                    title: "Click to edit label",
 
-                      onClick: handleEditLabelClick,
-                    }
+                    onClick: handleEditLabelClick,
+                  }
                   : {})}
               >
                 {relationshipText}

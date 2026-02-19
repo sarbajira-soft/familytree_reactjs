@@ -5,6 +5,13 @@ import { FiSmile } from 'react-icons/fi';
 import { motion } from 'framer-motion';
 import EmojiPicker from 'emoji-picker-react';
 import { useNavigate } from 'react-router-dom';
+import { BlockButton } from './block/BlockButton';
+import { logger } from '../utils/logger';
+
+const DEFAULT_BLOCK_STATUS = {
+  isBlockedByMe: false,
+  isBlockedByThem: false,
+};
 
 const CommentItem = ({ 
   comment, 
@@ -12,6 +19,8 @@ const CommentItem = ({
   onEdit, 
   onDelete, 
   onReply,
+  onBlockUser = null,
+  blockedUserIds = undefined,
   depth = 0,
   maxDepth = 3 
 }) => {
@@ -22,12 +31,20 @@ const CommentItem = ({
   const [replyText, setReplyText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [commentBlockStatus, setCommentBlockStatus] = useState(DEFAULT_BLOCK_STATUS);
   const replyTextareaRef = useRef(null);
   const emojiPickerRef = useRef(null);
 
   const isOwner = comment.userId === currentUserId;
   const hasReplies = comment.replies && comment.replies.length > 0;
   const canReply = depth < maxDepth;
+  const user = comment.user || {};
+  const commenterId = user.userId || comment.userId || null;
+
+  useEffect(() => {
+    const isBlockedByMe = blockedUserIds?.has(Number(commenterId));
+    setCommentBlockStatus({ ...DEFAULT_BLOCK_STATUS, isBlockedByMe: Boolean(isBlockedByMe) });
+  }, [blockedUserIds, commenterId]);
 
   const handleEdit = async () => {
     if (!editText.trim()) return;
@@ -36,7 +53,7 @@ const CommentItem = ({
       await onEdit(comment.id, editText.trim());
       setIsEditing(false);
     } catch (error) {
-      console.error('Failed to edit comment:', error);
+      logger.error('BLOCK OVERRIDE: Failed to edit comment', error);
     } finally {
       setIsLoading(false);
     }
@@ -95,7 +112,7 @@ const CommentItem = ({
     try {
       await onDelete(comment.id);
     } catch (error) {
-      console.error('Failed to delete comment:', error);
+      logger.error('BLOCK OVERRIDE: Failed to delete comment', error);
       setIsLoading(false);
     }
   };
@@ -109,14 +126,11 @@ const CommentItem = ({
       setIsReplying(false);
       setShowEmojiPicker(false);
     } catch (error) {
-      console.error('Failed to reply:', error);
+      logger.error('BLOCK OVERRIDE: Failed to reply', error);
     } finally {
       setIsLoading(false);
     }
   };
-
-  const user = comment.user || {};
-  const commenterId = user.userId || comment.userId || null;
   const fullName = `${user.firstName || 'Unknown'} ${user.lastName || ''}`.trim();
   const profileUrl = user.profile || '/assets/user.png';
   const commentText = comment.comment || comment.content || '';
@@ -127,6 +141,14 @@ const CommentItem = ({
       navigate('/myprofile');
     } else {
       navigate(`/user/${targetUserId}`);
+    }
+  };
+
+  const handleCommentBlockStatusChange = (status) => {
+    setCommentBlockStatus(status || DEFAULT_BLOCK_STATUS);
+    if (status?.isBlockedByMe && onBlockUser && commenterId) {
+      // BLOCK OVERRIDE: Optimistically remove blocked commenter's content from feed.
+      onBlockUser(commenterId);
     }
   };
 
@@ -212,6 +234,15 @@ const CommentItem = ({
                   >
                     Reply
                   </button>
+                )}
+                {!isOwner && commenterId && (
+                  <BlockButton
+                    userId={commenterId}
+                    isBlockedByMe={Boolean(commentBlockStatus?.isBlockedByMe)}
+                    location="comment"
+                    userName={fullName}
+                    onStatusChange={handleCommentBlockStatusChange}
+                  />
                 )}
                 {isOwner && (
                   <>
@@ -309,6 +340,8 @@ const CommentItem = ({
                 onEdit={onEdit}
                 onDelete={onDelete}
                 onReply={onReply}
+                onBlockUser={onBlockUser}
+                blockedUserIds={blockedUserIds}
                 depth={depth + 1}
                 maxDepth={maxDepth}
               />
@@ -340,6 +373,8 @@ CommentItem.propTypes = {
   onEdit: PropTypes.func.isRequired,
   onDelete: PropTypes.func.isRequired,
   onReply: PropTypes.func.isRequired,
+  onBlockUser: PropTypes.func,
+  blockedUserIds: PropTypes.instanceOf(Set),
   depth: PropTypes.number,
   maxDepth: PropTypes.number,
 };

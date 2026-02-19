@@ -6,6 +6,8 @@ import {
   Navigate,
 } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import { queryClient } from "./utils/queryClient";
 
 import { UserProvider } from "./Contexts/UserContext";
@@ -53,6 +55,7 @@ const LinkedFamilyTreesPage = lazy(() =>
 const ProfileModule = lazy(() => import("./Pages/ProfileFormPage"));
 const UserProfile = lazy(() => import("./Pages/UserProfile"));
 const EditProfilePage = lazy(() => import("./Pages/EditProfilePage"));
+const BlockedMembersPage = lazy(() => import("./Pages/BlockedMembersPage"));
 
 // ---------------- Loading Fallback ----------------
 const LoadingFallback = () => (
@@ -79,6 +82,8 @@ const AdminRoute = ({ children }) => {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
+      {/* BLOCK OVERRIDE: Global toast container for block/unblock success and error feedback. */}
+      <ToastContainer position="top-right" autoClose={2500} newestOnTop />
       <ThemeProvider>
         <UserProvider>
           <Router>
@@ -182,6 +187,8 @@ function App() {
                 {/* Family & Members */}
                 <Route path="/my-family" element={<MyFamily />} />
                 <Route path="/my-family-member" element={<MyFamilyMember />} />
+                {/* BLOCK OVERRIDE: Dedicated route for active blocked users list. */}
+                <Route path="/blocked-members" element={<BlockedMembersPage />} />
                 <Route path="/family-management" element={<FamilyManagementMobile />} />
 
                 {/* Family Trees */}

@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { FiEdit2, FiTrash2, FiEye, FiLoader, FiShare2, FiUserX, FiUserCheck } from 'react-icons/fi';
+import PropTypes from 'prop-types';
+import { FiTrash2, FiEye, FiLoader, FiShare2 } from 'react-icons/fi';
 import { FaBirthdayCake, FaPhone, FaHome, FaMale, FaFemale } from 'react-icons/fa';
 import Swal from 'sweetalert2';
+import { BlockButton } from './block/BlockButton';
+import { BlockedBadge } from './block/BlockedBadge';
+import { logger } from '../utils/logger';
 
 const roleMapping = {
   1: 'Member',
@@ -15,12 +19,11 @@ const relationColors = {
   Superadmin: 'bg-green-100 text-green-800',
 };
 
-const FamilyMemberCard = ({ familyCode, token, onEditMember, onViewMember, currentUser }) => {
+const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [familyMembers, setFamilyMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [viewLoadingStates, setViewLoadingStates] = useState({});
-  const [editLoadingStates, setEditLoadingStates] = useState({});
   const [deletedMemberIds, setDeletedMemberIds] = useState(() => new Set());
 
   const BASE_URL = import.meta.env.VITE_API_BASE_URL;
@@ -38,23 +41,6 @@ const FamilyMemberCard = ({ familyCode, token, onEditMember, onViewMember, curre
         },
       });
 
-      // If user is blocked from this family, backend will return 403
-      if (res.status === 403) {
-        let message = 'You have been blocked from this family';
-        try {
-          const error = await res.json();
-          if (error?.message) message = error.message;
-        } catch (_) {}
-
-        await Swal.fire({
-          icon: 'error',
-          title: 'Access Restricted',
-          text: message,
-        });
-        setFamilyMembers([]);
-        return;
-      }
-
       if (!res.ok) throw new Error('Failed to fetch members');
       const json = await res.json();
       const members = json.data.map((item) => ({
@@ -63,7 +49,10 @@ const FamilyMemberCard = ({ familyCode, token, onEditMember, onViewMember, curre
         userId: item.user.id,
         membershipType: item.membershipType || 'member',
         name: (item.user.fullName && !/\bnull\b|\bundefined\b/i.test(item.user.fullName))
-          ? item.user.fullName.replace(/\bnull\b|\bundefined\b/gi, '').replace(/\s+/g, ' ').trim()
+          ? item.user.fullName
+              .replaceAll(/\bnull\b|\bundefined\b/gi, '')
+              .replaceAll(/\s+/g, ' ')
+              .trim()
           : (
               [item.user.userProfile?.firstName, item.user.userProfile?.lastName]
                 .filter(val => val && val !== 'null' && val !== 'undefined')
@@ -77,26 +66,29 @@ const FamilyMemberCard = ({ familyCode, token, onEditMember, onViewMember, curre
         age: item.user.userProfile?.age || '',
         profilePic: item.user.profileImage,
         isAdmin: item.isFamilyAdmin ?? item.user.role > 1,
-        isBlocked: item.isBlocked,
+        // BLOCK OVERRIDE: Use new bidirectional block status payload.
+        blockStatus: item.blockStatus || {
+          isBlockedByMe: false,
+          isBlockedByThem: false,
+        },
         lastUpdated: new Date(item.updatedAt).toLocaleDateString('en-IN'),
       }));
       setFamilyMembers(members);
     } catch (err) {
-        console.error('Error loading family members:', err);
+      logger.error('BLOCK OVERRIDE: Failed to load family members', err);
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
-    };
+  };
 
-    useEffect(() => {
-  if (familyCode && token) {
-    setLoading(true);
-    fetchMembers();
-  }
-}, [familyCode, token]);
+  useEffect(() => {
+    if (familyCode && token) {
+      setLoading(true);
+      fetchMembers();
+    }
+  }, [familyCode, token]);
 
   const calculateAge = (dob) => {
-    console.log('Calculating age for DOB:', dob);
     if (!dob) return 'N/A';
     const birthDate = new Date(dob);
     const today = new Date();
@@ -177,28 +169,12 @@ const FamilyMemberCard = ({ familyCode, token, onEditMember, onViewMember, curre
         });
       }, 600);
     } catch (err) {
-      console.error('Error deleting member:', err);
+      logger.error('BLOCK OVERRIDE: Failed to delete member', err);
       await Swal.fire({
         icon: 'error',
         title: 'Delete Failed',
         text: err?.message || 'Unable to delete this member. Please try again.',
       });
-    }
-  };
-
-  const handleEditMember = async (userId, e) => {
-    e.stopPropagation();
-    
-    // Set loading state for this specific member
-    setEditLoadingStates(prev => ({ ...prev, [userId]: true }));
-    
-    try {
-      await onEditMember(userId);
-    } finally {
-      // Clear loading state after a short delay to ensure smooth transition
-      setTimeout(() => {
-        setEditLoadingStates(prev => ({ ...prev, [userId]: false }));
-      }, 500);
     }
   };
 
@@ -222,7 +198,7 @@ const FamilyMemberCard = ({ familyCode, token, onEditMember, onViewMember, curre
         });
       }
     } catch (err) {
-      console.error('Error sharing invite link:', err);
+      logger.error('BLOCK OVERRIDE: Failed to share invite link', err);
       await Swal.fire({
         icon: 'error',
         title: 'Share Failed',
@@ -231,71 +207,37 @@ const FamilyMemberCard = ({ familyCode, token, onEditMember, onViewMember, curre
     }
   };
 
-  const handleToggleBlock = async (member, shouldBlock, e) => {
-    e.stopPropagation();
-
-    const actionLabel = shouldBlock ? 'block' : 'unblock';
-    const confirm = await Swal.fire({
-      icon: 'warning',
-      title: `Are you sure you want to ${actionLabel} this member?`,
-      text: shouldBlock
-        ? 'They will no longer be able to view or edit this family tree.'
-        : 'They will regain access to this family.',
-      showCancelButton: true,
-      confirmButtonText: `Yes, ${actionLabel}`,
-      cancelButtonText: 'Cancel',
-      confirmButtonColor: shouldBlock ? '#e53e3e' : '#16a34a',
-    });
-
-    if (!confirm.isConfirmed) return;
-
-    try {
-      const endpoint = shouldBlock ? 'block' : 'unblock';
-      const res = await fetch(
-        `${BASE_URL}/family/member/${endpoint}/${member.memberId}/${familyCode}`,
-        {
-          method: 'PUT',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      const json = await res.json().catch(() => null);
-
-      if (!res.ok) {
-        const msg = json?.message || `Failed to ${actionLabel} member`;
-        throw new Error(msg);
-      }
-
-      await Swal.fire({
-        icon: 'success',
-        title: `Member ${shouldBlock ? 'Blocked' : 'Unblocked'}`,
-        text: json?.message || `Family member has been ${shouldBlock ? 'blocked' : 'unblocked'} successfully.`,
-      });
-
-      // Refresh members
-      fetchMembers();
-    } catch (err) {
-      console.error(`Error trying to ${actionLabel} member:`, err);
-      await Swal.fire({
-        icon: 'error',
-        title: 'Action Failed',
-        text: err.message || `Unable to ${actionLabel} this member. Please try again.`,
-      });
-    }
+  const handleMemberBlockStatusChange = (memberUserId, nextStatus) => {
+    // BLOCK OVERRIDE: Apply local optimistic block status updates using new block contract.
+    setFamilyMembers((prevMembers) =>
+      prevMembers.map((member) =>
+        Number(member.userId) === Number(memberUserId)
+          ? { ...member, blockStatus: nextStatus }
+          : member,
+      ),
+    );
   };
 
   const filteredMembers = familyMembers.filter((member) =>
     member.name && member.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+  // BLOCK OVERRIDE: Keep blocked users out of active grid and move them to blocked section only.
+  const activeMembers = filteredMembers.filter(
+    (member) => !member?.blockStatus?.isBlockedByMe,
+  );
+  const blockedMembers = filteredMembers.filter(
+    (member) => member?.blockStatus?.isBlockedByMe,
   );
 
   const SingleMemberCard = ({ member }) => (
     <div
       onClick={() => {
         // Only allow viewing if user has Admin (role 2) or Superadmin (role 3) role
-        if (!deletedMemberIds.has(member.memberId) && currentUserIsFamilyAdmin) {
+        if (
+          !deletedMemberIds.has(member.memberId) &&
+          currentUserIsFamilyAdmin &&
+          !member?.blockStatus?.isBlockedByMe
+        ) {
           handleViewMember(member.userId, { stopPropagation: () => {} });
         }
       }}
@@ -325,10 +267,8 @@ const FamilyMemberCard = ({ familyCode, token, onEditMember, onViewMember, curre
         <div className="ml-4 flex-1 min-w-0">
           <div className="flex items-center space-x-2">
             <h3 className="text-xl font-extrabold text-gray-900 truncate pr-2">{member.name}</h3>
-            {currentUserIsFamilyAdmin && member.isBlocked && (
-              <span className="inline-block text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700">
-                Blocked
-              </span>
+            {currentUserIsFamilyAdmin && member?.blockStatus?.isBlockedByMe && (
+              <BlockedBadge />
             )}
             {member.membershipType !== 'member' && (
               <span className="inline-block text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
@@ -391,25 +331,15 @@ const FamilyMemberCard = ({ familyCode, token, onEditMember, onViewMember, curre
                 </button>
               )}
 
-              {/* Block / Unblock (cannot block yourself; backend also protects owner) */}
+              {/* BLOCK OVERRIDE: Legacy family-member block buttons replaced by user-level BlockButton. */}
               {member.membershipType === 'member' && currentUser?.userId !== member.userId && (
-                member.isBlocked ? (
-                  <button
-                    onClick={(e) => handleToggleBlock(member, false, e)}
-                    className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-green-100 hover:text-green-700 transition-colors tooltip"
-                    title="Unblock Member"
-                  >
-                    <FiUserCheck size={18} />
-                  </button>
-                ) : (
-                  <button
-                    onClick={(e) => handleToggleBlock(member, true, e)}
-                    className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-red-100 hover:text-red-700 transition-colors tooltip"
-                    title="Block Member"
-                  >
-                    <FiUserX size={18} />
-                  </button>
-                )
+                <BlockButton
+                  userId={member.userId}
+                  isBlockedByMe={Boolean(member?.blockStatus?.isBlockedByMe)}
+                  location="membersList"
+                  userName={member.name}
+                  onStatusChange={(nextStatus) => handleMemberBlockStatusChange(member.userId, nextStatus)}
+                />
               )}
 
               {member.membershipType === 'member' && currentUser?.userId !== member.userId && (
@@ -461,22 +391,74 @@ const FamilyMemberCard = ({ familyCode, token, onEditMember, onViewMember, curre
 
       {loading ? (
         <div className="flex justify-center items-center py-20">
-            <div className="animate-spin rounded-full h-10 w-10 border-t-4 border-primary-600 border-solid">
-            </div>
+          <div className="animate-spin rounded-full h-10 w-10 border-t-4 border-primary-600 border-solid">
+          </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-          {filteredMembers.length ? (
-            filteredMembers.map((member) =>{
-              console.log('Rendering member:', member);
-               return <SingleMemberCard key={member.id} member={member} />})
-          ) : (
+        <>
+          {!filteredMembers.length && (
             <p className="text-center text-gray-500 col-span-full">No family members found.</p>
           )}
-        </div>
+
+          {activeMembers.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+              {activeMembers.map((member) => (
+                <SingleMemberCard key={member.id} member={member} />
+              ))}
+            </div>
+          )}
+
+          {currentUserIsFamilyAdmin && (
+            <section className="rounded-xl border border-red-200 bg-red-50/50 p-4">
+              <h2 className="text-lg font-semibold text-red-700">Blocked Members</h2>
+              {blockedMembers.length > 0 ? (
+                <div className="mt-3 space-y-3">
+                  {blockedMembers.map((member) => (
+                    <div
+                      key={`blocked-member-${member.id}`}
+                      className="flex items-center justify-between rounded-lg border border-red-200 bg-white px-3 py-2"
+                    >
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={member.profilePic || 'https://placehold.co/48x48/e2e8f0/64748b?text=👤'}
+                          alt={member.name}
+                          className="h-10 w-10 rounded-full object-cover"
+                        />
+                        <span className="text-sm font-medium text-gray-900">{member.name}</span>
+                      </div>
+                      <BlockButton
+                        userId={member.userId}
+                        isBlockedByMe
+                        location="membersList"
+                        userName={member.name}
+                        onStatusChange={(nextStatus) => handleMemberBlockStatusChange(member.userId, nextStatus)}
+                      />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-2 text-sm text-gray-600">No blocked members.</p>
+              )}
+            </section>
+          )}
+        </>
       )}
     </div>
   );
+};
+
+FamilyMemberCard.propTypes = {
+  familyCode: PropTypes.string,
+  token: PropTypes.string,
+  onViewMember: PropTypes.func,
+  currentUser: PropTypes.shape({
+    userId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    role: PropTypes.number,
+    familyCode: PropTypes.string,
+    userProfile: PropTypes.shape({
+      familyCode: PropTypes.string,
+    }),
+  }),
 };
 
 // PHASE 3 OPTIMIZATION: Memoize FamilyMemberCard to prevent unnecessary re-renders

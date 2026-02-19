@@ -8,12 +8,20 @@ import PostViewerModal from "../Components/PostViewerModal";
 import GalleryViewerModal from "../Components/GalleryViewerModal";
 import ShimmerImageCard from "./ShimmerImageCard";
 import { useUser } from "../Contexts/UserContext";
+import { BlockButton } from "../Components/block/BlockButton";
+import { BlockedProfileView } from "../Components/block/BlockedProfileView";
+import { BlockerProfileView } from "../Components/block/BlockerProfileView";
+import { logger } from "../utils/logger";
 
 import { authFetchResponse } from "../utils/authFetch";
 import { getToken } from "../utils/auth";
 
 const EMPTY_VTT_TRACK_SRC = "data:text/vtt,WEBVTT";
 const SHIMMER_CARD_KEYS = ["a", "b", "c"];
+const DEFAULT_BLOCK_STATUS = {
+  isBlockedByMe: false,
+  isBlockedByThem: false,
+};
 
 const getListFromApiResponse = (json) => {
   if (Array.isArray(json)) return json;
@@ -172,6 +180,9 @@ const UserProfileView = ({
   loadingPosts,
   loadingGalleries,
   isPrivateAccount,
+  blockStatus,
+  onBlockStatusChange,
+  profileUserId,
   showPosts,
   setShowPosts,
   handleViewPost,
@@ -224,12 +235,24 @@ const UserProfileView = ({
                 {displayName}
               </h1>
             </div>
-            <button
-              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded transition-colors"
-              onClick={() => navigate(-1)}
-            >
-              Back
-            </button>
+            <div className="flex items-center gap-2">
+              {/* BLOCK OVERRIDE: Inject new profile-level block action using directional status contract. */}
+              {profileUserId && (
+                <BlockButton
+                  userId={profileUserId}
+                  isBlockedByMe={Boolean(blockStatus?.isBlockedByMe)}
+                  location="profile"
+                  userName={displayName}
+                  onStatusChange={onBlockStatusChange}
+                />
+              )}
+              <button
+                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded transition-colors"
+                onClick={() => navigate(-1)}
+              >
+                Back
+              </button>
+            </div>
           </div>
 
           <div className="text-gray-800 leading-relaxed text-sm md:text-base whitespace-pre-wrap">
@@ -360,6 +383,12 @@ UserProfileView.propTypes = {
   loadingPosts: PropTypes.bool,
   loadingGalleries: PropTypes.bool,
   isPrivateAccount: PropTypes.bool,
+  blockStatus: PropTypes.shape({
+    isBlockedByMe: PropTypes.bool,
+    isBlockedByThem: PropTypes.bool,
+  }),
+  onBlockStatusChange: PropTypes.func,
+  profileUserId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   showPosts: PropTypes.bool,
   setShowPosts: PropTypes.func,
   handleViewPost: PropTypes.func,
@@ -384,6 +413,8 @@ const UserProfile = () => {
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [error, setError] = useState(null);
   const [profile, setProfile] = useState(null);
+  const [profileBlockStatus, setProfileBlockStatus] = useState(DEFAULT_BLOCK_STATUS);
+  const [profileRefreshTick, setProfileRefreshTick] = useState(0);
 
   const [showPosts, setShowPosts] = useState(true);
   const [isBioExpanded, setIsBioExpanded] = useState(false);
@@ -435,13 +466,16 @@ const UserProfile = () => {
               j?.details ||
               (typeof j === "string" ? j : msg);
           } catch (err) {
-            console.warn("Failed to parse profile error response:", err);
+            logger.error("BLOCK OVERRIDE: Failed to parse profile error response", err);
           }
           throw new Error(msg);
         }
 
         const json = await res.json();
-        setProfile(json?.data || null);
+        const nextProfile = json?.data || null;
+        setProfile(nextProfile);
+        // BLOCK OVERRIDE: Consume new profile blockStatus payload.
+        setProfileBlockStatus(nextProfile?.blockStatus || DEFAULT_BLOCK_STATUS);
       } catch (e) {
         setError(e?.message || "Failed to load profile");
       } finally {
@@ -450,10 +484,21 @@ const UserProfile = () => {
     };
 
     fetchProfile();
-  }, [token, userId]);
+  }, [token, userId, profileRefreshTick]);
 
   const userProfile = profile?.userProfile || null;
   const isPrivateAccount = !!userProfile?.isPrivate;
+  const isBlockedByMe = Boolean(profileBlockStatus?.isBlockedByMe);
+  const isBlockedByThem = Boolean(profileBlockStatus?.isBlockedByThem);
+
+  const handleProfileBlockStatusChange = (nextStatus) => {
+    // BLOCK OVERRIDE: Keep profile block state in sync with block/unblock action.
+    setProfileBlockStatus(nextStatus || DEFAULT_BLOCK_STATUS);
+    if (!nextStatus?.isBlockedByMe) {
+      // BLOCK OVERRIDE: Unblock should restore full profile details and content visibility.
+      setProfileRefreshTick((prev) => prev + 1);
+    }
+  };
 
   const displayName = useMemo(() => {
     const n = `${userProfile?.firstName || ""} ${userProfile?.lastName || ""}`
@@ -494,7 +539,7 @@ const UserProfile = () => {
         familyCode: post.familyCode,
       }));
     },
-    enabled: !!userId && !!token && !isPrivateAccount,
+    enabled: !!userId && !!token && !isPrivateAccount && !isBlockedByMe && !isBlockedByThem,
     staleTime: 3 * 60 * 1000,
     cacheTime: 10 * 60 * 1000,
   });
@@ -535,7 +580,7 @@ const UserProfile = () => {
         })),
       }));
     },
-    enabled: !!userId && !!token && !isPrivateAccount,
+    enabled: !!userId && !!token && !isPrivateAccount && !isBlockedByMe && !isBlockedByThem,
     staleTime: 3 * 60 * 1000,
     cacheTime: 10 * 60 * 1000,
   });
@@ -560,6 +605,26 @@ const UserProfile = () => {
     setSelectedPost(null);
   };
 
+  if (!loadingProfile && isBlockedByThem) {
+    // BLOCK OVERRIDE: Blocked user sees dedicated restricted profile view only.
+    return <BlockedProfileView onBack={() => navigate(-1)} />;
+  }
+
+  if (!loadingProfile && isBlockedByMe) {
+    // BLOCK OVERRIDE: Blocker-side limited profile with unblock action only.
+    return (
+      <div className="mx-auto px-4 pt-6 pb-24 md:px-6 lg:px-8">
+        <BlockerProfileView
+          userId={userId}
+          userName={displayName}
+          profilePhoto={avatar}
+          isBlockedByMe={isBlockedByMe}
+          onStatusChange={handleProfileBlockStatusChange}
+        />
+      </div>
+    );
+  }
+
   return (
     <UserProfileView
       loadingProfile={loadingProfile}
@@ -575,6 +640,9 @@ const UserProfile = () => {
       loadingPosts={loadingPosts}
       loadingGalleries={loadingGalleries}
       isPrivateAccount={isPrivateAccount}
+      blockStatus={profileBlockStatus}
+      onBlockStatusChange={handleProfileBlockStatusChange}
+      profileUserId={userId}
       showPosts={showPosts}
       setShowPosts={setShowPosts}
       handleViewPost={handleViewPost}
