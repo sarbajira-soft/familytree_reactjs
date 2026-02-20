@@ -16,6 +16,20 @@ const PostViewerModal = ({
   authToken,
   currentUser,
 }) => {
+  const currentUserId =
+    currentUser?.userId ??
+    currentUser?.id ??
+    currentUser?.user?.userId ??
+    currentUser?.user?.id ??
+    null;
+  const postOwnerId =
+    post?.authorId ??
+    post?.createdBy ??
+    post?.user?.userId ??
+    post?.userId ??
+    null;
+  const isPostOwner = Number(postOwnerId) === Number(currentUserId);
+
   const [likeCount, setLikeCount] = useState(post?.likes || 0);
   const [isLiked, setIsLiked] = useState(post?.isLiked || false);
   const [comments, setComments] = useState([]);
@@ -370,7 +384,8 @@ const PostViewerModal = ({
                           <CommentItem
                             key={comment.id || `comment-${index}`}
                             comment={comment}
-                            currentUserId={currentUser?.userId}
+                            currentUserId={currentUserId}
+                            isPostOwner={isPostOwner}
                             onEdit={handleEditComment}
                             onDelete={handleDeleteComment}
                             onReply={handleReplyComment}

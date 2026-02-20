@@ -412,27 +412,52 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
             <section className="rounded-xl border border-red-200 bg-red-50/50 p-4">
               <h2 className="text-lg font-semibold text-red-700">Blocked Members</h2>
               {blockedMembers.length > 0 ? (
-                <div className="mt-3 space-y-3">
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
                   {blockedMembers.map((member) => (
                     <div
                       key={`blocked-member-${member.id}`}
-                      className="flex items-center justify-between rounded-lg border border-red-200 bg-white px-3 py-2"
+                      className="flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-white p-3 shadow-sm"
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex min-w-0 items-center gap-3">
                         <img
                           src={member.profilePic || 'https://placehold.co/48x48/e2e8f0/64748b?text=👤'}
                           alt={member.name}
-                          className="h-10 w-10 rounded-full object-cover"
+                          className="h-12 w-12 flex-shrink-0 rounded-full object-cover ring-2 ring-red-100"
                         />
-                        <span className="text-sm font-medium text-gray-900">{member.name}</span>
+
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="truncate text-sm font-semibold text-gray-900">{member.name}</span>
+                            <BlockedBadge />
+                          </div>
+                          <div className="mt-1 flex flex-wrap items-center gap-2">
+                            <span
+                              className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
+                                relationColors[member.role] || 'bg-gray-100 text-gray-800'
+                              }`}
+                            >
+                              {member.role}
+                            </span>
+                            {member.membershipType !== 'member' && (
+                              <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-700">
+                                Linked
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <BlockButton
-                        userId={member.userId}
-                        isBlockedByMe
-                        location="membersList"
-                        userName={member.name}
-                        onStatusChange={(nextStatus) => handleMemberBlockStatusChange(member.userId, nextStatus)}
-                      />
+
+                      <div className="flex flex-shrink-0 items-center">
+                        <BlockButton
+                          userId={member.userId}
+                          isBlockedByMe
+                          location="profile"
+                          userName={member.name}
+                          onStatusChange={(nextStatus) =>
+                            handleMemberBlockStatusChange(member.userId, nextStatus)
+                          }
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>

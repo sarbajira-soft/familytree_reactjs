@@ -1251,3 +1251,15 @@ h6 { font-size: 0.9rem; }
 .swal2-high-z {
   z-index: 99999 !important;
 }
+
+ .hide-video-zoom::-webkit-media-controls-fullscreen-button {
+   display: none !important;
+ }
+
+ .hide-video-zoom::-webkit-media-controls-overflow-button {
+   display: none !important;
+ }
+
+ .hide-video-zoom::-webkit-media-controls-enclosure {
+   overflow: hidden;
+ }

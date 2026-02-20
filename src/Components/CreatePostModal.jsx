@@ -1155,8 +1155,10 @@ const CreatePostModal = ({
             <div className="relative rounded-xl overflow-hidden border-2 border-gray-200 group shadow-md">
               <video
                 src={videoPreview || currentPostVideoUrl}
-                className="w-full max-h-72 sm:max-h-96 object-contain bg-gray-100"
+                className="hide-video-zoom w-full max-h-72 sm:max-h-96 object-contain bg-gray-100"
                 controls
+                controlsList="nofullscreen nodownload noremoteplayback noplaybackrate"
+                disablePictureInPicture
               />
 
               <button

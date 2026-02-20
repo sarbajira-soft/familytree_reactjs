@@ -24,6 +24,20 @@ const GalleryViewerModal = ({
   currentUser,
   authToken,
 }) => {
+  const currentUserId =
+    currentUser?.userId ??
+    currentUser?.id ??
+    currentUser?.user?.userId ??
+    currentUser?.user?.id ??
+    null;
+  const albumOwnerId =
+    album?.userId ??
+    album?.createdBy ??
+    album?.user?.userId ??
+    album?.authorId ??
+    null;
+  const isAlbumOwner = Number(albumOwnerId) === Number(currentUserId);
+
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
 
   useEffect(() => {
@@ -441,7 +455,8 @@ const GalleryViewerModal = ({
                           <CommentItem
                             key={comment.id}
                             comment={comment}
-                            currentUserId={currentUser?.userId}
+                            currentUserId={currentUserId}
+                            isPostOwner={isAlbumOwner}
                             onEdit={handleEditComment}
                             onDelete={handleDeleteComment}
                             onReply={handleReplyComment}

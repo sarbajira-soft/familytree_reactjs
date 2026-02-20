@@ -1,26 +1,19 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef ,useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { FaReply, FaTimes } from 'react-icons/fa';
 import { FiSmile } from 'react-icons/fi';
 import { motion } from 'framer-motion';
 import EmojiPicker from 'emoji-picker-react';
 import { useNavigate } from 'react-router-dom';
-import { BlockButton } from './block/BlockButton';
 import { logger } from '../utils/logger';
-
-const DEFAULT_BLOCK_STATUS = {
-  isBlockedByMe: false,
-  isBlockedByThem: false,
-};
 
 const CommentItem = ({ 
   comment, 
   currentUserId, 
+  isPostOwner = false,
   onEdit, 
   onDelete, 
   onReply,
-  onBlockUser = null,
-  blockedUserIds = undefined,
   depth = 0,
   maxDepth = 3 
 }) => {
@@ -31,20 +24,14 @@ const CommentItem = ({
   const [replyText, setReplyText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [commentBlockStatus, setCommentBlockStatus] = useState(DEFAULT_BLOCK_STATUS);
   const replyTextareaRef = useRef(null);
   const emojiPickerRef = useRef(null);
 
-  const isOwner = comment.userId === currentUserId;
+  const isOwner = Number(comment.userId) === Number(currentUserId);
   const hasReplies = comment.replies && comment.replies.length > 0;
   const canReply = depth < maxDepth;
   const user = comment.user || {};
   const commenterId = user.userId || comment.userId || null;
-
-  useEffect(() => {
-    const isBlockedByMe = blockedUserIds?.has(Number(commenterId));
-    setCommentBlockStatus({ ...DEFAULT_BLOCK_STATUS, isBlockedByMe: Boolean(isBlockedByMe) });
-  }, [blockedUserIds, commenterId]);
 
   const handleEdit = async () => {
     if (!editText.trim()) return;
@@ -144,14 +131,6 @@ const CommentItem = ({
     }
   };
 
-  const handleCommentBlockStatusChange = (status) => {
-    setCommentBlockStatus(status || DEFAULT_BLOCK_STATUS);
-    if (status?.isBlockedByMe && onBlockUser && commenterId) {
-      // BLOCK OVERRIDE: Optimistically remove blocked commenter's content from feed.
-      onBlockUser(commenterId);
-    }
-  };
-
   return (
     <motion.div
       className={`flex gap-3 items-start ${depth > 0 ? 'ml-8 mt-2' : ''}`}
@@ -235,14 +214,14 @@ const CommentItem = ({
                     Reply
                   </button>
                 )}
-                {!isOwner && commenterId && (
-                  <BlockButton
-                    userId={commenterId}
-                    isBlockedByMe={Boolean(commentBlockStatus?.isBlockedByMe)}
-                    location="comment"
-                    userName={fullName}
-                    onStatusChange={handleCommentBlockStatusChange}
-                  />
+                {(isOwner || isPostOwner) && (
+                  <button
+                    onClick={handleDelete}
+                    disabled={isLoading}
+                    className="font-medium text-red-500 hover:text-red-700 bg-transparent"
+                  >
+                    Delete
+                  </button>
                 )}
                 {isOwner && (
                   <>
@@ -252,13 +231,6 @@ const CommentItem = ({
                       className="font-medium hover:text-gray-700 bg-transparent"
                     >
                       Edit
-                    </button>
-                    <button
-                      onClick={handleDelete}
-                      disabled={isLoading}
-                      className="font-medium text-red-500 hover:text-red-700 bg-transparent"
-                    >
-                      Delete
                     </button>
                   </>
                 )}
@@ -337,11 +309,10 @@ const CommentItem = ({
                 key={reply.id || `reply-${comment.id || "root"}-${index}`}
                 comment={reply}
                 currentUserId={currentUserId}
+                isPostOwner={isPostOwner}
                 onEdit={onEdit}
                 onDelete={onDelete}
                 onReply={onReply}
-                onBlockUser={onBlockUser}
-                blockedUserIds={blockedUserIds}
                 depth={depth + 1}
                 maxDepth={maxDepth}
               />
@@ -370,11 +341,10 @@ CommentItem.propTypes = {
     replies: PropTypes.arrayOf(PropTypes.object),
   }).isRequired,
   currentUserId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+  isPostOwner: PropTypes.bool,
   onEdit: PropTypes.func.isRequired,
   onDelete: PropTypes.func.isRequired,
   onReply: PropTypes.func.isRequired,
-  onBlockUser: PropTypes.func,
-  blockedUserIds: PropTypes.instanceOf(Set),
   depth: PropTypes.number,
   maxDepth: PropTypes.number,
 };
