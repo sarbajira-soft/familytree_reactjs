@@ -21,6 +21,7 @@ export const BlockConfirmationModal = ({
   action,
   onConfirm,
   onCancel,
+  loading = false,
 }) => {
   const handleEscape = useCallback(
     (event) => {
@@ -73,11 +74,17 @@ export const BlockConfirmationModal = ({
 
   const handleCancelClick = (event) => {
     event.stopPropagation();
+    if (loading) {
+      return;
+    }
     onCancel();
   };
 
   const handleConfirmClick = (event) => {
     event.stopPropagation();
+    if (loading) {
+      return;
+    }
     onConfirm();
   };
 
@@ -103,7 +110,10 @@ export const BlockConfirmationModal = ({
           <button
             type="button"
             aria-label="Cancel block action"
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700"
+            className={`rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 ${
+              loading ? 'opacity-60 cursor-not-allowed' : ''
+            }`}
+            disabled={loading}
             onClick={handleCancelClick}
           >
             Cancel
@@ -113,10 +123,11 @@ export const BlockConfirmationModal = ({
             aria-label={`${confirmLabel} user`}
             className={`rounded-lg px-4 py-2 text-sm text-white ${
               action === 'block' ? 'bg-red-500' : 'bg-green-600'
-            }`}
+            } ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
+            disabled={loading}
             onClick={handleConfirmClick}
           >
-            {confirmLabel}
+            {loading ? 'Please wait...' : confirmLabel}
           </button>
         </div>
       </div>
@@ -131,4 +142,5 @@ BlockConfirmationModal.propTypes = {
   action: PropTypes.oneOf(['block', 'unblock']).isRequired,
   onConfirm: PropTypes.func.isRequired,
   onCancel: PropTypes.func.isRequired,
+  loading: PropTypes.bool,
 };

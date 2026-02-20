@@ -8,6 +8,7 @@ import {
   FiClock,
   FiSmile,
   FiChevronDown,
+  FiMoreVertical,
   FiSend,
   FiVolumeX,
   FiVolume2,
@@ -65,11 +66,32 @@ const PostPage = () => {
   const [blockedUserIds, setBlockedUserIds] = useState(() => new Set());
   const [activeEmojiPostId, setActiveEmojiPostId] = useState(null);
   const [feedMenuOpen, setFeedMenuOpen] = useState(false);
+  const [postActionMenuPostId, setPostActionMenuPostId] = useState(null);
   const commentInputRefs = useRef({});
   const emojiPickerRef = useRef(null);
   const feedMenuRef = useRef(null);
   const feedMenuButtonRef = useRef(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const handleGlobalPointerDown = () => {
+      setPostActionMenuPostId(null);
+    };
+
+    const handleGlobalKeyDown = (e) => {
+      if (e.key === "Escape") {
+        setPostActionMenuPostId(null);
+      }
+    };
+
+    document.addEventListener("pointerdown", handleGlobalPointerDown);
+    document.addEventListener("keydown", handleGlobalKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handleGlobalPointerDown);
+      document.removeEventListener("keydown", handleGlobalKeyDown);
+    };
+  }, []);
 
   const goToUserProfile = (targetUserId) => {
     if (!targetUserId) return;
@@ -952,13 +974,12 @@ const PostPage = () => {
               key={comment.id || `comment-${index}`}
               comment={comment}
               currentUserId={userInfo?.userId}
+              isPostOwner={Number(post.authorId) === Number(userInfo?.userId)}
               onEdit={(id, text) => handleEditCommentFromItem(id, post.id, text)}
               onDelete={(id) => handleDeleteCommentFromItem(id, post.id)}
               onReply={(id, text) =>
                 handleReplyToCommentFromItem(id, post.id, text)
               }
-              onBlockUser={removeBlockedUserContent}
-              blockedUserIds={blockedUserIds}
             />
           ))}
         </div>
@@ -1113,21 +1134,48 @@ const PostPage = () => {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {post.authorId && Number(post.authorId) !== Number(userInfo?.userId) && (
-                      <BlockButton
-                        userId={post.authorId}
-                        isBlockedByMe={blockedUserIds.has(Number(post.authorId))}
-                        location="post"
-                        userName={post.author}
-                        onStatusChange={(status) =>
-                          handleBlockStatusFromFeed(post.authorId, status)
-                        }
-                      />
-                    )}
                     <span className="text-secondary-600 flex items-center gap-1 text-xs sm:text-sm">
                       {post.privacy === "public" ? <FiGlobe /> : <FiUsers />}
                       {post.privacy === "public" ? "Public" : "Family"}
                     </span>
+
+                    {post.authorId &&
+                    Number(post.authorId) !== Number(userInfo?.userId) &&
+                    String(post.privacy || '').toLowerCase() !== 'public' && (
+                      <div className="relative" onPointerDown={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          aria-label="Post actions"
+                          className="h-8 w-8 grid place-items-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPostActionMenuPostId((prev) =>
+                              prev === post.id ? null : post.id,
+                            );
+                          }}
+                        >
+                          <FiMoreVertical />
+                        </button>
+
+                        {postActionMenuPostId === post.id && (
+                          <div className="absolute right-0 mt-2 w-40 rounded-xl border border-gray-200 bg-white shadow-lg z-50 overflow-hidden">
+                            <div className="py-1">
+                              <div className="px-2 py-1">
+                                <BlockButton
+                                  userId={post.authorId}
+                                  isBlockedByMe={blockedUserIds.has(Number(post.authorId))}
+                                  location="membersList"
+                                  userName={post.author}
+                                  onStatusChange={(status) =>
+                                    handleBlockStatusFromFeed(post.authorId, status)
+                                  }
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
 

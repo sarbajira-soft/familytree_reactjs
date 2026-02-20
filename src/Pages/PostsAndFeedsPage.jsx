@@ -9,9 +9,11 @@ import {
 } from 'react-icons/fi';
 import { FaRegHeart, FaHeart, FaCommentDots } from 'react-icons/fa';
 import { MdPublic, MdPeople } from 'react-icons/md';
+import { FiMoreVertical } from 'react-icons/fi';
 
 import { authFetch } from '../utils/authFetch';
 import { getToken } from '../utils/auth';
+import { BlockButton } from '../Components/block/BlockButton';
 
 const EMPTY_VTT_TRACK_SRC = 'data:text/vtt,WEBVTT';
 
@@ -30,6 +32,7 @@ const PostsAndFeedsPage = () => {
     const [showSearchInput, setShowSearchInput] = useState(false);
     const [searchCaption, setSearchCaption] = useState('');
     const [feedError, setFeedError] = useState(null);
+    const [postActionMenuPostId, setPostActionMenuPostId] = useState(null);
 
     const searchTimeoutRef = useRef(null);
     const navigate = useNavigate();
@@ -43,6 +46,26 @@ const PostsAndFeedsPage = () => {
             navigate(`/user/${targetUserId}`);
         }
     };
+
+    useEffect(() => {
+        const handleGlobalPointerDown = () => {
+            setPostActionMenuPostId(null);
+        };
+
+        const handleGlobalKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                setPostActionMenuPostId(null);
+            }
+        };
+
+        document.addEventListener('pointerdown', handleGlobalPointerDown);
+        document.addEventListener('keydown', handleGlobalKeyDown);
+
+        return () => {
+            document.removeEventListener('pointerdown', handleGlobalPointerDown);
+            document.removeEventListener('keydown', handleGlobalKeyDown);
+        };
+    }, []);
 
     useEffect(() => {
         const storedToken = getToken();
@@ -255,6 +278,7 @@ const PostsAndFeedsPage = () => {
                 <div key={post.id} className="bg-white rounded-xl overflow-hidden animate-fade-in border border-gray-100">
                     <div className="flex items-center justify-between p-4 pb-2">
                         <div className="flex items-center">
+
                             <button
                                 type="button"
                                 className="bg-transparent p-0"
@@ -280,6 +304,38 @@ const PostsAndFeedsPage = () => {
                                 </div>
                             </div>
                         </div>
+
+                        {post.authorId &&
+                        Number(post.authorId) !== Number(userInfo?.userId) &&
+                        String(post.privacy || '').toLowerCase() !== 'public' && (
+                            <div className="relative" onPointerDown={(e) => e.stopPropagation()}>
+                                <button
+                                    type="button"
+                                    aria-label="Post actions"
+                                    className="h-9 w-9 grid place-items-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setPostActionMenuPostId((prev) => (prev === post.id ? null : post.id));
+                                    }}
+                                >
+                                    <FiMoreVertical />
+                                </button>
+
+                                {postActionMenuPostId === post.id && (
+                                    <div className="absolute right-0 mt-2 w-40 rounded-xl border border-gray-200 bg-white shadow-lg z-50 overflow-hidden">
+                                        <div className="py-1">
+                                            <div className="px-2 py-1">
+                                                <BlockButton
+                                                    userId={post.authorId}
+                                                    location="membersList"
+                                                    userName={post.author}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     <div className="px-4 py-2">

@@ -39,14 +39,6 @@ export const useBlockButton = ({
       return;
     }
 
-    const previousStatus = { ...DEFAULT_STATUS, isBlockedByMe: Boolean(isBlockedByMe) };
-    const nextStatus = { ...DEFAULT_STATUS, isBlockedByMe: action === 'block' };
-
-    if (onStatusChange) {
-      // BLOCK OVERRIDE: Optimistic UI update with rollback on failure.
-      onStatusChange(nextStatus);
-    }
-
     setLoading(true);
     try {
       if (action === 'block') {
@@ -56,11 +48,14 @@ export const useBlockButton = ({
         await unblockUser(userId);
         toast.success(BLOCK_MESSAGES.unblockedSuccess);
       }
+
+      if (onStatusChange) {
+        const nextStatus = { ...DEFAULT_STATUS, isBlockedByMe: action === 'block' };
+        onStatusChange(nextStatus);
+      }
+
       closeModal();
     } catch (error) {
-      if (onStatusChange) {
-        onStatusChange(previousStatus);
-      }
       logger.error('BLOCK OVERRIDE: block button action failed', error);
       toast.error(getActionErrorMessage(error));
     } finally {

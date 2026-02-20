@@ -916,8 +916,10 @@ const ProfilePage = () => {
                       {post.postVideo ? (
                         <video
                           src={post.postVideo}
-                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                          className="hide-video-zoom w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
                           controls
+                          controlsList="nofullscreen nodownload noremoteplayback noplaybackrate"
+                          disablePictureInPicture
                           onClick={(e) => e.stopPropagation()}
                         />
                       ) : post.fullImageUrl ? (
