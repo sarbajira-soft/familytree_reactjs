@@ -93,6 +93,32 @@ const SuggestionApproving = () => {
     return age;
   };
 
+  const hasApiError = (payload) => {
+    if (!payload || typeof payload !== 'object') return true;
+    if (payload?.error) return true;
+    if (typeof payload?.statusCode === 'number' && payload.statusCode >= 400) return true;
+    return false;
+  };
+
+  const normalizeFamilyCode = (value) => String(value || '').trim().toUpperCase();
+
+  const isJoinRequestType = (type) => {
+    const normalizedType = String(type || '').trim();
+    return [
+      'FAMILY_JOIN_REQUEST',
+      'FAMILY_JOIN_REQUEST_UPDATED',
+      'FAMILY_ASSOCIATION_REQUEST',
+      'family_join_request',
+      'family_join_request_updated',
+      'family_association_request',
+    ].includes(normalizedType);
+  };
+
+  const isOpenRequestStatus = (status) => {
+    const normalizedStatus = String(status || '').trim().toLowerCase();
+    return !['accepted', 'rejected', 'expired', 'cancelled'].includes(normalizedStatus);
+  };
+
   const getDisplayName = (user, profile) => {
     const fullName = (user?.fullName || '').toString().trim();
     if (fullName && !/\bnull\b|\bundefined\b/i.test(fullName)) {
@@ -260,11 +286,12 @@ const SuggestionApproving = () => {
           `/user/profile/${effectiveUserId}`,
           { method: 'GET', skipThrow: true }
         );
-        if (!userData || userData?.message) {
+        if (hasApiError(userData)) {
           throw new Error(userData?.message || 'Failed to load your profile');
         }
 
-        const code = userData.data?.userProfile?.familyCode;
+        const userPayload = userData?.data || userData;
+        const code = userPayload?.userProfile?.familyCode;
         setFamilyCode(code || null);
 
         if (!code) {
@@ -276,22 +303,67 @@ const SuggestionApproving = () => {
           `/notifications/${code}/join-requests`,
           { method: 'GET', skipThrow: true }
         );
-        if (!data || data?.message) {
+        if (hasApiError(data)) {
           throw new Error(data?.message || 'Failed to load join requests');
         }
 
-        const pendingRequests = (data.data || []).filter((req) => req.status === 'pending');
+        let requestList = Array.isArray(data?.data)
+          ? data.data
+          : Array.isArray(data)
+            ? data
+            : [];
+
+        // Fallback: some environments return empty from family-specific endpoint;
+        // fetch all user notifications and filter join requests for this family.
+        if (requestList.length === 0) {
+          const allNotifications = await authFetch(
+            '/notifications?all=true',
+            { method: 'GET', skipThrow: true }
+          );
+          if (!hasApiError(allNotifications) && Array.isArray(allNotifications)) {
+            requestList = allNotifications.filter((req) =>
+              normalizeFamilyCode(req?.familyCode) === normalizeFamilyCode(code) &&
+              isJoinRequestType(req?.type) &&
+              isOpenRequestStatus(req?.status)
+            );
+          }
+        }
+
+        const pendingRequests = requestList
+          .filter((req) => req && typeof req === 'object')
+          .filter((req) => isOpenRequestStatus(req?.status));
 
         const requestsWithUser = await Promise.all(
           pendingRequests.map(async (req) => {
             let user = null;
-            if (req.triggeredBy) {
+            if (req?.triggeredByUser) {
+              const name = String(req.triggeredByUser?.name || '').trim();
+              const [firstName = '', ...rest] = name.split(' ');
+              user = {
+                firstName: req.triggeredByUser?.firstName || firstName || 'Member',
+                lastName: req.triggeredByUser?.lastName || rest.join(' '),
+                profile: req.triggeredByUser?.profile || null,
+              };
+            } else if (req?.data?.requesterName) {
+              const requesterName = String(req.data.requesterName).trim();
+              const [firstName = '', ...rest] = requesterName.split(' ');
+              user = {
+                firstName: firstName || 'Member',
+                lastName: rest.join(' '),
+                profile: null,
+              };
+            } else if (req?.triggeredBy) {
               try {
                 const requesterData = await authFetch(
                   `/user/profile/${req.triggeredBy}`,
                   { method: 'GET', skipThrow: true }
                 );
-                user = requesterData ? requesterData.data?.userProfile || null : null;
+                if (hasApiError(requesterData)) {
+                  user = null;
+                } else {
+                  const requesterPayload = requesterData?.data || requesterData;
+                  user = requesterPayload?.userProfile || null;
+                }
               } catch (_) {
                 user = null;
               }

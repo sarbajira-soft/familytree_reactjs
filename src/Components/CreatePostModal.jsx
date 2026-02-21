@@ -18,6 +18,7 @@ import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { fetchFile, toBlobURL } from "@ffmpeg/util";
 import SparkMD5 from "spark-md5";
 import { throwIfNotOk } from "../utils/apiMessages";
+import { getFamilyPrivacyContentSetting } from "../utils/familyPrivacySettings";
 
 const CreatePostModal = ({
   isOpen,
@@ -55,6 +56,18 @@ const CreatePostModal = ({
     const isApproved = userInfo?.approveStatus === "approved";
 
     return hasFamily && isApproved ? "family" : "public";
+  };
+
+  const getPreferredFamilyCode = () => {
+    const fallbackCode = String(
+      currentUser?.familyCode || userInfo?.familyCode || "",
+    ).trim();
+    const setting = getFamilyPrivacyContentSetting({
+      userId: currentUser?.userId || userInfo?.userId,
+      familyCode: fallbackCode,
+      contentType: "posts",
+    });
+    return String(setting?.familyCode || fallbackCode).trim();
   };
 
   // State for form fields
@@ -128,7 +141,7 @@ const CreatePostModal = ({
       } else {
         setContent("");
         setPrivacy(getDefaultPrivacy());
-        setFamilyCode(currentUser?.familyCode || userInfo?.familyCode || "");
+        setFamilyCode(getPreferredFamilyCode());
         setImageFile(null);
         setImagePreview(null);
         setCurrentPostImageUrl(null);
@@ -155,11 +168,7 @@ const CreatePostModal = ({
   useEffect(() => {
     if (!isOpen) return;
 
-    const defaultCode = (
-      currentUser?.familyCode ||
-      userInfo?.familyCode ||
-      ""
-    ).trim();
+    const defaultCode = getPreferredFamilyCode();
     if (
       privacy === "family" &&
       !String(familyCode || "").trim() &&

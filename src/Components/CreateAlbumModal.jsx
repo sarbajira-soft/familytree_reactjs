@@ -3,6 +3,7 @@ import { FaTimes, FaUpload, FaImage, FaTrashAlt, FaPlus } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 import { throwIfNotOk } from '../utils/apiMessages';
 import { useUser } from '../Contexts/UserContext';
+import { getFamilyPrivacyContentSetting } from '../utils/familyPrivacySettings';
 
 const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authToken, mode = 'create', albumData = null }) => {
     const { userInfo } = useUser();
@@ -11,6 +12,16 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
         const hasFamily = Boolean(currentUser?.familyCode || userInfo?.familyCode);
         const isApproved = userInfo?.approveStatus === 'approved';
         return hasFamily && isApproved ? 'family' : 'public';
+    };
+
+    const getPreferredFamilyCode = () => {
+        const fallbackCode = String(currentUser?.familyCode || userInfo?.familyCode || '').trim();
+        const setting = getFamilyPrivacyContentSetting({
+            userId: currentUser?.userId || userInfo?.userId,
+            familyCode: fallbackCode,
+            contentType: 'albums',
+        });
+        return String(setting?.familyCode || fallbackCode).trim();
     };
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
@@ -58,7 +69,7 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
                 if (galleryPhotoInputRef.current) galleryPhotoInputRef.current.value = '';
             } else {
                 resetForm();
-                setFamilyCode(currentUser?.familyCode || userInfo?.familyCode || '');
+                setFamilyCode(getPreferredFamilyCode());
 
                 setPrivacy(getDefaultPrivacy());
             }

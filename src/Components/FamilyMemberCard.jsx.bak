@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import PropTypes from 'prop-types';
-import { FiTrash2, FiEye, FiLoader, FiShare2, FiSearch } from 'react-icons/fi';
+import { FiTrash2, FiEye, FiLoader, FiShare2 } from 'react-icons/fi';
 import { FaBirthdayCake, FaPhone, FaHome, FaMale, FaFemale } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 import { BlockButton } from './block/BlockButton';
@@ -49,16 +49,6 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
     buildDefaultFamilyPrivacySettings(''),
   );
   const [privacySavedAt, setPrivacySavedAt] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [familyFilterPage, setFamilyFilterPage] = useState(1);
-  const itemsPerPage = 10;
-  const familiesPerPage = 1;
-
-  // Reset page when tab or filters change
-  useEffect(() => {
-    setCurrentPage(1);
-    setFamilyFilterPage(1);
-  }, [activeTab, searchTerm, selectedAssociatedFamilyCode, selectedLinkedFamilyCode]);
 
   const BASE_URL = import.meta.env.VITE_API_BASE_URL;
   const normalizeFamilyCode = (code) => String(code || '').trim().toUpperCase();
@@ -773,6 +763,7 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
   }) => (
     <div
       onClick={() => {
+        // Only allow viewing if user has Admin (role 2) or Superadmin (role 3) role
         if (
           !deletedMemberIds.has(member.memberId) &&
           currentUserIsFamilyAdmin &&
@@ -781,177 +772,181 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
           handleViewMember(member.userId, { stopPropagation: () => { } });
         }
       }}
-      className={`group relative flex flex-col sm:flex-row items-stretch bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md hover:border-primary-300 transition-all duration-200 overflow-hidden ${currentUserIsFamilyAdmin ? 'cursor-pointer' : 'cursor-default'
+      className={`relative bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-md transition-all duration-300 ease-in-out group transform hover:-translate-y-1 ${currentUserIsFamilyAdmin
+          ? 'hover:shadow-lg cursor-pointer'
+          : 'cursor-default'
         } ${deletedMemberIds.has(member.memberId) ? 'opacity-20 grayscale pointer-events-none' : ''}`}
     >
-      {/* Left Accent Bar */}
-      <div className={`w-1.5 flex-shrink-0 ${member.gender === 'male' ? 'bg-sky-400' : member.gender === 'female' ? 'bg-pink-400' : 'bg-gray-300'}`}></div>
-
-      <div className="flex-1 p-3 sm:p-4 flex flex-col sm:flex-row items-center gap-4 min-w-0">
-        {/* Profile Avatar */}
-        <div className="flex-shrink-0 relative">
+      <div className="flex items-start p-5 pb-0">
+        <div className="relative flex-shrink-0 w-24 h-24 rounded-full overflow-hidden border-3 border-primary-200 shadow-lg">
           <img
-            src={member.profilePic || 'https://placehold.co/80x80/f8fafc/94a3b8?text=👤'}
+            src={member.profilePic || 'https://placehold.co/96x96/e2e8f0/64748b?text=👤'}
             alt={member.name}
-            className="w-16 h-16 sm:w-12 sm:h-12 rounded-full object-cover border border-gray-200 shadow-sm"
+            className="w-full h-full object-cover"
             onError={(e) => {
-              e.target.src = 'https://placehold.co/80x80/f8fafc/94a3b8?text=👤';
+              e.target.src = 'https://placehold.co/96x96/e2e8f0/64748b?text=👤';
             }}
           />
+          {/* {member.isAdmin && (
+            <span className="absolute bottom-0 right-0 -mr-1 -mb-1 px-2 py-0.5 bg-primary-DEFAULT text-white text-xs font-bold rounded-full border-2 border-white shadow">
+              Admin
+            </span>
+          )} */}
         </div>
 
-        {/* Content Grid */}
-        <div className="flex-1 w-full grid grid-cols-1 sm:grid-cols-12 gap-4 sm:gap-6 items-center">
-
-          {/* Identity Info (Col 4) */}
-          <div className="sm:col-span-4 flex flex-col items-center sm:items-start text-center sm:text-left min-w-0 pr-2">
-            <div className="flex items-center gap-2 max-w-full">
-              <h3 className="text-base font-bold text-gray-900 truncate">{member.name}</h3>
-              {currentUserIsFamilyAdmin && member?.blockStatus?.isBlockedByMe && (
-                <BlockedBadge />
-              )}
-            </div>
-            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-1.5 mt-1">
-              <span className={`inline-flex items-center text-[10px] sm:text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${relationColors[member.role] || 'bg-gray-100 text-gray-700'}`}>
-                {member.role}
+        <div className="ml-4 flex-1 min-w-0">
+          <div className="flex items-center space-x-2">
+            <h3 className="text-xl font-extrabold text-gray-900 truncate pr-2">{member.name}</h3>
+            {currentUserIsFamilyAdmin && member?.blockStatus?.isBlockedByMe && (
+              <BlockedBadge />
+            )}
+            {member.membershipType !== 'member' && (
+              <span className="inline-block text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
+                Linked
               </span>
-              {member.membershipType !== 'member' && (
-                <span className="inline-block text-[10px] sm:text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
-                  Linked
-                </span>
-              )}
-              {showFamilyCode && member.sourceFamilyCode && (
-                <span className="inline-block text-[10px] sm:text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-100">
-                  Code: {member.sourceFamilyCode}
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Demographics (Col 3) */}
-          <div className="sm:col-span-3 flex flex-row sm:flex-col justify-center sm:justify-center items-center sm:items-start gap-3 sm:gap-1.5 text-sm text-gray-600 border-t sm:border-t-0 border-gray-100 pt-3 sm:pt-0">
-            <div className="flex items-center gap-2 truncate" title="Age / DOB">
-              <FaBirthdayCake className="text-gray-400 flex-shrink-0" size={14} />
-              <span className="font-medium truncate">{member.age || calculateAge(member.dob)} yrs</span>
-            </div>
-            <div className="flex items-center gap-2 truncate" title="Gender">
-              {member.gender === 'male' ? <FaMale className="text-sky-500 flex-shrink-0" size={14} /> : member.gender === 'female' ? <FaFemale className="text-pink-500 flex-shrink-0" size={14} /> : <div className="w-[14px]"></div>}
-              <span className="font-medium capitalize truncate">{member.gender || 'N/A'}</span>
-            </div>
-          </div>
-
-          {/* Contact info (Col 3) */}
-          <div className="sm:col-span-3 flex flex-col justify-center items-center sm:items-start gap-1.5 text-sm text-gray-500 min-w-0">
-            {member.contact ? (
-              <div className="flex items-center gap-2 w-full justify-center sm:justify-start">
-                <FaPhone className="text-gray-400 flex-shrink-0" size={13} />
-                <span className="truncate" title={member.contact}>{member.contact}</span>
-              </div>
-            ) : (
-              <div className="hidden sm:block text-gray-300 text-xs italic">-</div>
-            )}
-            {member.address ? (
-              <div className="flex items-center gap-2 w-full justify-center sm:justify-start mt-1 sm:mt-0">
-                <FaHome className="text-gray-400 flex-shrink-0" size={13} />
-                <span className="truncate" title={member.address}>{member.address}</span>
-              </div>
-            ) : (
-              <div className="hidden sm:block text-gray-300 text-xs italic">-</div>
             )}
           </div>
+          <span
+            className={`mt-1 inline-block text-sm font-semibold px-3 py-1 rounded-full ${relationColors[member.role] || 'bg-gray-100 text-gray-800'
+              }`}
+          >
+            {member.role}
+          </span>
+          <div className="mt-2 flex items-center text-sm text-gray-600">
+            <FaBirthdayCake className="mr-2 text-primary-500" size={16} />
+            <span className="font-medium">{member.age || calculateAge(member.dob)} years old</span>
+          </div>
+          <div className="mt-1 flex items-center text-sm text-gray-600">
+            {member.gender === 'male' ? (
+              <FaMale className="mr-2 text-blue-500" size={16} />
+            ) : (
+              <FaFemale className="mr-2 text-pink-500" size={16} />
+            )}
+            <span className="font-medium">{member.gender}</span>
+          </div>
+        </div>
+      </div>
 
-          {/* Actions (Col 2) */}
-          <div className="sm:col-span-2 flex items-center justify-center sm:justify-end gap-2 sm:pl-4 border-t sm:border-t-0 sm:border-l border-gray-100 pt-4 sm:pt-0 pb-1 sm:pb-0 h-full">
-            {currentUserIsFamilyAdmin && (
-              <>
-                {allowManageActions && member.membershipType === 'member' && (
-                  <button
-                    onClick={(e) => handleShareInvite(member, e)}
-                    disabled={deletedMemberIds.has(member.memberId)}
-                    className="p-1.5 rounded-lg bg-gray-50 text-gray-500 hover:bg-blue-50 hover:text-blue-600 hover:shadow-sm border border-transparent hover:border-blue-100 transition-all tooltip"
-                    title="Share invite link"
-                  >
-                    <FiShare2 size={16} />
-                  </button>
-                )}
-                {allowManageActions && member.membershipType === 'member' && currentUser?.userId !== member.userId && (
-                  <div className="flex items-center scale-95 origin-right">
-                    <BlockButton
-                      userId={member.userId}
-                      isBlockedByMe={Boolean(member?.blockStatus?.isBlockedByMe)}
-                      location="membersList"
-                      userName={member.name}
-                      onStatusChange={(nextStatus) => handleMemberBlockStatusChange(member.userId, nextStatus)}
-                    />
-                  </div>
-                )}
-                {allowDelete && member.membershipType === 'member' && currentUser?.userId !== member.userId && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteMember(member.memberId, familyCode, member.userId, e);
-                    }}
-                    disabled={deletedMemberIds.has(member.memberId)}
-                    className="p-1.5 rounded-lg bg-gray-50 text-gray-500 hover:bg-red-50 hover:text-red-600 hover:shadow-sm border border-transparent hover:border-red-100 transition-all tooltip"
-                    title="Delete"
-                  >
-                    <FiTrash2 size={16} />
-                  </button>
-                )}
+      {showFamilyCode && member.sourceFamilyCode && (
+        <div className="px-5 pt-3">
+          <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+            Family Code: {member.sourceFamilyCode}
+          </span>
+        </div>
+      )}
+
+      <div className="px-5 py-4 mt-4 bg-gray-50 border-t border-b border-gray-100 mx-5 rounded-lg">
+        {member.contact && (
+          <div className="flex items-center text-sm text-gray-700 mb-2">
+            <FaPhone className="mr-3 text-primary-500" size={16} />
+            <span className="font-medium">{member.contact}</span>
+          </div>
+        )}
+        {member.address && (
+          <div className="flex items-start text-sm text-gray-700">
+            <FaHome className="mr-3 text-primary-500 mt-1" size={16} />
+            <span className="line-clamp-2">{member.address}</span>
+          </div>
+        )}
+      </div>
+
+      <div className="flex justify-between items-center px-5 py-4">
+        <span className="text-xs text-gray-500">Last updated: {member.lastUpdated}</span>
+        <div className="flex space-x-2">
+          {/* Show view, edit, delete buttons only for Admin (role 2) and Superadmin (role 3) */}
+          {currentUserIsFamilyAdmin && (
+            <>
+              {/* Share profile invite link */}
+              {allowManageActions && member.membershipType === 'member' && (
                 <button
-                  onClick={(e) => handleViewMember(member.userId, e)}
-                  disabled={deletedMemberIds.has(member.memberId) || viewLoadingStates[member.userId]}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all border font-semibold text-sm ${viewLoadingStates[member.userId]
-                      ? 'bg-primary-50 text-primary-400 border-primary-100 cursor-not-allowed'
-                      : 'bg-white text-primary-600 border-primary-200 hover:bg-primary-50 hover:border-primary-300 hover:shadow-sm'
-                    } tooltip`}
-                  title="View Profile"
+                  onClick={(e) => handleShareInvite(member, e)}
+                  disabled={deletedMemberIds.has(member.memberId)}
+                  className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-blue-100 hover:text-blue-700 transition-colors tooltip"
+                  title="Share profile invite link"
                 >
-                  {viewLoadingStates[member.userId] ? (
-                    <FiLoader size={16} className="animate-spin" />
-                  ) : (
-                    <FiEye size={16} />
-                  )}
+                  <FiShare2 size={18} />
                 </button>
-              </>
-            )}
-          </div>
+              )}
+
+              {/* BLOCK OVERRIDE: Legacy family-member block buttons replaced by user-level BlockButton. */}
+              {allowManageActions && member.membershipType === 'member' && currentUser?.userId !== member.userId && (
+                <BlockButton
+                  userId={member.userId}
+                  isBlockedByMe={Boolean(member?.blockStatus?.isBlockedByMe)}
+                  location="membersList"
+                  userName={member.name}
+                  onStatusChange={(nextStatus) => handleMemberBlockStatusChange(member.userId, nextStatus)}
+                />
+              )}
+
+              {allowDelete && member.membershipType === 'member' && currentUser?.userId !== member.userId && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteMember(member.memberId, familyCode, member.userId, e);
+                  }}
+                  disabled={deletedMemberIds.has(member.memberId)}
+                  className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-red-100 hover:text-red-700 transition-colors tooltip"
+                  title="Delete Member"
+                >
+                  <FiTrash2 size={18} />
+                </button>
+              )}
+              {/* View button with loading state */}
+              <button
+                onClick={(e) => handleViewMember(member.userId, e)}
+                disabled={deletedMemberIds.has(member.memberId) || viewLoadingStates[member.userId]}
+                className={`p-2 rounded-full transition-all duration-200 tooltip ${viewLoadingStates[member.userId]
+                    ? 'bg-primary-100 text-primary-700 cursor-not-allowed'
+                    : 'bg-gray-100 text-gray-600 hover:bg-primary-100 hover:text-primary-700'
+                  }`}
+                title="View Member"
+              >
+                {viewLoadingStates[member.userId] ? (
+                  <FiLoader size={18} className="animate-spin" />
+                ) : (
+                  <FiEye size={18} />
+                )}
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>
   );
+
   const PrivacyControls = () => (
-    <section className="rounded-2xl border border-primary-100 bg-white p-5 sm:p-8 shadow-sm">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-6 border-b border-primary-50 pb-6">
+    <section className="rounded-2xl border border-indigo-200 bg-indigo-50/70 p-4 sm:p-5">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-bold text-gray-900">Privacy Settings</h2>
-          <p className="text-sm text-gray-500 mt-1">
-            Configure visibility for posts, albums, and events. Default is All Members.
+          <h2 className="text-lg font-semibold text-indigo-900">Privacy Settings</h2>
+          <p className="text-sm text-indigo-800">
+            Configure visibility for posts, albums, and events at family level. Default is All Members (except blocked users).
           </p>
         </div>
         <button
           type="button"
           onClick={handleSavePrivacySettings}
-          className="rounded-lg bg-primary-600 px-6 py-2.5 text-sm font-bold text-white hover:bg-primary-700 transition-all active:scale-95 shadow-md shadow-primary-600/20"
+          className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
         >
           Save Privacy Settings
         </button>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-6 md:grid-cols-3">
+      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
         {[
           { key: 'posts', label: 'Posts' },
           { key: 'albums', label: 'Albums' },
           { key: 'events', label: 'Events' },
         ].map((entry) => (
-          <div key={entry.key} className="rounded-xl border border-primary-100 bg-primary-50/40 p-5">
-            <p className="text-base font-bold text-gray-900 mb-4">{entry.label}</p>
+          <div key={entry.key} className="rounded-xl border border-indigo-200 bg-white p-3">
+            <p className="text-sm font-semibold text-gray-900">{entry.label}</p>
 
-            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Visibility</label>
+            <label className="mt-2 block text-xs font-medium text-gray-600">Visibility</label>
             <select
               value={privacySettings?.[entry.key]?.visibility || 'all-members'}
               onChange={(e) => updatePrivacySetting(entry.key, 'visibility', e.target.value)}
-              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium focus:ring-2 focus:ring-primary-100 focus:border-primary-300 shadow-sm mb-4 text-gray-700"
+              className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
             >
               {PRIVACY_VISIBILITY_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -960,11 +955,11 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
               ))}
             </select>
 
-            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Family Level</label>
+            <label className="mt-3 block text-xs font-medium text-gray-600">Family Level</label>
             <select
               value={privacySettings?.[entry.key]?.familyCode || birthFamilyCode}
               onChange={(e) => updatePrivacySetting(entry.key, 'familyCode', normalizeFamilyCode(e.target.value))}
-              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium focus:ring-2 focus:ring-primary-100 focus:border-primary-300 shadow-sm text-gray-700 disabled:opacity-50 disabled:bg-gray-50"
+              className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
               disabled={privacySettings?.[entry.key]?.visibility !== 'specific-family'}
             >
               {privacyFamilyOptions.map((familyOption) => (
@@ -978,8 +973,8 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
       </div>
 
       {privacySavedAt && (
-        <p className="mt-6 text-xs text-center font-medium text-gray-400">
-          Last saved: {new Date(privacySavedAt).toLocaleString()}
+        <p className="mt-3 text-xs text-indigo-700">
+          Saved on this device: {new Date(privacySavedAt).toLocaleString()}
         </p>
       )}
     </section>
@@ -987,324 +982,262 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
 
   const TABS = [
     { id: 'birth', label: 'Birth Family', count: activeBirthMembers.length, color: 'text-slate-700 bg-slate-100' },
-    { id: 'associated', label: 'Associated', count: associatedFamiliesOptions.length, color: 'text-sky-700 bg-sky-100' },
-    { id: 'linked', label: 'Linked', count: linkedFamiliesOptions.length, color: 'text-emerald-700 bg-emerald-100' },
-    { id: 'pending', label: 'Pending', count: filteredMembersNotInTree.length, color: 'text-amber-700 bg-amber-100' },
-    { id: 'blocked', label: 'Blocked', count: blockedMembers.length, color: 'text-red-700 bg-red-100' },
-    { id: 'privacy', label: 'Privacy', count: null, color: null },
+    { id: 'associated', label: 'Associated Families', count: associatedFamiliesOptions.length, color: 'text-sky-700 bg-sky-100' },
+    { id: 'linked', label: 'Linked Families', count: linkedFamiliesOptions.length, color: 'text-emerald-700 bg-emerald-100' },
+    { id: 'pending', label: 'Members Not In Tree', count: filteredMembersNotInTree.length, color: 'text-amber-700 bg-amber-100' },
+    { id: 'blocked', label: 'Blocked Members', count: blockedMembers.length, color: 'text-red-700 bg-red-100' },
+    { id: 'privacy', label: 'Privacy Settings', count: null, color: null },
   ];
 
-  /* PAGINATION LOGIC */
-  const paginateData = (dataArray) => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return dataArray.slice(startIndex, startIndex + itemsPerPage);
-  };
-
-  const paginateFamilies = (familiesArray) => {
-    const startIndex = (familyFilterPage - 1) * familiesPerPage;
-    return familiesArray.slice(startIndex, startIndex + familiesPerPage);
-  };
-
-  const FamilyFilterPagination = ({ totalFamilies }) => {
-    const totalPages = Math.ceil(totalFamilies / familiesPerPage);
-    if (totalPages <= 1) return null;
-
-    return (
-      <div className="flex items-center gap-2 ml-auto">
-        <button
-          onClick={() => setFamilyFilterPage(prev => Math.max(prev - 1, 1))}
-          disabled={familyFilterPage === 1}
-          className="px-2 py-1 rounded-md border border-gray-200 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          Prev
-        </button>
-        <span className="text-xs text-gray-500 font-medium">
-          {familyFilterPage} / {totalPages}
-        </span>
-        <button
-          onClick={() => setFamilyFilterPage(prev => Math.min(prev + 1, totalPages))}
-          disabled={familyFilterPage === totalPages}
-          className="px-2 py-1 rounded-md border border-gray-200 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          Next
-        </button>
-      </div>
-    );
-  };
-
-  const PaginationControls = ({ totalItems }) => {
-    const totalPages = Math.ceil(totalItems / itemsPerPage);
-    if (totalPages <= 1) return null;
-
-    let pages = [];
-    if (totalPages <= 7) {
-      pages = [...Array(totalPages)].map((_, i) => i + 1);
-    } else {
-      if (currentPage <= 3) {
-        pages = [1, 2, 3, 4, 5, '...', totalPages];
-      } else if (currentPage >= totalPages - 2) {
-        pages = [1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
-      } else {
-        pages = [1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages];
-      }
-    }
-
-    return (
-      <div className="flex flex-col sm:flex-row items-center justify-between mt-8 pt-6 border-t border-gray-100 gap-4">
-        <p className="text-sm text-gray-500 font-medium">
-          Showing <span className="font-bold text-gray-900">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-bold text-gray-900">{Math.min(currentPage * itemsPerPage, totalItems)}</span> of <span className="font-bold text-gray-900">{totalItems}</span> members
-        </p>
-        <div className="flex items-center gap-1 sm:gap-2">
-          <button
-            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-            disabled={currentPage === 1}
-            className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg border border-gray-200 text-xs sm:text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            Prev
-          </button>
-
-          <div className="flex items-center gap-1">
-            {pages.map((p, i) => (
-              p === '...' ? (
-                <span key={`ellipsis-${i}`} className="px-2 text-gray-400">...</span>
-              ) : (
-                <button
-                  key={`page-${p}`}
-                  onClick={() => setCurrentPage(p)}
-                  className={`w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-md text-sm font-semibold transition-colors ${currentPage === p
-                      ? 'bg-primary-600 text-white shadow-sm'
-                      : 'text-gray-600 hover:bg-gray-100'
-                    }`}
-                >
-                  {p}
-                </button>
-              )
-            ))}
-          </div>
-
-          <button
-            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-            disabled={currentPage === totalPages}
-            className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg border border-gray-200 text-xs sm:text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            Next
-          </button>
-        </div>
-      </div>
-    );
-  };
-
   return (
-    <div className="w-full pb-6">
-      {/* Search and Pill Filters Header */}
-      <div className="w-full mb-4">
-        <div className="max-w-7xl mx-auto px-2">
-          <div className="max-w-7xl mx-auto">
-            <div className="px-1 pb-1">
-              <div className="flex items-center gap-3 w-full">
-                {/* Tabs */}
-                <div className="min-w-0 flex items-center gap-2 overflow-hidden">
-                  {TABS.map((tab) => (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id)}
-                      className={`flex-shrink-0 whitespace-nowrap flex items-center gap-2 px-3 py-2 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-200 ${activeTab === tab.id
-                          ? 'bg-primary-600 text-white shadow-md shadow-primary-600/20'
-                          : 'bg-white text-gray-600 hover:bg-primary-50 hover:text-gray-900 border border-gray-200 shadow-sm'
-                        }`}
-                    >
-                      {tab.label}
-                      {tab.count !== null && (
-                        <span className={`px-2 py-0.5 rounded-md text-[10px] tracking-wide font-bold ${activeTab === tab.id ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'
-                          }`}>
-                          {tab.count}
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                </div>
+    <div className="space-y-6">
+      {/* Search Input */}
+      <div className="bg-white p-2 rounded-xl border border-gray-200 shadow-sm">
+        <input
+          type="text"
+          placeholder="Search family members..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full p-3 bg-transparent border-none focus:outline-none focus:ring-0 text-gray-800 placeholder-gray-400"
+        />
+      </div>
 
-                {/* Search (name-only) */}
-                <div className="flex-shrink-0">
-                  <div className="relative group shadow-sm rounded-lg bg-white transition-shadow hover:shadow-md focus-within:shadow-md focus-within:ring-2 focus-within:ring-primary-100 border border-gray-200 w-44 sm:w-52 md:w-60 h-10">
-                    <div className="absolute inset-y-0 left-0 w-12 flex items-center justify-center pointer-events-none">
-                      <FiSearch
-                        size={16}
-                        className="text-gray-400 group-focus-within:text-primary-500 transition-colors"
-                      />
-                    </div>
-                    <input
-                      type="text"
-                      placeholder="Search by name..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full h-full pr-3 bg-transparent border-none focus:outline-none focus:ring-0 text-gray-800 placeholder-gray-400 text-sm rounded-lg"
-                      style={{ paddingLeft: '3.25rem' }}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+      {/* Tab Navigation Hub */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mt-6">
+        <div className="flex overflow-x-auto hide-scrollbar border-b border-gray-100">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex-shrink-0 flex items-center gap-2 px-6 py-4 text-sm font-semibold transition-all duration-200 relative ${
+                activeTab === tab.id
+                  ? 'text-primary-600 bg-primary-50/50'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              {tab.label}
+              {tab.count !== null && (
+                <span className={`px-2 py-0.5 rounded-full text-xs ${activeTab === tab.id ? 'bg-primary-100 text-primary-700' : 'bg-gray-100 text-gray-600'}`}>
+                  {tab.count}
+                </span>
+              )}
+              {activeTab === tab.id && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary-600" />
+              )}
+            </button>
+          ))}
         </div>
       </div>
 
-      <div className="w-full pb-20 max-w-7xl mx-auto">
-        {loading ? (
-          <div className="flex justify-center items-center py-20">
-            <div className="animate-spin rounded-full h-10 w-10 border-4 border-gray-200 border-t-primary-600" />
-          </div>
-        ) : (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
-            {!filteredMembers.length && !notInTreeLoading && activeTab !== 'privacy' && (
-              <div className="flex flex-col items-center justify-center py-16 bg-white rounded-xl border border-gray-200 shadow-sm text-gray-400">
-                <p className="text-lg font-semibold text-gray-600">No members found</p>
-                <p className="text-sm text-gray-400 mt-1">Try adjusting your filters or search terms.</p>
-              </div>
-            )}
+      {loading ? (
+        <div className="flex justify-center items-center py-20">
+          <div className="animate-spin rounded-full h-10 w-10 border-t-4 border-primary-600 border-solid" />
+        </div>
+      ) : (
+        <div className="animate-in fade-in duration-300">
+          {!filteredMembers.length && !notInTreeLoading && activeTab !== 'privacy' && (
+            <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-500 shadow-sm">
+              <p>No family members found.</p>
+            </div>
+          )}
 
-            {activeTab === 'birth' && activeBirthMembers.length > 0 && (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-1">Birth Family Directory</h2>
-                <p className="text-sm text-gray-500 mb-6">Manage members of your primary birth family.</p>
-                <div className="flex flex-col gap-3">
-                  {paginateData(activeBirthMembers).map((member) => (
+          {activeTab === 'birth' && (
+            <section className="rounded-xl border border-slate-200 bg-white p-4 sm:p-5 shadow-sm">
+              <div className="mb-6">
+                <h2 className="text-xl font-bold text-slate-900">Birth Family</h2>
+                <p className="text-sm text-slate-500 mt-1">Manage members of your primary birth family.</p>
+              </div>
+
+              {activeBirthMembers.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {activeBirthMembers.map((member) => (
                     <SingleMemberCard key={`birth-${member.id}`} member={member} allowManageActions />
                   ))}
                 </div>
-                <PaginationControls totalItems={activeBirthMembers.length} />
+              ) : (
+                <div className="text-center py-10 bg-slate-50 rounded-lg border border-dashed border-slate-300">
+                  <p className="text-sm text-slate-500">No birth family members found.</p>
+                </div>
+              )}
+            </section>
+          )}
+
+          {activeTab === 'associated' && (
+            <section className="rounded-xl border border-sky-200 bg-sky-50 p-4 sm:p-5 shadow-sm">
+              <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-bold text-sky-900">Associated Families</h2>
+                  <p className="text-sm text-sky-700 mt-1">Members linked through marriage or other primary associations.</p>
+                </div>
               </div>
-            )}
 
-            {activeTab === 'associated' && (
-              <div className="space-y-6">
-                {associatedFamiliesOptions.length > 0 ? (
-                  <>
-                    <div className="flex flex-wrap items-center gap-2 bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-                      <span className="text-sm font-semibold text-gray-500 mr-2">Filter Family:</span>
-                      {paginateFamilies(associatedFamiliesOptions).map((family) => (
-                        <button
-                          type="button"
-                          key={`associated-family-${family.familyCode}`}
-                          onClick={() => setSelectedAssociatedFamilyCode(family.familyCode)}
-                          className={`rounded-lg px-4 py-1.5 text-sm font-semibold transition-all ${selectedAssociatedFamilyCode === family.familyCode
-                              ? 'bg-sky-500 text-white shadow-sm'
-                              : 'bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-100'
-                            }`}
-                        >
-                          {(family.familyName || 'Family')} ({family.familyCode})
-                        </button>
-                      ))}
-                      <FamilyFilterPagination totalFamilies={associatedFamiliesOptions.length} />
-                    </div>
-
-                    {selectedAssociatedFamilyMembers.length > 0 ? (
-                      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                        <div className="flex flex-col gap-3">
-                          {paginateData(selectedAssociatedFamilyMembers).map((member) => (
-                            <SingleMemberCard key={`associated-${member.id}`} member={member} showFamilyCode />
-                          ))}
-                        </div>
-                        <PaginationControls totalItems={selectedAssociatedFamilyMembers.length} />
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-center py-10 bg-white rounded-xl shadow-sm border border-gray-200">
-                        <p className="text-gray-500 text-sm font-medium">No members found in this selection.</p>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="flex items-center justify-center py-10 bg-white rounded-xl shadow-sm border border-gray-200">
-                    <p className="text-gray-500 text-sm font-medium">No associated families linked.</p>
+              {associatedFamiliesOptions.length > 0 ? (
+                <>
+                  <div className="mb-6 flex flex-wrap gap-2 bg-white/50 p-2 rounded-lg inline-flex border border-sky-100 overflow-x-auto hide-scrollbar shadow-sm">
+                    {associatedFamiliesOptions.map((family) => (
+                      <button
+                        type="button"
+                        key={`associated-family-${family.familyCode}`}
+                        onClick={() => setSelectedAssociatedFamilyCode(family.familyCode)}
+                        className={`rounded-md px-4 py-2 text-sm font-semibold transition whitespace-nowrap ${
+                          selectedAssociatedFamilyCode === family.familyCode
+                            ? 'bg-sky-600 text-white shadow-md'
+                            : 'bg-white text-sky-700 hover:bg-sky-100'
+                        }`}
+                      >
+                        {(family.familyName || 'Family')} ({family.familyCode})
+                      </button>
+                    ))}
                   </div>
-                )}
-              </div>
-            )}
 
-            {activeTab === 'linked' && (
-              <div className="space-y-6">
-                {linkedFamiliesOptions.length > 0 ? (
-                  <>
-                    <div className="flex flex-wrap items-center gap-2 bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-                      <span className="text-sm font-semibold text-gray-500 mr-2">Filter Family:</span>
-                      {paginateFamilies(linkedFamiliesOptions).map((family) => (
-                        <button
-                          type="button"
-                          key={`linked-family-${family.familyCode}`}
-                          onClick={() => setSelectedLinkedFamilyCode(family.familyCode)}
-                          className={`rounded-lg px-4 py-1.5 text-sm font-semibold transition-all ${selectedLinkedFamilyCode === family.familyCode
-                              ? 'bg-emerald-500 text-white shadow-sm'
-                              : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-100'
-                            }`}
-                        >
-                          {(family.familyName || 'Family')} ({family.familyCode})
-                        </button>
+                  {selectedAssociatedFamilyMembers.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                      {selectedAssociatedFamilyMembers.map((member) => (
+                        <SingleMemberCard
+                          key={`associated-${member.id}`}
+                          member={member}
+                          showFamilyCode
+                        />
                       ))}
-                      <FamilyFilterPagination totalFamilies={linkedFamiliesOptions.length} />
                     </div>
+                  ) : (
+                    <div className="text-center py-10 bg-white rounded-lg border border-dashed border-sky-200">
+                      <p className="text-sm text-sky-600">No members found for this associated family matching your search.</p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-center py-10 bg-white rounded-lg border border-dashed border-sky-200">
+                  <p className="text-sm text-sky-600">No associated families linked to your profile yet.</p>
+                </div>
+              )}
+            </section>
+          )}
 
-                    {selectedLinkedFamilyMembers.length > 0 ? (
-                      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                        <div className="flex flex-col gap-3">
-                          {paginateData(selectedLinkedFamilyMembers).map((member) => (
-                            <SingleMemberCard key={`linked-${member.id}`} member={member} showFamilyCode />
-                          ))}
-                        </div>
-                        <PaginationControls totalItems={selectedLinkedFamilyMembers.length} />
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center py-10 bg-white rounded-xl shadow-sm border border-gray-200">
-                        <p className="text-gray-500 text-sm font-medium">No members found in this selection.</p>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="flex items-center justify-center py-10 bg-white rounded-xl shadow-sm border border-gray-200">
-                    <p className="text-gray-500 text-sm font-medium">No linked families discovered yet.</p>
-                  </div>
-                )}
+          {activeTab === 'linked' && (
+            <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 sm:p-5 shadow-sm">
+              <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-bold text-emerald-900">Linked Families</h2>
+                  <p className="text-sm text-emerald-700 mt-1">Families connected through member profile linking.</p>
+                </div>
               </div>
-            )}
 
-            {activeTab === 'pending' && filteredMembersNotInTree.length > 0 && (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-1">Pending Connections</h2>
-                <p className="text-sm text-gray-500 mb-6">These members have registered but need tree placement.</p>
-                <div className="flex flex-col gap-3">
-                  {paginateData(filteredMembersNotInTree).map((member) => (
-                    <SingleMemberCard key={`not-in-tree-${member.id}`} member={member} allowDelete />
+              {linkedFamiliesOptions.length > 0 ? (
+                <>
+                  <div className="mb-6 flex flex-wrap gap-2 bg-white/50 p-2 rounded-lg inline-flex border border-emerald-100 overflow-x-auto hide-scrollbar shadow-sm">
+                    {linkedFamiliesOptions.map((family) => (
+                      <button
+                        type="button"
+                        key={`linked-family-${family.familyCode}`}
+                        onClick={() => setSelectedLinkedFamilyCode(family.familyCode)}
+                        className={`rounded-md px-4 py-2 text-sm font-semibold transition whitespace-nowrap ${
+                          selectedLinkedFamilyCode === family.familyCode
+                            ? 'bg-emerald-600 text-white shadow-md'
+                            : 'bg-white text-emerald-700 hover:bg-emerald-100'
+                        }`}
+                      >
+                        {(family.familyName || 'Family')} ({family.familyCode})
+                      </button>
+                    ))}
+                  </div>
+
+                  {selectedLinkedFamilyMembers.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                      {selectedLinkedFamilyMembers.map((member) => (
+                        <SingleMemberCard
+                          key={`linked-${member.id}`}
+                          member={member}
+                          showFamilyCode
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-10 bg-white rounded-lg border border-dashed border-emerald-200">
+                      <p className="text-sm text-emerald-600">No members found for this linked family matching your search.</p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-center py-10 bg-white rounded-lg border border-dashed border-emerald-200">
+                  <p className="text-sm text-emerald-600">No linked families discovered yet.</p>
+                </div>
+              )}
+            </section>
+          )}
+
+          {activeTab === 'pending' && (
+            <section className="rounded-xl border border-amber-200 bg-amber-50 p-4 sm:p-5 shadow-sm">
+              <div className="mb-6">
+                <h2 className="text-xl font-bold text-amber-900">Pending Placement</h2>
+                <p className="text-sm text-amber-800 mt-1">
+                  Members that have joined your family through the invite link but have not been placed on the tree canvas by an Admin.
+                </p>
+              </div>
+
+              {notInTreeLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <FiLoader className="animate-spin text-amber-600" size={30} />
+                </div>
+              ) : filteredMembersNotInTree.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {filteredMembersNotInTree.map((member) => (
+                    <SingleMemberCard
+                      key={`not-in-tree-${member.id}`}
+                      member={member}
+                      allowDelete
+                    />
                   ))}
                 </div>
-                <PaginationControls totalItems={filteredMembersNotInTree.length} />
-              </div>
-            )}
+              ) : (
+                <div className="text-center py-10 bg-white rounded-lg border border-dashed border-amber-200">
+                  <p className="text-sm text-amber-700">All registered members have been successfully placed on your tree!</p>
+                </div>
+              )}
+            </section>
+          )}
 
-            {activeTab === 'blocked' && blockedMembers.length > 0 && (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <h2 className="text-xl font-bold text-red-600 mb-1">Blocked Profiles</h2>
-                <p className="text-sm text-gray-500 mb-6">Manage restricted users.</p>
-                <div className="flex flex-col gap-3">
-                  {paginateData(blockedMembers).map((member) => (
+          {activeTab === 'blocked' && (
+            <section className="rounded-xl border border-red-200 bg-red-50 p-4 sm:p-5 shadow-sm">
+              <div className="mb-6">
+                <h2 className="text-xl font-bold text-red-900">Blocked Profiles</h2>
+                <p className="text-sm text-red-800 mt-1">Users you have restricted from viewing your updates or interacting with you.</p>
+              </div>
+
+              {blockedMembers.length > 0 ? (
+                <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {blockedMembers.map((member) => (
                     <div
                       key={`blocked-member-${member.id}`}
-                      className="flex items-center gap-4 rounded-xl border border-red-100 bg-red-50/30 p-4 shadow-sm"
+                      className="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-xl border border-red-200 bg-white p-4 shadow-sm"
                     >
-                      <img
-                        src={member.profilePic || 'https://placehold.co/48x48/e2e8f0/64748b?text=👤'}
-                        alt={member.name}
-                        className="h-12 w-12 flex-shrink-0 rounded-full object-cover ring-2 ring-red-100"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="truncate text-sm font-bold text-gray-900">{member.name}</span>
-                          <BlockedBadge />
+                      <div className="flex min-w-0 items-center justify-center sm:justify-start gap-4 w-full sm:w-auto text-center sm:text-left">
+                        <img
+                          src={member.profilePic || 'https://placehold.co/48x48/e2e8f0/64748b?text=👤'}
+                          alt={member.name}
+                          className="h-14 w-14 flex-shrink-0 rounded-full object-cover ring-4 ring-red-50"
+                        />
+
+                        <div className="min-w-0">
+                          <div className="flex flex-col sm:flex-row items-center sm:gap-2">
+                            <span className="truncate text-base font-bold text-gray-900">{member.name}</span>
+                            <div className="mt-1 sm:mt-0"><BlockedBadge /></div>
+                          </div>
+                          <div className="mt-2 flex flex-wrap justify-center sm:justify-start gap-2">
+                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${relationColors[member.role] || 'bg-gray-100 text-gray-800'}`}>
+                              {member.role}
+                            </span>
+                            {member.sourceFamilyCode && (
+                              <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
+                                {member.sourceFamilyCode}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <span className={`mt-1 inline-flex items-center rounded-md px-2 py-0.5 text-[10px] uppercase font-bold tracking-wider ${relationColors[member.role] || 'bg-gray-100 text-gray-800'}`}>
-                          {member.role}
-                        </span>
                       </div>
+
                       {currentUserIsFamilyAdmin && (
-                        <div className="flex-shrink-0 scale-90">
+                        <div className="flex flex-shrink-0 items-center w-full sm:w-auto justify-center">
                           <BlockButton
                             userId={member.userId}
                             isBlockedByMe
@@ -1319,18 +1252,21 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                     </div>
                   ))}
                 </div>
-                <PaginationControls totalItems={blockedMembers.length} />
-              </div>
-            )}
+              ) : (
+                <div className="text-center py-10 bg-white rounded-lg border border-dashed border-red-200">
+                  <p className="text-sm text-red-600">You haven't blocked any family members.</p>
+                </div>
+              )}
+            </section>
+          )}
 
-            {activeTab === 'privacy' && (
-              <div className="max-w-4xl mx-auto">
-                <PrivacyControls />
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+          {activeTab === 'privacy' && (
+            <div className="animate-in slide-in-from-bottom-4 duration-300">
+              <PrivacyControls />
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

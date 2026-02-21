@@ -216,12 +216,10 @@ const PostPage = () => {
     try {
       let url =
         activeFeed === "family"
-          ? `${import.meta.env.VITE_API_BASE_URL}/post/by-options?familyCode=${
-              userInfo.familyCode
-            }&privacy=private`
-          : `${
-              import.meta.env.VITE_API_BASE_URL
-            }/post/by-options?privacy=public`;
+          ? `${import.meta.env.VITE_API_BASE_URL}/post/by-options?familyCode=${userInfo.familyCode
+          }&privacy=private`
+          : `${import.meta.env.VITE_API_BASE_URL
+          }/post/by-options?privacy=public`;
 
       if (captionSearch.trim())
         url += `&caption=${encodeURIComponent(captionSearch.trim())}`;
@@ -230,19 +228,19 @@ const PostPage = () => {
       const data = await res.json();
       const nextPosts = Array.isArray(data)
         ? data.map((p) => ({
-            id: p.id,
-            author: p.user?.name || "Unknown",
-            authorId: p.user?.userId || p.createdBy || null,
-            avatar: p.user?.profile || "/assets/user.png",
-            time: new Date(p.createdAt).toLocaleString(),
-            caption: p.caption,
-            fullImageUrl: p.postImage,
-            postVideo: p.postVideo,
-            likes: p.likeCount,
-            comments: p.commentCount,
-            liked: p.isLiked,
-            privacy: p.privacy,
-          }))
+          id: p.id,
+          author: p.user?.name || "Unknown",
+          authorId: p.user?.userId || p.createdBy || null,
+          avatar: p.user?.profile || "/assets/user.png",
+          time: new Date(p.createdAt).toLocaleString(),
+          caption: p.caption,
+          fullImageUrl: p.postImage,
+          postVideo: p.postVideo,
+          likes: p.likeCount,
+          comments: p.commentCount,
+          liked: p.isLiked,
+          privacy: p.privacy,
+        }))
         : [];
 
       setPosts(
@@ -267,7 +265,7 @@ const PostPage = () => {
     if (videoObserverRef.current) {
       try {
         videoObserverRef.current.disconnect();
-      } catch {}
+      } catch { }
     }
 
     const observer = new IntersectionObserver(
@@ -280,7 +278,7 @@ const PostPage = () => {
           if (manualPausedIdsRef.current.has(String(postId))) {
             try {
               video.pause();
-            } catch {}
+            } catch { }
             return;
           }
 
@@ -291,7 +289,7 @@ const PostPage = () => {
               if (!v || id === String(postId)) return;
               try {
                 v.pause();
-              } catch {}
+              } catch { }
             });
 
             setManualPausedIds((prev) => {
@@ -306,15 +304,15 @@ const PostPage = () => {
 
             try {
               const p = video.play();
-              if (p && typeof p.catch === 'function') p.catch(() => {});
-            } catch {}
+              if (p && typeof p.catch === 'function') p.catch(() => { });
+            } catch { }
           } else {
             try {
               video.pause();
               if (!entry.isIntersecting || entry.intersectionRatio === 0) {
                 video.currentTime = 0;
               }
-            } catch {}
+            } catch { }
           }
         });
       },
@@ -333,7 +331,7 @@ const PostPage = () => {
     return () => {
       try {
         observer.disconnect();
-      } catch {}
+      } catch { }
     };
   }, [posts]);
 
@@ -346,7 +344,7 @@ const PostPage = () => {
       if (!v) return;
       try {
         v.muted = Boolean(isMuted);
-      } catch {}
+      } catch { }
     });
   }, [isMuted]);
 
@@ -388,7 +386,7 @@ const PostPage = () => {
           return next;
         });
         const p = video.play();
-        if (p && typeof p.catch === 'function') p.catch(() => {});
+        if (p && typeof p.catch === 'function') p.catch(() => { });
       } else {
         video.pause();
         setManualPausedIds((prev) => {
@@ -398,7 +396,7 @@ const PostPage = () => {
           return next;
         });
       }
-    } catch {}
+    } catch { }
 
     flashCenterIcon(postId);
   };
@@ -1010,7 +1008,7 @@ const PostPage = () => {
 
           <button
             onClick={() => setIsCreateModalOpen(true)}
-             className="
+            className="
               flex-1 min-w-0
               bg-gray-100 text-gray-600 rounded-full
               py-2 px-3 sm:px-4
@@ -1020,8 +1018,8 @@ const PostPage = () => {
               transition-all
             "
           >
-           
-             <span className="block sm:hidden">
+
+            <span className="block sm:hidden">
               Share something…
             </span>
             <span className="hidden sm:block">
@@ -1037,11 +1035,10 @@ const PostPage = () => {
                 if (!userInfo?.familyCode) return;
                 setFeedMenuOpen((prev) => !prev);
               }}
-              className={`bg-unset flex items-center gap-1.5 px-3 py-2 rounded-full text-xs sm:text-sm font-medium border transition-all ${
-                activeFeed === "family"
+              className={`bg-unset flex items-center gap-1.5 px-3 py-2 rounded-full text-xs sm:text-sm font-medium border transition-all ${activeFeed === "family"
                   ? "bg-blue-600 text-white border-blue-600"
                   : "bg-orange-500 text-white border-orange-500"
-              } ${userInfo?.familyCode ? "cursor-pointer" : "cursor-default"}`}
+                } ${userInfo?.familyCode ? "cursor-pointer" : "cursor-default"}`}
               title="Choose feed"
             >
               {activeFeed === "family" ? (
@@ -1065,11 +1062,10 @@ const PostPage = () => {
                     setActiveFeed("public");
                     setFeedMenuOpen(false);
                   }}
-                  className={`bg-unset w-full flex items-center gap-2 px-4 py-2.5 text-sm text-left hover:bg-gray-50 ${
-                    activeFeed === "public"
+                  className={`bg-unset w-full flex items-center gap-2 px-4 py-2.5 text-sm text-left hover:bg-gray-50 ${activeFeed === "public"
                       ? "text-gray-900 font-medium"
                       : "text-gray-700"
-                  }`}
+                    }`}
                 >
                   <MdPublic size={16} />
                   <span>Public</span>
@@ -1079,11 +1075,10 @@ const PostPage = () => {
                     setActiveFeed("family");
                     setFeedMenuOpen(false);
                   }}
-                  className={`bg-unset w-full flex items-center gap-2 px-4 py-2.5 text-sm text-left hover:bg-gray-50 ${
-                    activeFeed === "family"
+                  className={`bg-unset w-full flex items-center gap-2 px-4 py-2.5 text-sm text-left hover:bg-gray-50 ${activeFeed === "family"
                       ? "text-gray-900 font-medium"
                       : "text-gray-700"
-                  }`}
+                    }`}
                 >
                   <MdPeople size={16} />
                   <span>Family</span>
@@ -1140,42 +1135,42 @@ const PostPage = () => {
                     </span>
 
                     {post.authorId &&
-                    Number(post.authorId) !== Number(userInfo?.userId) &&
-                    String(post.privacy || '').toLowerCase() !== 'public' && (
-                      <div className="relative" onPointerDown={(e) => e.stopPropagation()}>
-                        <button
-                          type="button"
-                          aria-label="Post actions"
-                          className="h-8 w-8 grid place-items-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setPostActionMenuPostId((prev) =>
-                              prev === post.id ? null : post.id,
-                            );
-                          }}
-                        >
-                          <FiMoreVertical />
-                        </button>
+                      Number(post.authorId) !== Number(userInfo?.userId) &&
+                      String(post.privacy || '').toLowerCase() !== 'public' && (
+                        <div className="relative" onPointerDown={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            aria-label="Post actions"
+                            className="h-8 w-8 grid place-items-center rounded-full text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPostActionMenuPostId((prev) =>
+                                prev === post.id ? null : post.id,
+                              );
+                            }}
+                          >
+                            <FiMoreVertical />
+                          </button>
 
-                        {postActionMenuPostId === post.id && (
-                          <div className="absolute right-0 mt-2 w-40 rounded-xl border border-gray-200 bg-white shadow-lg z-50 overflow-hidden">
-                            <div className="py-1">
-                              <div className="px-2 py-1">
-                                <BlockButton
-                                  userId={post.authorId}
-                                  isBlockedByMe={blockedUserIds.has(Number(post.authorId))}
-                                  location="membersList"
-                                  userName={post.author}
-                                  onStatusChange={(status) =>
-                                    handleBlockStatusFromFeed(post.authorId, status)
-                                  }
-                                />
+                          {postActionMenuPostId === post.id && (
+                            <div className="absolute right-0 mt-2 w-40 rounded-xl border border-gray-200 bg-white shadow-lg z-50 overflow-hidden">
+                              <div className="py-1">
+                                <div className="px-2 py-1">
+                                  <BlockButton
+                                    userId={post.authorId}
+                                    isBlockedByMe={blockedUserIds.has(Number(post.authorId))}
+                                    location="membersList"
+                                    userName={post.author}
+                                    onStatusChange={(status) =>
+                                      handleBlockStatusFromFeed(post.authorId, status)
+                                    }
+                                  />
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                          )}
+                        </div>
+                      )}
                   </div>
                 </div>
 
@@ -1218,9 +1213,8 @@ const PostPage = () => {
                       aria-label={manualPausedIds.has(String(post.id)) ? "Play video" : "Pause video"}
                     >
                       <span
-                        className={`inline-flex h-16 w-16 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur transition-opacity duration-200 ${
-                          centerIconPostId === String(post.id) ? "opacity-100" : "opacity-0"
-                        }`}
+                        className={`inline-flex h-16 w-16 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur transition-opacity duration-200 ${centerIconPostId === String(post.id) ? "opacity-100" : "opacity-0"
+                          }`}
                       >
                         {manualPausedIds.has(String(post.id)) ? (
                           <FiPlay size={30} />

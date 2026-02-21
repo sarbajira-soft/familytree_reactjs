@@ -21,6 +21,7 @@ import PostViewerModal from "../Components/PostViewerModal";
 import { UserProvider, useUser } from "../Contexts/UserContext";
 import { Phone, Mail } from "lucide-react";
 import ShimmerImageCard from "./ShimmerImageCard";
+import ProfileShimmer from "./ProfileShimmer";
 
 import { authFetch, authFetchResponse } from "../utils/authFetch";
 import { getToken } from "../utils/auth";
@@ -302,8 +303,8 @@ const ProfilePage = () => {
       const list = Array.isArray(json)
         ? json
         : Array.isArray(json?.data)
-        ? json.data
-        : [];
+          ? json.data
+          : [];
 
       return list.map((post) => ({
         id: post.id,
@@ -335,8 +336,8 @@ const ProfilePage = () => {
       const list = Array.isArray(json)
         ? json
         : Array.isArray(json?.data)
-        ? json.data
-        : [];
+          ? json.data
+          : [];
 
       return list.map((gallery) => ({
         id: gallery.id,
@@ -470,10 +471,10 @@ const ProfilePage = () => {
         old?.map((post) =>
           post.id === postId
             ? {
-                ...post,
-                isLiked: !currentIsLiked,
-                likes: currentIsLiked ? post.likes - 1 : post.likes + 1,
-              }
+              ...post,
+              isLiked: !currentIsLiked,
+              likes: currentIsLiked ? post.likes - 1 : post.likes + 1,
+            }
             : post
         )
       );
@@ -689,9 +690,7 @@ const ProfilePage = () => {
       <div className="mx-auto px-4 pt-4 pb-24 md:px-6 lg:px-8 space-y-8  font-inter">
         {/* Profile Header Section */}
         {loadingUserProfile ? (
-          <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-10 w-10 border-t-4 border-primary-600 border-solid"></div>
-          </div>
+          <ProfileShimmer />
         ) : (
           user && (
             <div className="bg-gradient-to-r from-primary-600 via-primary-500 to-primary-300 rounded-2xl shadow-xl p-[1px]">
@@ -786,21 +785,18 @@ const ProfilePage = () => {
                                 !token ||
                                 typeof userInfo?.isPrivate !== 'boolean'
                               }
-                              className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-opacity-75 ${
-                                userInfo?.isPrivate ? 'bg-primary-600' : 'bg-gray-300'
-                              } ${
-                                privacyMutation.isPending || !token
+                              className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-opacity-75 ${userInfo?.isPrivate ? 'bg-primary-600' : 'bg-gray-300'
+                                } ${privacyMutation.isPending || !token
                                   ? 'opacity-60 cursor-not-allowed'
                                   : 'cursor-pointer'
-                              }`}
+                                }`}
                               aria-pressed={Boolean(userInfo?.isPrivate)}
                             >
                               <span
-                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                                  userInfo?.isPrivate
+                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${userInfo?.isPrivate
                                     ? 'translate-x-5'
                                     : 'translate-x-1'
-                                }`}
+                                  }`}
                               />
                             </button>
                           </label>
@@ -846,11 +842,10 @@ const ProfilePage = () => {
           <div className="flex flex-1 items-center gap-1 md:gap-2">
             <button
               onClick={() => setShowPosts(true)}
-              className={`flex-1 flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-lg font-semibold text-sm transition-all duration-300 ${
-                showPosts
+              className={`flex-1 flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-lg font-semibold text-sm transition-all duration-300 ${showPosts
                   ? "bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow"
                   : "text-white bg-primary-700 hover:bg-primary-800"
-              }`}
+                }`}
             >
               <FiGrid size={20} />
               <span className="hidden sm:inline">Created Posts</span>
@@ -870,11 +865,10 @@ const ProfilePage = () => {
           <div className="flex flex-1 items-center gap-1 md:gap-2">
             <button
               onClick={() => setShowPosts(false)}
-              className={`flex-1 flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-lg font-semibold text-sm transition-all duration-300 ${
-                !showPosts
+              className={`flex-1 flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-lg font-semibold text-sm transition-all duration-300 ${!showPosts
                   ? "bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow"
                   : "bg-primary-700 text-white hover:bg-primary-800"
-              }`}
+                }`}
             >
               <FiImage size={20} />
               <span className="hidden sm:inline">Created Galleries</span>

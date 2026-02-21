@@ -43,6 +43,8 @@ import html2canvas from "html2canvas";
 
 import LanguageSwitcher from "../Components/LanguageSwitcher";
 
+import LoadingSpinner from "../Components/LoadingSpinner";
+
 import Swal from "sweetalert2";
 
 import { FaPlus, FaSave, FaArrowLeft, FaHome, FaMinus } from "react-icons/fa";
@@ -177,7 +179,7 @@ const FamilyTreePage = () => {
         const errBody = await response.json();
 
         if (errBody?.message) msg = errBody.message;
-      } catch (e) {}
+      } catch (e) { }
 
       await Swal.fire({
         icon: "error",
@@ -240,7 +242,7 @@ const FamilyTreePage = () => {
 
   const [selectedPersonId, setSelectedPersonId] = useState(null);
 
-  const [treeLoading, setTreeLoading] = useState(false);
+  const [treeLoading, setTreeLoading] = useState(true);
 
   const [zoom, setZoom] = useState(1);
 
@@ -608,7 +610,7 @@ const FamilyTreePage = () => {
         const source = params.get("source");
 
         sourceFromQuery = source ? String(source) : null;
-      } catch {}
+      } catch { }
 
       if (!userInfo || !familyCodeToUse) {
         console.log(" Debug - Missing userInfo or familyCodeToUse");
@@ -621,9 +623,8 @@ const FamilyTreePage = () => {
       let data = null;
 
       try {
-        const apiUrl = `${
-          import.meta.env.VITE_API_BASE_URL
-        }/family/tree/${familyCodeToUse}`;
+        const apiUrl = `${import.meta.env.VITE_API_BASE_URL
+          }/family/tree/${familyCodeToUse}`;
 
         console.log(" Debug - Making API call to:", apiUrl);
 
@@ -845,7 +846,7 @@ const FamilyTreePage = () => {
                 return true;
               }
             }
-          } catch (_) {}
+          } catch (_) { }
 
           return false;
         })();
@@ -1087,7 +1088,7 @@ const FamilyTreePage = () => {
       relationshipCodeToRoot = rel?.relationshipCode
         ? String(rel.relationshipCode)
         : "";
-    } catch (_) {}
+    } catch (_) { }
 
     const isSpouseCard =
       typeof relationshipCodeToRoot === "string" &&
@@ -1141,7 +1142,7 @@ const FamilyTreePage = () => {
       items.push({
         label: "Add Spouse",
 
-        action: () => {},
+        action: () => { },
 
         icon: icons["Add Spouse"],
 
@@ -2130,8 +2131,7 @@ const FamilyTreePage = () => {
       // ✅ PRESERVE EXISTING POSITIONS - No recalculation needed!
       try {
         const treeResponse = await authFetch(
-          `${import.meta.env.VITE_API_BASE_URL}/family/tree/${
-            userInfo.familyCode
+          `${import.meta.env.VITE_API_BASE_URL}/family/tree/${userInfo.familyCode
           }`,
 
           {
@@ -2341,15 +2341,7 @@ const FamilyTreePage = () => {
 
       <>
         {showFullScreenLoading ? (
-          <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-slate-950">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-
-              <p className="text-gray-600 dark:text-slate-300">
-                Loading family tree...
-              </p>
-            </div>
-          </div>
+          <LoadingSpinner type="generic" fullScreen={true} />
         ) : accessView ? (
           <div className="min-h-[calc(100vh-6rem)] bg-gray-50 flex items-center justify-center px-4 py-6">
             {accessView}
@@ -2389,15 +2381,7 @@ const FamilyTreePage = () => {
             </div>
           </div>
         ) : !tree ? (
-          <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-slate-950">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-
-              <p className="text-gray-600 dark:text-slate-300">
-                Loading family tree...
-              </p>
-            </div>
-          </div>
+          <LoadingSpinner type="generic" fullScreen={true} />
         ) : (
           <>
             {/* Main container for tree and controls */}
@@ -2770,24 +2754,24 @@ const FamilyTreePage = () => {
                       <div className="flex items-center justify-center lg:justify-start gap-3 xl:gap-6 flex-wrap">
                         {(isLinkedMode ||
                           (code && code !== userInfo.familyCode)) && (
-                          <div className="flex items-center gap-2 pr-3 border-r border-gray-300">
-                            <button
-                              className="inline-flex items-center justify-center w-9 h-9 bg-gray-100 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-200 hover:border-gray-400 active:scale-95 transition-all duration-200 shadow-sm dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700"
-                              onClick={() => navigate(-1)}
-                              title="Back"
-                            >
-                              <FaArrowLeft className="text-sm" />
-                            </button>
+                            <div className="flex items-center gap-2 pr-3 border-r border-gray-300">
+                              <button
+                                className="inline-flex items-center justify-center w-9 h-9 bg-gray-100 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-200 hover:border-gray-400 active:scale-95 transition-all duration-200 shadow-sm dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700"
+                                onClick={() => navigate(-1)}
+                                title="Back"
+                              >
+                                <FaArrowLeft className="text-sm" />
+                              </button>
 
-                            <button
-                              className="inline-flex items-center justify-center w-9 h-9 bg-blue-600 border border-blue-600 text-white rounded-lg hover:bg-blue-700 active:scale-95 transition-all duration-200 shadow-sm"
-                              onClick={() => navigate("/family-tree")}
-                              title="My Birth Family Tree"
-                            >
-                              <FaHome className="text-sm" />
-                            </button>
-                          </div>
-                        )}
+                              <button
+                                className="inline-flex items-center justify-center w-9 h-9 bg-blue-600 border border-blue-600 text-white rounded-lg hover:bg-blue-700 active:scale-95 transition-all duration-200 shadow-sm"
+                                onClick={() => navigate("/family-tree")}
+                                title="My Birth Family Tree"
+                              >
+                                <FaHome className="text-sm" />
+                              </button>
+                            </div>
+                          )}
 
                         <div className="flex items-center gap-6 text-sm">
                           <span className="text-gray-700 dark:text-slate-200">
@@ -2903,9 +2887,8 @@ const FamilyTreePage = () => {
 
               <div
                 ref={containerRef}
-                className={`custom-scrollbar flex-1 w-full h-full min-h-0 min-w-0 overflow-auto touch-pan-x touch-pan-y ${
-                  needsPlacementBanner ? "pt-28" : "pt-14"
-                } sm:pt-0`}
+                className={`custom-scrollbar flex-1 w-full h-full min-h-0 min-w-0 overflow-auto touch-pan-x touch-pan-y ${needsPlacementBanner ? "pt-28" : "pt-14"
+                  } sm:pt-0`}
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
@@ -3063,8 +3046,8 @@ const FamilyTreePage = () => {
               existingMemberIds={
                 tree
                   ? Array.from(tree.people.values())
-                      .map((p) => p.memberId)
-                      .filter(Boolean)
+                    .map((p) => p.memberId)
+                    .filter(Boolean)
                   : []
               }
             />
@@ -3079,21 +3062,21 @@ const FamilyTreePage = () => {
               existingMemberIds={
                 tree
                   ? Array.from(tree.people.values())
-                      .map((p) => p.memberId)
-                      .filter(Boolean)
+                    .map((p) => p.memberId)
+                    .filter(Boolean)
                   : []
               }
               existingCanonicalKeys={
                 tree
                   ? Array.from(tree.people.values())
-                      .filter(
-                        (p) => p?.canonicalFamilyCode && p?.canonicalNodeUid,
-                      )
-                      .map(
-                        (p) =>
-                          `${String(p.canonicalFamilyCode).trim()}|${String(p.canonicalNodeUid).trim()}`,
-                      )
-                      .filter(Boolean)
+                    .filter(
+                      (p) => p?.canonicalFamilyCode && p?.canonicalNodeUid,
+                    )
+                    .map(
+                      (p) =>
+                        `${String(p.canonicalFamilyCode).trim()}|${String(p.canonicalNodeUid).trim()}`,
+                    )
+                    .filter(Boolean)
                   : []
               }
             />

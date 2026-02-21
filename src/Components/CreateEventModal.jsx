@@ -15,6 +15,7 @@ import Swal from "sweetalert2";
 import { useUser } from "../Contexts/UserContext";
 import { getToken } from "../utils/auth";
 import { authFetchResponse } from "../utils/authFetch";
+import { getFamilyPrivacyContentSetting } from "../utils/familyPrivacySettings";
 
 const CreateEventModal = ({
   isOpen,
@@ -57,6 +58,16 @@ const CreateEventModal = ({
 
   const { userInfo } = useUser();
 
+  const getPreferredFamilyCode = () => {
+    const fallbackCode = String(userInfo?.familyCode || "").trim();
+    const setting = getFamilyPrivacyContentSetting({
+      userId: userInfo?.userId,
+      familyCode: fallbackCode,
+      contentType: "events",
+    });
+    return String(setting?.familyCode || fallbackCode).trim();
+  };
+
   const getImageKey = (file) => `${file?.name || ""}-${file?.size || 0}-${file?.lastModified || 0}`;
 
   useEffect(() => {
@@ -89,6 +100,14 @@ const CreateEventModal = ({
       setShowSuccess(false);
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const preferredCode = getPreferredFamilyCode();
+    if (preferredCode) {
+      setFamilyCode(preferredCode);
+    }
+  }, [isOpen, userInfo?.familyCode, userInfo?.userId]);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -292,7 +311,8 @@ const CreateEventModal = ({
       return;
     }
 
-    if (!userInfo?.userId || !userInfo?.familyCode) {
+    const targetFamilyCode = String(familyCode || userInfo?.familyCode || "").trim();
+    if (!userInfo?.userId || !targetFamilyCode) {
       Swal.fire({
         icon: "warning",
         title: "Missing info",
@@ -327,7 +347,7 @@ const CreateEventModal = ({
       if (location && String(location).trim()) {
         formData.append("location", String(location).trim());
       }
-      formData.append("familyCode", userInfo?.familyCode);
+      formData.append("familyCode", targetFamilyCode);
 
       images.forEach((img) => {
         formData.append("eventImages", img);

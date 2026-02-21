@@ -28,6 +28,7 @@ import NoFamilyView from "../Components/NoFamilyView";
 import PendingApprovalView from "../Components/PendingApprovalView";
 import CreateFamilyModal from "../Components/CreateFamilyModal";
 import JoinFamilyModal from "../Components/JoinFamilyModal";
+import EventsShimmer from "./EventsShimmer";
 
 const EventsPage = () => {
   const { userInfo, userLoading } = useUser();
@@ -72,10 +73,10 @@ const EventsPage = () => {
             item.eventImages && item.eventImages.length > 0
               ? item.eventImages
               : item.images && item.images.length > 0
-              ? item.images.map(
+                ? item.images.map(
                   (img) => `${apiBaseUrl}/uploads/event/${img.imageUrl}`
                 )
-              : [],
+                : [],
           attendeesCount: null,
         };
 
@@ -282,21 +283,7 @@ const EventsPage = () => {
   };
 
   if (userLoading) {
-    return (
-      <>
-        <div className="max-w-7xl mx-auto px-4 py-8 md:px-6 lg:px-8">
-          <div className="flex flex-col items-center justify-center py-20">
-            <FiLoader className="text-6xl text-[#1976D2] animate-spin mb-4" />
-            <h2 className="text-2xl font-semibold text-gray-700 mb-2">
-              Loading User Data...
-            </h2>
-            <p className="text-gray-500">
-              Please wait while we fetch your information.
-            </p>
-          </div>
-        </div>
-      </>
-    );
+    return <EventsShimmer />;
   }
 
   const accessView = !userInfo?.familyCode ? (
@@ -329,7 +316,7 @@ const EventsPage = () => {
                     <FiCalendar size={22} className="text-white" />
                   </div>
                   <h1 className="text-2xl sm:text-4xl font-extrabold text-[#1976D2]">
-                     Events
+                    Events
                   </h1>
                 </div>
 
@@ -366,326 +353,297 @@ const EventsPage = () => {
               </button>
             </div>
 
-          {/* Filter Tabs – Responsive (Mobile vs Desktop) */}
-          <div className="flex justify-center w-full mt-1">
-            {/* Container */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-md p-2 border border-gray-200 dark:border-slate-800 w-full">
-              {/* Desktop View (Old UI) */}
-              <div className="hidden md:flex items-center justify-center gap-4">
-                {/* Upcoming */}
-                <button
-                  onClick={() => setActiveTab("upcoming")}
-                  className={`flex items-center gap-2 py-3 px-6 rounded-xl font-semibold transition-all
-        ${
-          activeTab === "upcoming"
-            ? "bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg scale-105"
-            : "bg-[#1976D2] text-white hover:bg-[#1565C0]"
-        }`}
-                >
-                  <FiCalendar size={18} />
-                  <span>Upcoming Events</span>
-                </button>
+            {/* Filter Tabs – Responsive (Mobile vs Desktop) */}
+            <div className="flex justify-center w-full mt-1">
+              {/* Container */}
+              <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-md p-2 border border-gray-200 dark:border-slate-800 w-full">
+                {/* Desktop View (Old UI) */}
+                <div className="hidden md:flex items-center justify-center gap-4">
+                  {/* Upcoming */}
+                  <button
+                    onClick={() => setActiveTab("upcoming")}
+                    className={`flex items-center gap-2 py-3 px-6 rounded-xl font-semibold transition-all
+        ${activeTab === "upcoming"
+                        ? "bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg scale-105"
+                        : "bg-[#1976D2] text-white hover:bg-[#1565C0]"
+                      }`}
+                  >
+                    <FiCalendar size={18} />
+                    <span>Upcoming Events</span>
+                  </button>
 
-                {/* My Events */}
-                <button
-                  onClick={() => setActiveTab("my-events")}
-                  className={`flex items-center gap-2 py-3 px-6 rounded-xl font-semibold transition-all
-        ${
-          activeTab === "my-events"
-            ? "bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg scale-105"
-            : "bg-[#1976D2] text-white hover:bg-[#1565C0]"
-        }`}
-                >
-                  <FiList size={18} />
-                  <span>My Events</span>
-                </button>
+                  {/* My Events */}
+                  <button
+                    onClick={() => setActiveTab("my-events")}
+                    className={`flex items-center gap-2 py-3 px-6 rounded-xl font-semibold transition-all
+        ${activeTab === "my-events"
+                        ? "bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg scale-105"
+                        : "bg-[#1976D2] text-white hover:bg-[#1565C0]"
+                      }`}
+                  >
+                    <FiList size={18} />
+                    <span>My Events</span>
+                  </button>
 
-                {/* All Events */}
-                <button
-                  onClick={() => setActiveTab("all")}
-                  className={`flex items-center gap-2 py-3 px-6 rounded-xl font-semibold transition-all
-        ${
-          activeTab === "all"
-            ? "bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg scale-105"
-            : "bg-[#1976D2] text-white hover:bg-[#1565C0]"
-        }`}
-                >
-                  <FiGlobe size={18} />
-                  <span>All Events</span>
-                </button>
-              </div>
+                  {/* All Events */}
+                  <button
+                    onClick={() => setActiveTab("all")}
+                    className={`flex items-center gap-2 py-3 px-6 rounded-xl font-semibold transition-all
+        ${activeTab === "all"
+                        ? "bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg scale-105"
+                        : "bg-[#1976D2] text-white hover:bg-[#1565C0]"
+                      }`}
+                  >
+                    <FiGlobe size={18} />
+                    <span>All Events</span>
+                  </button>
+                </div>
 
-              {/* Mobile View (Compact UI) */}
-              <div className="flex md:hidden items-center gap-2">
-                {/* Upcoming */}
-                <button
-                  onClick={() => setActiveTab("upcoming")}
-                  className={`flex-1 inline-flex items-center justify-center gap-1 py-1.5 px-1.5 text-[10px] rounded-full font-semibold transition-all
-        ${
-          activeTab === "upcoming"
-            ? "bg-orange-500 text-white shadow-md"
-            : "bg-white text-[#1976D2] border border-[#1976D2]/30"
-        }`}
-                >
-                  <FiCalendar size={14} />
-                  <span className="whitespace-nowrap">Upcoming</span>
-                </button>
+                {/* Mobile View (Compact UI) */}
+                <div className="flex md:hidden items-center gap-2">
+                  {/* Upcoming */}
+                  <button
+                    onClick={() => setActiveTab("upcoming")}
+                    className={`flex-1 inline-flex items-center justify-center gap-1 py-1.5 px-1.5 text-[10px] rounded-full font-semibold transition-all
+        ${activeTab === "upcoming"
+                        ? "bg-orange-500 text-white shadow-md"
+                        : "bg-white text-[#1976D2] border border-[#1976D2]/30"
+                      }`}
+                  >
+                    <FiCalendar size={14} />
+                    <span className="whitespace-nowrap">Upcoming</span>
+                  </button>
 
-                {/* My Events */}
-                <button
-                  onClick={() => setActiveTab("my-events")}
-                  className={`flex-1 inline-flex items-center justify-center gap-1 py-1.5 px-1.5 text-[10px] rounded-full font-semibold transition-all
-        ${
-          activeTab === "my-events"
-            ? "bg-orange-500 text-white shadow-md"
-            : "bg-white text-[#1976D2] border border-[#1976D2]/30"
-        }`}
-                >
-                  <FiList size={14} />
-                  <span className="whitespace-nowrap">My Events</span>
-                </button>
+                  {/* My Events */}
+                  <button
+                    onClick={() => setActiveTab("my-events")}
+                    className={`flex-1 inline-flex items-center justify-center gap-1 py-1.5 px-1.5 text-[10px] rounded-full font-semibold transition-all
+        ${activeTab === "my-events"
+                        ? "bg-orange-500 text-white shadow-md"
+                        : "bg-white text-[#1976D2] border border-[#1976D2]/30"
+                      }`}
+                  >
+                    <FiList size={14} />
+                    <span className="whitespace-nowrap">My Events</span>
+                  </button>
 
-                {/* All */}
-                <button
-                  onClick={() => setActiveTab("all")}
-                  className={`flex-1 inline-flex items-center justify-center gap-1 py-1.5 px-1.5 text-[10px] rounded-full font-semibold transition-all
-        ${
-          activeTab === "all"
-            ? "bg-orange-500 text-white shadow-md"
-            : "bg-white text-[#1976D2] border border-[#1976D2]/30"
-        }`}
-                >
-                  <FiGlobe size={14} />
-                  <span className="whitespace-nowrap">All</span>
-                </button>
+                  {/* All */}
+                  <button
+                    onClick={() => setActiveTab("all")}
+                    className={`flex-1 inline-flex items-center justify-center gap-1 py-1.5 px-1.5 text-[10px] rounded-full font-semibold transition-all
+        ${activeTab === "all"
+                        ? "bg-orange-500 text-white shadow-md"
+                        : "bg-white text-[#1976D2] border border-[#1976D2]/30"
+                      }`}
+                  >
+                    <FiGlobe size={14} />
+                    <span className="whitespace-nowrap">All</span>
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Events Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {eventsLoading ? (
-              Array.from({ length: 4 }).map((_, idx) => (
-                <div
-                  key={idx}
-                  className="bg-white dark:bg-slate-900 rounded-2xl shadow-lg border border-gray-100 dark:border-slate-800 overflow-hidden animate-pulse"
-                >
-                  <div className="h-40 bg-gray-200 dark:bg-slate-800" />
-                  <div className="p-3 space-y-3">
-                    <div className="h-4 bg-gray-200 dark:bg-slate-800 rounded w-3/4" />
-                    <div className="h-3 bg-gray-100 dark:bg-slate-800 rounded w-full" />
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 bg-gray-200 dark:bg-slate-800 rounded flex-shrink-0" />
-                        <div className="h-3 bg-gray-200 dark:bg-slate-800 rounded w-1/2" />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 bg-gray-200 dark:bg-slate-800 rounded flex-shrink-0" />
-                        <div className="h-3 bg-gray-200 dark:bg-slate-800 rounded w-2/3" />
-                      </div>
-                    </div>
-                    <div className="h-3 bg-gray-100 dark:bg-slate-800 rounded w-full" />
-                  </div>
+            {/* Events Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {eventsLoading ? (
+                <div className="col-span-full">
+                  <EventsShimmer />
                 </div>
-              ))
-            ) : displayedEvents.length > 0 ? (
-              displayedEvents.map((event) => {
-                const eventStyle = getEventTypeStyle(event.eventType);
-                const EventIcon = eventStyle.icon;
+              ) : displayedEvents.length > 0 ? (
+                displayedEvents.map((event) => {
+                  const eventStyle = getEventTypeStyle(event.eventType);
+                  const EventIcon = eventStyle.icon;
 
-                return (
-                  <div
-                    key={event.id}
-                    className={`group bg-white dark:bg-slate-900 rounded-2xl shadow-lg transition-all duration-300 border h-full flex flex-col ${
-                      eventStyle.borderColor
-                    } dark:border-slate-800 overflow-hidden ${
-                      event.eventType === "custom"
-                        ? "cursor-pointer hover:shadow-xl transform hover:scale-105"
-                        : "cursor-default"
-                    }`}
-                    onClick={
-                      event.eventType === "custom"
-                        ? () => handleViewEvent(event)
-                        : undefined
-                    }
-                  >
-                    {/* Event Image */}
-                    <div className="relative h-40 overflow-hidden">
-                      {event.eventImages && event.eventImages.length > 0 ? (
-                        <img
-                          src={event.eventImages[0]}
-                          alt={event.title}
-                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                          onError={(e) => {
-                            e.target.onerror = null;
-                            e.target.src =
-                              "https://placehold.co/800x450/e0f2fe/0369a1?text=Event+Image";
-                          }}
-                        />
-                      ) : event.profileImage ? (
-                        <img
-                          src={event.profileImage}
-                          alt={event.title}
-                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                          onError={(e) => {
-                            e.target.onerror = null;
-                            e.target.src =
-                              "https://placehold.co/800x450/e0f2fe/0369a1?text=Event+Image";
-                          }}
-                        />
-                      ) : (
-                        <div
-                          className={`w-full h-full ${eventStyle.bgColor} flex items-center justify-center`}
-                        >
-                          <EventIcon size={40} className="text-white" />
-                        </div>
-                      )}
-
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-
-                      {event.eventImages && event.eventImages.length > 1 && (
-                        <div className="absolute top-3 right-3 bg-black/80 text-white px-2 py-1 rounded-full text-xs font-medium backdrop-blur-sm">
-                          +{event.eventImages.length - 1} photos
-                        </div>
-                      )}
-
-                      <div
-                        className={`absolute top-3 left-3 ${eventStyle.bgColor} text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1`}
-                      >
-                        <EventIcon size={12} />
-                        {eventStyle.label}
-                      </div>
-
-                      {event.eventType === "birthday" && event.age && (
-                        <div className="absolute bottom-3 right-3 bg-white/90 text-pink-600 px-2 py-1 rounded-full text-xs font-bold dark:bg-slate-900/90 dark:text-pink-200">
-                          {event.age} years
-                        </div>
-                      )}
-                      {event.eventType === "anniversary" &&
-                        event.yearsOfMarriage && (
-                          <div className="absolute bottom-3 right-3 bg-white/90 text-red-600 px-2 py-1 rounded-full text-xs font-bold dark:bg-slate-900/90 dark:text-red-200">
-                            {event.yearsOfMarriage} years
+                  return (
+                    <div
+                      key={event.id}
+                      className={`group bg-white dark:bg-slate-900 rounded-2xl shadow-lg transition-all duration-300 border h-full flex flex-col ${eventStyle.borderColor
+                        } dark:border-slate-800 overflow-hidden ${event.eventType === "custom"
+                          ? "cursor-pointer hover:shadow-xl transform hover:scale-105"
+                          : "cursor-default"
+                        }`}
+                      onClick={
+                        event.eventType === "custom"
+                          ? () => handleViewEvent(event)
+                          : undefined
+                      }
+                    >
+                      {/* Event Image */}
+                      <div className="relative h-40 overflow-hidden">
+                        {event.eventImages && event.eventImages.length > 0 ? (
+                          <img
+                            src={event.eventImages[0]}
+                            alt={event.title}
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src =
+                                "https://placehold.co/800x450/e0f2fe/0369a1?text=Event+Image";
+                            }}
+                          />
+                        ) : event.profileImage ? (
+                          <img
+                            src={event.profileImage}
+                            alt={event.title}
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src =
+                                "https://placehold.co/800x450/e0f2fe/0369a1?text=Event+Image";
+                            }}
+                          />
+                        ) : (
+                          <div
+                            className={`w-full h-full ${eventStyle.bgColor} flex items-center justify-center`}
+                          >
+                            <EventIcon size={40} className="text-white" />
                           </div>
                         )}
-                    </div>
 
-                    {/* Event Content */}
-                    <div className="p-3 flex-1 flex flex-col">
-                      <div className="space-y-2">
-                        <h3
-                          className={`text-base font-bold text-gray-900 dark:text-slate-100 line-clamp-2 group-hover:${eventStyle.textColor} transition-colors duration-300`}
-                        >
-                          {event.title}
-                        </h3>
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
 
-                        {event.message && (
-                          <p className="text-xs text-gray-600 dark:text-slate-300 italic bg-gray-50 dark:bg-slate-800 p-2 rounded-lg line-clamp-2">
-                            "{event.message}"
-                          </p>
+                        {event.eventImages && event.eventImages.length > 1 && (
+                          <div className="absolute top-3 right-3 bg-black/80 text-white px-2 py-1 rounded-full text-xs font-medium backdrop-blur-sm">
+                            +{event.eventImages.length - 1} photos
+                          </div>
                         )}
 
-                        {/* Keep info rows a consistent height so icons/footers align in grid rows */}
-                        <div className="space-y-2 min-h-[64px]">
-                          <div className="flex items-center gap-2 text-gray-700 dark:text-slate-200">
-                            <div
-                              className={`w-6 h-6 ${eventStyle.bgColor} rounded flex items-center justify-center flex-shrink-0`}
-                            >
-                              <FiCalendar size={14} className="text-white" />
+                        <div
+                          className={`absolute top-3 left-3 ${eventStyle.bgColor} text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1`}
+                        >
+                          <EventIcon size={12} />
+                          {eventStyle.label}
+                        </div>
+
+                        {event.eventType === "birthday" && event.age && (
+                          <div className="absolute bottom-3 right-3 bg-white/90 text-pink-600 px-2 py-1 rounded-full text-xs font-bold dark:bg-slate-900/90 dark:text-pink-200">
+                            {event.age} years
+                          </div>
+                        )}
+                        {event.eventType === "anniversary" &&
+                          event.yearsOfMarriage && (
+                            <div className="absolute bottom-3 right-3 bg-white/90 text-red-600 px-2 py-1 rounded-full text-xs font-bold dark:bg-slate-900/90 dark:text-red-200">
+                              {event.yearsOfMarriage} years
                             </div>
-                            <div>
-                              <p className="text-xs text-gray-500 dark:text-slate-400">Date & Time</p>
-                              <p className="text-sm font-semibold">
-                                {event.date} {event.time && `• ${event.time}`}
+                          )}
+                      </div>
+
+                      {/* Event Content */}
+                      <div className="p-3 flex-1 flex flex-col">
+                        <div className="space-y-2">
+                          <h3
+                            className={`text-base font-bold text-gray-900 dark:text-slate-100 line-clamp-2 group-hover:${eventStyle.textColor} transition-colors duration-300`}
+                          >
+                            {event.title}
+                          </h3>
+
+                          {event.message && (
+                            <p className="text-xs text-gray-600 dark:text-slate-300 italic bg-gray-50 dark:bg-slate-800 p-2 rounded-lg line-clamp-2">
+                              "{event.message}"
+                            </p>
+                          )}
+
+                          {/* Keep info rows a consistent height so icons/footers align in grid rows */}
+                          <div className="space-y-2 min-h-[64px]">
+                            <div className="flex items-center gap-2 text-gray-700 dark:text-slate-200">
+                              <div
+                                className={`w-6 h-6 ${eventStyle.bgColor} rounded flex items-center justify-center flex-shrink-0`}
+                              >
+                                <FiCalendar size={14} className="text-white" />
+                              </div>
+                              <div>
+                                <p className="text-xs text-gray-500 dark:text-slate-400">Date & Time</p>
+                                <p className="text-sm font-semibold">
+                                  {event.date} {event.time && `• ${event.time}`}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div
+                              className={`flex items-center gap-2 text-gray-700 dark:text-slate-200 ${event.location ? "" : "opacity-0 pointer-events-none"
+                                }`}
+                              aria-hidden={!event.location}
+                            >
+                              <div
+                                className={`w-6 h-6 ${eventStyle.bgColor} rounded flex items-center justify-center flex-shrink-0`}
+                              >
+                                <FiMapPin size={14} className="text-white" />
+                              </div>
+                              <p className="text-sm font-semibold line-clamp-1">
+                                {event.location || "—"}
                               </p>
                             </div>
                           </div>
 
-                          <div
-                            className={`flex items-center gap-2 text-gray-700 dark:text-slate-200 ${
-                              event.location ? "" : "opacity-0 pointer-events-none"
-                            }`}
-                            aria-hidden={!event.location}
-                          >
-                            <div
-                              className={`w-6 h-6 ${eventStyle.bgColor} rounded flex items-center justify-center flex-shrink-0`}
-                            >
-                              <FiMapPin size={14} className="text-white" />
-                            </div>
-                            <p className="text-sm font-semibold line-clamp-1">
-                              {event.location || "—"}
+                          {event.description && (
+                            <p className="text-gray-600 dark:text-slate-300 text-xs leading-relaxed line-clamp-2">
+                              {event.description}
                             </p>
-                          </div>
-                        </div>
-
-                        {event.description && (
-                          <p className="text-gray-600 dark:text-slate-300 text-xs leading-relaxed line-clamp-2">
-                            {event.description}
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="flex items-center justify-between pt-2 mt-auto border-t border-gray-100 dark:border-slate-800">
-                        <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-slate-300">
-                          {event.attendeesCount && (
-                            <div className="flex items-center gap-2">
-                              <FiUsers size={14} />
-                              <span className="font-medium">
-                                {event.attendeesCount}
-                              </span>
-                            </div>
                           )}
                         </div>
 
-                        <div className="flex items-center gap-2">
-                          {activeTab === "my-events" &&
-                            event.eventType === "custom" && (
-                              <>
-                                <button
-                                  onClick={(e) =>
-                                    handleEditEventFromCard(event, e)
-                                  }
-                                  className="bg-unset p-1.5 text-gray-500 hover:text-[#1976D2] hover:bg-[#1976D2]/10 rounded-lg transition-all duration-200"
-                                  title="Edit Event"
-                                >
-                                  <FiEdit3 size={14} />
-                                </button>
-                                <button
-                                  onClick={(e) =>
-                                    handleDeleteEventFromCard(event, e)
-                                  }
-                                  className="bg-unset p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-all duration-200"
-                                  title="Delete Event"
-                                >
-                                  <FiTrash2 size={14} />
-                                </button>
-                              </>
+                        <div className="flex items-center justify-between pt-2 mt-auto border-t border-gray-100 dark:border-slate-800">
+                          <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-slate-300">
+                            {event.attendeesCount && (
+                              <div className="flex items-center gap-2">
+                                <FiUsers size={14} />
+                                <span className="font-medium">
+                                  {event.attendeesCount}
+                                </span>
+                              </div>
                             )}
+                          </div>
 
-                          {event.eventType === "custom" && (
-                            <div
-                              className={`flex items-center gap-1 ${eventStyle.textColor} font-semibold group-hover:${eventStyle.hoverColor} transition-colors`}
-                            >
-                              <span className="text-xs">View</span>
-                              <FiArrowRight
-                                size={12}
-                                className="transform group-hover:translate-x-1 transition-transform"
-                              />
-                            </div>
-                          )}
+                          <div className="flex items-center gap-2">
+                            {activeTab === "my-events" &&
+                              event.eventType === "custom" && (
+                                <>
+                                  <button
+                                    onClick={(e) =>
+                                      handleEditEventFromCard(event, e)
+                                    }
+                                    className="bg-unset p-1.5 text-gray-500 hover:text-[#1976D2] hover:bg-[#1976D2]/10 rounded-lg transition-all duration-200"
+                                    title="Edit Event"
+                                  >
+                                    <FiEdit3 size={14} />
+                                  </button>
+                                  <button
+                                    onClick={(e) =>
+                                      handleDeleteEventFromCard(event, e)
+                                    }
+                                    className="bg-unset p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-all duration-200"
+                                    title="Delete Event"
+                                  >
+                                    <FiTrash2 size={14} />
+                                  </button>
+                                </>
+                              )}
+
+                            {event.eventType === "custom" && (
+                              <div
+                                className={`flex items-center gap-1 ${eventStyle.textColor} font-semibold group-hover:${eventStyle.hoverColor} transition-colors`}
+                              >
+                                <span className="text-xs">View</span>
+                                <FiArrowRight
+                                  size={12}
+                                  className="transform group-hover:translate-x-1 transition-transform"
+                                />
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })
-            ) : (
-              <div className="col-span-full text-center py-12 text-gray-500">
-                No events found
-              </div>
-            )}
+                  );
+                })
+              ) : (
+                <div className="col-span-full text-center py-12 text-gray-500">
+                  No events found
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </div>
       )}
 
       {/* Modals */}

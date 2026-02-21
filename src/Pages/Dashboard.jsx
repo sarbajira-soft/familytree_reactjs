@@ -177,7 +177,7 @@ const MiniEventCalendar = ({ events = [] }) => {
                   key={`${wi}-${di}`}
                   className="h-7 flex items-center justify-center text-[11px] text-gray-300"
                 >
-                  
+
                 </div>
               );
             }
@@ -218,9 +218,8 @@ const MiniEventCalendar = ({ events = [] }) => {
               const dateKey = getLocalDateKey(event.eventDate || event.date);
               const timeKey = event.eventTime || event.time || "time";
               const eventKey = `${event.id || title || "event"}_${dateKey}_${timeKey}_${index}`;
-              const dateDisplay = `${event.eventDate || event.date || ""}$$${
-                event.eventTime ? " • " + event.eventTime : ""
-              }`;
+              const dateDisplay = `${event.eventDate || event.date || ""}$$${event.eventTime ? " • " + event.eventTime : ""
+                }`;
               const location = event.location;
               const description = event.eventDescription || event.description;
 
@@ -311,8 +310,8 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
   const { setSelectedGiftEvent } = useGiftEvent();
   const navigate = useNavigate();
   const token = getToken();
-    const [isGalleryModalOpen, setIsGalleryModalOpen] = useState(false);
-    const [selectedAlbum, setSelectedAlbum] = useState(null);
+  const [isGalleryModalOpen, setIsGalleryModalOpen] = useState(false);
+  const [selectedAlbum, setSelectedAlbum] = useState(null);
   // Dashboard data query
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: ["dashboardData", userInfo?.familyCode],
@@ -349,41 +348,41 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
     const list = Array.isArray(rawGallery?.data) ? rawGallery.data : rawGallery;
     return Array.isArray(list) ? list.slice(0, 3) : [];
   }, [dashboardData]);
-  
-   const formatAlbumForModal = (album) => {
-     return {
-       id: album.id,
-       title: album.galleryTitle || album.title || "Album",
-       description: album.galleryDescription || album.description || "",
-       author: album.user?.name || "Unknown",
-       privacy: album.privacy,
-       photosCount: album.galleryAlbums?.length || 0,
-       likes: album.likeCount || 0,
-       isLiked: album.isLiked || false,
-       comments: new Array(album.commentCount || 0).fill(""),
-       coverPhoto:
-         album.coverPhoto ||
-         (album.galleryAlbums &&
-           album.galleryAlbums[0] &&
-           album.galleryAlbums[0].album) ||
-         "https://via.placeholder.com/400x300?text=Photo",
-       photos: (album.galleryAlbums || []).map((photo, index) => ({
-         id: photo.id,
-         url: photo.album,
-         caption: photo.caption || `Photo ${index + 1}`,
-         likes: photo.likeCount || 0,
-         comments: photo.commentCount
-           ? new Array(photo.commentCount).fill("")
-           : [],
-       })),
-     };
-   };
 
-   const openGalleryModal = (album) => {
-     const formattedAlbum = formatAlbumForModal(album);
-     setSelectedAlbum(formattedAlbum);
-     setIsGalleryModalOpen(true);
-   };
+  const formatAlbumForModal = (album) => {
+    return {
+      id: album.id,
+      title: album.galleryTitle || album.title || "Album",
+      description: album.galleryDescription || album.description || "",
+      author: album.user?.name || "Unknown",
+      privacy: album.privacy,
+      photosCount: album.galleryAlbums?.length || 0,
+      likes: album.likeCount || 0,
+      isLiked: album.isLiked || false,
+      comments: new Array(album.commentCount || 0).fill(""),
+      coverPhoto:
+        album.coverPhoto ||
+        (album.galleryAlbums &&
+          album.galleryAlbums[0] &&
+          album.galleryAlbums[0].album) ||
+        "https://via.placeholder.com/400x300?text=Photo",
+      photos: (album.galleryAlbums || []).map((photo, index) => ({
+        id: photo.id,
+        url: photo.album,
+        caption: photo.caption || `Photo ${index + 1}`,
+        likes: photo.likeCount || 0,
+        comments: photo.commentCount
+          ? new Array(photo.commentCount).fill("")
+          : [],
+      })),
+    };
+  };
+
+  const openGalleryModal = (album) => {
+    const formattedAlbum = formatAlbumForModal(album);
+    setSelectedAlbum(formattedAlbum);
+    setIsGalleryModalOpen(true);
+  };
 
   const handleProductSuggestionClick = (product) => {
     if (!product || !product.id) {
@@ -517,18 +516,18 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
 
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-5 py-4 pt-2 space-y-5">
-        {/* Header */}
-       
+      {/* Header */}
 
-         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 pb-8">
-          <div className="lg:col-span-8 space-y-3">
-            {/* Posts Section */}
-            <div className="bg-white rounded-xl shadow-md p-2 sm:p-3 border border-gray-100">
-              <PostPage />
-            </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 pb-8">
+        <div className="lg:col-span-8 space-y-3">
+          {/* Posts Section */}
+          <div className="bg-white rounded-xl shadow-md p-2 sm:p-3 border border-gray-100">
+            <PostPage />
           </div>
+        </div>
 
-         <div className="hidden lg:block space-y-4 lg:col-span-4">
+        <div className="hidden lg:block space-y-4 lg:col-span-4">
 
           <div className="space-y-4 lg:col-span-4">
             <div className="bg-white rounded-xl shadow-sm p-3 border border-gray-100">
@@ -566,8 +565,8 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
                   <p className="text-sm font-semibold text-gray-800">
                     Recent Photos
                   </p>
-                
-  <button
+
+                  <button
                     onClick={() => navigate("/family-gallery")}
                     className="text-xs font-semibold bg-white text-primary-700 hover:text-primary-900"
                   >
@@ -588,9 +587,8 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
                         key={album.id}
                         className="relative w-full pt-[100%] overflow-hidden rounded-lg cursor-pointer group bg-transparent p-0 border-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
                         onClick={() => openGalleryModal(album)}
-                        aria-label={`Open album ${
-                          album.galleryTitle || album.title || "Album"
-                        }`}
+                        aria-label={`Open album ${album.galleryTitle || album.title || "Album"
+                          }`}
                       >
                         <img
                           src={cover}
@@ -644,9 +642,8 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
                         key={eventKey}
                         className="group relative rounded-xl overflow-hidden bg-white shadow-sm border border-gray-100 hover:shadow-md hover:-translate-y-0.5 transition-all duration-300"
                         style={{
-                          animation: `fadeInUp 0.5s ease-out ${
-                            index * 0.05
-                          }s both`,
+                          animation: `fadeInUp 0.5s ease-out ${index * 0.05
+                            }s both`,
                         }}
                       >
                         <div
@@ -863,99 +860,99 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
               </button>
             </div>
           </div>
-         </div>
         </div>
+      </div>
 
-        {/* Modals */}
-        {isScheduleOptionsOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-            <div className="bg-white rounded-xl shadow-lg w-full max-w-sm p-5">
-              <h2 className="text-lg font-semibold text-gray-900">Schedule Event</h2>
-              <p className="mt-1 text-sm text-gray-600">
-                Choose how you want to manage your events.
-              </p>
-              <div className="mt-4 space-y-3">
-                <button
-                  onClick={() => {
-                    setIsScheduleOptionsOpen(false);
-                    setIsCreateEventModalOpen(true);
-                  }}
-                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-primary-700 text-white text-sm font-semibold hover:bg-primary-800 transition-colors"
-                >
-                  <span>Create new event</span>
-                </button>
-                <button
-                  onClick={() => {
-                    setIsScheduleOptionsOpen(false);
-                    setIsEventCalendarModalOpen(true);
-                  }}
-                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-primary-700 text-white text-sm font-semibold hover:bg-primary-800 transition-colors"
-                >
-                  <span>View event calendar</span>
-                </button>
-              </div>
+      {/* Modals */}
+      {isScheduleOptionsOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-lg w-full max-w-sm p-5">
+            <h2 className="text-lg font-semibold text-gray-900">Schedule Event</h2>
+            <p className="mt-1 text-sm text-gray-600">
+              Choose how you want to manage your events.
+            </p>
+            <div className="mt-4 space-y-3">
               <button
-                onClick={() => setIsScheduleOptionsOpen(false)}
-                className="mt-4 bg-white w-full text-center text-sm font-medium text-gray-500 hover:text-gray-700"
+                onClick={() => {
+                  setIsScheduleOptionsOpen(false);
+                  setIsCreateEventModalOpen(true);
+                }}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-primary-700 text-white text-sm font-semibold hover:bg-primary-800 transition-colors"
               >
-                Cancel
+                <span>Create new event</span>
+              </button>
+              <button
+                onClick={() => {
+                  setIsScheduleOptionsOpen(false);
+                  setIsEventCalendarModalOpen(true);
+                }}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-primary-700 text-white text-sm font-semibold hover:bg-primary-800 transition-colors"
+              >
+                <span>View event calendar</span>
               </button>
             </div>
+            <button
+              onClick={() => setIsScheduleOptionsOpen(false)}
+              className="mt-4 bg-white w-full text-center text-sm font-medium text-gray-500 hover:text-gray-700"
+            >
+              Cancel
+            </button>
           </div>
-        )}
+        </div>
+      )}
 
-        {isEventCalendarModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-            <div className="bg-white rounded-xl shadow-lg w-full max-w-2xl max-h-[90vh] flex flex-col">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-                <h2 className="text-base sm:text-lg font-semibold text-gray-900">
-                  Event Calendar
-                </h2>
-                <button
-                  type="button"
-                  onClick={() => setIsEventCalendarModalOpen(false)}
-                  className="bg-unset text-gray-500 hover:text-gray-700 text-xl leading-none px-2"
-                >
-                  &times;
-                </button>
-              </div>
-              <div className="p-3 sm:p-4 overflow-y-auto">
-                <MiniEventCalendar events={upcomingEventsPreview} />
-              </div>
+      {isEventCalendarModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-lg w-full max-w-2xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+              <h2 className="text-base sm:text-lg font-semibold text-gray-900">
+                Event Calendar
+              </h2>
+              <button
+                type="button"
+                onClick={() => setIsEventCalendarModalOpen(false)}
+                className="bg-unset text-gray-500 hover:text-gray-700 text-xl leading-none px-2"
+              >
+                &times;
+              </button>
+            </div>
+            <div className="p-3 sm:p-4 overflow-y-auto">
+              <MiniEventCalendar events={upcomingEventsPreview} />
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        <CreateEventModal
-          isOpen={isCreateEventModalOpen}
-          onClose={() => setIsCreateEventModalOpen(false)}
+      <CreateEventModal
+        isOpen={isCreateEventModalOpen}
+        onClose={() => setIsCreateEventModalOpen(false)}
+      />
+      <CreateAlbumModal
+        isOpen={isCreateAlbumModalOpen}
+        onClose={() => setIsCreateAlbumModalOpen(false)}
+      />
+      <CreatePostModal
+        isOpen={isCreatePostModalOpen}
+        onClose={() => setIsCreatePostModalOpen(false)}
+      />
+      <DashboardGiftProductModal
+        isOpen={isGiftDetailModalOpen}
+        productId={selectedGiftProductId}
+        onClose={() => {
+          setIsGiftDetailModalOpen(false);
+          setSelectedGiftProductId(null);
+        }}
+      />
+      {/* Gallery Viewer Modal */}
+      {selectedAlbum && (
+        <GalleryViewerModal
+          isOpen={isGalleryModalOpen}
+          onClose={() => setIsGalleryModalOpen(false)}
+          album={selectedAlbum}
+          currentUser={userInfo}
+          authToken={token}
         />
-        <CreateAlbumModal
-          isOpen={isCreateAlbumModalOpen}
-          onClose={() => setIsCreateAlbumModalOpen(false)}
-        />
-        <CreatePostModal
-          isOpen={isCreatePostModalOpen}
-          onClose={() => setIsCreatePostModalOpen(false)}
-        />
-        <DashboardGiftProductModal
-          isOpen={isGiftDetailModalOpen}
-          productId={selectedGiftProductId}
-          onClose={() => {
-            setIsGiftDetailModalOpen(false);
-            setSelectedGiftProductId(null);
-          }}
-        />
-        {/* Gallery Viewer Modal */}
-        {selectedAlbum && (
-          <GalleryViewerModal
-            isOpen={isGalleryModalOpen}
-            onClose={() => setIsGalleryModalOpen(false)}
-            album={selectedAlbum}
-            currentUser={userInfo}
-            authToken={token}
-          />
-        )}
+      )}
     </div>
   );
 };

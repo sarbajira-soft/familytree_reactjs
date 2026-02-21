@@ -8,7 +8,7 @@ import { useUser } from '../Contexts/UserContext';
 
 import { authFetch } from '../utils/authFetch';
 import { getToken } from '../utils/auth';
-
+import LoadingSpinner from '../Components/LoadingSpinner';
 
 // ✅ WhatsApp Share Modal
 const WhatsAppShareModal = ({ onClose, familyCode, member }) => {
@@ -167,10 +167,10 @@ const FamilyMemberListing = () => {
         name: (item.user.fullName && !/\bnull\b|\bundefined\b/i.test(item.user.fullName))
           ? item.user.fullName.replaceAll(/\bnull\b|\bundefined\b/gi, '').replaceAll(/\s+/g, ' ').trim()
           : (
-              [item.user.userProfile?.firstName, item.user.userProfile?.lastName]
-                .filter(val => val && val !== 'null' && val !== 'undefined')
-                .join(' ') || 'Unknown Name'
-            ),
+            [item.user.userProfile?.firstName, item.user.userProfile?.lastName]
+              .filter(val => val && val !== 'null' && val !== 'undefined')
+              .join(' ') || 'Unknown Name'
+          ),
         email: item.user?.email || '',
         requestedDate: new Date(item.createdAt).toLocaleDateString('en-IN', {
           year: 'numeric',
@@ -211,9 +211,9 @@ const FamilyMemberListing = () => {
           <FiArrowLeft className="mr-1.5" />
           <span>Back to Family Management</span>
         </button>
-        <FiLoader className="text-6xl text-blue-600 animate-spin mb-4" />
-        <h2 className="text-2xl font-semibold text-gray-700 mb-2">Loading...</h2>
-        <p className="text-gray-500">Please wait while we verify your access.</p>
+        <LoadingSpinner type="list" />
+        <h2 className="text-2xl font-semibold text-gray-700 mb-2 mt-4 text-center">Loading...</h2>
+        <p className="text-gray-500 text-center">Please wait while we verify your access.</p>
       </div>
     );
   }
@@ -271,9 +271,9 @@ const FamilyMemberListing = () => {
           <FiArrowLeft className="mr-1.5" />
           <span>Back to Family Management</span>
         </button>
-        <FiLoader className="text-6xl text-blue-600 animate-spin mb-4" />
-        <h2 className="text-2xl font-semibold text-gray-700 mb-2">Loading Members...</h2>
-        <p className="text-gray-500">Please wait while we fetch family members.</p>
+        <LoadingSpinner type="list" />
+        <h2 className="text-2xl font-semibold text-gray-700 mb-2 mt-4 text-center">Loading Members...</h2>
+        <p className="text-gray-500 text-center">Please wait while we fetch family members.</p>
       </div>
     );
   }
