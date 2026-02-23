@@ -37,11 +37,16 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
   const [deletedMemberIds, setDeletedMemberIds] = useState(() => new Set());
   const [linkedFamilies, setLinkedFamilies] = useState([]);
   const [selectedAssociatedFamilyCode, setSelectedAssociatedFamilyCode] = useState('');
+  const [selectedAssociatedFamilyMembersAll, setSelectedAssociatedFamilyMembersAll] = useState([]);
+  const [loadingAssociatedFamily, setLoadingAssociatedFamily] = useState(false);
+  const [selectedLinkedFamilyMembersAll, setSelectedLinkedFamilyMembersAll] = useState([]);
+  const [loadingLinkedFamily, setLoadingLinkedFamily] = useState(false);
   const [selectedLinkedFamilyCode, setSelectedLinkedFamilyCode] = useState('');
   const [activeTab, setActiveTab] = useState('birth');
   const [membersNotInTree, setMembersNotInTree] = useState([]);
   const [memberIdsInTree, setMemberIdsInTree] = useState(() => new Set());
   const [treeLinkedFamilyMap, setTreeLinkedFamilyMap] = useState({});
+  const [treeAllPeople, setTreeAllPeople] = useState([]);
   const [notInTreeLoading, setNotInTreeLoading] = useState(false);
   const [associatedFamilyNameMap, setAssociatedFamilyNameMap] = useState({});
   const [linkedFamilyNameMap, setLinkedFamilyNameMap] = useState({});
@@ -51,8 +56,20 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
   const [privacySavedAt, setPrivacySavedAt] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [familyFilterPage, setFamilyFilterPage] = useState(1);
+  // Accordion states for Linked tab
+  const [linkedAccordionOpen, setLinkedAccordionOpen] = useState({
+    inTree: true,
+    allLinked: false,
+    readyToLink: false,
+  });
+  // Accordion states for Associated tab
+  const [associatedAccordionOpen, setAssociatedAccordionOpen] = useState({
+    inTree: true,
+    allAssociated: false,
+    readyToAssociate: false,
+  });
   const itemsPerPage = 10;
-  const familiesPerPage = 1;
+  const familiesPerPage = 5;
 
   // Reset page when tab or filters change
   useEffect(() => {
@@ -84,6 +101,7 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
         memberId: item.memberId,
         userId: item.user?.id,
         membershipType: item.membershipType || 'member',
+        user: item.user, // Preserve user object for isAppUser badge
         name: (item?.user?.fullName && !/\bnull\b|\bundefined\b/i.test(item.user.fullName))
           ? item.user.fullName
             .replaceAll(/\bnull\b|\bundefined\b/gi, '')
@@ -329,16 +347,40 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
       familyMembers.filter(
         (member) =>
           member.membershipType === 'member' &&
+          member.sourceFamilyCode === birthFamilyCode &&
           member.name &&
           member.name.toLowerCase().includes(searchTerm.toLowerCase()),
       ),
-    [familyMembers, searchTerm],
+    [familyMembers, birthFamilyCode, searchTerm],
   );
 
-  const associatedMembersAll = useMemo(
-    () => familyMembers.filter((member) => member.membershipType === 'associated'),
-    [familyMembers],
-  );
+  const associatedMembersAll = useMemo(() => {
+    const fromApi = familyMembers.filter((member) => member.membershipType === 'associated');
+    const fromTree = treeAllPeople.filter((m) => m.membershipType === 'associated');
+    
+    // Deduplicate by userId - prefer API data over tree data
+    const seenUserIds = new Set();
+    const deduped = [];
+    
+    // First add API members
+    fromApi.forEach((member) => {
+      if (member.userId) {
+        seenUserIds.add(Number(member.userId));
+      }
+      deduped.push(member);
+    });
+    
+    // Then add tree members only if not already seen
+    fromTree.forEach((member) => {
+      const userId = Number(member.userId);
+      if (userId && !seenUserIds.has(userId)) {
+        seenUserIds.add(userId);
+        deduped.push(member);
+      }
+    });
+    
+    return deduped;
+  }, [familyMembers, treeAllPeople]);
 
   const linkedMembersAll = useMemo(
     () => familyMembers.filter((member) => member.membershipType === 'linked'),
@@ -350,8 +392,7 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
     [familyMembers],
   );
 
-  const associatedFamilyCodes = useMemo(
-    () =>
+  const associatedFamilyCodes = useMemo(() =>
       Array.from(
         new Set(
           associatedMembersAll
@@ -538,29 +579,136 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
     );
   }, [associatedMembersAll, selectedAssociatedFamilyCode, searchTerm]);
 
+  // Fetch all members of selected associated family
+  useEffect(() => {
+    const fetchAssociatedFamilyMembers = async () => {
+      if (!selectedAssociatedFamilyCode || !token) {
+        setSelectedAssociatedFamilyMembersAll([]);
+        return;
+      }
+      
+      setLoadingAssociatedFamily(true);
+      try {
+        const res = await fetch(`${BASE_URL}/family/member/${selectedAssociatedFamilyCode}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        
+        if (!res.ok) throw new Error('Failed to fetch associated family members');
+        
+        const json = await res.json().catch(() => null);
+        const list = Array.isArray(json?.data) ? json.data : [];
+        
+        const members = list.map((item) => ({
+          id: item.id,
+          memberId: item.memberId,
+          userId: item.user?.id,
+          membershipType: item.membershipType || 'member',
+          user: item.user,
+          name: (item?.user?.fullName && !/\bnull\b|\bundefined\b/i.test(item.user.fullName))
+            ? item.user.fullName
+              .replaceAll(/\bnull\b|\bundefined\b/gi, '')
+              .replaceAll(/\s+/g, ' ')
+              .trim()
+            : (
+              [item?.user?.userProfile?.firstName, item?.user?.userProfile?.lastName]
+                .filter(val => val && val !== 'null' && val !== 'undefined')
+                .join(' ') || 'Unknown Name'
+            ),
+          gender: item?.user?.userProfile?.gender || 'N/A',
+          role: item.familyRole || roleMapping[item?.user?.role] || 'Member',
+          contact: item?.user?.userProfile?.contactNumber,
+          address: item?.user?.userProfile?.address || '',
+          dob: item?.user?.userProfile?.dob || '',
+          age: item?.user?.userProfile?.age || '',
+          profilePic: item?.user?.profileImage,
+          isAdmin: item.isFamilyAdmin ?? item?.user?.role > 1,
+          blockStatus: item.blockStatus || { isBlockedByMe: false, isBlockedByThem: false },
+          sourceFamilyCode: normalizeFamilyCode(item?.user?.userProfile?.familyCode || item?.familyCode),
+        }));
+        
+        setSelectedAssociatedFamilyMembersAll(members);
+      } catch (err) {
+        logger.error('Failed to load associated family members', err);
+        setSelectedAssociatedFamilyMembersAll([]);
+      } finally {
+        setLoadingAssociatedFamily(false);
+      }
+    };
+    
+    fetchAssociatedFamilyMembers();
+  }, [selectedAssociatedFamilyCode, token, BASE_URL]);
+
+  // Fetch all members of selected linked family
+  useEffect(() => {
+    const fetchLinkedFamilyMembers = async () => {
+      if (!selectedLinkedFamilyCode || !token) {
+        setSelectedLinkedFamilyMembersAll([]);
+        return;
+      }
+      
+      setLoadingLinkedFamily(true);
+      try {
+        const res = await fetch(`${BASE_URL}/family/member/${selectedLinkedFamilyCode}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        
+        if (!res.ok) throw new Error('Failed to fetch linked family members');
+        
+        const json = await res.json().catch(() => null);
+        const list = Array.isArray(json?.data) ? json.data : [];
+        
+        const members = list.map((item) => ({
+          id: item.id,
+          memberId: item.memberId,
+          userId: item.user?.id,
+          membershipType: item.membershipType || 'member',
+          user: item.user, // Preserve user object for isAppUser badge
+          name: (item?.user?.fullName && !/\bnull\b|\bundefined\b/i.test(item.user.fullName))
+            ? item.user.fullName
+              .replaceAll(/\bnull\b|\bundefined\b/gi, '')
+              .replaceAll(/\s+/g, ' ')
+              .trim()
+            : (
+              [item?.user?.userProfile?.firstName, item?.user?.userProfile?.lastName]
+                .filter(val => val && val !== 'null' && val !== 'undefined')
+                .join(' ') || 'Unknown Name'
+            ),
+          gender: item?.user?.userProfile?.gender || 'N/A',
+          role: item.familyRole || roleMapping[item?.user?.role] || 'Member',
+          contact: item?.user?.userProfile?.contactNumber,
+          address: item?.user?.userProfile?.address || '',
+          dob: item?.user?.userProfile?.dob || '',
+          age: item?.user?.userProfile?.age || '',
+          profilePic: item?.user?.profileImage,
+          isAdmin: item.isFamilyAdmin ?? item?.user?.role > 1,
+          blockStatus: item.blockStatus || { isBlockedByMe: false, isBlockedByThem: false },
+          sourceFamilyCode: normalizeFamilyCode(item?.user?.userProfile?.familyCode || item?.familyCode),
+        }));
+        
+        setSelectedLinkedFamilyMembersAll(members);
+      } catch (err) {
+        logger.error('Failed to load linked family members', err);
+        setSelectedLinkedFamilyMembersAll([]);
+      } finally {
+        setLoadingLinkedFamily(false);
+      }
+    };
+    
+    fetchLinkedFamilyMembers();
+  }, [selectedLinkedFamilyCode, token, BASE_URL]);
+
   const selectedLinkedFamilyMembers = useMemo(() => {
     if (!selectedLinkedFamilyCode) return [];
-    const fromMemberList = linkedMembersAll.filter(
-      (member) =>
-        normalizeFamilyCode(member.sourceFamilyCode) === selectedLinkedFamilyCode &&
-        member.name &&
-        member.name.toLowerCase().includes(searchTerm.toLowerCase()),
-    );
-
-    if (fromMemberList.length > 0) {
-      return fromMemberList;
-    }
-
-    const fromTree = Array.isArray(treeLinkedFamilyMap?.[selectedLinkedFamilyCode])
-      ? treeLinkedFamilyMap[selectedLinkedFamilyCode]
-      : [];
-
-    return fromTree.filter(
+    return selectedLinkedFamilyMembersAll.filter(
       (member) =>
         member.name &&
         member.name.toLowerCase().includes(searchTerm.toLowerCase()),
     );
-  }, [linkedMembersAll, selectedLinkedFamilyCode, treeLinkedFamilyMap, searchTerm]);
+  }, [selectedLinkedFamilyMembersAll, selectedLinkedFamilyCode, searchTerm]);
 
   useEffect(() => {
     let ignore = false;
@@ -609,6 +757,7 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
               memberId: Number(person?.memberId) || null,
               userId: Number(person?.userId || person?.memberId) || null,
               membershipType: 'linked',
+              user: { isAppUser: Boolean(person?.isAppUser) }, // Preserve isAppUser for badge
               name: person?.name || 'Unknown',
               gender: person?.gender || 'N/A',
               role: 'Member',
@@ -631,10 +780,39 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
           (member) => !idsInTree.has(Number(member.userId)),
         );
 
+        const associatedFromTree = people
+          .filter((person) => 
+            person?.associatedFamilyCodes?.includes(birthFamilyCode) &&
+            normalizeFamilyCode(person?.primaryFamilyCode) !== birthFamilyCode
+          )
+          .map((person, index) => ({
+            id: `tree-associated-${index}`,
+            memberId: Number(person?.memberId) || null,
+            userId: Number(person?.userId || person?.memberId) || null,
+            membershipType: 'associated',
+            user: { isAppUser: Boolean(person?.isAppUser) },
+            name: person?.name || 'Unknown',
+            gender: person?.gender || 'N/A',
+            role: 'Member',
+            contact: person?.contactNumber || person?.mobile || '',
+            address: '',
+            dob: '',
+            age: person?.age || '',
+            profilePic: person?.img || null,
+            isAdmin: false,
+            blockStatus: person?.blockStatus || {
+              isBlockedByMe: false,
+              isBlockedByThem: false,
+            },
+            lastUpdated: '-',
+            sourceFamilyCode: normalizeFamilyCode(person?.primaryFamilyCode),
+          }));
+
         if (!ignore) {
           setMemberIdsInTree(idsInTree);
           setTreeLinkedFamilyMap(linkedFromTree);
           setMembersNotInTree(notInTreeMembers);
+          setTreeAllPeople([...associatedFromTree]);
         }
       } catch (error) {
         logger.error('Failed to compute members not in tree', error);
@@ -655,6 +833,15 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
       ignore = true;
     };
   }, [familyCode, token, allBirthFamilyMembers]);
+
+  // Non-linked family members (app users only - those who have a userId from the backend)
+  const nonLinkedFamilyMembers = useMemo(() => {
+    return familyMembers.filter((member) => 
+      member.membershipType === 'member' && 
+      member.userId && 
+      !memberIdsInTree.has(Number(member.userId))
+    );
+  }, [familyMembers, memberIdsInTree]);
 
   const filteredMembersNotInTree = useMemo(
     () =>
@@ -694,18 +881,21 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
     const userId = currentUser?.userId;
     const defaults = buildDefaultFamilyPrivacySettings(birthFamilyCode);
     const stored = getFamilyPrivacySettings({ userId, familyCode: birthFamilyCode });
-    const validCodes = new Set(privacyFamilyOptions.map((entry) => entry.familyCode));
+    const validCodesSet = new Set(privacyFamilyOptions.map((entry) => entry.familyCode));
 
     const normalizeContentSetting = (setting, fallbackSetting) => {
       const visibility =
         setting?.visibility === 'specific-family' ? 'specific-family' : 'all-members';
-      const requestedCode = normalizeFamilyCode(setting?.familyCode || fallbackSetting?.familyCode);
-      const resolvedCode = validCodes.has(requestedCode)
-        ? requestedCode
-        : fallbackSetting?.familyCode || birthFamilyCode;
+      const requestedCodes = Array.isArray(setting?.familyCodes) 
+        ? setting.familyCodes 
+        : [setting?.familyCode || fallbackSetting?.familyCode].filter(Boolean);
+      const validCodes = requestedCodes.filter(c => validCodesSet.has(c));
+      const resolvedCodes = validCodes.length > 0 
+        ? validCodes 
+        : [fallbackSetting?.familyCode || birthFamilyCode].filter(Boolean);
       return {
         visibility,
-        familyCode: resolvedCode,
+        familyCodes: resolvedCodes,
       };
     };
 
@@ -770,19 +960,21 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
     showFamilyCode = false,
     allowManageActions = false,
     allowDelete = false,
+    disabled = false,
   }) => (
     <div
       onClick={() => {
         if (
           !deletedMemberIds.has(member.memberId) &&
           currentUserIsFamilyAdmin &&
-          !member?.blockStatus?.isBlockedByMe
+          !member?.blockStatus?.isBlockedByMe &&
+          !disabled
         ) {
           handleViewMember(member.userId, { stopPropagation: () => { } });
         }
       }}
-      className={`group relative flex flex-col sm:flex-row items-stretch bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md hover:border-primary-300 transition-all duration-200 overflow-hidden ${currentUserIsFamilyAdmin ? 'cursor-pointer' : 'cursor-default'
-        } ${deletedMemberIds.has(member.memberId) ? 'opacity-20 grayscale pointer-events-none' : ''}`}
+      className={`group relative flex flex-col sm:flex-row items-stretch bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md hover:border-primary-300 transition-all duration-200 overflow-hidden ${currentUserIsFamilyAdmin && !disabled ? 'cursor-pointer' : 'cursor-default'
+        } ${deletedMemberIds.has(member.memberId) || disabled ? 'opacity-60 grayscale' : ''}`}
     >
       {/* Left Accent Bar */}
       <div className={`w-1.5 flex-shrink-0 ${member.gender === 'male' ? 'bg-sky-400' : member.gender === 'female' ? 'bg-pink-400' : 'bg-gray-300'}`}></div>
@@ -815,9 +1007,29 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
               <span className={`inline-flex items-center text-[10px] sm:text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${relationColors[member.role] || 'bg-gray-100 text-gray-700'}`}>
                 {member.role}
               </span>
-              {member.membershipType !== 'member' && (
+              {/* Show Associated or Linked badge based on membershipType */}
+              {member.membershipType === 'associated' && (
+                <span className="inline-block text-[10px] sm:text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-sky-100 text-sky-600 border border-sky-200">
+                  Associated
+                </span>
+              )}
+              {member.membershipType === 'linked' && (
                 <span className="inline-block text-[10px] sm:text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
                   Linked
+                </span>
+              )}
+              {disabled && (
+                <span className="inline-block text-[10px] sm:text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 border border-emerald-200">
+                  Already in Tree
+                </span>
+              )}
+              {member.user?.isAppUser ? (
+                <span className="inline-block text-[10px] sm:text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-green-100 text-green-700 border border-green-200">
+                  App User
+                </span>
+              ) : (
+                <span className="inline-block text-[10px] sm:text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-gray-100 text-gray-500 border border-gray-200">
+                  Non-App
                 </span>
               )}
               {showFamilyCode && member.sourceFamilyCode && (
@@ -862,7 +1074,7 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
 
           {/* Actions (Col 2) */}
           <div className="sm:col-span-2 flex items-center justify-center sm:justify-end gap-2 sm:pl-4 border-t sm:border-t-0 sm:border-l border-gray-100 pt-4 sm:pt-0 pb-1 sm:pb-0 h-full">
-            {currentUserIsFamilyAdmin && (
+            {currentUserIsFamilyAdmin && !disabled && (
               <>
                 {allowManageActions && member.membershipType === 'member' && (
                   <button
@@ -874,7 +1086,8 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                     <FiShare2 size={16} />
                   </button>
                 )}
-                {allowManageActions && member.membershipType === 'member' && currentUser?.userId !== member.userId && (
+                {/* Block button for all app users (not self) */}
+                {member.user?.isAppUser && currentUser?.userId !== member.userId && (
                   <div className="flex items-center scale-95 origin-right">
                     <BlockButton
                       userId={member.userId}
@@ -915,83 +1128,151 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                 </button>
               </>
             )}
+            {disabled && (
+              <span className="text-xs text-emerald-600 font-medium bg-emerald-50 px-2 py-1 rounded">
+                Already Linked
+              </span>
+            )}
           </div>
         </div>
       </div>
     </div>
   );
   const PrivacyControls = () => (
-    <section className="rounded-2xl border border-primary-100 bg-white p-5 sm:p-8 shadow-sm">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-6 border-b border-primary-50 pb-6">
-        <div>
-          <h2 className="text-xl font-bold text-gray-900">Privacy Settings</h2>
-          <p className="text-sm text-gray-500 mt-1">
-            Configure visibility for posts, albums, and events. Default is All Members.
-          </p>
+    <section className="w-full rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+      {/* Header */}
+      <div className="bg-gradient-to-r from-primary-600 to-primary-700 px-6 py-5">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-bold text-white">Privacy Settings</h2>
+            <p className="text-sm text-primary-100 mt-1">
+              Control who can see your posts, albums, and events
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleSavePrivacySettings}
+            className="flex items-center gap-2 px-5 py-2.5 bg-white text-primary-700 font-semibold rounded-lg hover:bg-primary-50 transition-all shadow-lg"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            Save Settings
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={handleSavePrivacySettings}
-          className="rounded-lg bg-primary-600 px-6 py-2.5 text-sm font-bold text-white hover:bg-primary-700 transition-all active:scale-95 shadow-md shadow-primary-600/20"
-        >
-          Save Privacy Settings
-        </button>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-6 md:grid-cols-3">
+      {/* Content Cards */}
+      <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
         {[
-          { key: 'posts', label: 'Posts' },
-          { key: 'albums', label: 'Albums' },
-          { key: 'events', label: 'Events' },
+          { key: 'posts', label: 'Posts', icon: '📝', desc: 'Photos, videos, and status updates' },
+          { key: 'albums', label: 'Albums', icon: '📷', desc: 'Photo collections and galleries' },
+          { key: 'events', label: 'Events', icon: '📅', desc: 'Family gatherings and occasions' },
         ].map((entry) => (
-          <div key={entry.key} className="rounded-xl border border-primary-100 bg-primary-50/40 p-5">
-            <p className="text-base font-bold text-gray-900 mb-4">{entry.label}</p>
+          <div key={entry.key} className="rounded-xl border border-gray-200 bg-white shadow-sm hover:shadow-md transition-shadow">
+            {/* Card Header */}
+            <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50 rounded-t-xl">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">{entry.icon}</span>
+                <div>
+                  <h3 className="font-bold text-gray-900">{entry.label}</h3>
+                  <p className="text-xs text-gray-500">{entry.desc}</p>
+                </div>
+              </div>
+            </div>
 
-            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Visibility</label>
-            <select
-              value={privacySettings?.[entry.key]?.visibility || 'all-members'}
-              onChange={(e) => updatePrivacySetting(entry.key, 'visibility', e.target.value)}
-              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium focus:ring-2 focus:ring-primary-100 focus:border-primary-300 shadow-sm mb-4 text-gray-700"
-            >
-              {PRIVACY_VISIBILITY_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+            {/* Card Body */}
+            <div className="p-5 space-y-5">
+              {/* Visibility Toggle */}
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
+                  Visibility
+                </label>
+                <div className="flex bg-gray-100 p-1 rounded-lg">
+                  {[
+                    { value: 'all-members', label: 'All Members' },
+                    { value: 'specific-family', label: 'Specific Families' },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => updatePrivacySetting(entry.key, 'visibility', option.value)}
+                      className={`flex-1 py-2 px-3 text-sm font-medium rounded-md transition-all ${
+                        (privacySettings?.[entry.key]?.visibility || 'all-members') === option.value
+                          ? 'bg-white text-primary-700 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Family Level</label>
-            <select
-              value={privacySettings?.[entry.key]?.familyCode || birthFamilyCode}
-              onChange={(e) => updatePrivacySetting(entry.key, 'familyCode', normalizeFamilyCode(e.target.value))}
-              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium focus:ring-2 focus:ring-primary-100 focus:border-primary-300 shadow-sm text-gray-700 disabled:opacity-50 disabled:bg-gray-50"
-              disabled={privacySettings?.[entry.key]?.visibility !== 'specific-family'}
-            >
-              {privacyFamilyOptions.map((familyOption) => (
-                <option key={`${entry.key}-${familyOption.familyCode}`} value={familyOption.familyCode}>
-                  {(familyOption.familyName || 'Family')} ({familyOption.familyCode})
-                </option>
-              ))}
-            </select>
+              {/* Family Selection - Show only when specific-family is selected */}
+              {(privacySettings?.[entry.key]?.visibility === 'specific-family') && (
+                <div className="animate-in slide-in-from-top-2 duration-200">
+                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
+                    Select Families
+                  </label>
+                  <div className="space-y-2 max-h-48 overflow-y-auto rounded-lg border border-gray-200 p-2 bg-gray-50">
+                    {privacyFamilyOptions.map((familyOption) => {
+                      const isSelected = (privacySettings?.[entry.key]?.familyCodes || []).includes(familyOption.familyCode);
+                      return (
+                        <button
+                          key={`${entry.key}-${familyOption.familyCode}`}
+                          onClick={() => {
+                            const currentCodes = privacySettings?.[entry.key]?.familyCodes || [];
+                            const newCodes = isSelected
+                              ? currentCodes.filter(c => c !== familyOption.familyCode)
+                              : [...currentCodes, familyOption.familyCode];
+                            updatePrivacySetting(entry.key, 'familyCodes', newCodes);
+                          }}
+                          className={`w-full flex items-center gap-3 p-3 rounded-lg text-left transition-all ${
+                            isSelected 
+                              ? 'bg-primary-50 border border-primary-200' 
+                              : 'bg-white border border-transparent hover:bg-gray-100'
+                          }`}
+                        >
+                          {/* Toggle Switch */}
+                          <div className={`relative w-11 h-6 rounded-full transition-colors ${
+                            isSelected ? 'bg-primary-600' : 'bg-gray-300'
+                          }`}>
+                            <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                              isSelected ? 'translate-x-5' : 'translate-x-0'
+                            }`} />
+                          </div>
+                          <span className={`text-sm font-medium ${isSelected ? 'text-primary-900' : 'text-gray-700'}`}>
+                            {familyOption.familyName} ({familyOption.familyCode})
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         ))}
       </div>
 
+      {/* Footer */}
       {privacySavedAt && (
-        <p className="mt-6 text-xs text-center font-medium text-gray-400">
-          Last saved: {new Date(privacySavedAt).toLocaleString()}
-        </p>
+        <div className="px-6 py-3 bg-gray-50 border-t border-gray-200">
+          <p className="text-xs text-gray-500 text-center">
+            Last saved: {new Date(privacySavedAt).toLocaleString()}
+          </p>
+        </div>
       )}
     </section>
   );
 
   const TABS = [
-    { id: 'birth', label: 'Birth Family', count: activeBirthMembers.length, color: 'text-slate-700 bg-slate-100' },
-    { id: 'associated', label: 'Associated', count: associatedFamiliesOptions.length, color: 'text-sky-700 bg-sky-100' },
-    { id: 'linked', label: 'Linked', count: linkedFamiliesOptions.length, color: 'text-emerald-700 bg-emerald-100' },
-    { id: 'pending', label: 'Pending', count: filteredMembersNotInTree.length, color: 'text-amber-700 bg-amber-100' },
-    { id: 'blocked', label: 'Blocked', count: blockedMembers.length, color: 'text-red-700 bg-red-100' },
-    { id: 'privacy', label: 'Privacy', count: null, color: null },
+    { id: 'birth', label: 'Birth Family', count: activeBirthMembers.length, color: 'text-slate-700 bg-slate-100', emptyMessage: 'No birth family members found.' },
+    { id: 'associated', label: 'Associated', count: associatedFamiliesOptions.length, color: 'text-sky-700 bg-sky-100', emptyMessage: 'No associated families linked.' },
+    { id: 'linked', label: 'Linked', count: linkedFamiliesOptions.length, color: 'text-emerald-700 bg-emerald-100', emptyMessage: 'No linked families discovered yet.' },
+    { id: 'pending', label: 'Members Not in Tree', count: filteredMembersNotInTree.length, color: 'text-amber-700 bg-amber-100', emptyMessage: 'All birth family members are already placed in the family tree.' },
+    { id: 'blocked', label: 'Blocked', count: blockedMembers.length, color: 'text-red-700 bg-red-100', emptyMessage: 'No blocked members.' },
+    { id: 'privacy', label: 'Privacy', count: null, color: null, emptyMessage: null },
   ];
 
   /* PAGINATION LOGIC */
@@ -1156,175 +1437,772 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
           </div>
         ) : (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
-            {!filteredMembers.length && !notInTreeLoading && activeTab !== 'privacy' && (
+            {!filteredMembers.length && !notInTreeLoading && activeTab !== 'privacy' && activeTab !== 'birth' && activeTab !== 'linked' && activeTab !== 'pending' && activeTab !== 'blocked' && activeTab !== 'associated' && (
               <div className="flex flex-col items-center justify-center py-16 bg-white rounded-xl border border-gray-200 shadow-sm text-gray-400">
                 <p className="text-lg font-semibold text-gray-600">No members found</p>
                 <p className="text-sm text-gray-400 mt-1">Try adjusting your filters or search terms.</p>
               </div>
             )}
 
-            {activeTab === 'birth' && activeBirthMembers.length > 0 && (
+            {activeTab === 'birth' && (
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                 <h2 className="text-xl font-bold text-gray-900 mb-1">Birth Family Directory</h2>
                 <p className="text-sm text-gray-500 mb-6">Manage members of your primary birth family.</p>
-                <div className="flex flex-col gap-3">
-                  {paginateData(activeBirthMembers).map((member) => (
-                    <SingleMemberCard key={`birth-${member.id}`} member={member} allowManageActions />
-                  ))}
-                </div>
-                <PaginationControls totalItems={activeBirthMembers.length} />
+                {activeBirthMembers.length > 0 ? (
+                  <>
+                    <div className="flex flex-col gap-3">
+                      {paginateData(activeBirthMembers).map((member) => (
+                        <SingleMemberCard key={`birth-${member.id}`} member={member} allowManageActions />
+                      ))}
+                    </div>
+                    <PaginationControls totalItems={activeBirthMembers.length} />
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12 bg-gray-50 rounded-xl border border-gray-100">
+                    <p className="text-gray-500 text-sm font-medium">No birth family members found.</p>
+                    <p className="text-gray-400 text-xs mt-1">Family members will appear here once added.</p>
+                  </div>
+                )}
               </div>
             )}
 
             {activeTab === 'associated' && (
-              <div className="space-y-6">
-                {associatedFamiliesOptions.length > 0 ? (
-                  <>
-                    <div className="flex flex-wrap items-center gap-2 bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-                      <span className="text-sm font-semibold text-gray-500 mr-2">Filter Family:</span>
-                      {paginateFamilies(associatedFamiliesOptions).map((family) => (
-                        <button
-                          type="button"
-                          key={`associated-family-${family.familyCode}`}
-                          onClick={() => setSelectedAssociatedFamilyCode(family.familyCode)}
-                          className={`rounded-lg px-4 py-1.5 text-sm font-semibold transition-all ${selectedAssociatedFamilyCode === family.familyCode
-                              ? 'bg-sky-500 text-white shadow-sm'
-                              : 'bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-100'
-                            }`}
-                        >
-                          {(family.familyName || 'Family')} ({family.familyCode})
-                        </button>
-                      ))}
-                      <FamilyFilterPagination totalFamilies={associatedFamiliesOptions.length} />
+              <div className="space-y-4">
+                {/* Section 1: Associated Members IN MY TREE (Highlighted) */}
+                <div className="bg-white rounded-xl shadow-sm border-2 border-sky-200 overflow-hidden">
+                  <button
+                    onClick={() => setAssociatedAccordionOpen(prev => ({ ...prev, inTree: !prev.inTree }))}
+                    className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-sky-50 to-white hover:from-sky-100 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-sky-500 flex items-center justify-center text-white">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                        </svg>
+                      </div>
+                      <div className="text-left">
+                        <h2 className="text-lg font-bold text-gray-900">Associated in My Tree</h2>
+                        <p className="text-sm text-gray-500">Associated members already placed in your family tree</p>
+                      </div>
                     </div>
+                    <div className="flex items-center gap-2">
+                      <span className="px-3 py-1 bg-sky-100 text-sky-700 rounded-full text-sm font-bold">
+                        {associatedMembersAll.filter(m => memberIdsInTree.has(Number(m.userId))).length}
+                      </span>
+                      <svg 
+                        className={`w-5 h-5 text-gray-400 transition-transform ${associatedAccordionOpen.inTree ? 'rotate-180' : ''}`} 
+                        fill="none" 
+                        stroke="currentColor" 
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </button>
+                  
+                  {associatedAccordionOpen.inTree && (
+                    <div className="p-4 border-t border-gray-100">
+                      {(() => {
+                        const associatedInTree = associatedMembersAll.filter(m => memberIdsInTree.has(Number(m.userId)));
+                        return associatedInTree.length > 0 ? (
+                          <>
+                            <div className="mb-4">
+                              <div className="flex flex-wrap gap-1 bg-gray-100/50 p-1 rounded-lg">
+                                {associatedFamiliesOptions.map((family) => {
+                                  const familyMemberCount = associatedInTree.filter(
+                                    m => normalizeFamilyCode(m.sourceFamilyCode) === family.familyCode
+                                  ).length;
+                                  if (familyMemberCount === 0) return null;
+                                  return (
+                                    <button
+                                      type="button"
+                                      key={`associated-tree-tab-${family.familyCode}`}
+                                      onClick={() => setSelectedAssociatedFamilyCode(family.familyCode)}
+                                      className={`px-4 py-2 text-sm font-semibold transition-all rounded-md ${selectedAssociatedFamilyCode === family.familyCode
+                                          ? 'bg-white text-sky-600 shadow-sm'
+                                          : 'text-gray-500 hover:text-gray-700'
+                                        }`}
+                                    >
+                                      {family.familyName || family.familyCode}
+                                      <span className="ml-1.5 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">
+                                        {familyMemberCount}
+                                      </span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                            <div className="bg-sky-50/50 rounded-lg p-4">
+                              {selectedAssociatedFamilyCode ? (
+                                (() => {
+                                  const filtered = associatedInTree.filter(
+                                    m => normalizeFamilyCode(m.sourceFamilyCode) === selectedAssociatedFamilyCode
+                                  );
+                                  return filtered.length > 0 ? (
+                                    <div className="flex flex-col gap-2">
+                                      <h3 className="text-sm font-bold text-sky-800 mb-3 flex items-center gap-2">
+                                        <span className="w-2 h-2 bg-sky-500 rounded-full"></span>
+                                        {associatedFamilyNameMap[selectedAssociatedFamilyCode] || selectedAssociatedFamilyCode}
+                                        <span className="text-xs font-normal text-gray-500 bg-white px-2 py-0.5 rounded border">
+                                          {selectedAssociatedFamilyCode}
+                                        </span>
+                                      </h3>
+                                      {paginateData(filtered).map((member) => (
+                                        <SingleMemberCard 
+                                          key={`associated-tree-${member.id}`} 
+                                          member={member} 
+                                          showFamilyCode 
+                                          allowManageActions 
+                                        />
+                                      ))}
+                                      <PaginationControls totalItems={filtered.length} />
+                                    </div>
+                                  ) : (
+                                    <div className="flex flex-col items-center justify-center py-8">
+                                      <p className="text-gray-500 text-sm font-medium">No associated members from this family in your tree</p>
+                                    </div>
+                                  );
+                                })()
+                              ) : (
+                                <div className="flex flex-col items-center justify-center py-8">
+                                  <p className="text-gray-500 text-sm font-medium">Select a family to view members</p>
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center py-8 bg-gray-50 rounded-lg">
+                            <p className="text-gray-500 text-sm font-medium">No associated members in your tree yet</p>
+                            <p className="text-gray-400 text-xs mt-1">Associated members will appear here when placed in your tree</p>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </div>
 
-                    {selectedAssociatedFamilyMembers.length > 0 ? (
-                      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                        <div className="flex flex-col gap-3">
-                          {paginateData(selectedAssociatedFamilyMembers).map((member) => (
-                            <SingleMemberCard key={`associated-${member.id}`} member={member} showFamilyCode />
-                          ))}
+                {/* Section 2: ALL Associated Family Members */}
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                  <button
+                    onClick={() => setAssociatedAccordionOpen(prev => ({ ...prev, allAssociated: !prev.allAssociated }))}
+                    className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                      </div>
+                      <div className="text-left">
+                        <h2 className="text-lg font-bold text-gray-900">All Associated Members</h2>
+                        <p className="text-sm text-gray-500">Complete list of all members from associated families</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-bold">
+                        {selectedAssociatedFamilyCode 
+                          ? selectedAssociatedFamilyMembersAll.filter(m => m.name?.toLowerCase().includes(searchTerm.toLowerCase())).length
+                          : associatedMembersAll.length}
+                      </span>
+                      <svg 
+                        className={`w-5 h-5 text-gray-400 transition-transform ${associatedAccordionOpen.allAssociated ? 'rotate-180' : ''}`} 
+                        fill="none" 
+                        stroke="currentColor" 
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </button>
+                  
+                  {associatedAccordionOpen.allAssociated && (
+                    <div className="p-4 border-t border-gray-100">
+                      {associatedFamiliesOptions.length > 0 ? (
+                        <>
+                          {/* Tab-style Family Filter */}
+                          <div className="mb-4">
+                            <div className="flex flex-wrap gap-1 bg-gray-100/50 p-1 rounded-lg">
+                              {associatedFamiliesOptions.map((family) => {
+                                const familyMemberCount = selectedAssociatedFamilyMembersAll.filter(
+                                  m => normalizeFamilyCode(m.sourceFamilyCode) === family.familyCode &&
+                                  m.name?.toLowerCase().includes(searchTerm.toLowerCase())
+                                ).length;
+                                return (
+                                  <button
+                                    type="button"
+                                    key={`associated-tab-${family.familyCode}`}
+                                    onClick={() => setSelectedAssociatedFamilyCode(family.familyCode)}
+                                    className={`px-4 py-2 text-sm font-semibold transition-all rounded-md ${selectedAssociatedFamilyCode === family.familyCode
+                                        ? 'bg-white text-blue-600 shadow-sm'
+                                        : 'text-gray-500 hover:text-gray-700'
+                                      }`}
+                                  >
+                                    {family.familyName || 'Family'}
+                                    <span className="ml-1.5 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">
+                                      {familyMemberCount}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {selectedAssociatedFamilyCode ? (
+                            loadingAssociatedFamily ? (
+                              <div className="flex justify-center items-center py-8">
+                                <div className="animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-blue-500" />
+                                <span className="ml-3 text-sm text-gray-500">Loading...</span>
+                              </div>
+                            ) : (
+                              (() => {
+                                const filteredMembers = selectedAssociatedFamilyMembersAll.filter(
+                                  m => m.name?.toLowerCase().includes(searchTerm.toLowerCase())
+                                );
+                                
+                                return filteredMembers.length > 0 ? (
+                                  <div className="flex flex-col gap-3">
+                                    <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 mb-2">
+                                      <p className="text-sm text-blue-700">
+                                        <span className="font-semibold">{filteredMembers.length}</span> member{filteredMembers.length > 1 ? 's' : ''}
+                                        {' from '}{associatedFamilyNameMap[selectedAssociatedFamilyCode] || selectedAssociatedFamilyCode}
+                                      </p>
+                                    </div>
+                                    {paginateData(filteredMembers).map((member) => (
+                                      <SingleMemberCard 
+                                        key={`associated-all-${member.id}`} 
+                                        member={member} 
+                                        showFamilyCode 
+                                      />
+                                    ))}
+                                    <PaginationControls totalItems={filteredMembers.length} />
+                                  </div>
+                                ) : (
+                                  <div className="flex flex-col items-center justify-center py-8 bg-gray-50 rounded-lg">
+                                    <p className="text-gray-500 text-sm font-medium">No members from this family</p>
+                                  </div>
+                                );
+                              })()
+                            )
+                          ) : (
+                            <div className="flex flex-col items-center justify-center py-8 bg-gray-50 rounded-lg">
+                              <p className="text-gray-500 text-sm font-medium">Select a family to view members</p>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center py-8 bg-gray-50 rounded-lg">
+                          <p className="text-gray-500 text-sm font-medium">No associated families discovered yet</p>
                         </div>
-                        <PaginationControls totalItems={selectedAssociatedFamilyMembers.length} />
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Section 3: App Users Ready to Associate (NOT in tree yet) */}
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                  <button
+                    onClick={() => setAssociatedAccordionOpen(prev => ({ ...prev, readyToAssociate: !prev.readyToAssociate }))}
+                    className="w-full flex items-center justify-between p-4 bg-amber-50 hover:bg-amber-100 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center text-white">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                        </svg>
                       </div>
-                    ) : (
-                      <div className="flex items-center justify-center py-10 bg-white rounded-xl shadow-sm border border-gray-200">
-                        <p className="text-gray-500 text-sm font-medium">No members found in this selection.</p>
+                      <div className="text-left">
+                        <h2 className="text-lg font-bold text-gray-900">Ready to Associate</h2>
+                        <p className="text-sm text-gray-500">App users from associated families available to add to your tree</p>
                       </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="flex items-center justify-center py-10 bg-white rounded-xl shadow-sm border border-gray-200">
-                    <p className="text-gray-500 text-sm font-medium">No associated families linked.</p>
-                  </div>
-                )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <svg 
+                        className={`w-5 h-5 text-gray-400 transition-transform ${associatedAccordionOpen.readyToAssociate ? 'rotate-180' : ''}`} 
+                        fill="none" 
+                        stroke="currentColor" 
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </button>
+                  
+                  {associatedAccordionOpen.readyToAssociate && (
+                    <div className="p-4 border-t border-gray-100">
+                      {selectedAssociatedFamilyCode ? (
+                        loadingAssociatedFamily ? (
+                          <div className="flex justify-center items-center py-8">
+                            <div className="animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-amber-500" />
+                            <span className="ml-3 text-sm text-gray-500">Loading...</span>
+                          </div>
+                        ) : (
+                          (() => {
+                            // Get all app users from the selected associated family
+                            const allAppUsers = selectedAssociatedFamilyMembersAll.filter(
+                              (m) => 
+                                m.userId && 
+                                m.user?.isAppUser &&
+                                m.name && 
+                                m.name.toLowerCase().includes(searchTerm.toLowerCase())
+                            );
+                            
+                            // Get IDs of users already in current family (members or associated)
+                            const currentFamilyUserIds = new Set(
+                              familyMembers
+                                .filter(m => m.userId && (m.membershipType === 'member' || m.membershipType === 'associated'))
+                                .map(m => Number(m.userId))
+                                .filter(id => id > 0)
+                            );
+                            
+                            // Filter out users already in current family
+                            const availableToAssociate = allAppUsers.filter(m => !currentFamilyUserIds.has(Number(m.userId)));
+                            const alreadyInFamily = allAppUsers.filter(m => currentFamilyUserIds.has(Number(m.userId)));
+                            
+                            const readyCount = availableToAssociate.length;
+                            const hiddenCount = alreadyInFamily.length;
+                            
+                            return readyCount > 0 || hiddenCount > 0 ? (
+                              <div className="flex flex-col gap-3">
+                                <div className="bg-amber-50 border border-amber-100 rounded-lg p-3">
+                                  <p className="text-sm text-amber-700">
+                                    <span className="font-semibold">{readyCount}</span> ready to associate
+                                    {hiddenCount > 0 && (
+                                      <span className="text-amber-600"> • <span className="font-semibold">{hiddenCount}</span> already in family (hidden)</span>
+                                    )}
+                                  </p>
+                                </div>
+                                {/* Ready to associate */}
+                                {availableToAssociate.map((member) => (
+                                  <SingleMemberCard key={`ready-assoc-${member.id}`} member={member} showFamilyCode allowManageActions />
+                                ))}
+                                {/* Already in family - show as disabled */}
+                                {alreadyInFamily.map((member) => (
+                                  <SingleMemberCard key={`ready-assoc-hidden-${member.id}`} member={member} showFamilyCode disabled />
+                                ))}
+                                <PaginationControls totalItems={readyCount + hiddenCount} />
+                              </div>
+                            ) : (
+                              <div className="flex flex-col items-center justify-center py-8 bg-gray-50 rounded-lg">
+                                <p className="text-gray-500 text-sm font-medium">No app users available from this family</p>
+                                <p className="text-gray-400 text-xs mt-1">All users are already members of your current family</p>
+                              </div>
+                            );
+                          })()
+                        )
+                      ) : (
+                        <div className="flex flex-col items-center justify-center py-8 bg-gray-50 rounded-lg">
+                          <p className="text-gray-500 text-sm font-medium">Select an associated family first</p>
+                          <p className="text-gray-400 text-xs mt-1">Choose a family from the &quot;All Associated Members&quot; section above</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
             {activeTab === 'linked' && (
-              <div className="space-y-6">
-                {linkedFamiliesOptions.length > 0 ? (
-                  <>
-                    <div className="flex flex-wrap items-center gap-2 bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-                      <span className="text-sm font-semibold text-gray-500 mr-2">Filter Family:</span>
-                      {paginateFamilies(linkedFamiliesOptions).map((family) => (
-                        <button
-                          type="button"
-                          key={`linked-family-${family.familyCode}`}
-                          onClick={() => setSelectedLinkedFamilyCode(family.familyCode)}
-                          className={`rounded-lg px-4 py-1.5 text-sm font-semibold transition-all ${selectedLinkedFamilyCode === family.familyCode
-                              ? 'bg-emerald-500 text-white shadow-sm'
-                              : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-100'
-                            }`}
-                        >
-                          {(family.familyName || 'Family')} ({family.familyCode})
-                        </button>
-                      ))}
-                      <FamilyFilterPagination totalFamilies={linkedFamiliesOptions.length} />
+              <div className="space-y-4">
+                {/* Section 1: Linked Members IN MY TREE (Highlighted) */}
+                <div className="bg-white rounded-xl shadow-sm border-2 border-emerald-200 overflow-hidden">
+                  <button
+                    onClick={() => setLinkedAccordionOpen(prev => ({ ...prev, inTree: !prev.inTree }))}
+                    className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-emerald-50 to-white hover:from-emerald-100 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center text-white">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                        </svg>
+                      </div>
+                      <div className="text-left">
+                        <h2 className="text-lg font-bold text-gray-900">Linked in My Tree</h2>
+                        <p className="text-sm text-gray-500">Members from linked families already placed in your family tree</p>
+                      </div>
                     </div>
+                    <div className="flex items-center gap-2">
+                      <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-sm font-bold">
+                        {Object.values(treeLinkedFamilyMap).flat().length}
+                      </span>
+                      <svg 
+                        className={`w-5 h-5 text-gray-400 transition-transform ${linkedAccordionOpen.inTree ? 'rotate-180' : ''}`} 
+                        fill="none" 
+                        stroke="currentColor" 
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </button>
+                  
+                  {linkedAccordionOpen.inTree && (
+                    <div className="p-4 border-t border-gray-100">
+                      {Object.keys(treeLinkedFamilyMap).length > 0 ? (
+                        <>
+                          {/* Horizontal Tab-style Family Selector */}
+                          <div className="mb-4">
+                            <div className="flex flex-wrap gap-1 bg-gray-100/50 p-1 rounded-lg">
+                              {Object.entries(treeLinkedFamilyMap).map(([familyCode, members]) => (
+                                <button
+                                  type="button"
+                                  key={`tree-tab-${familyCode}`}
+                                  onClick={() => setSelectedLinkedFamilyCode(familyCode)}
+                                  className={`px-4 py-2 text-sm font-semibold transition-all rounded-md ${selectedLinkedFamilyCode === familyCode
+                                      ? 'bg-white text-emerald-600 shadow-sm'
+                                      : 'text-gray-500 hover:text-gray-700'
+                                    }`}
+                                >
+                                  {linkedFamilyNameMap[familyCode] || familyCode}
+                                  <span className="ml-1.5 text-xs text-gray-400">({familyCode})</span>
+                                  <span className="ml-1.5 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">
+                                    {members.length}
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
 
-                    {selectedLinkedFamilyMembers.length > 0 ? (
-                      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                        <div className="flex flex-col gap-3">
-                          {paginateData(selectedLinkedFamilyMembers).map((member) => (
-                            <SingleMemberCard key={`linked-${member.id}`} member={member} showFamilyCode />
-                          ))}
+                          {/* Selected Family Members */}
+                          {selectedLinkedFamilyCode && treeLinkedFamilyMap[selectedLinkedFamilyCode] ? (
+                            <div className="bg-emerald-50/50 rounded-lg p-4">
+                              <h3 className="text-sm font-bold text-emerald-800 mb-3 flex items-center gap-2">
+                                <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
+                                {linkedFamilyNameMap[selectedLinkedFamilyCode] || selectedLinkedFamilyCode}
+                                <span className="text-xs font-normal text-gray-500 bg-white px-2 py-0.5 rounded border">
+                                  {selectedLinkedFamilyCode}
+                                </span>
+                              </h3>
+                              <div className="flex flex-col gap-2">
+                                {treeLinkedFamilyMap[selectedLinkedFamilyCode].map((member) => (
+                                  <SingleMemberCard 
+                                    key={`tree-${member.id}`} 
+                                    member={member} 
+                                    showFamilyCode 
+                                    allowManageActions 
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center justify-center py-8 bg-gray-50 rounded-lg">
+                              <p className="text-gray-500 text-sm font-medium">Select a family to view members</p>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center py-8 bg-gray-50 rounded-lg">
+                          <p className="text-gray-500 text-sm font-medium">No linked members in your tree yet</p>
+                          <p className="text-gray-400 text-xs mt-1">Add members from linked families to your tree to see them here</p>
                         </div>
-                        <PaginationControls totalItems={selectedLinkedFamilyMembers.length} />
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Section 2: ALL Linked Family Members */}
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                  <button
+                    onClick={() => setLinkedAccordionOpen(prev => ({ ...prev, allLinked: !prev.allLinked }))}
+                    className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
                       </div>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center py-10 bg-white rounded-xl shadow-sm border border-gray-200">
-                        <p className="text-gray-500 text-sm font-medium">No members found in this selection.</p>
+                      <div className="text-left">
+                        <h2 className="text-lg font-bold text-gray-900">All Family Members</h2>
+                        <p className="text-sm text-gray-500">Complete list of all members from linked families</p>
                       </div>
-                    )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-bold">
+                        {selectedLinkedFamilyCode 
+                          ? selectedLinkedFamilyMembersAll.filter(m => m.sourceFamilyCode === selectedLinkedFamilyCode).length
+                          : 'Select a family'}
+                      </span>
+                      <svg 
+                        className={`w-5 h-5 text-gray-400 transition-transform ${linkedAccordionOpen.allLinked ? 'rotate-180' : ''}`} 
+                        fill="none" 
+                        stroke="currentColor" 
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </button>
+                  
+                  {linkedAccordionOpen.allLinked && (
+                    <div className="p-4 border-t border-gray-100">
+                      {linkedFamiliesOptions.length > 0 ? (
+                        <>
+                          {/* Tab-style Family Filter */}
+                          <div className="mb-4">
+                            <div className="flex flex-wrap gap-1 bg-gray-100/50 p-1 rounded-lg">
+                              {linkedFamiliesOptions.map((family) => {
+                                const familyMemberCount = selectedLinkedFamilyMembersAll.filter(
+                                  m => m.sourceFamilyCode === family.familyCode
+                                ).length;
+                                return (
+                                  <button
+                                    type="button"
+                                    key={`linked-tab-${family.familyCode}`}
+                                    onClick={() => setSelectedLinkedFamilyCode(family.familyCode)}
+                                    className={`px-4 py-2 text-sm font-semibold transition-all rounded-md ${selectedLinkedFamilyCode === family.familyCode
+                                        ? 'bg-white text-blue-600 shadow-sm'
+                                        : 'text-gray-500 hover:text-gray-700'
+                                      }`}
+                                  >
+                                    {family.familyName || 'Family'}
+                                    <span className="ml-1.5 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">
+                                      {familyMemberCount}
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Members List */}
+                          {selectedLinkedFamilyCode ? (
+                            (() => {
+                              const filteredMembers = selectedLinkedFamilyMembersAll.filter(m => m.sourceFamilyCode === selectedLinkedFamilyCode);
+                              
+                              return filteredMembers.length > 0 ? (
+                                <div className="flex flex-col gap-3">
+                                  <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 mb-2">
+                                    <p className="text-sm text-blue-700">
+                                      <span className="font-semibold">{filteredMembers.length}</span> member{filteredMembers.length > 1 ? 's' : ''}
+                                      {' from '}{linkedFamilyNameMap[selectedLinkedFamilyCode] || selectedLinkedFamilyCode}
+                                    </p>
+                                  </div>
+                                  {paginateData(filteredMembers).map((member) => (
+                                    <SingleMemberCard 
+                                      key={`family-all-${member.id}`} 
+                                      member={member} 
+                                      showFamilyCode 
+                                    />
+                                  ))}
+                                  <PaginationControls totalItems={filteredMembers.length} />
+                                </div>
+                              ) : (
+                                <div className="flex flex-col items-center justify-center py-8 bg-gray-50 rounded-lg">
+                                  <p className="text-gray-500 text-sm font-medium">No members from this family</p>
+                                </div>
+                              );
+                            })()
+                          ) : (
+                            <div className="flex flex-col items-center justify-center py-8 bg-gray-50 rounded-lg">
+                              <p className="text-gray-500 text-sm font-medium">Select a family to view members</p>
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center py-8 bg-gray-50 rounded-lg">
+                          <p className="text-gray-500 text-sm font-medium">No linked families discovered yet</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Section 3: App Users Ready to Link (NOT linked yet) */}
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                  <button
+                    onClick={() => setLinkedAccordionOpen(prev => ({ ...prev, readyToLink: !prev.readyToLink }))}
+                    className="w-full flex items-center justify-between p-4 bg-amber-50 hover:bg-amber-100 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center text-white">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                        </svg>
+                      </div>
+                      <div className="text-left">
+                        <h2 className="text-lg font-bold text-gray-900">Ready to Link</h2>
+                        <p className="text-sm text-gray-500">App users from linked families available for linking</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <svg 
+                        className={`w-5 h-5 text-gray-400 transition-transform ${linkedAccordionOpen.readyToLink ? 'rotate-180' : ''}`} 
+                        fill="none" 
+                        stroke="currentColor" 
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </button>
+                  
+                  {linkedAccordionOpen.readyToLink && (
+                    <div className="p-4 border-t border-gray-100">
+                      {selectedLinkedFamilyCode ? (
+                        loadingLinkedFamily ? (
+                          <div className="flex justify-center items-center py-8">
+                            <div className="animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-amber-500" />
+                            <span className="ml-3 text-sm text-gray-500">Loading...</span>
+                          </div>
+                        ) : (
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2 bg-gray-50 p-3 rounded-lg border border-gray-100 mb-4">
+                              <span className="text-sm font-semibold text-gray-500 mr-2">Select Family:</span>
+                              {linkedFamiliesOptions.map((family) => (
+                                <button
+                                  type="button"
+                                  key={`ready-${family.familyCode}`}
+                                  onClick={() => setSelectedLinkedFamilyCode(family.familyCode)}
+                                  className={`rounded-lg px-3 py-1 text-sm font-semibold transition-all ${selectedLinkedFamilyCode === family.familyCode
+                                      ? 'bg-amber-500 text-white shadow-sm'
+                                      : 'bg-white text-gray-700 hover:bg-amber-50 border border-gray-200'
+                                    }`}
+                                >
+                                  {(family.familyName || 'Family')}
+                                </button>
+                              ))}
+                            </div>
+                            
+                            {(() => {
+                              // Get all app users from selected family
+                              const allAppUsers = selectedLinkedFamilyMembersAll.filter(
+                                (m) => m.userId && 
+                                        m.user?.isAppUser &&
+                                        m.name && 
+                                        m.name.toLowerCase().includes(searchTerm.toLowerCase())
+                              );
+                              
+                              // Check which users are already in the tree
+                              const linkedInTreeIds = new Set(
+                                Object.values(treeLinkedFamilyMap)
+                                  .flat()
+                                  .map(m => Number(m.userId))
+                                  .filter(id => id > 0)
+                              );
+                              
+                              // Separate into ready and already linked
+                              const readyToLink = allAppUsers.filter(m => !linkedInTreeIds.has(Number(m.userId)));
+                              const alreadyLinked = allAppUsers.filter(m => linkedInTreeIds.has(Number(m.userId)));
+                              
+                              const totalCount = allAppUsers.length;
+                              
+                              return totalCount > 0 ? (
+                                <div className="flex flex-col gap-3">
+                                  <div className="bg-amber-50 border border-amber-100 rounded-lg p-3">
+                                    <p className="text-sm text-amber-700">
+                                      <span className="font-semibold">{readyToLink.length}</span> ready to link
+                                      {alreadyLinked.length > 0 && (
+                                        <span className="text-amber-600"> • <span className="font-semibold">{alreadyLinked.length}</span> already in tree</span>
+                                      )}
+                                    </p>
+                                  </div>
+                                  {/* Ready to link - normal state */}
+                                  {readyToLink.map((member) => (
+                                    <SingleMemberCard key={`ready-${member.id}`} member={member} showFamilyCode allowManageActions />
+                                  ))}
+                                  {/* Already linked - disabled state */}
+                                  {alreadyLinked.map((member) => (
+                                    <SingleMemberCard key={`ready-linked-${member.id}`} member={member} showFamilyCode disabled />
+                                  ))}
+                                  <PaginationControls totalItems={totalCount} />
+                                </div>
+                              ) : (
+                                <div className="flex flex-col items-center justify-center py-8 bg-gray-50 rounded-lg">
+                                  <p className="text-gray-500 text-sm font-medium">No app users found in this family</p>
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        )
+                      ) : (
+                        <div className="flex flex-col items-center justify-center py-8 bg-gray-50 rounded-lg">
+                          <p className="text-gray-500 text-sm font-medium">Select a linked family first</p>
+                          <p className="text-gray-400 text-xs mt-1">Choose a family from the &quot;All Linked Members&quot; section above</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'pending' && (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-1">Members Not in Tree</h2>
+                <p className="text-sm text-gray-500 mb-6">These birth family members are not yet placed in the family tree (Under Admin's Family Code).</p>
+                {filteredMembersNotInTree.length > 0 ? (
+                  <>
+                    <div className="flex flex-col gap-3">
+                      {paginateData(filteredMembersNotInTree).map((member) => (
+                        <SingleMemberCard key={`not-in-tree-${member.id}`} member={member} allowDelete />
+                      ))}
+                    </div>
+                    <PaginationControls totalItems={filteredMembersNotInTree.length} />
                   </>
                 ) : (
-                  <div className="flex items-center justify-center py-10 bg-white rounded-xl shadow-sm border border-gray-200">
-                    <p className="text-gray-500 text-sm font-medium">No linked families discovered yet.</p>
+                  <div className="flex flex-col items-center justify-center py-12 bg-gray-50 rounded-xl border border-gray-100">
+                    <p className="text-gray-500 text-sm font-medium">All birth family members are already placed in the family tree.</p>
+                    <p className="text-gray-400 text-xs mt-1">New members who haven't been added to the tree will appear here.</p>
                   </div>
                 )}
               </div>
             )}
 
-            {activeTab === 'pending' && filteredMembersNotInTree.length > 0 && (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-1">Pending Connections</h2>
-                <p className="text-sm text-gray-500 mb-6">These members have registered but need tree placement.</p>
-                <div className="flex flex-col gap-3">
-                  {paginateData(filteredMembersNotInTree).map((member) => (
-                    <SingleMemberCard key={`not-in-tree-${member.id}`} member={member} allowDelete />
-                  ))}
-                </div>
-                <PaginationControls totalItems={filteredMembersNotInTree.length} />
-              </div>
-            )}
-
-            {activeTab === 'blocked' && blockedMembers.length > 0 && (
+            {activeTab === 'blocked' && (
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                 <h2 className="text-xl font-bold text-red-600 mb-1">Blocked Profiles</h2>
-                <p className="text-sm text-gray-500 mb-6">Manage restricted users.</p>
-                <div className="flex flex-col gap-3">
-                  {paginateData(blockedMembers).map((member) => (
-                    <div
-                      key={`blocked-member-${member.id}`}
-                      className="flex items-center gap-4 rounded-xl border border-red-100 bg-red-50/30 p-4 shadow-sm"
-                    >
-                      <img
-                        src={member.profilePic || 'https://placehold.co/48x48/e2e8f0/64748b?text=👤'}
-                        alt={member.name}
-                        className="h-12 w-12 flex-shrink-0 rounded-full object-cover ring-2 ring-red-100"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="truncate text-sm font-bold text-gray-900">{member.name}</span>
-                          <BlockedBadge />
-                        </div>
-                        <span className={`mt-1 inline-flex items-center rounded-md px-2 py-0.5 text-[10px] uppercase font-bold tracking-wider ${relationColors[member.role] || 'bg-gray-100 text-gray-800'}`}>
-                          {member.role}
-                        </span>
-                      </div>
-                      {currentUserIsFamilyAdmin && (
-                        <div className="flex-shrink-0 scale-90">
-                          <BlockButton
-                            userId={member.userId}
-                            isBlockedByMe
-                            location="profile"
-                            userName={member.name}
-                            onStatusChange={(nextStatus) =>
-                              handleMemberBlockStatusChange(member.userId, nextStatus)
-                            }
+                <p className="text-sm text-gray-500 mb-6">Manage restricted users. Blocked users cannot see your posts or interact with you.</p>
+                {blockedMembers.length > 0 ? (
+                  <>
+                    <div className="flex flex-col gap-3">
+                      {paginateData(blockedMembers).map((member) => (
+                        <div
+                          key={`blocked-member-${member.id}`}
+                          className="flex items-center gap-4 rounded-xl border border-red-100 bg-red-50/30 p-4 shadow-sm"
+                        >
+                          <img
+                            src={member.profilePic || 'https://placehold.co/48x48/e2e8f0/64748b?text=👤'}
+                            alt={member.name}
+                            className="h-12 w-12 flex-shrink-0 rounded-full object-cover ring-2 ring-red-100"
                           />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="truncate text-sm font-bold text-gray-900">{member.name}</span>
+                              <BlockedBadge />
+                            </div>
+                            <span className={`mt-1 inline-flex items-center rounded-md px-2 py-0.5 text-[10px] uppercase font-bold tracking-wider ${relationColors[member.role] || 'bg-gray-100 text-gray-800'}`}>
+                              {member.role}
+                            </span>
+                          </div>
+                          {currentUserIsFamilyAdmin && (
+                            <div className="flex-shrink-0 scale-90">
+                              <BlockButton
+                                userId={member.userId}
+                                isBlockedByMe
+                                location="profile"
+                                userName={member.name}
+                                onStatusChange={(nextStatus) =>
+                                  handleMemberBlockStatusChange(member.userId, nextStatus)
+                                }
+                              />
+                            </div>
+                          )}
                         </div>
-                      )}
+                      ))}
                     </div>
-                  ))}
-                </div>
-                <PaginationControls totalItems={blockedMembers.length} />
+                    <PaginationControls totalItems={blockedMembers.length} />
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12 bg-gray-50 rounded-xl border border-gray-100">
+                    <p className="text-gray-500 text-sm font-medium">No blocked members.</p>
+                    <p className="text-gray-400 text-xs mt-1">Blocked users will appear here. You can unblock them anytime.</p>
+                  </div>
+                )}
               </div>
             )}
 
             {activeTab === 'privacy' && (
-              <div className="max-w-4xl mx-auto">
+              <div className="w-full">
                 <PrivacyControls />
               </div>
             )}

@@ -8,18 +8,18 @@ const getStorageKey = (userId) =>
 export const buildDefaultFamilyPrivacySettings = (familyCode = '') => {
   const normalizedCode = normalizeFamilyCode(familyCode);
   return {
-    version: 1,
+    version: 2,
     posts: {
       visibility: 'all-members',
-      familyCode: normalizedCode,
+      familyCodes: normalizedCode ? [normalizedCode] : [],
     },
     albums: {
       visibility: 'all-members',
-      familyCode: normalizedCode,
+      familyCodes: normalizedCode ? [normalizedCode] : [],
     },
     events: {
       visibility: 'all-members',
-      familyCode: normalizedCode,
+      familyCodes: normalizedCode ? [normalizedCode] : [],
     },
     updatedAt: '',
   };
@@ -38,10 +38,17 @@ export const getFamilyPrivacySettings = ({ userId, familyCode = '' } = {}) => {
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object') return defaults;
 
-    const normalizeSetting = (setting, fallback) => ({
-      visibility: setting?.visibility === 'specific-family' ? 'specific-family' : 'all-members',
-      familyCode: normalizeFamilyCode(setting?.familyCode || fallback.familyCode),
-    });
+    const normalizeSetting = (setting, fallback) => {
+      const familyCodes = Array.isArray(setting?.familyCodes) 
+        ? setting.familyCodes.filter(Boolean).map(normalizeFamilyCode)
+        : setting?.familyCode 
+          ? [normalizeFamilyCode(setting.familyCode)]
+          : fallback.familyCodes;
+      return {
+        visibility: setting?.visibility === 'specific-family' ? 'specific-family' : 'all-members',
+        familyCodes,
+      };
+    };
 
     return {
       ...defaults,
@@ -56,27 +63,30 @@ export const getFamilyPrivacySettings = ({ userId, familyCode = '' } = {}) => {
 };
 
 export const saveFamilyPrivacySettings = ({ userId, settings } = {}) => {
-  const defaults = buildDefaultFamilyPrivacySettings(settings?.posts?.familyCode || '');
+  const defaults = buildDefaultFamilyPrivacySettings(settings?.posts?.familyCodes?.[0] || '');
+  const normalizeCodes = (codes) => Array.isArray(codes) 
+    ? codes.filter(Boolean).map(normalizeFamilyCode)
+    : defaults.familyCodes;
   const next = {
     ...defaults,
     ...settings,
     posts: {
       ...defaults.posts,
       ...(settings?.posts || {}),
-      familyCode: normalizeFamilyCode(settings?.posts?.familyCode || defaults.posts.familyCode),
+      familyCodes: normalizeCodes(settings?.posts?.familyCodes),
     },
     albums: {
       ...defaults.albums,
       ...(settings?.albums || {}),
-      familyCode: normalizeFamilyCode(settings?.albums?.familyCode || defaults.albums.familyCode),
+      familyCodes: normalizeCodes(settings?.albums?.familyCodes),
     },
     events: {
       ...defaults.events,
       ...(settings?.events || {}),
-      familyCode: normalizeFamilyCode(settings?.events?.familyCode || defaults.events.familyCode),
+      familyCodes: normalizeCodes(settings?.events?.familyCodes),
     },
     updatedAt: new Date().toISOString(),
-    version: 1,
+    version: 2,
   };
 
   if (typeof window !== 'undefined' && window.localStorage) {
