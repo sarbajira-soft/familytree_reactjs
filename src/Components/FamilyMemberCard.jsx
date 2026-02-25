@@ -6,6 +6,7 @@ import Swal from 'sweetalert2';
 import { BlockButton } from './block/BlockButton';
 import { BlockedBadge } from './block/BlockedBadge';
 import { logger } from '../utils/logger';
+import { getBlockedUsers } from '../services/block.service';
 import {
   buildDefaultFamilyPrivacySettings,
   getFamilyPrivacySettings,
@@ -50,6 +51,9 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
   const [notInTreeLoading, setNotInTreeLoading] = useState(false);
   const [associatedFamilyNameMap, setAssociatedFamilyNameMap] = useState({});
   const [linkedFamilyNameMap, setLinkedFamilyNameMap] = useState({});
+  // BLOCK OVERRIDE: Add state for blocked users from API
+  const [blockedUsers, setBlockedUsers] = useState([]);
+  const [loadingBlocked, setLoadingBlocked] = useState(false);
   const [privacySettings, setPrivacySettings] = useState(() =>
     buildDefaultFamilyPrivacySettings(''),
   );
@@ -182,6 +186,46 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
     }
   };
 
+  // BLOCK OVERRIDE: Fetch blocked users from API
+  const fetchBlockedUsersData = async () => {
+    if (!token) return;
+    
+    setLoadingBlocked(true);
+    try {
+      const response = await getBlockedUsers();
+      const users = response?.data || [];
+      console.log('[FamilyMemberCard] Blocked users fetched:', users.length);
+      
+      // Transform blocked users to match member format
+      const formattedBlockedUsers = users.map((item) => ({
+        id: `blocked-${item.id}`,
+        memberId: null,
+        userId: item.blockedUserId,
+        membershipType: 'blocked',
+        user: item.user,
+        name: item.user?.name || 'Unknown User',
+        gender: item.user?.userProfile?.gender || 'N/A',
+        role: 'Blocked Member',
+        contact: item.user?.mobile || item.user?.email || '',
+        address: item.user?.userProfile?.address || '',
+        dob: item.user?.userProfile?.dob || '',
+        age: item.user?.userProfile?.age || '',
+        profilePic: item.user?.profilePhoto || null,
+        isAdmin: false,
+        blockStatus: { isBlockedByMe: true, isBlockedByThem: false },
+        sourceFamilyCode: item.user?.familyCode || '',
+        blockedDate: item.createdAt,
+      }));
+      
+      setBlockedUsers(formattedBlockedUsers);
+    } catch (err) {
+      logger.error('[FamilyMemberCard] Failed to load blocked users:', err);
+      setBlockedUsers([]);
+    } finally {
+      setLoadingBlocked(false);
+    }
+  };
+
   useEffect(() => {
     if (familyCode && token) {
       setLoading(true);
@@ -194,6 +238,13 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
       fetchLinkedFamilies();
     }
   }, [familyCode, token]);
+
+  // BLOCK OVERRIDE: Fetch blocked users when Blocked tab is active
+  useEffect(() => {
+    if (activeTab === 'blocked' && token) {
+      fetchBlockedUsersData();
+    }
+  }, [activeTab, token]);
 
   const calculateAge = (dob) => {
     if (!dob) return 'N/A';
@@ -325,7 +376,46 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
 
   const handleMemberBlockStatusChange = (memberUserId, nextStatus) => {
     // BLOCK OVERRIDE: Apply local optimistic block status updates using new block contract.
+    // Update ALL member arrays that might contain this user
+    
+    // Update main family members
     setFamilyMembers((prevMembers) =>
+      prevMembers.map((member) =>
+        Number(member.userId) === Number(memberUserId)
+          ? { ...member, blockStatus: nextStatus }
+          : member,
+      ),
+    );
+    
+    // Update selected associated family members
+    setSelectedAssociatedFamilyMembersAll((prevMembers) =>
+      prevMembers.map((member) =>
+        Number(member.userId) === Number(memberUserId)
+          ? { ...member, blockStatus: nextStatus }
+          : member,
+      ),
+    );
+    
+    // Update selected linked family members
+    setSelectedLinkedFamilyMembersAll((prevMembers) =>
+      prevMembers.map((member) =>
+        Number(member.userId) === Number(memberUserId)
+          ? { ...member, blockStatus: nextStatus }
+          : member,
+      ),
+    );
+    
+    // Update tree people (associated from tree)
+    setTreeAllPeople((prevMembers) =>
+      prevMembers.map((member) =>
+        Number(member.userId) === Number(memberUserId)
+          ? { ...member, blockStatus: nextStatus }
+          : member,
+      ),
+    );
+    
+    // Update members not in tree
+    setMembersNotInTree((prevMembers) =>
       prevMembers.map((member) =>
         Number(member.userId) === Number(memberUserId)
           ? { ...member, blockStatus: nextStatus }
@@ -851,6 +941,15 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
     [membersNotInTree, searchTerm],
   );
 
+  // BLOCK OVERRIDE: Add filtered blocked members
+  const filteredBlockedMembers = useMemo(
+    () =>
+      blockedUsers.filter((member) =>
+        member.name && member.name.toLowerCase().includes(searchTerm.toLowerCase())
+      ),
+    [blockedUsers, searchTerm],
+  );
+
   const privacyFamilyOptions = useMemo(() => {
     const map = new Map();
     if (birthFamilyCode) {
@@ -1120,7 +1219,7 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                       isBlockedByMe={Boolean(member?.blockStatus?.isBlockedByMe)}
                       location="membersList"
                       userName={member.name}
-                      onStatusChange={(nextStatus) => handleMemberBlockStatusChange(member.userId, nextStatus)}
+                      onStatusChange={(userId, nextStatus) => handleMemberBlockStatusChange(userId, nextStatus)}
                     />
                   </div>
                 )}
@@ -2179,10 +2278,14 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
                 <h2 className="text-xl font-bold text-red-600 mb-1">Blocked Profiles</h2>
                 <p className="text-sm text-gray-500 mb-6">Manage restricted users. Blocked users cannot see your posts or interact with you.</p>
-                {blockedMembers.length > 0 ? (
+                {loadingBlocked ? (
+                  <div className="flex flex-col items-center justify-center py-12 bg-gray-50 rounded-xl border border-gray-100">
+                    <p className="text-gray-500 text-sm font-medium">Loading blocked members...</p>
+                  </div>
+                ) : filteredBlockedMembers.length > 0 ? (
                   <>
                     <div className="flex flex-col gap-3">
-                      {paginateData(blockedMembers).map((member) => (
+                      {paginateData(filteredBlockedMembers).map((member) => (
                         <div
                           key={`blocked-member-${member.id}`}
                           className="flex items-center gap-4 rounded-xl border border-red-100 bg-red-50/30 p-4 shadow-sm"
@@ -2217,7 +2320,7 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                         </div>
                       ))}
                     </div>
-                    <PaginationControls totalItems={blockedMembers.length} />
+                    <PaginationControls totalItems={filteredBlockedMembers.length} />
                   </>
                 ) : (
                   <div className="flex flex-col items-center justify-center py-12 bg-gray-50 rounded-xl border border-gray-100">

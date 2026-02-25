@@ -97,7 +97,9 @@ const ViewFamilyMemberModal = ({ isOpen, onClose, member, isLoading = false }) =
   };
 
   const getGenderIcon = (gender) => {
-    return gender === 'Male' ? <FaMale className="text-blue-500" /> : <FaFemale className="text-pink-500" />;
+    const normalizedGender = String(gender || '').toLowerCase().trim();
+    const isMale = normalizedGender === 'male' || normalizedGender === 'm' || normalizedGender === 'man';
+    return isMale ? <FaMale className="text-blue-500" /> : <FaFemale className="text-pink-500" />;
   };
 
   const formatApprovalStatus = (status) => {

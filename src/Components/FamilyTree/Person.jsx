@@ -836,10 +836,13 @@ function getProfileBoxShadow(isRoot, isSelected, gender) {
 }
 
 function renderGenderIcon(genderLabel) {
-  if (["M", "H"].includes(genderLabel)) {
+  const normalized = String(genderLabel || '').toLowerCase().trim();
+  // M, H (husband), male, man → Male icon
+  if (normalized === 'm' || normalized === 'h' || normalized === 'male' || normalized === 'man') {
     return <FaMale className="mx-auto text-sky-600 text-lg" />;
   }
-  if (["F", "W"].includes(genderLabel)) {
+  // F, W (wife), female, woman → Female icon
+  if (normalized === 'f' || normalized === 'w' || normalized === 'female' || normalized === 'woman') {
     return <FaFemale className="mx-auto text-pink-500 text-lg" />;
   }
   return <FiUser className="mx-auto text-slate-500 text-[18px]" />;

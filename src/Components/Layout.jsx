@@ -708,6 +708,15 @@ const Layout = ({ noScroll = false }) => {
                     </button>
                     <button
                       onClick={() => {
+                        navigate('/blocked-members');
+                        setProfileOpen(false);
+                      }}
+                      className="block w-full bg-white text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                    >
+                      Privacy
+                    </button>
+                    <button
+                      onClick={() => {
                         toggleTheme();
                         setProfileOpen(false);
                       }}

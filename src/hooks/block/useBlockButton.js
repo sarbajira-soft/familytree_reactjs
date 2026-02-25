@@ -51,7 +51,7 @@ export const useBlockButton = ({
 
       if (onStatusChange) {
         const nextStatus = { ...DEFAULT_STATUS, isBlockedByMe: action === 'block' };
-        onStatusChange(nextStatus);
+        onStatusChange(userId, nextStatus);
       }
 
       closeModal();
