@@ -1072,14 +1072,24 @@ const ProfileFormModal = ({
 
   const handleDeleteProfile = async () => {
     const result = await Swal.fire({
-      title: 'Are you sure?',
-      text: "This action cannot be undone. Your profile will be permanently deleted!",
+      title: 'Delete account?',
+      text: 'Type DELETE to schedule account deletion. You can recover this account within 30 days.',
       icon: 'warning',
+      input: 'text',
+      inputPlaceholder: 'Type DELETE',
       showCancelButton: true,
       confirmButtonColor: '#d33',
       cancelButtonColor: '#3085d6',
-      confirmButtonText: 'Yes, delete my profile!',
-      cancelButtonText: 'Cancel'
+      confirmButtonText: 'Request deletion',
+      cancelButtonText: 'Cancel',
+      preConfirm: (value) => {
+        const normalized = String(value || '').trim().toUpperCase();
+        if (normalized !== 'DELETE') {
+          Swal.showValidationMessage('You must type DELETE exactly.');
+          return false;
+        }
+        return normalized;
+      },
     });
 
     if (result.isConfirmed) {
@@ -1091,13 +1101,10 @@ const ProfileFormModal = ({
           throw new Error('Authentication token not found');
         }
 
-        const userId = userInfo?.userId;
-        const response = await authFetchResponse(`/user/${userId}`, {
-          method: 'DELETE',
+        const response = await authFetchResponse('/user/account/delete', {
+          method: 'POST',
           skipThrow: true,
-          headers: {
-            accept: '*/*'
-          }
+          body: JSON.stringify({ confirmText: 'DELETE' }),
         });
 
         if (!response.ok) {
@@ -1106,16 +1113,37 @@ const ProfileFormModal = ({
           throw new Error(errorMessage);
         }
 
+        const payload = await response.json().catch(() => null);
+        const purgeAfter = payload?.data?.purgeAfter ? new Date(payload.data.purgeAfter) : null;
+        const recoverableUntil = purgeAfter && !Number.isNaN(purgeAfter.getTime())
+          ? purgeAfter.toLocaleString()
+          : null;
+
+        const identifier =
+          String(userInfo?.email || '').trim() ||
+          `${String(userInfo?.countryCode || '').trim()}${String(userInfo?.mobile || '').trim()}`;
+        if (identifier) {
+          sessionStorage.setItem(
+            'accountRecoveryHint',
+            JSON.stringify({
+              identifier,
+              purgeAfter: payload?.data?.purgeAfter || null,
+            }),
+          );
+        }
+
         // Clear local storage and redirect to login
         clearAuthData();
         
         Swal.fire({
           icon: 'success',
-          title: 'Profile Deleted!',
-          text: 'Your profile has been successfully deleted.',
+          title: 'Account Deletion Requested',
+          text: recoverableUntil
+            ? `Your account is recoverable until ${recoverableUntil}.`
+            : 'Your account is now pending deletion and can be recovered for 30 days.',
           confirmButtonColor: '#10b981',
         }).then(() => {
-          window.location.href = '/login';
+          window.location.href = '/account-recovery';
         });
         
       } catch (error) {

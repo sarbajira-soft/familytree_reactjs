@@ -26,6 +26,7 @@ const Register = lazy(() => import("./Pages/Register"));
 const ForgotPassword = lazy(() => import("./Pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./Pages/ResetPassword"));
 const VerifyOtp = lazy(() => import("./Pages/VerifyOtp"));
+const AccountRecoveryPage = lazy(() => import("./Pages/AccountRecoveryPage"));
 const OnBoarding = lazy(() => import("./Pages/OnBoarding"));
 const TermsAndConditions = lazy(() => import("./Pages/TermsAndConditions"));
 const Dashboard = lazy(() => import("./Pages/Dashboard"));
@@ -135,6 +136,14 @@ function App() {
                 element={
                   <GuestRoute>
                     <VerifyOtp />
+                  </GuestRoute>
+                }
+              />
+              <Route
+                path="/account-recovery"
+                element={
+                  <GuestRoute>
+                    <AccountRecoveryPage />
                   </GuestRoute>
                 }
               />

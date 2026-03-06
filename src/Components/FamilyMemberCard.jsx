@@ -48,6 +48,11 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
   const [memberIdsInTree, setMemberIdsInTree] = useState(() => new Set());
   const [treeLinkedFamilyMap, setTreeLinkedFamilyMap] = useState({});
   const [treeAllPeople, setTreeAllPeople] = useState([]);
+  const [nonAppUsers, setNonAppUsers] = useState([]);
+  const [loadingNonAppUsers, setLoadingNonAppUsers] = useState(false);
+  const [replacementSelections, setReplacementSelections] = useState({});
+  const [replacingDummyIds, setReplacingDummyIds] = useState(() => new Set());
+  const [selfRemoving, setSelfRemoving] = useState(false);
   const [notInTreeLoading, setNotInTreeLoading] = useState(false);
   const [associatedFamilyNameMap, setAssociatedFamilyNameMap] = useState({});
   const [linkedFamilyNameMap, setLinkedFamilyNameMap] = useState({});
@@ -143,6 +148,36 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
     }
   };
 
+  const fetchNonAppUsers = async () => {
+    if (!familyCode || !token || !currentUserIsFamilyAdmin) {
+      setNonAppUsers([]);
+      return;
+    }
+
+    setLoadingNonAppUsers(true);
+    try {
+      const res = await fetch(`${BASE_URL}/family/member/${familyCode}/non-app-users`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
+      });
+
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(json?.message || 'Failed to fetch non-app users');
+      }
+
+      const rows = Array.isArray(json?.data) ? json.data : [];
+      setNonAppUsers(rows);
+    } catch (error) {
+      logger.error('Failed to load non-app users', error);
+      setNonAppUsers([]);
+    } finally {
+      setLoadingNonAppUsers(false);
+    }
+  };
+
   const fetchLinkedFamilies = async () => {
     if (!familyCode || !token) return;
 
@@ -234,6 +269,28 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
   }, [familyCode, token]);
 
   useEffect(() => {
+    if (familyCode && token && currentUserIsFamilyAdmin) {
+      fetchNonAppUsers();
+    } else {
+      setNonAppUsers([]);
+    }
+  }, [familyCode, token, currentUserIsFamilyAdmin]);
+
+  useEffect(() => {
+    setReplacementSelections((prev) => {
+      const validDummyIds = new Set(nonAppUsers.map((row) => Number(row?.dummyUserId)));
+      const next = {};
+      Object.keys(prev).forEach((key) => {
+        const dummyId = Number(key);
+        if (validDummyIds.has(dummyId)) {
+          next[dummyId] = prev[key];
+        }
+      });
+      return next;
+    });
+  }, [nonAppUsers]);
+
+  useEffect(() => {
     if (familyCode && token) {
       fetchLinkedFamilies();
     }
@@ -275,26 +332,27 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
   const handleDeleteMember = async (memberId, familyCode, userId, e) => {
     if (e?.stopPropagation) e.stopPropagation();
 
-    if (memberIdsInTree.has(Number(userId))) {
-      await Swal.fire({
-        icon: 'info',
-        title: 'Member is in Tree',
-        text: 'This member is already placed in Family Tree. Use Family Tree unlink/delete flow to avoid genealogy breakage.',
-      });
-      return;
-    }
+    const inTree = memberIdsInTree.has(Number(userId));
 
     const confirm = await Swal.fire({
       icon: 'warning',
       title: 'Delete Member?',
-      text: 'This will remove the member from this family.',
+      text: inTree
+        ? 'This member is in the family tree. Deleting will convert the tree card into a Non-App user.'
+        : 'This will remove the member from this family.',
       showCancelButton: true,
-      confirmButtonText: 'Yes, Delete',
+      confirmButtonText: 'Yes, remove member',
       cancelButtonText: 'Cancel',
       confirmButtonColor: '#e53e3e',
     });
 
     if (!confirm.isConfirmed) return;
+
+    setDeletedMemberIds((prev) => {
+      const next = new Set(prev);
+      next.add(memberId);
+      return next;
+    });
 
     try {
       const res = await fetch(
@@ -317,30 +375,137 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
 
       await Swal.fire({
         icon: 'success',
-        title: 'Member Deleted',
+        title: json?.alreadyProcessed ? 'Already Removed' : 'Member Removed',
         text: json?.message || 'Family member removed successfully.',
       });
 
-      setDeletedMemberIds((prev) => {
-        const next = new Set(prev);
-        next.add(memberId);
-        return next;
-      });
-
-      setTimeout(() => {
-        setFamilyMembers((prev) => prev.filter((m) => m.memberId !== memberId));
-        setDeletedMemberIds((prev) => {
-          const next = new Set(prev);
-          next.delete(memberId);
-          return next;
-        });
-      }, 600);
+      await fetchMembers();
+      await fetchNonAppUsers();
     } catch (err) {
       logger.error('BLOCK OVERRIDE: Failed to delete member', err);
       await Swal.fire({
         icon: 'error',
         title: 'Delete Failed',
         text: err?.message || 'Unable to delete this member. Please try again.',
+      });
+    } finally {
+      setDeletedMemberIds((prev) => {
+        const next = new Set(prev);
+        next.delete(memberId);
+        return next;
+      });
+    }
+  };
+
+  const handleSelfRemove = async () => {
+    if (!familyCode || !token) return;
+
+    const confirm = await Swal.fire({
+      icon: 'warning',
+      title: 'Leave Family?',
+      text: 'Type LEAVE to confirm removing yourself from this family tree.',
+      input: 'text',
+      inputPlaceholder: 'Type LEAVE',
+      showCancelButton: true,
+      confirmButtonText: 'Leave family',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#dc2626',
+      preConfirm: (value) => {
+        if (String(value || '').trim().toUpperCase() !== 'LEAVE') {
+          Swal.showValidationMessage('Type LEAVE exactly to continue.');
+          return false;
+        }
+        return true;
+      },
+    });
+    if (!confirm.isConfirmed) return;
+
+    try {
+      setSelfRemoving(true);
+      const res = await fetch(`${BASE_URL}/family/member/self/${familyCode}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(json?.message || 'Failed to leave family');
+      }
+
+      await Swal.fire({
+        icon: 'success',
+        title: 'Removed From Family',
+        text: json?.message || 'You were removed from this family successfully.',
+      });
+      window.location.reload();
+    } catch (error) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Unable to Leave Family',
+        text: error?.message || 'Please try again.',
+      });
+    } finally {
+      setSelfRemoving(false);
+    }
+  };
+
+  const handleReplaceDummy = async (dummyUserId) => {
+    const replacementUserId = Number(replacementSelections?.[dummyUserId]);
+    if (!Number.isFinite(replacementUserId) || replacementUserId <= 0) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Select Replacement',
+        text: 'Choose a valid app user to replace this non-app user.',
+      });
+      return;
+    }
+
+    setReplacingDummyIds((prev) => new Set(prev).add(dummyUserId));
+
+    try {
+      const res = await fetch(
+        `${BASE_URL}/family/member/${familyCode}/non-app-users/${dummyUserId}/replace/${replacementUserId}`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(json?.message || 'Failed to replace dummy user');
+      }
+
+      await Swal.fire({
+        icon: 'success',
+        title: 'Replacement Complete',
+        text: json?.message || 'Dummy user replaced successfully.',
+      });
+
+      setReplacementSelections((prev) => {
+        const next = { ...prev };
+        delete next[dummyUserId];
+        return next;
+      });
+
+      await fetchMembers();
+      await fetchNonAppUsers();
+    } catch (error) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Replacement Failed',
+        text: error?.message || 'Unable to replace non-app user.',
+      });
+    } finally {
+      setReplacingDummyIds((prev) => {
+        const next = new Set(prev);
+        next.delete(dummyUserId);
+        return next;
       });
     }
   };
@@ -933,6 +1098,23 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
     );
   }, [familyMembers, memberIdsInTree]);
 
+  const replacementCandidates = useMemo(() => {
+    const unique = new Map();
+    familyMembers.forEach((member) => {
+      const userId = Number(member?.userId);
+      if (!Number.isFinite(userId) || userId <= 0) return;
+      if (member?.membershipType !== 'member') return;
+      if (!member?.user?.isAppUser) return;
+      if (memberIdsInTree.has(userId)) return;
+      if (unique.has(userId)) return;
+      unique.set(userId, {
+        userId,
+        name: member?.name || `User ${userId}`,
+      });
+    });
+    return Array.from(unique.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [familyMembers, memberIdsInTree]);
+
   const filteredMembersNotInTree = useMemo(
     () =>
       membersNotInTree.filter((member) =>
@@ -1052,6 +1234,10 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
   );
   const blockedMembers = filteredMembers.filter(
     (member) => member?.blockStatus?.isBlockedByMe,
+  );
+  const currentUserId = Number(currentUser?.userId || currentUser?.id);
+  const canSelfRemove = activeBirthMembers.some(
+    (member) => Number(member?.userId) === currentUserId,
   );
 
   const SingleMemberCard = ({
@@ -1572,13 +1758,35 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
 
             {activeTab === 'birth' && (
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-1">Birth Family Directory</h2>
-                <p className="text-sm text-gray-500 mb-6">Manage members of your primary birth family.</p>
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900 mb-1">Birth Family Directory</h2>
+                    <p className="text-sm text-gray-500">Manage members of your primary birth family.</p>
+                  </div>
+                  {canSelfRemove && (
+                    <button
+                      type="button"
+                      onClick={handleSelfRemove}
+                      disabled={selfRemoving}
+                      className="inline-flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-lg border border-red-200 text-red-600 bg-red-50 hover:bg-red-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {selfRemoving ? 'Leaving...' : 'Leave Family'}
+                    </button>
+                  )}
+                </div>
                 {activeBirthMembers.length > 0 ? (
                   <>
                     <div className="flex flex-col gap-3">
                       {paginateData(activeBirthMembers).map((member) => (
-                        <SingleMemberCard key={`birth-${member.id}`} member={member} allowManageActions memberIdsInTree={memberIdsInTree} showWhatsAppInvite showNotInTreeBadge />
+                        <SingleMemberCard
+                          key={`birth-${member.id}`}
+                          member={member}
+                          allowManageActions
+                          allowDelete
+                          memberIdsInTree={memberIdsInTree}
+                          showWhatsAppInvite
+                          showNotInTreeBadge
+                        />
                       ))}
                     </div>
                     <PaginationControls totalItems={activeBirthMembers.length} />
@@ -1587,6 +1795,90 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                   <div className="flex flex-col items-center justify-center py-12 bg-gray-50 rounded-xl border border-gray-100">
                     <p className="text-gray-500 text-sm font-medium">No birth family members found.</p>
                     <p className="text-gray-400 text-xs mt-1">Family members will appear here once added.</p>
+                  </div>
+                )}
+
+                {currentUserIsFamilyAdmin && (
+                  <div className="mt-8 pt-6 border-t border-gray-100">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                      <div>
+                        <h3 className="text-lg font-bold text-gray-900">Non-App Users In Tree</h3>
+                        <p className="text-sm text-gray-500">
+                          Replace dummy cards with active app members not already placed in the tree.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={fetchNonAppUsers}
+                        className="inline-flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-lg border border-gray-200 text-gray-700 bg-white hover:bg-gray-50"
+                      >
+                        Refresh
+                      </button>
+                    </div>
+
+                    {loadingNonAppUsers ? (
+                      <div className="py-8 text-sm text-gray-500">Loading non-app users...</div>
+                    ) : nonAppUsers.length === 0 ? (
+                      <div className="py-8 text-sm text-gray-500 bg-gray-50 rounded-lg border border-gray-100 px-4">
+                        No non-app users found in this family tree.
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-3">
+                        {nonAppUsers.map((dummy) => {
+                          const dummyUserId = Number(dummy?.dummyUserId);
+                          const selectedReplacement = Number(replacementSelections?.[dummyUserId] || 0);
+                          const isReplacing = replacingDummyIds.has(dummyUserId);
+                          return (
+                            <div key={`dummy-${dummyUserId}`} className="rounded-lg border border-gray-200 p-4 bg-gray-50/40">
+                              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                                <div>
+                                  <p className="text-sm font-semibold text-gray-900">
+                                    {dummy?.name || 'Familyss User'}
+                                  </p>
+                                  <p className="text-xs text-gray-500">
+                                    Dummy ID: {dummyUserId} | Node: {dummy?.nodeUid || '-'} | Generation: {dummy?.generation ?? '-'}
+                                  </p>
+                                </div>
+                                <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
+                                  <select
+                                    value={selectedReplacement || ''}
+                                    onChange={(e) => {
+                                      const nextValue = Number(e.target.value || 0);
+                                      setReplacementSelections((prev) => ({
+                                        ...prev,
+                                        [dummyUserId]: nextValue || '',
+                                      }));
+                                    }}
+                                    className="min-w-[220px] rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700"
+                                  >
+                                    <option value="">Select replacement member</option>
+                                    {replacementCandidates.map((candidate) => (
+                                      <option key={`replace-${dummyUserId}-${candidate.userId}`} value={candidate.userId}>
+                                        {candidate.name} (#{candidate.userId})
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleReplaceDummy(dummyUserId)}
+                                    disabled={isReplacing || !selectedReplacement}
+                                    className="inline-flex items-center justify-center px-3 py-2 rounded-lg bg-primary-600 text-white text-sm font-semibold hover:bg-primary-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                                  >
+                                    {isReplacing ? 'Replacing...' : 'Replace'}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {!loadingNonAppUsers && nonAppUsers.length > 0 && replacementCandidates.length === 0 && (
+                      <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                        No eligible replacement members available. Add or approve an app user who is not already in the tree.
+                      </p>
+                    )}
                   </div>
                 )}
               </div>

@@ -20,6 +20,43 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [stayLoggedIn, setStayLoggedIn] = useState(false); // New state for checkbox
 
+  const normalizeIdentifier = (value) => String(value || '').trim();
+
+  const readApiError = async (response) => {
+    try {
+      const body = await response.json();
+      return String(body?.message || body?.error || '').trim();
+    } catch (_) {
+      return '';
+    }
+  };
+
+  const isPendingDeletionError = (message) => {
+    const lower = String(message || '').toLowerCase();
+    return (
+      lower.includes('scheduled for deletion') ||
+      (lower.includes('account') && lower.includes('recover'))
+    );
+  };
+
+  const routeToRecovery = (rawIdentifier = '') => {
+    const identifier = normalizeIdentifier(rawIdentifier);
+    try {
+      if (identifier) {
+        sessionStorage.setItem(
+          'accountRecoveryHint',
+          JSON.stringify({
+            identifier,
+          }),
+        );
+      }
+    } catch (_) {
+      // ignore storage errors
+    }
+
+    navigate('/account-recovery');
+  };
+
   const validate = () => {
     const newErrors = {};
     if (!formData.username.trim()) newErrors.username = 'Email or phone is required';
@@ -71,8 +108,13 @@ const Login = () => {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        setApiError(errorData.message || 'Login failed. Please check credentials.');
+        const errorMessage = await readApiError(response);
+        if (response.status === 403 && isPendingDeletionError(errorMessage)) {
+          setApiError('Account scheduled for deletion. Redirecting to recovery.');
+          routeToRecovery(formData.username);
+          return;
+        }
+        setApiError(errorMessage || 'Login failed. Please check credentials.');
         return;
       }
 
@@ -266,6 +308,11 @@ const Login = () => {
               className="text-[#1976d2] hover:underline"
             >
               Forgot password?
+            </a>
+          </div>
+          <div className="text-right -mt-2">
+            <a href="/account-recovery" className="text-sm text-[#1976d2] hover:underline">
+              Recover deleted account
             </a>
           </div>
 

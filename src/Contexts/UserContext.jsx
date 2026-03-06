@@ -92,6 +92,9 @@ export const UserProvider = ({ children }) => {
       mobile: data.mobile || currentUser.mobile || '',
       status: data.status || currentUser.status || 0,
       role: data.role || currentUser.role || 0,
+      lifecycleState: data.lifecycleState || currentUser.lifecycleState || 'active',
+      deletedAt: data.deletedAt || currentUser.deletedAt || null,
+      purgeAfter: data.purgeAfter || currentUser.purgeAfter || null,
       isAppUser,
       hasAcceptedTerms,
       termsVersion: data.termsVersion || 'v1.0.0',
@@ -130,6 +133,20 @@ export const UserProvider = ({ children }) => {
         method: 'GET',
         skipThrow: true,
       });
+
+      if (response.status === 304) {
+        const existingUser = getUserInfo();
+        if (existingUser) {
+          setUserInfo(existingUser);
+          persistAuthData(token, existingUser);
+          return;
+        }
+
+        const minimalUser = buildMinimalUser(token, null);
+        setUserInfo(minimalUser);
+        persistAuthData(token, minimalUser);
+        return;
+      }
       if (response.status === 401) {
         await handleUnauthorized(response);
         return;
@@ -207,6 +224,9 @@ export const UserProvider = ({ children }) => {
         mobile: mobile || '',
         status: status || 0,
         role: role || 0,
+        lifecycleState: data.lifecycleState || 'active',
+        deletedAt: data.deletedAt || null,
+        purgeAfter: data.purgeAfter || null,
         isAppUser: typeof isAppUser === 'boolean' ? isAppUser : !!jsonData.currentUser?.isAppUser,
         hasAcceptedTerms: typeof hasAcceptedTerms === 'boolean' ? hasAcceptedTerms : !!jsonData.currentUser?.hasAcceptedTerms,
         termsVersion: termsVersion || 'v1.0.0',

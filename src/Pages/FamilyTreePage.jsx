@@ -267,6 +267,7 @@ const FamilyTreePage = () => {
   const pinchStateRef = useRef({ startDist: 0, startZoom: 1 });
 
   const lastTapRef = useRef(0);
+  const bootstrapRootAutoSavePendingRef = useRef(false);
 
   const { language } = useLanguage();
 
@@ -615,6 +616,8 @@ const FamilyTreePage = () => {
       if (!userInfo || !familyCodeToUse) {
         console.log(" Debug - Missing userInfo or familyCodeToUse");
 
+        setTreeLoading(false);
+
         return;
       }
 
@@ -687,6 +690,7 @@ const FamilyTreePage = () => {
         // No saved tree yet
 
         if (!canEdit) {
+          bootstrapRootAutoSavePendingRef.current = false;
           setTree(null);
         } else {
           // Admin can start a new tree with logged-in user as root
@@ -710,12 +714,19 @@ const FamilyTreePage = () => {
           });
 
           setTree(newTree);
+          // This is a local draft root (no DB tree exists yet); trigger one-shot autosave.
+          setHasUnsavedChanges(true);
+          bootstrapRootAutoSavePendingRef.current = true;
 
           updateStats(newTree);
 
-          arrangeTree(newTree);
+          setTree((prev) => {
+            const arranged = arrangeTree(newTree);
+            return arranged || newTree;
+          });
         }
       } else {
+        bootstrapRootAutoSavePendingRef.current = false;
         // Data exists, build tree from data
 
         const newTree = new FamilyTree();
@@ -978,7 +989,10 @@ const FamilyTreePage = () => {
 
         updateStats(newTree);
 
-        arrangeTree(newTree);
+        setTree((prev) => {
+          const arranged = arrangeTree(newTree);
+          return arranged || newTree;
+        });
       }
 
       setTreeLoading(false);
@@ -991,7 +1005,7 @@ const FamilyTreePage = () => {
     setStats(treeInstance.getStats());
   };
 
-  const arrangeTree = (treeInstance) => {
+  const arrangeTree = useCallback((treeInstance) => {
     // For large trees, show loading state during arrangement
 
     const memberCount = treeInstance.people.size;
@@ -1001,21 +1015,30 @@ const FamilyTreePage = () => {
 
       const layout = calculateHierarchicalLayout(treeInstance);
 
-      setHierarchicalLayout(layout);
+      // CRITICAL FIX: Create a NEW tree instance with positions applied (immutable update)
+      const positionedTree = new FamilyTree();
+      positionedTree.people = new Map();
+      positionedTree.nextId = treeInstance.nextId;
+      positionedTree.rootId = treeInstance.rootId;
 
-      // Update person positions in tree from layout
-
-      layout.positions.forEach((pos, personId) => {
-        const person = treeInstance.people.get(personId);
-
-        if (person) {
-          person.x = pos.x;
-
-          person.y = pos.y;
-        }
+      // Copy all people with updated positions (immutable)
+      treeInstance.people.forEach((person, id) => {
+        const position = layout.positions.get(id);
+        positionedTree.people.set(id, {
+          ...person,
+          x: position ? position.x : person.x,
+          y: position ? position.y : person.y,
+        });
       });
 
-      setTree(treeInstance);
+      // Update layout state
+      setHierarchicalLayout({
+        positions: layout.positions,
+        connections: layout.connections,
+      });
+
+      // Return the positioned tree for functional state updates
+      return positionedTree;
     } else {
       // Use dagre layout (old method)
 
@@ -1027,49 +1050,69 @@ const FamilyTreePage = () => {
 
           if (layout) {
             setDagreGraph(layout.g);
-
             setDagreLayoutOffsetX(layout.dagreLayoutOffsetX);
-
             setDagreLayoutOffsetY(layout.dagreLayoutOffsetY);
           }
 
-          setTree(treeInstance);
+          // CRITICAL FIX: Return a new tree instance instead of mutating
+          const dagreTree = new FamilyTree();
+          dagreTree.people = new Map(treeInstance.people);
+          dagreTree.nextId = treeInstance.nextId;
+          dagreTree.rootId = treeInstance.rootId;
 
+          // Apply dagre positions immutably
+          if (layout && layout.g) {
+            layout.g.nodes().forEach((nodeId) => {
+              const node = layout.g.node(nodeId);
+              const person = dagreTree.people.get(Number(nodeId));
+              if (person && node) {
+                dagreTree.people.set(Number(nodeId), {
+                  ...person,
+                  x: node.x,
+                  y: node.y,
+                });
+              }
+            });
+          }
+
+          setTree(dagreTree);
           setTreeLoading(false);
         }, 100);
+        return null; // Async update, no tree to return
       } else {
         const layout = autoArrange(treeInstance);
 
         if (layout) {
           setDagreGraph(layout.g);
-
           setDagreLayoutOffsetX(layout.dagreLayoutOffsetX);
-
           setDagreLayoutOffsetY(layout.dagreLayoutOffsetY);
         }
 
-        setTree(treeInstance);
+        // CRITICAL FIX: Create new tree with dagre positions
+        const dagreTree = new FamilyTree();
+        dagreTree.people = new Map(treeInstance.people);
+        dagreTree.nextId = treeInstance.nextId;
+        dagreTree.rootId = treeInstance.rootId;
+
+        // Apply dagre positions immutably
+        if (layout && layout.g) {
+          layout.g.nodes().forEach((nodeId) => {
+            const node = layout.g.node(nodeId);
+            const person = dagreTree.people.get(Number(nodeId));
+            if (person && node) {
+              dagreTree.people.set(Number(nodeId), {
+                ...person,
+                x: node.x,
+                y: node.y,
+              });
+            }
+          });
+        }
+
+        return dagreTree;
       }
     }
-
-    // Debug: Log positions of each person (only for smaller trees)
-
-    if (treeInstance && treeInstance.people && memberCount <= 25) {
-      console.log(
-        "Person positions:",
-
-        Array.from(treeInstance.people.values()).map((p) => ({
-          id: p.id,
-
-          name: p.name,
-
-          x: p.x,
-
-          y: p.y,
-        })),
-      );
-    }
-  };
+  }, [useHierarchical]);
 
   const handlePersonClick = (personId) => {
     if (!tree) return;
@@ -1353,13 +1396,14 @@ const FamilyTreePage = () => {
         newTree.people.set(existingPerson.id, updatedPerson);
       }
 
-      setTree(newTree);
+      setTree((prev) => {
+        const arranged = arrangeTree(newTree);
+        return arranged || newTree;
+      });
 
       updateStats(newTree);
 
-      arrangeTree(newTree);
-
-      setHasUnsavedChanges(true); // 🚀 Mark as changed
+      setHasUnsavedChanges(true); // Mark as changed
 
       return;
     }
@@ -1430,11 +1474,12 @@ const FamilyTreePage = () => {
     // If basePerson is undefined (new tree), just add the persons without relationships
 
     if (!basePerson) {
-      setTree(newTree);
+      setTree((prev) => {
+        const arranged = arrangeTree(newTree);
+        return arranged || newTree;
+      });
 
       updateStats(newTree);
-
-      arrangeTree(newTree);
 
       return;
     }
@@ -1446,11 +1491,12 @@ const FamilyTreePage = () => {
     if (!basePersonInNewTree) {
       console.error("Base person not found in tree");
 
-      setTree(newTree);
+      setTree((prev) => {
+        const arranged = arrangeTree(newTree);
+        return arranged || newTree;
+      });
 
       updateStats(newTree);
-
-      arrangeTree(newTree);
 
       return;
     }
@@ -1515,13 +1561,12 @@ const FamilyTreePage = () => {
       });
     }
 
-    setTree(newTree);
-
+    setTree((prev) => {
+      const arranged = arrangeTree(newTree);
+      return arranged || newTree;
+    });
     updateStats(newTree);
-
-    arrangeTree(newTree);
-
-    setHasUnsavedChanges(true); // 🚀 Mark as changed
+    setHasUnsavedChanges(true); // Mark as changed
   };
 
   const deletePerson = async (personId) => {
@@ -1606,13 +1651,14 @@ const FamilyTreePage = () => {
 
       newTree.people.delete(personId);
 
-      setTree(newTree);
+      setTree((prev) => {
+        const arranged = arrangeTree(newTree);
+        return arranged || newTree;
+      });
 
       updateStats(newTree);
 
-      arrangeTree(newTree);
-
-      setHasUnsavedChanges(true); // 🚀 Mark as changed
+      setHasUnsavedChanges(true); // Mark as changed
 
       if (selectedPersonId === personId) {
         setSelectedPersonId(null);
@@ -1622,15 +1668,14 @@ const FamilyTreePage = () => {
 
   const resetTree = async () => {
     console.log(
-      "🔵 New Tree button clicked! hasUnsavedChanges:",
-
+      " New Tree button clicked! hasUnsavedChanges:",
       hasUnsavedChanges,
     );
 
-    // 🚀 CRITICAL: Warn if there are unsaved changes
+    // CRITICAL: Warn if there are unsaved changes
 
     if (hasUnsavedChanges) {
-      console.warn("⚠️ Blocked: Unsaved changes exist");
+      console.warn(" Blocked: Unsaved changes exist");
 
       await Swal.fire({
         icon: "error",
@@ -1645,7 +1690,7 @@ const FamilyTreePage = () => {
       return; // Don't proceed
     }
 
-    // 🚀 CRITICAL: Warn about data loss
+    // CRITICAL: Warn about data loss
 
     const memberCount = tree ? tree.people.size : 0;
 
@@ -1660,11 +1705,7 @@ const FamilyTreePage = () => {
 
 
 
-
-
                    <p><strong style="color: red;">This action cannot be undone!</strong></p>
-
-
 
 
 
@@ -1709,11 +1750,12 @@ const FamilyTreePage = () => {
         memberId: userInfo.userId,
       });
 
-      setTree(newTree);
+      setTree((prev) => {
+        const arranged = arrangeTree(newTree);
+        return arranged || newTree;
+      });
 
       updateStats(newTree);
-
-      arrangeTree(newTree);
 
       setSelectedPersonId(null);
 
@@ -1724,7 +1766,7 @@ const FamilyTreePage = () => {
         activePersonId: null,
       });
 
-      setHasUnsavedChanges(true); // 🚀 Mark as changed - new tree needs to be saved!
+      setHasUnsavedChanges(true); // Mark as changed - new tree needs to be saved!
     }
   };
 
@@ -1968,29 +2010,29 @@ const FamilyTreePage = () => {
     };
   }, [radialMenu.isActive, radialMenu.activePersonId]);
 
-  // 🚀 PERFORMANCE: Use useCallback to prevent function re-creation
+  // PERFORMANCE: Use useCallback to prevent function re-creation
 
   const saveTreeToApi = useCallback(async () => {
-    console.log("🔵 Save button clicked! Current status:", saveStatus);
+    console.log(" Save button clicked! Current status:", saveStatus);
 
-    // 🚀 CRITICAL FIX: Prevent multiple simultaneous saves
+    // CRITICAL FIX: Prevent multiple simultaneous saves
 
     if (saveStatus === "loading") {
-      console.warn("⚠️ Save already in progress, ignoring click");
+      console.warn(" Save already in progress, ignoring click");
 
       return;
     }
 
     if (!tree) {
-      console.warn("⚠️ No tree data to save");
+      console.warn(" No tree data to save");
 
       return;
     }
 
-    // 🚀 NEW: Check if there are unsaved changes
+    // NEW: Check if there are unsaved changes
 
     if (!hasUnsavedChanges) {
-      console.log("ℹ️ No changes detected, skipping save");
+      console.log(" No changes detected, skipping save");
 
       Swal.fire({
         icon: "info",
@@ -2007,7 +2049,7 @@ const FamilyTreePage = () => {
       return;
     }
 
-    console.log(`🚀 Starting save for ${tree.people.size} members`);
+    console.log(` Starting save for ${tree.people.size} members`);
 
     setSaveStatus("loading");
 
@@ -2105,7 +2147,7 @@ const FamilyTreePage = () => {
       }
 
       const apiStartTime = Date.now();
-      console.log(`📤 Sending ${index} members to API...`);
+      console.log(` Sending ${index} members to API...`);
 
       const response = await authFetch(
         `${import.meta.env.VITE_API_BASE_URL}/family/tree/create`,
@@ -2120,15 +2162,15 @@ const FamilyTreePage = () => {
 
       const apiTime = Date.now() - apiStartTime;
       console.log(
-        `✅ API response received in ${apiTime}ms (${(apiTime / 1000).toFixed(2)}s)`,
+        ` API response received in ${apiTime}ms (${(apiTime / 1000).toFixed(2)}s)`,
       );
 
       if (!response) return;
       if (!response.ok) throw new Error("Failed to save");
 
-      // ✅ RELOAD TREE DATA FROM SERVER AFTER SUCCESSFUL SAVE
+      // RELOAD TREE DATA FROM SERVER AFTER SUCCESSFUL SAVE
 
-      // ✅ PRESERVE EXISTING POSITIONS - No recalculation needed!
+      // PRESERVE EXISTING POSITIONS - No recalculation needed!
       try {
         const treeResponse = await authFetch(
           `${import.meta.env.VITE_API_BASE_URL}/family/tree/${userInfo.familyCode
@@ -2143,7 +2185,7 @@ const FamilyTreePage = () => {
           const treeData = await treeResponse.json();
 
           if (treeData && treeData.people && treeData.people.length > 0) {
-            // ✅ PRESERVE POSITIONS: Store current positions before rebuilding
+            // PRESERVE POSITIONS: Store current positions before rebuilding
 
             const currentPositions = new Map();
 
@@ -2158,7 +2200,7 @@ const FamilyTreePage = () => {
             newTree.people = new Map();
 
             treeData.people.forEach((person) => {
-              // ✅ RESTORE POSITIONS: Use saved positions if available
+              // RESTORE POSITIONS: Use saved positions if available
 
               const savedPosition = currentPositions.get(person.id);
 
@@ -2188,7 +2230,7 @@ const FamilyTreePage = () => {
                   (person.siblings || []).map((id) => Number(id)),
                 ),
 
-                // ✅ KEEP EXACT SAME POSITIONS - No recalculation!
+                // KEEP EXACT SAME POSITIONS - No recalculation!
 
                 x: savedPosition ? savedPosition.x : person.x,
 
@@ -2222,7 +2264,7 @@ const FamilyTreePage = () => {
               newTree.rootId = treeData.people[0].id;
             }
 
-            // ✅ FIX GENERATION INCONSISTENCIES: Ensure spouses have same generation
+            // FIX GENERATION INCONSISTENCIES: Ensure spouses have same generation
 
             newTree.people.forEach((person) => {
               if (person.spouses && person.spouses.size > 0) {
@@ -2231,7 +2273,7 @@ const FamilyTreePage = () => {
 
                   if (spouse && spouse.generation !== person.generation) {
                     console.log(
-                      `🔧 Fixing generation for spouse ${spouse.name}: ${spouse.generation} → ${person.generation}`,
+                      ` Fixing generation for spouse ${spouse.name}: ${spouse.generation} → ${person.generation}`,
                     );
 
                     spouse.generation = person.generation;
@@ -2240,7 +2282,7 @@ const FamilyTreePage = () => {
               }
             });
 
-            // ✅ CRITICAL: Only recalculate if new people were added
+            // CRITICAL: Only recalculate if new people were added
 
             const hasNewPeople = treeData.people.some(
               (p) => !currentPositions.has(p.id),
@@ -2249,17 +2291,18 @@ const FamilyTreePage = () => {
             if (hasNewPeople) {
               // New people added - need to recalculate layout
 
-              console.log("🔄 New people detected - recalculating layout");
+              console.log(" New people detected - recalculating layout");
 
-              setTree(newTree);
+              setTree((prev) => {
+                const arranged = arrangeTree(newTree);
+                return arranged || newTree;
+              });
 
               updateStats(newTree);
-
-              arrangeTree(newTree);
             } else {
               // Same people - keep exact positions!
 
-              console.log("✅ No new people - preserving exact positions");
+              console.log(" No new people - preserving exact positions");
 
               // Update hierarchical layout with preserved positions
 
@@ -2285,7 +2328,7 @@ const FamilyTreePage = () => {
 
               updateStats(newTree);
 
-              // ✅ NO arrangeTree() call - positions already perfect!
+              // NO arrangeTree() call - positions already perfect!
             }
           }
         }
@@ -2299,11 +2342,11 @@ const FamilyTreePage = () => {
 
       setSaveMessage("Family tree saved successfully!");
 
-      setHasUnsavedChanges(false); // 🚀 Reset changes flag
+      setHasUnsavedChanges(false); // Reset changes flag
 
-      console.log("✅ Save completed successfully!");
+      console.log(" Save completed successfully!");
     } catch (err) {
-      console.error("❌ Save failed:", err);
+      console.error(" Save failed:", err);
 
       setSaveStatus("error");
 
@@ -2334,6 +2377,31 @@ const FamilyTreePage = () => {
       setSaveStatus("idle");
     }
   }, [saveStatus]);
+
+  // One-shot autosave for first-time root bootstrap when no tree exists in DB.
+  useEffect(() => {
+    if (!bootstrapRootAutoSavePendingRef.current) return;
+    if (!tree || !userInfo?.userId) return;
+    if (saveStatus !== "idle" || !hasUnsavedChanges) return;
+
+    if (tree.people.size !== 1) {
+      bootstrapRootAutoSavePendingRef.current = false;
+      return;
+    }
+
+    const onlyPerson = Array.from(tree.people.values())[0];
+    if (!onlyPerson || Number(onlyPerson.memberId) !== Number(userInfo.userId)) {
+      bootstrapRootAutoSavePendingRef.current = false;
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      bootstrapRootAutoSavePendingRef.current = false;
+      saveTreeToApi();
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [tree, userInfo?.userId, saveStatus, hasUnsavedChanges, saveTreeToApi]);
 
   return (
     <FamilyTreeProvider language={language}>
@@ -2725,10 +2793,11 @@ const FamilyTreePage = () => {
 
                   <div className="sm:hidden fixed bottom-[88px] left-3 z-50 flex flex-col gap-2">
                     <button
-                      onClick={zoomIn}
+                      onClick={zoomOut}
                       className="w-11 h-11 bg-white dark:bg-slate-900 text-gray-700 dark:text-slate-200 rounded-full shadow-lg border border-gray-200 dark:border-slate-700 flex items-center justify-center active:scale-95 transition-transform"
+                      title="Zoom Out"
                     >
-                      <FaPlus className="text-sm" />
+                      <FaMinus className="text-sm" />
                     </button>
 
                     <div className="w-11 h-11 bg-white dark:bg-slate-900 text-gray-700 dark:text-slate-200 rounded-full shadow-lg border border-gray-200 dark:border-slate-700 flex items-center justify-center text-[10px] font-bold">
@@ -2736,10 +2805,19 @@ const FamilyTreePage = () => {
                     </div>
 
                     <button
-                      onClick={zoomOut}
+                      onClick={zoomIn}
                       className="w-11 h-11 bg-white dark:bg-slate-900 text-gray-700 dark:text-slate-200 rounded-full shadow-lg border border-gray-200 dark:border-slate-700 flex items-center justify-center active:scale-95 transition-transform"
+                      title="Zoom In"
                     >
-                      <FaMinus className="text-sm" />
+                      <FaPlus className="text-sm" />
+                    </button>
+
+                    <button
+                      onClick={resetZoom}
+                      className="px-3 h-11 bg-white dark:bg-slate-900 text-gray-700 dark:text-slate-200 rounded-full shadow-lg border border-gray-200 dark:border-slate-700 flex items-center justify-center text-[10px] font-bold active:scale-95 transition-transform"
+                      title="Reset"
+                    >
+                      Reset
                     </button>
                   </div>
                 </>
@@ -2945,6 +3023,7 @@ const FamilyTreePage = () => {
                     <HierarchicalConnections
                       positions={hierarchicalLayout.positions}
                       connections={hierarchicalLayout.connections}
+                      memberCount={tree?.people?.size || 0}
                     />
                   ) : (
                     dagreGraph && (

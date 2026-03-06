@@ -30,6 +30,8 @@ import { getToken } from "../utils/auth";
 
 const EMPTY_VTT_TRACK_SRC = "data:text/vtt,WEBVTT";
 
+const logger = console;
+
 const PostPage = () => {
   const [token, setToken] = useState(null);
   const [user, setUser] = useState(null);

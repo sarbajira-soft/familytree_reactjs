@@ -101,7 +101,7 @@ const CreateFamilyModal = ({ isOpen, onClose, token, onFamilyCreated, mode = "cr
                 window.location.reload();
               });
             } else {
-              Swal.fire({
+            Swal.fire({
                 icon: 'success',
                 title: 'Family created!',
                 showConfirmButton: false,
@@ -123,10 +123,43 @@ const CreateFamilyModal = ({ isOpen, onClose, token, onFamilyCreated, mode = "cr
                   userInfo.familyCode = createdFamilyCode;
                   localStorage.setItem('userInfo', JSON.stringify(userInfo));
                 }
+
+                // Automatically initialize and save the family tree with the current user as root
+                try {
+                    const treeEndpoint = `${import.meta.env.VITE_API_BASE_URL}/family-tree/save`;
+                    const treeData = {
+                        familyCode: createdFamilyCode,
+                        people: [{
+                            id: "root",
+                            name: userInfo?.name || "Root",
+                            gender: userInfo?.gender || "male",
+                            age: userInfo?.age || 30,
+                            img: userInfo?.profileUrl || "",
+                            memberId: userInfo?.userId,
+                            generation: 0,
+                            position: 0,
+                            spouses: [],
+                            parents: [],
+                            children: []
+                        }]
+                    };
+
+                    await fetch(treeEndpoint, {
+                        method: 'POST',
+                        headers: { 
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}` 
+                        },
+                        body: JSON.stringify(treeData),
+                    });
+                    console.log('Initial family tree saved automatically');
+                } catch (treeErr) {
+                    console.error('Failed to auto-save initial family tree:', treeErr);
+                }
               }
               onFamilyCreated(data);
               onClose();
-              window.location.href = '/my-family';
+              window.location.href = '/family-tree';
             }
         } catch (err) {
             Swal.fire({
