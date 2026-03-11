@@ -440,6 +440,15 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
         title: 'Removed From Family',
         text: json?.message || 'You were removed from this family successfully.',
       });
+      
+      // Clear cached user info to force fresh fetch after reload
+      try {
+        localStorage.removeItem('userInfo');
+        sessionStorage.removeItem('userInfo');
+      } catch (e) {
+        // ignore storage errors
+      }
+      
       window.location.reload();
     } catch (error) {
       await Swal.fire({

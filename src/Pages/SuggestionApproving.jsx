@@ -56,6 +56,7 @@ const SuggestionApproving = () => {
   const [selectedMemberId, setSelectedMemberId] = useState(null);
   const [replaceLoading, setReplaceLoading] = useState(false);
   const [addNewMemberLoading, setAddNewMemberLoading] = useState(false);
+  const [addNewMemberError, setAddNewMemberError] = useState(null);
   const [search, setSearch] = useState('');
 
   const [viewMember, setViewMember] = useState(null); // for member details in replace modal
@@ -408,6 +409,7 @@ const SuggestionApproving = () => {
   const handleAddAsNewMember = async () => {
     if (!familyCode || !replaceModal.request) return;
     setAddNewMemberLoading(true);
+    setAddNewMemberError(null);
     try {
       const response = await authFetchResponse(
         `/family/member/add-user-to-family`,
@@ -433,11 +435,14 @@ const SuggestionApproving = () => {
           window.location.reload();
         }, 2000);
       } else {
-        console.error('Failed to add user to family');
+        const errorData = await response.json().catch(() => ({ message: 'Failed to add user to family' }));
+        console.error('Failed to add user to family:', errorData);
+        setAddNewMemberError(errorData?.message || 'Failed to add user to family');
         setAddNewMemberLoading(false);
       }
     } catch (error) {
       console.error('Error adding user to family:', error);
+      setAddNewMemberError(error?.message || 'Network error. Please try again.');
       setAddNewMemberLoading(false);
     }
   };
@@ -720,6 +725,11 @@ const SuggestionApproving = () => {
                   )}
 
                   <div className="mt-auto pt-4">
+                    {addNewMemberError && (
+                      <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                        {addNewMemberError}
+                      </div>
+                    )}
                     <div className="flex flex-col gap-2">
                       <button
                         type="button"

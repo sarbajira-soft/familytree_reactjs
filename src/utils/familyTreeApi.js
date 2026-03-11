@@ -4,6 +4,7 @@ import { authFetch } from './authFetch';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
 const API_BASE = `${API_BASE_URL}/family-tree`;
+const FAMILY_API_BASE = `${API_BASE_URL}/family`;
 
 export async function fetchFamilyTree(familyCode) {
   if (!familyCode) throw new Error('familyCode is required');
@@ -44,7 +45,7 @@ export async function editPerson(id, person, familyCode) {
 
 export async function deletePerson(id, familyCode) {
   if (!familyCode) throw new Error('familyCode is required');
-  await authFetch(`${API_BASE}/person/${id}`, {
+  await authFetch(`${FAMILY_API_BASE}/tree/${familyCode}/person/${id}`, {
     method: 'DELETE',
   });
   return true;
@@ -103,4 +104,72 @@ export async function addSpouseRelationship(userId, spouseUserId) {
     method: 'POST',
     body: JSON.stringify({ targetUserId: spouseUserId }),
   });
+}
+
+// Delete a family member (admin action)
+export async function deleteFamilyMember(memberId, familyCode) {
+  if (!familyCode) throw new Error('familyCode is required');
+  if (!memberId) throw new Error('memberId is required');
+  const response = await authFetch(`${FAMILY_API_BASE}/member/delete/${memberId}/${familyCode}`, {
+    method: 'DELETE',
+  });
+  return response;
+}
+
+// Self-remove from family
+export async function selfRemoveFromFamily(familyCode) {
+  if (!familyCode) throw new Error('familyCode is required');
+  const response = await authFetch(`${FAMILY_API_BASE}/member/self/${familyCode}`, {
+    method: 'DELETE',
+  });
+  return response;
+}
+
+// Replace dummy user with real user
+export async function replaceDummyUser(familyCode, dummyUserId, replacementUserId) {
+  if (!familyCode) throw new Error('familyCode is required');
+  if (!dummyUserId) throw new Error('dummyUserId is required');
+  if (!replacementUserId) throw new Error('replacementUserId is required');
+  const response = await authFetch(
+    `${FAMILY_API_BASE}/member/${familyCode}/non-app-users/${dummyUserId}/replace/${replacementUserId}`,
+    {
+      method: 'POST',
+    }
+  );
+  return response;
+}
+
+// Get members not in tree
+export async function getMembersNotInTree(familyCode) {
+  if (!familyCode) throw new Error('familyCode is required');
+  const response = await authFetch(`${FAMILY_API_BASE}/member/${familyCode}/members-not-in-tree`, {
+    method: 'GET',
+  });
+  return response;
+}
+
+// Request account deletion (30-day recovery)
+export async function requestAccountDeletion() {
+  const response = await authFetch(`${API_BASE_URL}/user/account-deletion/request`, {
+    method: 'POST',
+  });
+  return response;
+}
+
+// Request account recovery
+export async function requestAccountRecovery(identifier) {
+  const response = await authFetch(`${API_BASE_URL}/user/account-recovery/request`, {
+    method: 'POST',
+    body: JSON.stringify({ identifier }),
+  });
+  return response;
+}
+
+// Confirm account recovery
+export async function confirmAccountRecovery(token, identifier) {
+  const response = await authFetch(`${API_BASE_URL}/user/account-recovery/confirm`, {
+    method: 'POST',
+    body: JSON.stringify({ token, identifier }),
+  });
+  return response;
 }

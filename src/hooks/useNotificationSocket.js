@@ -145,6 +145,36 @@ export const useNotificationSocket = (userInfo) => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
     });
 
+    // Family deletion event handlers
+    socket.on('family_event', (event) => {
+      console.log('👥 Family event received:', event);
+      
+      switch (event.type) {
+        case 'TREE_PERSON_DELETED':
+          console.log('🗑️ Tree person deleted:', event.personId);
+          // Invalidate tree data to refresh
+          queryClient.invalidateQueries({ queryKey: ['familyTree'] });
+          break;
+          
+        case 'MEMBER_REMOVED':
+          console.log('👤 Member removed:', event.memberId);
+          // Invalidate both tree and members data
+          queryClient.invalidateQueries({ queryKey: ['familyTree'] });
+          queryClient.invalidateQueries({ queryKey: ['familyMembers'] });
+          break;
+          
+        case 'DUMMY_USER_REPLACED':
+          console.log('🔄 Dummy user replaced:', event.dummyUserId, '->', event.replacementUserId);
+          // Invalidate both tree and members data
+          queryClient.invalidateQueries({ queryKey: ['familyTree'] });
+          queryClient.invalidateQueries({ queryKey: ['familyMembers'] });
+          break;
+          
+        default:
+          console.log('ℹ️ Unknown family event type:', event.type);
+      }
+    });
+
     socket.on('error', (error) => {
       console.error('❌ WebSocket error:', error);
     });

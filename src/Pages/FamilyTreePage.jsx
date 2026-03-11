@@ -49,6 +49,8 @@ import Swal from "sweetalert2";
 
 import { FaPlus, FaSave, FaArrowLeft, FaHome, FaMinus } from "react-icons/fa";
 
+import { deletePerson as deletePersonApi } from "../utils/familyTreeApi";
+
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { FamilyTreeProvider } from "../Contexts/FamilyTreeContext";
@@ -1613,55 +1615,78 @@ const FamilyTreePage = () => {
     });
 
     if (result.isConfirmed) {
-      const newTree = new FamilyTree();
+      // Call backend API to persist deletion
+      try {
+        await deletePersonApi(personId, userInfo?.familyCode);
 
-      newTree.people = new Map(tree.people);
+        // Backend deletion successful, now update local state
+        const newTree = new FamilyTree();
 
-      newTree.nextId = tree.nextId;
+        newTree.people = new Map(tree.people);
 
-      newTree.rootId = tree.rootId;
+        newTree.nextId = tree.nextId;
 
-      const personToDelete = newTree.people.get(personId);
+        newTree.rootId = tree.rootId;
 
-      if (!personToDelete) return;
+        const personToDelete = newTree.people.get(personId);
 
-      const relatives = new Set([
-        ...personToDelete.parents,
+        if (!personToDelete) return;
 
-        ...personToDelete.children,
+        const relatives = new Set([
+          ...personToDelete.parents,
 
-        ...personToDelete.spouses,
+          ...personToDelete.children,
 
-        ...personToDelete.siblings,
-      ]);
+          ...personToDelete.spouses,
 
-      relatives.forEach((relId) => {
-        const relative = newTree.people.get(relId);
+          ...personToDelete.siblings,
+        ]);
 
-        if (relative) {
-          relative.parents.delete(personId);
+        relatives.forEach((relId) => {
+          const relative = newTree.people.get(relId);
 
-          relative.children.delete(personId);
+          if (relative) {
+            relative.parents.delete(personId);
 
-          relative.spouses.delete(personId);
+            relative.children.delete(personId);
 
-          relative.siblings.delete(personId);
+            relative.spouses.delete(personId);
+
+            relative.siblings.delete(personId);
+          }
+        });
+
+        newTree.people.delete(personId);
+
+        setTree((prev) => {
+          const arranged = arrangeTree(newTree);
+          return arranged || newTree;
+        });
+
+        updateStats(newTree);
+
+        setHasUnsavedChanges(true); // Mark as changed
+
+        if (selectedPersonId === personId) {
+          setSelectedPersonId(null);
         }
-      });
 
-      newTree.people.delete(personId);
+        // Show success message
+        await Swal.fire({
+          icon: "success",
+          title: "Deleted",
+          text: "Person has been removed from the family tree.",
+          timer: 2000,
+          showConfirmButton: false,
+        });
 
-      setTree((prev) => {
-        const arranged = arrangeTree(newTree);
-        return arranged || newTree;
-      });
-
-      updateStats(newTree);
-
-      setHasUnsavedChanges(true); // Mark as changed
-
-      if (selectedPersonId === personId) {
-        setSelectedPersonId(null);
+      } catch (error) {
+        console.error("Error deleting person:", error);
+        await Swal.fire({
+          icon: "error",
+          title: "Delete Failed",
+          text: error?.message || "Failed to delete person. Please try again.",
+        });
       }
     }
   };
