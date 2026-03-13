@@ -312,7 +312,7 @@ const JoinFamilyModal = ({ isOpen, onClose, token, onFamilyJoined }) => {
                     <ul className="text-sm text-primary-800 mt-2 space-y-1">
                       <li>1) Your request goes to the family admin</li>
                       <li>2) You’ll get a notification after approval</li>
-                      <li>3) You can request to join another family while waiting</li>
+                      <li>3) Sending a new code replaces any existing pending request</li>
                     </ul>
                   </div>
 

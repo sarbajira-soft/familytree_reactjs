@@ -150,15 +150,16 @@ export async function getMembersNotInTree(familyCode) {
 
 // Request account deletion (30-day recovery)
 export async function requestAccountDeletion() {
-  const response = await authFetch(`${API_BASE_URL}/user/account-deletion/request`, {
+  const response = await authFetch(`${API_BASE_URL}/user/account/delete`, {
     method: 'POST',
+    body: JSON.stringify({ confirmText: 'DELETE' }),
   });
   return response;
 }
 
 // Request account recovery
 export async function requestAccountRecovery(identifier) {
-  const response = await authFetch(`${API_BASE_URL}/user/account-recovery/request`, {
+  const response = await authFetch(`${API_BASE_URL}/user/account/recover/request`, {
     method: 'POST',
     body: JSON.stringify({ identifier }),
   });
@@ -167,7 +168,7 @@ export async function requestAccountRecovery(identifier) {
 
 // Confirm account recovery
 export async function confirmAccountRecovery(token, identifier) {
-  const response = await authFetch(`${API_BASE_URL}/user/account-recovery/confirm`, {
+  const response = await authFetch(`${API_BASE_URL}/user/account/recover/confirm`, {
     method: 'POST',
     body: JSON.stringify({ token, identifier }),
   });

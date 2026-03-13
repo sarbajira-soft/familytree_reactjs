@@ -373,9 +373,19 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
         throw new Error(msg);
       }
 
+      const successTitle = json?.alreadyProcessed
+        ? 'Already Removed'
+        : json?.action === 'moved_to_members_not_in_tree'
+          ? 'Moved Out Of Tree'
+          : json?.action === 'converted_to_dummy'
+            ? 'Converted To Non-App User'
+            : json?.action === 'deleted_non_app_user'
+              ? 'Non-App User Deleted'
+              : 'Member Removed';
+
       await Swal.fire({
         icon: 'success',
-        title: json?.alreadyProcessed ? 'Already Removed' : 'Member Removed',
+        title: successTitle,
         text: json?.message || 'Family member removed successfully.',
       });
 
@@ -1426,7 +1436,7 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                     }}
                     disabled={deletedMemberIds.has(member.memberId)}
                     className="p-1.5 rounded-lg bg-gray-50 text-gray-500 hover:bg-red-50 hover:text-red-600 hover:shadow-sm border border-transparent hover:border-red-100 transition-all tooltip"
-                    title="Delete"
+                    title={memberIdsInTree.has(Number(member.userId)) && member.sourceFamilyCode === birthFamilyCode && member.user?.isAppUser ? 'Move to Members Not in Tree' : 'Delete'}
                   >
                     <FiTrash2 size={16} />
                   </button>
