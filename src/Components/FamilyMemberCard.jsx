@@ -629,8 +629,12 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
   );
 
   const associatedMembersAll = useMemo(() => {
-    const fromApi = familyMembers.filter((member) => member.membershipType === 'associated');
-    const fromTree = treeAllPeople.filter((m) => m.membershipType === 'associated');
+    const fromApi = familyMembers.filter((member) =>
+      member.membershipType === 'associated' && normalizeFamilyCode(member.sourceFamilyCode) !== birthFamilyCode,
+    );
+    const fromTree = treeAllPeople.filter((m) =>
+      m.membershipType === 'associated' && normalizeFamilyCode(m.sourceFamilyCode) !== birthFamilyCode,
+    );
     
     // Deduplicate by userId - prefer API data over tree data
     const seenUserIds = new Set();
@@ -1782,16 +1786,6 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                     <h2 className="text-xl font-bold text-gray-900 mb-1">Birth Family Directory</h2>
                     <p className="text-sm text-gray-500">Manage members of your primary birth family.</p>
                   </div>
-                  {canSelfRemove && (
-                    <button
-                      type="button"
-                      onClick={handleSelfRemove}
-                      disabled={selfRemoving}
-                      className="inline-flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-lg border border-red-200 text-red-600 bg-red-50 hover:bg-red-100 disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                      {selfRemoving ? 'Leaving...' : 'Leave Family'}
-                    </button>
-                  )}
                 </div>
                 {activeBirthMembers.length > 0 ? (
                   <>
@@ -1801,7 +1795,6 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                           key={`birth-${member.id}`}
                           member={member}
                           allowManageActions
-                          allowDelete
                           memberIdsInTree={memberIdsInTree}
                           showWhatsAppInvite
                           showNotInTreeBadge
@@ -2135,106 +2128,6 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                   )}
                 </div>
 
-                {/* Section 3: App Users Ready to Associate (NOT in tree yet) */}
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                  <button
-                    onClick={() => setAssociatedAccordionOpen(prev => ({ ...prev, readyToAssociate: !prev.readyToAssociate }))}
-                    className="w-full flex items-center justify-between p-4 bg-amber-50 hover:bg-amber-100 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center text-white">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                        </svg>
-                      </div>
-                      <div className="text-left">
-                        <h2 className="text-lg font-bold text-gray-900">Ready to Associate</h2>
-                        <p className="text-sm text-gray-500">App users from associated families available to add to your tree</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <svg 
-                        className={`w-5 h-5 text-gray-400 transition-transform ${associatedAccordionOpen.readyToAssociate ? 'rotate-180' : ''}`} 
-                        fill="none" 
-                        stroke="currentColor" 
-                        viewBox="0 0 24 24"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </div>
-                  </button>
-                  
-                  {associatedAccordionOpen.readyToAssociate && (
-                    <div className="p-4 border-t border-gray-100">
-                      {selectedAssociatedFamilyCode ? (
-                        loadingAssociatedFamily ? (
-                          <div className="flex justify-center items-center py-8">
-                            <div className="animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-amber-500" />
-                            <span className="ml-3 text-sm text-gray-500">Loading...</span>
-                          </div>
-                        ) : (
-                          (() => {
-                            // Get all app users from the selected associated family
-                            const allAppUsers = selectedAssociatedFamilyMembersAll.filter(
-                              (m) => 
-                                m.userId && 
-                                m.user?.isAppUser &&
-                                m.name && 
-                                m.name.toLowerCase().includes(searchTerm.toLowerCase())
-                            );
-                            
-                            // Get IDs of users already in current family (members or associated)
-                            const currentFamilyUserIds = new Set(
-                              familyMembers
-                                .filter(m => m.userId && (m.membershipType === 'member' || m.membershipType === 'associated'))
-                                .map(m => Number(m.userId))
-                                .filter(id => id > 0)
-                            );
-                            
-                            // Filter out users already in current family
-                            const availableToAssociate = allAppUsers.filter(m => !currentFamilyUserIds.has(Number(m.userId)));
-                            const alreadyInFamily = allAppUsers.filter(m => currentFamilyUserIds.has(Number(m.userId)));
-                            
-                            const readyCount = availableToAssociate.length;
-                            const hiddenCount = alreadyInFamily.length;
-                            
-                            return readyCount > 0 || hiddenCount > 0 ? (
-                              <div className="flex flex-col gap-3">
-                                <div className="bg-amber-50 border border-amber-100 rounded-lg p-3">
-                                  <p className="text-sm text-amber-700">
-                                    <span className="font-semibold">{readyCount}</span> ready to associate
-                                    {hiddenCount > 0 && (
-                                      <span className="text-amber-600"> • <span className="font-semibold">{hiddenCount}</span> already in family (hidden)</span>
-                                    )}
-                                  </p>
-                                </div>
-                                {/* Ready to associate */}
-                                {availableToAssociate.map((member) => (
-                                  <SingleMemberCard key={`ready-assoc-${member.id}`} member={member} showFamilyCode allowManageActions />
-                                ))}
-                                {/* Already in family - show as disabled */}
-                                {alreadyInFamily.map((member) => (
-                                  <SingleMemberCard key={`ready-assoc-hidden-${member.id}`} member={member} showFamilyCode disabled />
-                                ))}
-                                <PaginationControls totalItems={readyCount + hiddenCount} />
-                              </div>
-                            ) : (
-                              <div className="flex flex-col items-center justify-center py-8 bg-gray-50 rounded-lg">
-                                <p className="text-gray-500 text-sm font-medium">No app users available from this family</p>
-                                <p className="text-gray-400 text-xs mt-1">All users are already members of your current family</p>
-                              </div>
-                            );
-                          })()
-                        )
-                      ) : (
-                        <div className="flex flex-col items-center justify-center py-8 bg-gray-50 rounded-lg">
-                          <p className="text-gray-500 text-sm font-medium">Select an associated family first</p>
-                          <p className="text-gray-400 text-xs mt-1">Choose a family from the &quot;All Associated Members&quot; section above</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
               </div>
             )}
 
@@ -2444,122 +2337,6 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                   )}
                 </div>
 
-                {/* Section 3: App Users Ready to Link (NOT linked yet) */}
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                  <button
-                    onClick={() => setLinkedAccordionOpen(prev => ({ ...prev, readyToLink: !prev.readyToLink }))}
-                    className="w-full flex items-center justify-between p-4 bg-amber-50 hover:bg-amber-100 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center text-white">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                        </svg>
-                      </div>
-                      <div className="text-left">
-                        <h2 className="text-lg font-bold text-gray-900">Ready to Link</h2>
-                        <p className="text-sm text-gray-500">App users from linked families available for linking</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <svg 
-                        className={`w-5 h-5 text-gray-400 transition-transform ${linkedAccordionOpen.readyToLink ? 'rotate-180' : ''}`} 
-                        fill="none" 
-                        stroke="currentColor" 
-                        viewBox="0 0 24 24"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </div>
-                  </button>
-                  
-                  {linkedAccordionOpen.readyToLink && (
-                    <div className="p-4 border-t border-gray-100">
-                      {selectedLinkedFamilyCode ? (
-                        loadingLinkedFamily ? (
-                          <div className="flex justify-center items-center py-8">
-                            <div className="animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-amber-500" />
-                            <span className="ml-3 text-sm text-gray-500">Loading...</span>
-                          </div>
-                        ) : (
-                          <div>
-                            <div className="flex flex-wrap items-center gap-2 bg-gray-50 p-3 rounded-lg border border-gray-100 mb-4">
-                              <span className="text-sm font-semibold text-gray-500 mr-2">Select Family:</span>
-                              {linkedFamiliesOptions.map((family) => (
-                                <button
-                                  type="button"
-                                  key={`ready-${family.familyCode}`}
-                                  onClick={() => setSelectedLinkedFamilyCode(family.familyCode)}
-                                  className={`rounded-lg px-3 py-1 text-sm font-semibold transition-all ${selectedLinkedFamilyCode === family.familyCode
-                                      ? 'bg-amber-500 text-white shadow-sm'
-                                      : 'bg-white text-gray-700 hover:bg-amber-50 border border-gray-200'
-                                    }`}
-                                >
-                                  {(family.familyName || 'Family')}
-                                </button>
-                              ))}
-                            </div>
-                            
-                            {(() => {
-                              // Get all app users from selected family
-                              const allAppUsers = selectedLinkedFamilyMembersAll.filter(
-                                (m) => m.userId && 
-                                        m.user?.isAppUser &&
-                                        m.name && 
-                                        m.name.toLowerCase().includes(searchTerm.toLowerCase())
-                              );
-                              
-                              // Check which users are already in the tree
-                              const linkedInTreeIds = new Set(
-                                Object.values(treeLinkedFamilyMap)
-                                  .flat()
-                                  .map(m => Number(m.userId))
-                                  .filter(id => id > 0)
-                              );
-                              
-                              // Separate into ready and already linked
-                              const readyToLink = allAppUsers.filter(m => !linkedInTreeIds.has(Number(m.userId)));
-                              const alreadyLinked = allAppUsers.filter(m => linkedInTreeIds.has(Number(m.userId)));
-                              
-                              const totalCount = allAppUsers.length;
-                              
-                              return totalCount > 0 ? (
-                                <div className="flex flex-col gap-3">
-                                  <div className="bg-amber-50 border border-amber-100 rounded-lg p-3">
-                                    <p className="text-sm text-amber-700">
-                                      <span className="font-semibold">{readyToLink.length}</span> ready to link
-                                      {alreadyLinked.length > 0 && (
-                                        <span className="text-amber-600"> • <span className="font-semibold">{alreadyLinked.length}</span> already in tree</span>
-                                      )}
-                                    </p>
-                                  </div>
-                                  {/* Ready to link - normal state */}
-                                  {readyToLink.map((member) => (
-                                    <SingleMemberCard key={`ready-${member.id}`} member={member} showFamilyCode allowManageActions />
-                                  ))}
-                                  {/* Already linked - disabled state */}
-                                  {alreadyLinked.map((member) => (
-                                    <SingleMemberCard key={`ready-linked-${member.id}`} member={member} showFamilyCode disabled />
-                                  ))}
-                                  <PaginationControls totalItems={totalCount} />
-                                </div>
-                              ) : (
-                                <div className="flex flex-col items-center justify-center py-8 bg-gray-50 rounded-lg">
-                                  <p className="text-gray-500 text-sm font-medium">No app users found in this family</p>
-                                </div>
-                              );
-                            })()}
-                          </div>
-                        )
-                      ) : (
-                        <div className="flex flex-col items-center justify-center py-8 bg-gray-50 rounded-lg">
-                          <p className="text-gray-500 text-sm font-medium">Select a linked family first</p>
-                          <p className="text-gray-400 text-xs mt-1">Choose a family from the &quot;All Linked Members&quot; section above</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
               </div>
             )}
 

@@ -32,6 +32,7 @@ const FamilyHubPage = () => {
   const [suggestedFamilies, setSuggestedFamilies] = useState([]);
   const [showSuggestModal, setShowSuggestModal] = useState(false);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [leavingFamily, setLeavingFamily] = useState(false);
 
   useEffect(() => {
       const storedToken = getToken();
@@ -187,6 +188,71 @@ const FamilyHubPage = () => {
     }
   };
 
+
+  const handleLeaveFamily = async () => {
+    const familyCode = userInfo?.familyCode || familyData?.familyCode;
+    if (!familyCode || !token) return;
+
+    const confirm = await Swal.fire({
+      icon: 'warning',
+      title: 'Leave Family?',
+      text: 'Type LEAVE to confirm removing yourself from this family tree.',
+      input: 'text',
+      inputPlaceholder: 'Type LEAVE',
+      showCancelButton: true,
+      confirmButtonText: 'Leave family',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#dc2626',
+      preConfirm: (value) => {
+        if (String(value || '').trim().toUpperCase() !== 'LEAVE') {
+          Swal.showValidationMessage('Type LEAVE exactly to continue.');
+          return false;
+        }
+        return true;
+      },
+    });
+
+    if (!confirm.isConfirmed) return;
+
+    try {
+      setLeavingFamily(true);
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/family/member/self/${familyCode}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(data?.message || 'Failed to leave family');
+      }
+
+      await Swal.fire({
+        icon: 'success',
+        title: 'Removed From Family',
+        text: data?.message || 'You were removed from this family successfully.',
+      });
+
+      try {
+        localStorage.removeItem('userInfo');
+        sessionStorage.removeItem('userInfo');
+      } catch (error) {
+        // Ignore storage cleanup errors.
+      }
+
+      window.location.reload();
+    } catch (error) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Unable to Leave Family',
+        text: error?.message || 'Please try again.',
+      });
+    } finally {
+      setLeavingFamily(false);
+    }
+  };
   const handleFamilyCreated = (newFamilyDetails) => {
     // Refresh user info to get updated family code and approval status
     
@@ -276,6 +342,8 @@ const FamilyHubPage = () => {
                   onManageGifts={handleManageGifts}
                   onEditFamily={handleEditFamily}
                   onShareFamilyCode={handleShareFamilyCode}
+                  onLeaveFamily={handleLeaveFamily}
+                  leavingFamily={leavingFamily}
                 />
 
                 <FamilyOverView
@@ -371,3 +439,4 @@ const FamilyHubPage = () => {
 };
 
 export default FamilyHubPage;
+

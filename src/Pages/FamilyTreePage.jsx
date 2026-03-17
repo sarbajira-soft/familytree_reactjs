@@ -1617,7 +1617,7 @@ const FamilyTreePage = () => {
     if (result.isConfirmed) {
       // Call backend API to persist deletion
       try {
-        await deletePersonApi(personId, userInfo?.familyCode);
+        await deletePersonApi(personId, familyCodeToUse);
 
         // Backend deletion successful, now update local state
         const newTree = new FamilyTree();
@@ -3251,3 +3251,4 @@ const FamilyTreePage = () => {
 };
 
 export default FamilyTreePage;
+

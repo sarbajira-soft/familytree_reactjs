@@ -387,23 +387,57 @@ const SuggestionApproving = () => {
 
   const handleApproveReplace = async () => {
     if (!familyCode || !replaceModal.request || !selectedMemberId) return;
+
     setReplaceLoading(true);
-    await authFetchResponse(
-      `/family/${familyCode}/approve-replace`,
-      {
-        method: 'POST',
-        skipThrow: true,
-        body: JSON.stringify({
-          joinUserId: replaceModal.request.triggeredBy,
-          replaceMemberId: selectedMemberId,
-        }),
+    setAddNewMemberError(null);
+
+    try {
+      const addResponse = await authFetchResponse(
+        `/family/member/add-user-to-family`,
+        {
+          method: 'POST',
+          skipThrow: true,
+          body: JSON.stringify({
+            userId: replaceModal.request.triggeredBy,
+            familyCode,
+          }),
+        }
+      );
+
+      if (!addResponse.ok) {
+        const addError = await addResponse.json().catch(() => ({ message: 'Failed to add user to family' }));
+        throw new Error(addError?.message || 'Failed to add user to family');
       }
-    );
-    setReplaceLoading(false);
-    setReplaceModal({ open: false, request: null });
-    setSelectedMemberId(null);
-    // Refresh requests
-    window.location.reload();
+
+      const replaceResponse = await authFetchResponse(
+        `/family/member/${familyCode}/non-app-users/${selectedMemberId}/replace/${replaceModal.request.triggeredBy}`,
+        {
+          method: 'POST',
+          skipThrow: true,
+        }
+      );
+
+      if (!replaceResponse.ok) {
+        const replaceError = await replaceResponse.json().catch(() => ({ message: 'Failed to replace tree member' }));
+        throw new Error(replaceError?.message || 'Failed to replace tree member');
+      }
+
+      await markNotificationAsRead(replaceModal.request.id, 'accepted');
+      setShowConfirm(false);
+      setReplaceModal({ open: false, request: null });
+      setSelectedMemberId(null);
+      setViewMember(null);
+      setShowSuccess(true);
+      setTimeout(() => {
+        setShowSuccess(false);
+        window.location.reload();
+      }, 2000);
+    } catch (error) {
+      console.error('Failed to approve and replace member:', error);
+      setAddNewMemberError(error?.message || 'Failed to replace member in family tree');
+    } finally {
+      setReplaceLoading(false);
+    }
   };
 
   const handleAddAsNewMember = async () => {
@@ -452,12 +486,37 @@ const SuggestionApproving = () => {
     setReplaceModal({ open: true, request });
     setSelectedMemberId(null);
     setViewMember(null);
-    // Fetch family members (approved only)
+    setAddNewMemberError(null);
+
     const data = await authFetch(
-      `/family/member/${familyCode}`,
+      `/family/member/${familyCode}/non-app-users`,
       { method: 'GET', skipThrow: true }
     );
-    setFamilyMembers(data?.data || []);
+
+    const rows = Array.isArray(data?.data) ? data.data : [];
+    const mappedMembers = rows.map((row) => ({
+      id: row.dummyUserId,
+      user: {
+        id: row.dummyUserId,
+        isAppUser: false,
+        profileImage: row.profile || null,
+        userProfile: {
+          firstName: row.name || 'Member',
+          lastName: '',
+          gender: row.gender || '',
+          profile: row.profile || null,
+        },
+      },
+      dummyUserId: row.dummyUserId,
+      personId: row.personId,
+      nodeUid: row.nodeUid,
+      generation: row.generation,
+      familyCode: row.familyCode,
+      name: row.name || 'Member',
+      gender: row.gender || '',
+    }));
+
+    setFamilyMembers(mappedMembers);
   };
 
   const filteredMembers = familyMembers.filter((member) => {
@@ -465,15 +524,6 @@ const SuggestionApproving = () => {
     const profile = user.userProfile || {};
     const memberUserId = user.id;
     const requesterUserId = replaceModal?.request?.triggeredBy;
-
-    const isNonAppUser =
-      typeof user.isAppUser === 'boolean'
-        ? user.isAppUser === false
-        : (!user.email && !user.mobile);
-
-    if (!isNonAppUser) {
-      return false;
-    }
 
     if (memberUserId && effectiveUserId && Number(memberUserId) === Number(effectiveUserId)) {
       return false;
@@ -771,30 +821,7 @@ const SuggestionApproving = () => {
                       window.alert('Invalid replacement target selected. Please choose another member.');
                       return;
                     }
-                    setReplaceLoading(true);
-                    await authFetchResponse(
-                      `/user/merge`,
-                      {
-                        method: 'POST',
-                        skipThrow: true,
-                        body: JSON.stringify({
-                          existingId: selectedMemberId,
-                          currentId: replaceModal.request.triggeredBy,
-                          notificationId: replaceModal.request.id,
-                        }),
-                      }
-                    );
-                    // Mark the notification as read with accepted status after successful merge
-                    await markNotificationAsRead(replaceModal.request.id, 'accepted');
-                    setReplaceLoading(false);
-                    setShowConfirm(false);
-                    setReplaceModal({ open: false, request: null });
-                    setSelectedMemberId(null);
-                    setShowSuccess(true);
-                    setTimeout(() => {
-                      setShowSuccess(false);
-                      window.location.reload();
-                    }, 2000);
+                    await handleApproveReplace();
                   }}
                 >
                   Yes, Replace

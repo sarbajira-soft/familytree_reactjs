@@ -1,18 +1,81 @@
-import React from 'react';
-import { FiEdit, FiShare2 } from 'react-icons/fi';
+import React, { useEffect, useRef, useState } from 'react';
+import { FiEdit, FiMoreVertical, FiShare2, FiLogOut } from 'react-icons/fi';
 
-const FamilyView = ({ familyData, totalMembers, males, females, averageAge, onManageMembers, onManageEvents, onManageGifts, onEditFamily, onShareFamilyCode }) => {
-
+const FamilyView = ({
+  familyData,
+  totalMembers,
+  males,
+  females,
+  averageAge,
+  onManageMembers,
+  onManageEvents,
+  onManageGifts,
+  onEditFamily,
+  onShareFamilyCode,
+  onLeaveFamily,
+  leavingFamily = false,
+}) => {
   const defaultFamilyPhoto = "/assets/family-default.png";
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setIsMenuOpen(false);
+      }
+    };
+
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        setIsMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, []);
 
   return (
     <div className="space-y-8 mb-6 animate-fade-in-up">
-      {/* Family Header */}
       <div className="relative rounded-[2.5rem] overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-primary-500/20 group hover:shadow-[0_20px_40px_rgba(var(--color-primary-500),0.15)] transition-all duration-500">
         <div className="absolute inset-0 bg-gradient-to-br from-primary-600 via-primary-500 to-primary-700"></div>
-        {/* Dynamic Dopamine Orbs */}
         <div className="absolute -top-32 -right-32 w-80 h-80 bg-white/10 rounded-full blur-3xl pointer-events-none group-hover:scale-125 group-hover:-translate-x-10 group-hover:translate-y-10 transition-all duration-1000 ease-in-out"></div>
         <div className="absolute -bottom-32 -left-32 w-80 h-80 bg-primary-300/20 rounded-full blur-3xl pointer-events-none group-hover:scale-125 group-hover:translate-x-10 group-hover:-translate-y-10 transition-all duration-1000 ease-in-out"></div>
+
+        <div className="absolute top-5 right-5 z-20" ref={menuRef}>
+          <button
+            type="button"
+            onClick={() => setIsMenuOpen((prev) => !prev)}
+            className="inline-flex items-center justify-center w-12 h-12 rounded-2xl border border-white/25 bg-white/10 text-white backdrop-blur-md hover:bg-white/20 transition-all duration-200"
+            aria-label="Open family actions"
+            aria-expanded={isMenuOpen}
+          >
+            <FiMoreVertical className="text-xl" />
+          </button>
+
+          {isMenuOpen && (
+            <div className="absolute right-0 mt-3 w-52 rounded-2xl border border-white/20 bg-white shadow-2xl overflow-hidden">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  onLeaveFamily?.();
+                }}
+                disabled={leavingFamily}
+                className="w-full flex items-center gap-3 px-4 py-3 text-left text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <FiLogOut className="text-base" />
+                {leavingFamily ? 'Leaving...' : 'Leave Family'}
+              </button>
+            </div>
+          )}
+        </div>
 
         <div className="relative z-10 p-8 sm:p-12 flex flex-col md:flex-row items-center gap-8 sm:gap-12 backdrop-blur-sm">
           <div className="relative group/avatar cursor-pointer">
@@ -26,7 +89,6 @@ const FamilyView = ({ familyData, totalMembers, males, females, averageAge, onMa
                 onError={(e) => e.target.src = defaultFamilyPhoto}
               />
             </div>
-            {/* Playful badge */}
             <div className="absolute bottom-2 right-2 sm:bottom-4 sm:right-4 bg-white text-primary-600 w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-xl sm:text-2xl shadow-lg transform translate-y-4 opacity-0 group-hover/avatar:translate-y-0 group-hover/avatar:opacity-100 transition-all duration-300 bounce">
               👋
             </div>
@@ -63,7 +125,6 @@ const FamilyView = ({ familyData, totalMembers, males, females, averageAge, onMa
           </div>
         </div>
       </div>
-
     </div>
   );
 };

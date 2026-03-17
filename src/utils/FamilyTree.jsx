@@ -149,6 +149,11 @@ export class FamilyTree {
         let maxGeneration = -Infinity;
         
         for (const person of this.people.values()) {
+            const isTreeOnlyPlaceholder = !person?.memberId;
+            if (isTreeOnlyPlaceholder) {
+                continue;
+            }
+
             total++;
             const gender = (person.gender || '').toLowerCase();
             if (gender === 'male') male++;
