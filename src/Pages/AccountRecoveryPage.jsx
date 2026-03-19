@@ -33,6 +33,7 @@ const AccountRecoveryPage = () => {
   const [purgeAfter, setPurgeAfter] = useState(hint.purgeAfter);
   const [secondsLeft, setSecondsLeft] = useState(null);
   const [checkingStatus, setCheckingStatus] = useState(false);
+  const [recoverable, setRecoverable] = useState(null);
 
   useEffect(() => {
     if (!purgeAfter) {
@@ -91,6 +92,15 @@ const AccountRecoveryPage = () => {
     const identifierError = validateIdentifier(normalized);
     if (identifierError) {
       await Swal.fire({ icon: 'warning', title: 'Invalid Identifier', text: identifierError });
+      return;
+    }
+
+    if (recoverable === false) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Account Not Recoverable',
+        text: 'This account cannot be recovered.',
+      });
       return;
     }
 
@@ -155,7 +165,10 @@ const AccountRecoveryPage = () => {
         throw new Error(json?.message || 'Unable to check recovery window.');
       }
 
-      const nextPurgeAfter = json?.data?.recoveryWindowEndsAt || null;
+      const nextRecoverable = json?.data?.recoverable === true;
+      setRecoverable(nextRecoverable);
+
+      const nextPurgeAfter = nextRecoverable ? (json?.data?.recoveryWindowEndsAt || null) : null;
       setPurgeAfter(nextPurgeAfter);
       sessionStorage.setItem(
         'accountRecoveryHint',
@@ -167,9 +180,9 @@ const AccountRecoveryPage = () => {
 
       if (!silent) {
         await Swal.fire({
-          icon: nextPurgeAfter ? 'info' : 'warning',
-          title: nextPurgeAfter ? 'Recovery Window Found' : 'No Active Recovery Window',
-          text: nextPurgeAfter
+          icon: nextRecoverable && nextPurgeAfter ? 'info' : 'warning',
+          title: nextRecoverable && nextPurgeAfter ? 'Recovery Window Found' : 'Account Not Recoverable',
+          text: nextRecoverable && nextPurgeAfter
             ? `Recovery available until ${new Date(nextPurgeAfter).toLocaleString()}.`
             : 'No recoverable account was found for this identifier.',
         });
@@ -195,6 +208,15 @@ const AccountRecoveryPage = () => {
 
   const handleConfirmToken = async (e) => {
     e.preventDefault();
+
+    if (recoverable === false) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Account Not Recoverable',
+        text: 'This account cannot be recovered.',
+      });
+      return;
+    }
 
     const normalizedIdentifier = String(identifier || '').trim();
     const identifierError = validateIdentifier(normalizedIdentifier);
@@ -249,7 +271,12 @@ const AccountRecoveryPage = () => {
           Recover a deleted account within the 30-day window.
         </p>
 
-        {purgeAfter && (
+        {recoverable === false ? (
+          <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+            <p className="text-xs text-gray-600 font-semibold uppercase tracking-wide">Recovery Unavailable</p>
+            <p className="text-sm text-gray-800 mt-1">This account is not eligible for recovery.</p>
+          </div>
+        ) : purgeAfter ? (
           <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
             <p className="text-xs text-amber-700 font-semibold uppercase tracking-wide">Recovery Window</p>
             <p className="text-sm text-amber-900 mt-1">
@@ -259,7 +286,7 @@ const AccountRecoveryPage = () => {
               <p className="text-sm text-amber-900">Time left: {formatCountdown(secondsLeft)}</p>
             )}
           </div>
-        )}
+        ) : null}
 
         <form onSubmit={handleRequestToken} className="mt-6 space-y-3">
           <label className="block text-sm font-medium text-gray-700">Email or Mobile</label>
@@ -273,7 +300,7 @@ const AccountRecoveryPage = () => {
           />
           <button
             type="submit"
-            disabled={requesting}
+            disabled={requesting || recoverable === false}
             className="w-full rounded-lg bg-primary-600 text-white font-semibold py-2.5 hover:bg-primary-700 disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {requesting ? 'Sending...' : 'Send Recovery Token'}
@@ -305,7 +332,7 @@ const AccountRecoveryPage = () => {
           )}
           <button
             type="submit"
-            disabled={confirming}
+            disabled={confirming || recoverable === false}
             className="w-full rounded-lg bg-emerald-600 text-white font-semibold py-2.5 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {confirming ? 'Recovering...' : 'Recover Account'}
