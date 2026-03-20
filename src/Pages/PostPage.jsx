@@ -21,6 +21,7 @@ import CreatePostModal from "../Components/CreatePostModal";
 import PostViewerModal from "../Components/PostViewerModal";
 import CommentItem from "../Components/CommentItem";
 import { BlockButton } from "../Components/block/BlockButton";
+import ReportContentModal from "../Components/ReportContentModal";
 import { useUser } from "../Contexts/UserContext";
 import PostsShimmer from "./PostsShimmer";
 import DeleteConfirmModal from "./DeleteConfirmModal";
@@ -69,11 +70,28 @@ const PostPage = () => {
   const [activeEmojiPostId, setActiveEmojiPostId] = useState(null);
   const [feedMenuOpen, setFeedMenuOpen] = useState(false);
   const [postActionMenuPostId, setPostActionMenuPostId] = useState(null);
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [reportTarget, setReportTarget] = useState(null);
   const commentInputRefs = useRef({});
   const emojiPickerRef = useRef(null);
   const feedMenuRef = useRef(null);
   const feedMenuButtonRef = useRef(null);
   const navigate = useNavigate();
+
+  const openReportModalForPost = (post) => {
+    if (!post?.id) return;
+    setReportTarget({
+      targetType: "post",
+      targetId: post.id,
+      targetLabel: post?.caption ? String(post.caption).slice(0, 80) : "Post",
+    });
+    setReportModalOpen(true);
+  };
+
+  const closeReportModal = () => {
+    setReportModalOpen(false);
+    setReportTarget(null);
+  };
 
   useEffect(() => {
     const handleGlobalPointerDown = () => {
@@ -1138,7 +1156,7 @@ const PostPage = () => {
 
                     {post.authorId &&
                       Number(post.authorId) !== Number(userInfo?.userId) &&
-                      String(post.privacy || '').toLowerCase() !== 'public' && (
+                      (
                         <div className="relative" onPointerDown={(e) => e.stopPropagation()}>
                           <button
                             type="button"
@@ -1157,17 +1175,30 @@ const PostPage = () => {
                           {postActionMenuPostId === post.id && (
                             <div className="absolute right-0 mt-2 w-40 rounded-xl border border-gray-200 bg-white shadow-lg z-50 overflow-hidden">
                               <div className="py-1">
-                                <div className="px-2 py-1">
-                                  <BlockButton
-                                    userId={post.authorId}
-                                    isBlockedByMe={blockedUserIds.has(Number(post.authorId))}
-                                    location="membersList"
-                                    userName={post.author}
-                                    onStatusChange={(status) =>
-                                      handleBlockStatusFromFeed(post.authorId, status)
-                                    }
-                                  />
-                                </div>
+                                {String(post.privacy || '').toLowerCase() !== 'public' && (
+                                  <div className="px-2 py-1">
+                                    <BlockButton
+                                      userId={post.authorId}
+                                      isBlockedByMe={blockedUserIds.has(Number(post.authorId))}
+                                      location="membersList"
+                                      userName={post.author}
+                                      onStatusChange={(status) =>
+                                        handleBlockStatusFromFeed(post.authorId, status)
+                                      }
+                                    />
+                                  </div>
+                                )}
+                                <button
+                                  type="button"
+                                  className="w-full flex items-center rounded-lg px-3 py-2 text-left text-sm text-gray-700 hover:bg-red-50 active:bg-red-100 transition-colors"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPostActionMenuPostId(null);
+                                    openReportModalForPost(post);
+                                  }}
+                                >
+                                  Report
+                                </button>
                               </div>
                             </div>
                           )}
@@ -1175,6 +1206,14 @@ const PostPage = () => {
                       )}
                   </div>
                 </div>
+
+                <ReportContentModal
+                  isOpen={reportModalOpen}
+                  onClose={closeReportModal}
+                  targetType={reportTarget?.targetType}
+                  targetId={reportTarget?.targetId}
+                  targetLabel={reportTarget?.targetLabel}
+                />
 
                 {/* Caption */}
                 {post.caption && (
