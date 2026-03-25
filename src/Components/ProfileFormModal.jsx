@@ -92,6 +92,9 @@ const ProfileFormModal = ({
     state: '',
     pincode: '',
     country: 'India',
+    emailPrivacy: 'FAMILY',
+    addressPrivacy: 'FAMILY',
+    phonePrivacy: 'FAMILY',
     
     // Family Information
     maritalStatus: '',
@@ -265,6 +268,9 @@ const ProfileFormModal = ({
             addressLine1,
             addressLine2,
             city,
+            emailPrivacy: safeString(sourceDataRaw.emailPrivacy || sourceDataRaw.privacySettings?.emailPrivacy || sourceDataRaw.raw?.userProfile?.emailPrivacy || sourceDataRaw.raw?.userProfile?.privacySettings?.emailPrivacy || 'FAMILY') || 'FAMILY',
+            addressPrivacy: safeString(sourceDataRaw.addressPrivacy || sourceDataRaw.privacySettings?.addressPrivacy || sourceDataRaw.raw?.userProfile?.addressPrivacy || sourceDataRaw.raw?.userProfile?.privacySettings?.addressPrivacy || 'FAMILY') || 'FAMILY',
+            phonePrivacy: safeString(sourceDataRaw.phonePrivacy || sourceDataRaw.privacySettings?.phonePrivacy || sourceDataRaw.raw?.userProfile?.phonePrivacy || sourceDataRaw.raw?.userProfile?.privacySettings?.phonePrivacy || 'FAMILY') || 'FAMILY',
             state,
             pincode,
             country: country || 'India',
@@ -872,12 +878,14 @@ const ProfileFormModal = ({
       'pincode',
       'country',
       'bio',
+      ...(mode !== 'add' ? ['emailPrivacy', 'addressPrivacy', 'phonePrivacy'] : []),
       'familyCode',
       'email',
       'mobile',
       'countryCode',
       'role',
       'status',
+      ...(mode !== 'add' ? ['emailPrivacy', 'addressPrivacy', 'phonePrivacy'] : []),
     ];
 
     const formDataToSend = new FormData();
@@ -1164,13 +1172,13 @@ const ProfileFormModal = ({
   };
 
   const isPageVariant = variant === 'page';
-
   if (!isPageVariant && !isOpen) return null;
 
   const title = mode === 'add' ? 'Add New Family Member' : (mode === 'edit-profile' ? 'Edit Profile' : 'Edit Family Member Profile');
   
   const submitButtonText = isLoading ? 'Processing...' : (mode === 'add' ? 'Add Member' : 'Save');
   const lockEmailAndMobile = mode === 'edit-profile' || mode === 'edit-member';
+  const showFieldPrivacyControls = mode === 'edit-profile';
 
   const inputClassName = (fieldName) => `w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-1 text-sm font-inter text-gray-800 placeholder-gray-400 ${
     errors[fieldName] ? 'border-red-500 focus:ring-red-300' : 'border-gray-300 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)]'
@@ -1315,7 +1323,6 @@ const ProfileFormModal = ({
             <div className={sectionClassName}>
               <h3 className="text-lg font-semibold text-gray-800 mb-4">Account Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-               
                 <div>
                   <label htmlFor="email" className={labelClassName}>
                     Email Address <span className="text-red-500">*</span>
@@ -1332,6 +1339,23 @@ const ProfileFormModal = ({
                     maxLength={255}
                   />
                   {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
+                  {showFieldPrivacyControls && (
+                    <div className="mt-3">
+                      <label htmlFor="emailPrivacy" className="block text-xs font-medium text-gray-600 mb-1">
+                        Email Visibility
+                      </label>
+                      <select
+                        id="emailPrivacy"
+                        name="emailPrivacy"
+                        value={formData.emailPrivacy || 'FAMILY'}
+                        onChange={handleChange}
+                        className={inputClassName('emailPrivacy')}
+                      >
+                        <option value="FAMILY">Visible to family</option>
+                        <option value="PRIVATE">Only me</option>
+                      </select>
+                    </div>
+                  )}
                 </div>
                 
                 {/* Login Mobile Number */}
@@ -1370,6 +1394,23 @@ const ProfileFormModal = ({
                     }}
                   />
                   {errors.mobile && <p className="text-red-500 text-xs mt-1">{errors.mobile}</p>}
+                  {showFieldPrivacyControls && (
+                    <div className="mt-3">
+                      <label htmlFor="phonePrivacy" className="block text-xs font-medium text-gray-600 mb-1">
+                        Phone Visibility
+                      </label>
+                      <select
+                        id="phonePrivacy"
+                        name="phonePrivacy"
+                        value={formData.phonePrivacy || 'FAMILY'}
+                        onChange={handleChange}
+                        className={inputClassName('phonePrivacy')}
+                      >
+                        <option value="FAMILY">Visible to family</option>
+                        <option value="PRIVATE">Only me</option>
+                      </select>
+                    </div>
+                  )}
                 </div>
                 
                 {canEditAccountSettings && (
@@ -1801,6 +1842,24 @@ const ProfileFormModal = ({
                     maxLength={80}
                   />
                 </div>
+                {showFieldPrivacyControls && (
+                  <div className="md:col-span-2">
+                    <label htmlFor="addressPrivacy" className={labelClassName}>
+                      Address Visibility
+                    </label>
+                    <select
+                      id="addressPrivacy"
+                      name="addressPrivacy"
+                      value={formData.addressPrivacy || 'FAMILY'}
+                      onChange={handleChange}
+                      className={inputClassName('addressPrivacy')}
+                    >
+                      <option value="FAMILY">Visible to family</option>
+                      <option value="PRIVATE">Only me</option>
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">Family visibility applies only to permitted family viewers. Private keeps the field visible only to you.</p>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -2291,3 +2350,5 @@ const ProfileFormModal = ({
 };
 
 export default ProfileFormModal;
+
+

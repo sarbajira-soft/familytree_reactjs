@@ -112,6 +112,7 @@ const PullToRefresh = ({ children, onRefresh, disabled }) => {
       ? "Release to refresh"
       : "Pull to refresh";
 
+
   return (
     <div
       ref={containerRef}
@@ -291,6 +292,11 @@ const Layout = ({ noScroll = false }) => {
 
   const { userInfo, userLoading, logout } = useUser();
   const { theme, toggleTheme } = useTheme();
+  const profileDisplayName = [userInfo?.firstName, userInfo?.lastName]
+    .filter(Boolean)
+    .join(' ')
+    .trim() || userInfo?.name || userInfo?.email || (userInfo?.mobile ? `${userInfo?.countryCode || ''} ${userInfo.mobile}`.trim() : 'My Account');
+  const profileSecondaryInfo = userInfo?.familyCode || userInfo?.email || (userInfo?.mobile ? `${userInfo?.countryCode || ''} ${userInfo.mobile}`.trim() : '');
   const { isConnected, unreadCount, refetchUnreadCount, notifications } =
     useNotificationSocket(userInfo);
 
@@ -686,11 +692,11 @@ const Layout = ({ noScroll = false }) => {
                   >
                     <div className="px-4 py-2  text-sm text-gray-800 border-b border-gray-100 dark:text-slate-100 dark:border-slate-700">
                       <p className="font-semibold">
-                        {userInfo?.firstName} {userInfo?.lastName}
+                        {profileDisplayName}
                       </p>
-                      {userInfo?.familyCode && (
+                      {profileSecondaryInfo && (
                         <p className="text-gray-500 text-xs dark:text-slate-300">
-                          Family Code: {userInfo.familyCode}
+                          {userInfo?.familyCode ? `Family Code: ${profileSecondaryInfo}` : profileSecondaryInfo}
                         </p>
                       )}
                     </div>

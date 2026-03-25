@@ -182,6 +182,19 @@ export const UserProvider = ({ children }) => {
         childFields[`childName${index}`] = name;
       });
 
+      const resolvedContactNumber = userProfile.contactNumber || [countryCode, mobile].filter(Boolean).join(' ').trim() || '';
+      const privacySettings = userProfile.privacySettings || {
+        isPrivate: typeof userProfile.isPrivate === 'boolean' ? userProfile.isPrivate : false,
+        emailPrivacy: userProfile.emailPrivacy || 'FAMILY',
+        addressPrivacy: userProfile.addressPrivacy || 'FAMILY',
+        phonePrivacy: userProfile.phonePrivacy || 'FAMILY',
+      };
+      const fieldVisibility = userProfile.fieldVisibility || {
+        email: !!(email || userProfile.email),
+        phone: !!resolvedContactNumber,
+        address: !!userProfile.address,
+      };
+
       setUserInfo({
         userId: userProfile.userId,
         firstName: userProfile.firstName || '',
@@ -209,7 +222,7 @@ export const UserProvider = ({ children }) => {
         dislikes: userProfile.dislikes || '',
         favoriteFoods: userProfile.favoriteFoods || '',
         address: userProfile.address || '',
-        contactNumber: userProfile.contactNumber || '',
+        contactNumber: resolvedContactNumber,
         bio: userProfile.bio || '',
         profileUrl: userProfile.profile || '',
         // Prefer profile.familyCode as primary; if missing, fall back to membership familyCode
@@ -233,8 +246,13 @@ export const UserProvider = ({ children }) => {
         termsAcceptedAt: termsAcceptedAt || null,
 
         isPrivate: typeof userProfile.isPrivate === 'boolean' ? userProfile.isPrivate : false,
+        privacySettings,
+        fieldVisibility,
+        emailPrivacy: privacySettings.emailPrivacy || userProfile.emailPrivacy || 'FAMILY',
+        addressPrivacy: privacySettings.addressPrivacy || userProfile.addressPrivacy || 'FAMILY',
+        phonePrivacy: privacySettings.phonePrivacy || userProfile.phonePrivacy || 'FAMILY',
 
-        raw: userProfile,
+        raw: data,
       });
       
     } catch (err) {
@@ -335,3 +353,4 @@ const calculateAge = (dob) => {
   }
   return age;
 };
+
