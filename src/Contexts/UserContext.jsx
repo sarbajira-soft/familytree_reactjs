@@ -188,11 +188,13 @@ export const UserProvider = ({ children }) => {
         emailPrivacy: userProfile.emailPrivacy || 'FAMILY',
         addressPrivacy: userProfile.addressPrivacy || 'FAMILY',
         phonePrivacy: userProfile.phonePrivacy || 'FAMILY',
+        dobPrivacy: userProfile.dobPrivacy || 'FAMILY',
       };
       const fieldVisibility = userProfile.fieldVisibility || {
         email: !!(email || userProfile.email),
         phone: !!resolvedContactNumber,
         address: !!userProfile.address,
+        dob: !!userProfile.dob,
       };
 
       setUserInfo({
@@ -251,6 +253,7 @@ export const UserProvider = ({ children }) => {
         emailPrivacy: privacySettings.emailPrivacy || userProfile.emailPrivacy || 'FAMILY',
         addressPrivacy: privacySettings.addressPrivacy || userProfile.addressPrivacy || 'FAMILY',
         phonePrivacy: privacySettings.phonePrivacy || userProfile.phonePrivacy || 'FAMILY',
+        dobPrivacy: privacySettings.dobPrivacy || userProfile.dobPrivacy || 'FAMILY',
 
         raw: data,
       });

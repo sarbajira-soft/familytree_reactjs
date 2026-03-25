@@ -95,6 +95,7 @@ const ProfileFormModal = ({
     emailPrivacy: 'FAMILY',
     addressPrivacy: 'FAMILY',
     phonePrivacy: 'FAMILY',
+    dobPrivacy: 'FAMILY',
     
     // Family Information
     maritalStatus: '',
@@ -271,6 +272,7 @@ const ProfileFormModal = ({
             emailPrivacy: safeString(sourceDataRaw.emailPrivacy || sourceDataRaw.privacySettings?.emailPrivacy || sourceDataRaw.raw?.userProfile?.emailPrivacy || sourceDataRaw.raw?.userProfile?.privacySettings?.emailPrivacy || 'FAMILY') || 'FAMILY',
             addressPrivacy: safeString(sourceDataRaw.addressPrivacy || sourceDataRaw.privacySettings?.addressPrivacy || sourceDataRaw.raw?.userProfile?.addressPrivacy || sourceDataRaw.raw?.userProfile?.privacySettings?.addressPrivacy || 'FAMILY') || 'FAMILY',
             phonePrivacy: safeString(sourceDataRaw.phonePrivacy || sourceDataRaw.privacySettings?.phonePrivacy || sourceDataRaw.raw?.userProfile?.phonePrivacy || sourceDataRaw.raw?.userProfile?.privacySettings?.phonePrivacy || 'FAMILY') || 'FAMILY',
+            dobPrivacy: safeString(sourceDataRaw.dobPrivacy || sourceDataRaw.privacySettings?.dobPrivacy || sourceDataRaw.raw?.userProfile?.dobPrivacy || sourceDataRaw.raw?.userProfile?.privacySettings?.dobPrivacy || 'FAMILY') || 'FAMILY',
             state,
             pincode,
             country: country || 'India',
@@ -847,7 +849,7 @@ const ProfileFormModal = ({
 
     setIsLoading(true);
 
-    const allowedFields = [
+    const allowedFields = Array.from(new Set([
       'profile',
       'firstName',
       'lastName',
@@ -878,15 +880,14 @@ const ProfileFormModal = ({
       'pincode',
       'country',
       'bio',
-      ...(mode !== 'add' ? ['emailPrivacy', 'addressPrivacy', 'phonePrivacy'] : []),
+      ...(mode !== 'add' ? ['emailPrivacy', 'addressPrivacy', 'phonePrivacy', 'dobPrivacy'] : []),
       'familyCode',
       'email',
       'mobile',
       'countryCode',
       'role',
       'status',
-      ...(mode !== 'add' ? ['emailPrivacy', 'addressPrivacy', 'phonePrivacy'] : []),
-    ];
+    ]));
 
     const formDataToSend = new FormData();
 
@@ -999,7 +1000,9 @@ const ProfileFormModal = ({
 
       if (!response.ok) {
         const errorData = await response.json();
-        const errorMessage = errorData.message || 'Operation failed. Please try again.';
+        const errorMessage = Array.isArray(errorData.message)
+          ? errorData.message.join('\n')
+          : (errorData.message || 'Operation failed. Please try again.');
         setApiError(errorMessage);
         return;
       }
@@ -1251,11 +1254,11 @@ const ProfileFormModal = ({
             <div 
               ref={errorRef}
               tabIndex="-1"
-              className="mb-4 p-3 text-sm text-red-700 bg-red-100 rounded border border-red-300 flex justify-between items-center focus:outline-none focus:ring-2 focus:ring-red-500"
+              className="mb-4 p-3 text-sm text-red-700 bg-red-100 rounded border border-red-300 flex justify-between items-start gap-3 focus:outline-none focus:ring-2 focus:ring-red-500"
               role="alert"
               aria-live="polite"
             >
-              <span>{apiError}</span>
+              <span className="whitespace-pre-line">{apiError}</span>
               <button 
                 onClick={() => setApiError('')} 
                 className="bg-unset text-red-700 hover:text-red-900 focus:outline-none focus:ring-2 focus:ring-red-500 rounded"
@@ -1731,6 +1734,23 @@ const ProfileFormModal = ({
                     </div>
                   )}
                   {errors.dob && <p className="text-red-500 text-xs mt-1">{errors.dob}</p>}
+                  {showFieldPrivacyControls && (
+                    <div className="mt-3">
+                      <label htmlFor="dobPrivacy" className="block text-xs font-medium text-gray-600 mb-1">
+                        Date of Birth Visibility
+                      </label>
+                      <select
+                        id="dobPrivacy"
+                        name="dobPrivacy"
+                        value={formData.dobPrivacy || 'FAMILY'}
+                        onChange={handleChange}
+                        className={inputClassName('dobPrivacy')}
+                      >
+                        <option value="FAMILY">Visible to family</option>
+                        <option value="PRIVATE">Only me</option>
+                      </select>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label htmlFor="age" className={labelClassName}>
