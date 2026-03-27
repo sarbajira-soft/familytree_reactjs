@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useUser } from "../Contexts/UserContext";
 import Swal from "sweetalert2";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -19,6 +19,7 @@ import {
   FiTrash2,
   FiGift,
   FiHeart,
+  FiMoreVertical,
 } from "react-icons/fi";
 
 import CreateEventModal from "../Components/CreateEventModal";
@@ -29,6 +30,7 @@ import PendingApprovalView from "../Components/PendingApprovalView";
 import CreateFamilyModal from "../Components/CreateFamilyModal";
 import JoinFamilyModal from "../Components/JoinFamilyModal";
 import EventsShimmer from "./EventsShimmer";
+import ReportContentModal from "../Components/ReportContentModal";
 
 const EventsPage = () => {
   const { userInfo, userLoading } = useUser();
@@ -41,6 +43,37 @@ const EventsPage = () => {
   const [isCreateFamilyModalOpen, setIsCreateFamilyModalOpen] = useState(false);
   const [isJoinFamilyModalOpen, setIsJoinFamilyModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
+  const [eventActionMenuEventId, setEventActionMenuEventId] = useState(null);
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [reportTarget, setReportTarget] = useState(null);
+
+  const openReportModalForEvent = (event) => {
+    if (!event?.id) return;
+    setReportTarget({
+      targetType: "event",
+      targetId: event.id,
+      targetLabel: event?.title ? String(event.title).slice(0, 80) : "Event",
+    });
+    setReportModalOpen(true);
+  };
+
+  const closeReportModal = () => {
+    setReportModalOpen(false);
+    setReportTarget(null);
+  };
+
+  useEffect(() => {
+    if (!eventActionMenuEventId) return;
+    const handleDocMouseDown = (e) => {
+      const el = e.target;
+      if (el?.closest?.('[data-event-action-menu]')) return;
+      setEventActionMenuEventId(null);
+    };
+    document.addEventListener("mousedown", handleDocMouseDown);
+    return () => {
+      document.removeEventListener("mousedown", handleDocMouseDown);
+    };
+  }, [eventActionMenuEventId]);
 
   // Use React Query for events with tab-based caching
   const { data: allEvents = [], isLoading: eventsLoading } = useQuery({
@@ -68,6 +101,7 @@ const EventsPage = () => {
           date: item.eventDate,
           time: item.eventTime,
           location: item.location,
+          createdBy: item.createdBy ?? item.userId ?? item.created_by,
           eventType: item.eventType || "custom",
           eventImages:
             item.eventImages && item.eventImages.length > 0
@@ -453,6 +487,10 @@ const EventsPage = () => {
                 displayedEvents.map((event) => {
                   const eventStyle = getEventTypeStyle(event.eventType);
                   const EventIcon = eventStyle.icon;
+                  const canReport =
+                    userInfo?.userId &&
+                    event?.createdBy &&
+                    Number(event.createdBy) !== Number(userInfo.userId);
 
                   return (
                     <div
@@ -619,6 +657,44 @@ const EventsPage = () => {
                                 </>
                               )}
 
+                            {canReport ? (
+                              <div
+                                className="relative"
+                                data-event-action-menu
+                                onPointerDown={(e) => e.stopPropagation()}
+                              >
+                                <button
+                                  type="button"
+                                  aria-label="Event actions"
+                                  className="bg-unset p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-all duration-200"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEventActionMenuEventId((prev) =>
+                                      prev === event.id ? null : event.id,
+                                    );
+                                  }}
+                                >
+                                  <FiMoreVertical size={16} />
+                                </button>
+
+                                {eventActionMenuEventId === event.id && (
+                                  <div className="absolute right-0 mt-2 w-40 rounded-xl border border-gray-200 bg-white shadow-lg z-50 overflow-hidden">
+                                    <button
+                                      type="button"
+                                      className="w-full flex items-center rounded-lg px-3 py-2 text-left text-sm text-gray-700 hover:bg-red-50 active:bg-red-100 transition-colors"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setEventActionMenuEventId(null);
+                                        openReportModalForEvent(event);
+                                      }}
+                                    >
+                                      Report
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            ) : null}
+
                             {event.eventType === "custom" && (
                               <div
                                 className={`flex items-center gap-1 ${eventStyle.textColor} font-semibold group-hover:${eventStyle.hoverColor} transition-colors`}
@@ -658,6 +734,14 @@ const EventsPage = () => {
         isMyEvent={activeTab === "my-events"}
         onEdit={handleEditEvent}
         onDelete={handleDeleteEvent}
+      />
+
+      <ReportContentModal
+        isOpen={reportModalOpen}
+        onClose={closeReportModal}
+        targetType={reportTarget?.targetType}
+        targetId={reportTarget?.targetId}
+        targetLabel={reportTarget?.targetLabel}
       />
       <EditEventModal
         isOpen={isEditEventModalOpen}

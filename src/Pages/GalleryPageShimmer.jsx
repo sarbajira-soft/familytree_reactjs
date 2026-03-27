@@ -1,10 +1,10 @@
 // DashboardCardShimmer.jsx
 import React from "react";
-const shimmerCards = Array(6).fill(null);
+const shimmerCards = Array(4).fill(null);
 
 const GalleryPageShimmer = () => (
     
-  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-7">
+  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-7">
     {shimmerCards.map((_, i) => (
       <div
         key={i}

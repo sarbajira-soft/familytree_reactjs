@@ -194,9 +194,18 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
         formData.append('galleryTitle', trimmedTitle);
         formData.append('galleryDescription', description || '');
         formData.append('privacy', privacy === 'family' ? 'private' : privacy);
-        formData.append('status', 1);
+
+        const nextStatus = 1;
+        if (Number.isFinite(Number(nextStatus))) {
+            formData.append('status', String(nextStatus));
+        }
+
         // Backend derives createdBy from the auth token; keep this only as a best-effort fallback.
-        formData.append('createdBy', currentUser?.userId || userInfo?.userId || '');
+        // Do NOT send empty string, otherwise backend validation (IsNumber) can fail with 400.
+        const resolvedCreatedBy = Number(currentUser?.userId || userInfo?.userId);
+        if (Number.isFinite(resolvedCreatedBy) && resolvedCreatedBy > 0) {
+            formData.append('createdBy', String(resolvedCreatedBy));
+        }
         
         if (privacy === 'family') {
             formData.append('familyCode', resolvedFamilyCode);

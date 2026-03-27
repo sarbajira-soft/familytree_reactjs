@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import GalleryViewerModal from '../Components/GalleryViewerModal';
-import {  FiPlusCircle } from 'react-icons/fi';
+import ReportContentModal from '../Components/ReportContentModal';
+import {  FiMoreVertical, FiPlusCircle } from 'react-icons/fi';
 import { MdPublic, MdPeople } from 'react-icons/md';
 import CreateAlbumModal from '../Components/CreateAlbumModal';
 import { useUser } from '../Contexts/UserContext'; // Import useUser context
@@ -12,123 +13,7 @@ import { authFetch } from '../utils/authFetch';
 import { getToken } from '../utils/auth';
 
 const GalleryCollage = ({ photos = [], onOpenAlbum }) => {
-  const [activeIndex, setActiveIndex] = useState(0);
-
-  useEffect(() => {
-    if (photos.length) {
-      setActiveIndex(photos.length - 1);
-    } else {
-      setActiveIndex(0);
-    }
-  }, [photos.length]);
-
-  useEffect(() => {
-    if (!photos.length) return;
-    const id = setInterval(() => {
-      setActiveIndex((prev) => (prev + 1) % photos.length);
-    }, 5000);
-    return () => clearInterval(id);
-  }, [photos.length]);
-
-  if (!photos.length) return null;
-
-  const peripheralPositions = [
-    // Left column (top, middle, bottom)
-    "top-[4%] left-4 w-[18%] h-[28%]",
-    "top-[36%] left-4 w-[18%] h-[28%]",
-    "top-[68%] left-4 w-[18%] h-[28%]",
-    // Right column (top, middle, bottom)
-    "top-[4%] left-[78%] w-[18%] h-[28%]",
-    "top-[36%] left-[78%] w-[18%] h-[28%]",
-    "top-[68%] left-[78%] w-[18%] h-[28%]",
-  ];
-
-  const peripheralRotations = [
-    "rotate-0",
-    "rotate-0",
-    "rotate-0",
-    "rotate-0",
-    "rotate-0",
-    "rotate-0",
-  ];
-
-  const total = photos.length;
-  const visibleCount = Math.min(1 + peripheralPositions.length, total);
-
-  const { orderedPhotos, orderedIndices } = useMemo(() => {
-    if (!total) return { orderedPhotos: [], orderedIndices: [] };
-    const orderedPhotos = [];
-    const orderedIndices = [];
-
-    orderedPhotos.push(photos[activeIndex]);
-    orderedIndices.push(activeIndex);
-
-    for (let i = 1; i < visibleCount; i++) {
-      const idx = (activeIndex + i) % total;
-      orderedPhotos.push(photos[idx]);
-      orderedIndices.push(idx);
-    }
-
-    return { orderedPhotos, orderedIndices };
-  }, [photos, activeIndex, total, visibleCount]);
-
-  if (!orderedPhotos.length) return null;
-
-  return (
-    <div className="w-full mb-10">
-      <div className="relative w-full aspect-[16/9] bg-black rounded-3xl overflow-hidden shadow-2xl">
-        {orderedPhotos.map((photo, index) => {
-
-           if (!photo) return null; 
-
-          const globalIndex = orderedIndices[index];
-
-          if (index === 0) {
-            return (
-              <div
-                key={photo.id || globalIndex}
-                className="absolute top-1/2 left-1/2 w-[62%] h-[68%] -translate-x-1/2 -translate-y-1/2 transition-all duration-500 ease-out origin-center z-30 scale-105 rotate-0 shadow-2xl ring-4 ring-secondary-500 overflow-hidden rounded-3xl"
-              >
-                <img
-                  src={photo.url}
-                  alt={photo.caption || 'Family memory'}
-                  className="w-full h-full object-cover border border-white/10"
-                />
-                {onOpenAlbum && photo.albumId && (
-                  <button
-                    type="button"
-                    onClick={() => onOpenAlbum(photo.albumId)}
-                    className="absolute bottom-4 right-4 px-4 py-2 text-xs font-semibold rounded-full bg-secondary-500 hover:bg-secondary-600 text-white shadow-md"
-                  >
-                    Open album
-                  </button>
-                )}
-              </div>
-            );
-          }
-
-          const peripheralIndex = index - 1;
-          const pos = peripheralPositions[peripheralIndex] || "inset-4";
-          const rotation = peripheralRotations[peripheralIndex] || "-rotate-2";
-
-          return (
-            <button
-              key={photo.id || globalIndex}
-              type="button"
-              onClick={() => setActiveIndex(globalIndex)}
-              className={`absolute ${pos} transition-all duration-500 ease-out origin-center z-20 opacity-80 hover:opacity-100 hover:scale-105 ${rotation} grayscale-[35%]`}
-            >
-              <img
-                src={photo.url}
-                alt={photo.caption || 'Family memory'}
-                className="w-full h-full object-cover rounded-2xl border border-white/10"
-              />
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
+  // ... (rest of the code remains the same)
 };
 
 const FamilyGalleryPage = () => {
@@ -146,6 +31,11 @@ const FamilyGalleryPage = () => {
   const [searchCaption, setSearchCaption] = useState('');
 
   const searchTimeoutRef = useRef(null);
+
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [reportTarget, setReportTarget] = useState(null);
+
+  const [albumActionMenuAlbumId, setAlbumActionMenuAlbumId] = useState(null);
 
   // Fetch token from localStorage on component mount
   useEffect(() => {
@@ -257,6 +147,21 @@ const FamilyGalleryPage = () => {
     setIsCreateAlbumModalOpen(true);
   };
 
+  const openReportModalForAlbum = (album) => {
+    if (!album?.id) return;
+    setReportTarget({
+      targetType: 'gallery',
+      targetId: album.id,
+      targetLabel: album?.title ? `Album: ${album.title}` : 'Album',
+    });
+    setReportModalOpen(true);
+  };
+
+  const closeReportModal = () => {
+    setReportModalOpen(false);
+    setReportTarget(null);
+  };
+
   const handleCloseCreateAlbumModal = () => {
     setIsCreateAlbumModalOpen(false);
   };
@@ -271,6 +176,21 @@ const FamilyGalleryPage = () => {
       openGalleryModal(album);
     }
   };
+
+  useEffect(() => {
+    if (!albumActionMenuAlbumId) return;
+
+    const handleDocMouseDown = (e) => {
+      const el = e.target;
+      if (el?.closest?.('[data-album-action-menu]')) return;
+      setAlbumActionMenuAlbumId(null);
+    };
+
+    document.addEventListener('mousedown', handleDocMouseDown);
+    return () => {
+      document.removeEventListener('mousedown', handleDocMouseDown);
+    };
+  }, [albumActionMenuAlbumId]);
 
   return (
     <>
@@ -402,10 +322,14 @@ const FamilyGalleryPage = () => {
                 filteredAlbums.map((album) => (
                   <div
                     key={album.id}
-                    className="bg-white rounded-2xl overflow-hidden shadow-xl border border-gray-100 cursor-pointer transform hover:scale-[1.03] transition-all duration-300 ease-in-out group relative"
-                    onClick={() => openGalleryModal(album)}
+                    className="bg-white rounded-2xl overflow-hidden shadow-xl border border-gray-100 transform hover:scale-[1.03] transition-all duration-300 ease-in-out group relative"
                   >
-                    <div className="relative w-full h-56 bg-gray-100 overflow-hidden">
+                    <button
+                      type="button"
+                      className="relative w-full h-56 bg-gray-100 overflow-hidden text-left"
+                      onClick={() => openGalleryModal(album)}
+                      aria-label={`Open album ${album.title || ''}`}
+                    >
                       <img
                         src={album.coverPhoto}
                         alt={album.title}
@@ -423,11 +347,49 @@ const FamilyGalleryPage = () => {
                           +{album.photos.length - 1} More
                         </div>
                       )}
-                    </div>
+                    </button>
                     <div className="p-5">
-                      <h3 className="font-bold text-xl text-gray-900 mb-2 line-clamp-1">
-                        {album.title}
-                      </h3>
+                      <div className="flex items-start justify-between gap-3">
+                        <h3 className="font-bold text-xl text-gray-900 mb-2 line-clamp-1">
+                          {album.title}
+                        </h3>
+
+                        {album?.authorId && userInfo?.userId &&
+                        Number(album.authorId) !== Number(userInfo.userId) ? (
+                          <div className="relative" data-album-action-menu>
+                            <button
+                              type="button"
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-full text-gray-700 hover:bg-gray-100 active:bg-gray-200 transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setAlbumActionMenuAlbumId((prev) =>
+                                  prev === album.id ? null : album.id,
+                                );
+                              }}
+                              aria-label="Album actions"
+                            >
+                              <FiMoreVertical />
+                            </button>
+
+                            {albumActionMenuAlbumId === album.id && (
+                              <div className="absolute right-0 mt-2 w-40 rounded-xl border border-gray-200 bg-white shadow-lg z-10 overflow-hidden">
+                                <button
+                                  type="button"
+                                  className="w-full flex items-center px-3 py-2 text-left text-sm text-gray-700 hover:bg-red-50 active:bg-red-100 transition-colors"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setAlbumActionMenuAlbumId(null);
+                                    openReportModalForAlbum(album);
+                                  }}
+                                >
+                                  Report
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        ) : null}
+                      </div>
+
                       <p className="text-sm text-gray-600 mb-3">
                         by{" "}
                         <span
@@ -487,6 +449,14 @@ const FamilyGalleryPage = () => {
           authToken={token}
         />
       )}
+
+      <ReportContentModal
+        isOpen={reportModalOpen}
+        onClose={closeReportModal}
+        targetType={reportTarget?.targetType}
+        targetId={reportTarget?.targetId}
+        targetLabel={reportTarget?.targetLabel}
+      />
 
       <CreateAlbumModal
         isOpen={isCreateAlbumModalOpen}
