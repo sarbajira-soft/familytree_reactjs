@@ -422,8 +422,30 @@ const PostPage = () => {
   };
 
   const toggleLike = async (postId) => {
-    // prevent multiple clicks during loading
-    // Add postId to loading set
+    // Prevent multiple clicks during loading
+    if (likeLoadingIds.has(postId)) return;
+
+    // Get current post state for potential rollback
+    const targetPost = posts.find((p) => p.id === postId);
+    if (!targetPost) return;
+
+    const originalLiked = targetPost.liked;
+    const originalLikes = targetPost.likes;
+
+    // 🟢 Optimistic update - show like immediately
+    setPosts((prevPosts) =>
+      prevPosts.map((post) =>
+        post.id === postId
+          ? {
+              ...post,
+              liked: !post.liked,
+              likes: post.liked ? post.likes - 1 : post.likes + 1,
+            }
+          : post
+      )
+    );
+
+    // Add to loading set
     setLikeLoadingIds((prev) => new Set(prev).add(postId));
 
     try {
@@ -432,7 +454,7 @@ const PostPage = () => {
       });
 
       if (data) {
-        // Update post like status and like count in posts array
+        // Update with server response (confirm the optimistic update)
         setPosts((prevPosts) =>
           prevPosts.map((post) =>
             post.id === postId
@@ -441,18 +463,34 @@ const PostPage = () => {
           )
         );
       } else {
+        // 🔴 Rollback on no response
         logger.error("BLOCK OVERRIDE: Failed to toggle like", "No response");
+        setPosts((prevPosts) =>
+          prevPosts.map((post) =>
+            post.id === postId
+              ? { ...post, liked: originalLiked, likes: originalLikes }
+              : post
+          )
+        );
       }
     } catch (error) {
+      // 🔴 Rollback on error
       logger.error("BLOCK OVERRIDE: Error toggling like", error);
+      setPosts((prevPosts) =>
+        prevPosts.map((post) =>
+          post.id === postId
+            ? { ...post, liked: originalLiked, likes: originalLikes }
+            : post
+        )
+      );
+    } finally {
+      // Remove from loading set
+      setLikeLoadingIds((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(postId);
+        return newSet;
+      });
     }
-
-    // Remove postId from loading set
-    setLikeLoadingIds((prev) => {
-      const newSet = new Set(prev);
-      newSet.delete(postId);
-      return newSet;
-    });
   };
 
   const handleEmojiClickForPost = (postId, emojiData) => {
@@ -1378,6 +1416,7 @@ const PostPage = () => {
                                   handlePostComment(post.id);
                                 }
                               }}
+                              maxLength={100}
                               className="flex-1 bg-transparent border-none text-[11px] sm:text-sm placeholder-gray-400 focus:outline-none"
                             />
                             <button

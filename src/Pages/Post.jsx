@@ -973,6 +973,7 @@ const PostPage = () => {
                             handlePostComment(post.id);
                           }
                         }}
+                        maxLength={100}
                         className="flex-1 bg-transparent border-none text-[11px] sm:text-sm placeholder-gray-400 focus:outline-none"
                       />
                       <button
@@ -1515,6 +1516,7 @@ const PostPage = () => {
                               handlePostComment(post.id);
                             }
                           }}
+                          maxLength={100}
                           className="flex-1 bg-transparent border-none text-[11px] sm:text-sm placeholder-gray-400 focus:outline-none"
                         />
                         <button

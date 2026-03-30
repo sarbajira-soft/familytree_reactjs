@@ -485,6 +485,7 @@ const GalleryViewerModal = ({
                         value={newComment}
                         onChange={(e) => setNewComment(e.target.value)}
                         placeholder="Add a comment..."
+                        maxLength={100}
                         className="flex-1 bg-transparent border-none text-[11px] sm:text-sm placeholder-gray-400 focus:outline-none"
                       />
                       <button

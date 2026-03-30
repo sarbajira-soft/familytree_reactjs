@@ -253,8 +253,8 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
 
             console.log(`Album ${mode === 'create' ? 'Created' : 'Updated'}:`, result);
 
-            // Only proceed if still mounted and not cancelled
-            onCreateAlbum(result);
+            // Wait for the parent to handle the update (refetch data)
+            await onCreateAlbum(result);
             handleClose();
 
             Swal.fire({
@@ -429,7 +429,7 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
                             id="coverPhoto"
                             ref={coverPhotoInputRef}
                             onChange={handleCoverPhotoChange}
-                            accept="image/*"
+                            accept="image/jpeg,image/png,image/jpg,image/gif"
                             disabled={isSubmitting}
                             className="hidden"
                         />
@@ -476,7 +476,7 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
                             id="galleryPhotos"
                             ref={galleryPhotoInputRef}
                             onChange={handleGalleryPhotosChange}
-                            accept="image/*"
+                            accept="image/jpeg,image/png,image/jpg,image/gif"
                             multiple
                             disabled={isSubmitting}
                             className="hidden"

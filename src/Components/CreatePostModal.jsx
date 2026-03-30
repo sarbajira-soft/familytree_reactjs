@@ -863,8 +863,9 @@ const CreatePostModal = ({
       await throwIfNotOk(response, {
         fallback: `Unable to ${mode === "edit" ? "update" : "create"} the post. Please try again.`,
       });
+      const result = await response.json().catch(() => ({}));
       setShowSuccess(true);
-      onPostCreated();
+      onPostCreated(result);
       // Auto-close after 2 seconds
       setTimeout(() => {
         setShowSuccess(false);
@@ -1308,7 +1309,7 @@ const CreatePostModal = ({
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/*"
+                  accept="image/jpeg,image/png,image/jpg,image/gif"
                   className="hidden"
                   onChange={handleImageChange}
                 />
