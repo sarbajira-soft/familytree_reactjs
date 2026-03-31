@@ -23,8 +23,10 @@ import { Phone, Mail } from "lucide-react";
 import ShimmerImageCard from "./ShimmerImageCard";
 import ProfileShimmer from "./ProfileShimmer";
 
+import DeleteConfirmationModal from "../Components/DeleteConfirmationModal";
 import { authFetch, authFetchResponse } from "../utils/authFetch";
 import { getToken } from "../utils/auth";
+import { toast } from "react-toastify";
 
 const ProfilePage = () => {
   const [token, setToken] = useState(null);
@@ -52,6 +54,12 @@ const ProfilePage = () => {
   const [albumToEdit, setAlbumToEdit] = useState(null);
   const [isBioExpanded, setIsBioExpanded] = useState(false);
   const toggleBioExpanded = () => setIsBioExpanded(!isBioExpanded);
+
+  // Delete confirmation modal state
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState(null);
+  const [deleteType, setDeleteType] = useState(null); // 'post' or 'gallery'
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const privacyMutation = useMutation({
     mutationFn: async (isPrivate) => {
@@ -533,55 +541,56 @@ const ProfilePage = () => {
 
   const handleDeletePost = async (e, postId) => {
     e.stopPropagation();
-    const result = await Swal.fire({
-      title: "Are you sure?",
-      text: "This post and all related comments/likes will be permanently deleted.",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#d33",
-      cancelButtonColor: "#3085d6",
-      confirmButtonText: "Yes, delete it!",
-    });
+    const post = userPosts.find((p) => p.id === postId);
+    setItemToDelete({ id: postId, name: post?.caption?.substring(0, 50) || 'this post' });
+    setDeleteType('post');
+    setIsDeleteModalOpen(true);
+  };
 
-    if (result.isConfirmed) {
-      try {
-        const response = await authFetchResponse(`/post/delete/${postId}`, {
-          method: "DELETE",
-          skipThrow: true,
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to delete post: ${response.statusText}`);
-        }
-
-        await Swal.fire({
-          icon: "success",
-          title: "Deleted!",
-          text: "Post has been deleted successfully.",
-          confirmButtonColor: "#3f982c",
-        });
-
-        queryClient.invalidateQueries({
-          queryKey: ["userPosts", userInfo?.userId],
-        }); // Refresh posts
-      } catch (error) {
-        console.error("Error deleting post:", error);
-        Swal.fire({
-          icon: "error",
-          title: "Error!",
-          text: "Failed to delete the post. Please try again later.",
-          confirmButtonColor: "#d33",
+  const handlePostUpdated = async (updatedData) => {
+    // Close modal first
+    setIsEditPostModalOpen(false);
+    setPostToEditDetails(null);
+    
+    // First update cache immediately for instant UI refresh if we have data
+    if (updatedData) {
+      const id = updatedData.id || updatedData.data?.id;
+      const caption = updatedData.caption || updatedData.data?.caption;
+      const privacy = updatedData.privacy || updatedData.data?.privacy;
+      const postImage = updatedData.postImage || updatedData.url || updatedData.data?.postImage;
+      const postVideo = updatedData.postVideo || updatedData.data?.postVideo;
+      
+      if (id) {
+        queryClient.setQueryData(["userPosts", userInfo?.userId], (old) => {
+          if (!old) return old;
+          return old.map((post) =>
+            post.id === id
+              ? {
+                  ...post,
+                  caption: caption || post.caption,
+                  privacy: privacy || post.privacy,
+                  fullImageUrl: postImage || post.fullImageUrl,
+                  url: postImage || post.url,
+                  postVideo: postVideo || post.postVideo,
+                }
+              : post
+          );
         });
       }
     }
-  };
-
-  const handlePostUpdated = () => {
-    setIsEditPostModalOpen(false);
-    setPostToEditDetails(null);
-    queryClient.invalidateQueries({
+    
+    // Clear the cache and force fresh fetch
+    queryClient.removeQueries({
+      queryKey: ["userPosts", userInfo?.userId],
+      exact: true,
+    });
+    
+    // Fetch fresh data
+    await queryClient.fetchQuery({
       queryKey: ["userPosts", userInfo?.userId],
     });
+    
+    toast.success("Post updated successfully!");
   };
 
   const handleEditAlbum = async (e, albumId) => {
@@ -629,30 +638,80 @@ const ProfilePage = () => {
     }
   };
 
-  const handleAlbumUpdated = () => {
+  const handleAlbumUpdated = async (updatedData) => {
+    // Close modal first
     setIsEditAlbumModalOpen(false);
     setAlbumToEdit(null);
-    queryClient.invalidateQueries({
+    
+    // First update cache immediately for instant UI refresh if we have data
+    if (updatedData) {
+      const id = updatedData.id || updatedData.data?.id;
+      const title = updatedData.galleryTitle || updatedData.title || updatedData.data?.galleryTitle;
+      const description = updatedData.galleryDescription || updatedData.description || updatedData.data?.galleryDescription;
+      const cover = updatedData.coverPhoto || updatedData.cover || updatedData.data?.coverPhoto;
+      const privacy = updatedData.privacy || updatedData.data?.privacy;
+      
+      if (id) {
+        queryClient.setQueryData(["userGalleries", userInfo?.userId], (old) => {
+          if (!old) return old;
+          return old.map((gallery) =>
+            gallery.id === id
+              ? {
+                  ...gallery,
+                  title: title || gallery.title,
+                  description: description || gallery.description,
+                  cover: cover || gallery.cover,
+                  privacy: privacy || gallery.privacy,
+                }
+              : gallery
+          );
+        });
+      }
+    }
+    
+    // Clear the cache and force fresh fetch
+    queryClient.removeQueries({
+      queryKey: ["userGalleries", userInfo?.userId],
+      exact: true,
+    });
+    
+    // Fetch fresh data
+    await queryClient.fetchQuery({
       queryKey: ["userGalleries", userInfo?.userId],
     });
+    
+    toast.success("Gallery updated successfully!");
   };
 
   const handleDeleteAlbum = async (e, albumId) => {
     e.stopPropagation();
+    const album = userGalleries.find((g) => g.id === albumId);
+    setItemToDelete({ id: albumId, name: album?.title || 'this gallery' });
+    setDeleteType('gallery');
+    setIsDeleteModalOpen(true);
+  };
 
-    const result = await Swal.fire({
-      title: "Are you sure?",
-      text: "This gallery and all its photos will be permanently deleted.",
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonColor: "#d33",
-      cancelButtonColor: "#3085d6",
-      confirmButtonText: "Yes, delete it!",
-    });
+  const handleConfirmDelete = async () => {
+    if (!itemToDelete || !deleteType) return;
+    
+    setIsDeleting(true);
+    try {
+      if (deleteType === 'post') {
+        const response = await authFetchResponse(`/post/delete/${itemToDelete.id}`, {
+          method: "DELETE",
+          skipThrow: true,
+        });
 
-    if (result.isConfirmed) {
-      try {
-        const response = await authFetchResponse(`/gallery/${albumId}`, {
+        if (!response.ok) {
+          throw new Error(`Failed to delete post: ${response.statusText}`);
+        }
+
+        toast.success("Post deleted successfully!");
+        queryClient.invalidateQueries({
+          queryKey: ["userPosts", userInfo?.userId],
+        });
+      } else if (deleteType === 'gallery') {
+        const response = await authFetchResponse(`/gallery/${itemToDelete.id}`, {
           method: "DELETE",
           skipThrow: true,
         });
@@ -661,25 +720,19 @@ const ProfilePage = () => {
           throw new Error(`Failed to delete gallery: ${response.statusText}`);
         }
 
-        await Swal.fire({
-          icon: "success",
-          title: "Deleted!",
-          text: "Gallery has been deleted successfully.",
-          confirmButtonColor: "#3f982c",
-        });
-
+        toast.success("Gallery deleted successfully!");
         queryClient.invalidateQueries({
           queryKey: ["userGalleries", userInfo?.userId],
-        }); // Refresh album list
-      } catch (error) {
-        console.error("Error deleting gallery:", error);
-        Swal.fire({
-          icon: "error",
-          title: "Error!",
-          text: "Failed to delete the gallery. Please try again later.",
-          confirmButtonColor: "#d33",
         });
       }
+    } catch (error) {
+      console.error(`Error deleting ${deleteType}:`, error);
+      toast.error(`Failed to delete ${deleteType}. Please try again.`);
+    } finally {
+      setIsDeleting(false);
+      setIsDeleteModalOpen(false);
+      setItemToDelete(null);
+      setDeleteType(null);
     }
   };
 
@@ -1109,6 +1162,25 @@ const ProfilePage = () => {
         onLikePost={handleLikePostInModal}
         authToken={token}
         currentUser={user}
+      />
+      <DeleteConfirmationModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          if (!isDeleting) {
+            setIsDeleteModalOpen(false);
+            setItemToDelete(null);
+            setDeleteType(null);
+          }
+        }}
+        onConfirm={handleConfirmDelete}
+        title={deleteType === 'post' ? 'Delete Post' : 'Delete Gallery'}
+        message={
+          deleteType === 'post'
+            ? 'This post and all related comments/likes will be permanently deleted. Are you sure you want to continue?'
+            : 'This gallery and all its photos will be permanently deleted. Are you sure you want to continue?'
+        }
+        itemName={itemToDelete?.name}
+        isDeleting={isDeleting}
       />
     </>
   );

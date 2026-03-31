@@ -291,10 +291,17 @@ const JoinFamilyModal = ({ isOpen, onClose, token, onFamilyJoined }) => {
                       type="text"
                       value={familyCodeDigits}
                       onChange={(e) => setFamilyCodeDigits(extractDigits(e.target.value).slice(0, 6))}
+                      onPaste={(e) => {
+                        const text = e.clipboardData?.getData('text') || '';
+                        const digits = extractDigits(text).slice(0, 6);
+                        if (digits) {
+                          e.preventDefault();
+                          setFamilyCodeDigits(digits);
+                        }
+                      }}
                       required
                       className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                       placeholder="Enter family code"
-                      maxLength={6}
                       inputMode="numeric"
                       autoComplete="off"
                     />

@@ -757,6 +757,14 @@ export default function LinkTreeModal({
                   <input
                     value={receiverFamilyCodeDigits}
                     onChange={(e) => setReceiverFamilyCodeDigits(extractDigits(e.target.value).slice(0, 6))}
+                    onPaste={(e) => {
+                      const text = e.clipboardData?.getData("text") || "";
+                      const digits = extractDigits(text).slice(0, 6);
+                      if (digits) {
+                        e.preventDefault();
+                        setReceiverFamilyCodeDigits(digits);
+                      }
+                    }}
                     placeholder="Enter family code"
                     maxLength={6}
                     inputMode="numeric"

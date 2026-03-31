@@ -194,9 +194,18 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
         formData.append('galleryTitle', trimmedTitle);
         formData.append('galleryDescription', description || '');
         formData.append('privacy', privacy === 'family' ? 'private' : privacy);
-        formData.append('status', 1);
+
+        const nextStatus = 1;
+        if (Number.isFinite(Number(nextStatus))) {
+            formData.append('status', String(nextStatus));
+        }
+
         // Backend derives createdBy from the auth token; keep this only as a best-effort fallback.
-        formData.append('createdBy', currentUser?.userId || userInfo?.userId || '');
+        // Do NOT send empty string, otherwise backend validation (IsNumber) can fail with 400.
+        const resolvedCreatedBy = Number(currentUser?.userId || userInfo?.userId);
+        if (Number.isFinite(resolvedCreatedBy) && resolvedCreatedBy > 0) {
+            formData.append('createdBy', String(resolvedCreatedBy));
+        }
         
         if (privacy === 'family') {
             formData.append('familyCode', resolvedFamilyCode);
@@ -244,8 +253,8 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
 
             console.log(`Album ${mode === 'create' ? 'Created' : 'Updated'}:`, result);
 
-            // Only proceed if still mounted and not cancelled
-            onCreateAlbum(result);
+            // Wait for the parent to handle the update (refetch data)
+            await onCreateAlbum(result);
             handleClose();
 
             Swal.fire({
@@ -420,7 +429,7 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
                             id="coverPhoto"
                             ref={coverPhotoInputRef}
                             onChange={handleCoverPhotoChange}
-                            accept="image/*"
+                            accept="image/jpeg,image/png,image/jpg,image/gif"
                             disabled={isSubmitting}
                             className="hidden"
                         />
@@ -467,7 +476,7 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
                             id="galleryPhotos"
                             ref={galleryPhotoInputRef}
                             onChange={handleGalleryPhotosChange}
-                            accept="image/*"
+                            accept="image/jpeg,image/png,image/jpg,image/gif"
                             multiple
                             disabled={isSubmitting}
                             className="hidden"

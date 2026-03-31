@@ -603,7 +603,7 @@ const EditEventModal = ({
               <input
                 id="edit-event-image-input"
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/jpg,image/gif"
                 multiple
                 className="hidden"
                 onChange={handleImageChange}
