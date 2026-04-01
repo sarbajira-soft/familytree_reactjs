@@ -22,7 +22,7 @@ const SuggestionApproving = () => {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [familyCode, setFamilyCode] = useState(null);
-  const { userInfo: ctxUserInfo } = useUser();
+  const { userInfo: ctxUserInfo, refetchUser } = useUser();
   const accessToken = getToken();
   const navigate = useNavigate();
 
@@ -67,6 +67,7 @@ const SuggestionApproving = () => {
   const [familyTreePeople, setFamilyTreePeople] = useState(null);
   const [relationToAdmin, setRelationToAdmin] = useState(null);
   const [relationLoading, setRelationLoading] = useState(false);
+  const [actionRequestId, setActionRequestId] = useState(null);
 
   const safeParseUserInfo = () => {
     try {
@@ -257,19 +258,25 @@ const SuggestionApproving = () => {
     computeRelationToAdmin();
   }, [replaceModal.open, selectedMemberId, effectiveUserId, familyTreePeople]);
 
-  const markNotificationAsRead = async (notificationId, status = null) => {
-    try {
-      const url = new URL(`${import.meta.env.VITE_API_BASE_URL}/notifications/${notificationId}/read`);
-      if (status) {
-        url.searchParams.append('status', status);
-      }
+  const removeProcessedRequest = (notificationId) => {
+    setRequests((prev) => prev.filter((request) => request.id !== notificationId));
+  };
 
-      await authFetchResponse(url.toString(), {
+  const respondToJoinRequest = async (notificationId, action) => {
+    setActionRequestId(notificationId);
+    try {
+      const response = await authFetchResponse('/notifications/respond', {
         method: 'POST',
         skipThrow: true,
+        body: JSON.stringify({ notificationId, action }),
       });
-    } catch (err) {
-      console.error('Failed to mark notification as read:', err);
+      const json = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(json?.message || `Failed to ${action} request`);
+      }
+      return json;
+    } finally {
+      setActionRequestId(null);
     }
   };
 
@@ -392,22 +399,7 @@ const SuggestionApproving = () => {
     setAddNewMemberError(null);
 
     try {
-      const addResponse = await authFetchResponse(
-        `/family/member/add-user-to-family`,
-        {
-          method: 'POST',
-          skipThrow: true,
-          body: JSON.stringify({
-            userId: replaceModal.request.triggeredBy,
-            familyCode,
-          }),
-        }
-      );
-
-      if (!addResponse.ok) {
-        const addError = await addResponse.json().catch(() => ({ message: 'Failed to add user to family' }));
-        throw new Error(addError?.message || 'Failed to add user to family');
-      }
+      await respondToJoinRequest(replaceModal.request.id, 'accept');
 
       const replaceResponse = await authFetchResponse(
         `/family/member/${familyCode}/non-app-users/${selectedMemberId}/replace/${replaceModal.request.triggeredBy}`,
@@ -419,10 +411,11 @@ const SuggestionApproving = () => {
 
       if (!replaceResponse.ok) {
         const replaceError = await replaceResponse.json().catch(() => ({ message: 'Failed to replace tree member' }));
-        throw new Error(replaceError?.message || 'Failed to replace tree member');
+        throw new Error(replaceError?.message || 'Family request was accepted, but replacing the tree member failed');
       }
 
-      await markNotificationAsRead(replaceModal.request.id, 'accepted');
+      removeProcessedRequest(replaceModal.request.id);
+      await refetchUser?.();
       setShowConfirm(false);
       setReplaceModal({ open: false, request: null });
       setSelectedMemberId(null);
@@ -430,7 +423,6 @@ const SuggestionApproving = () => {
       setShowSuccess(true);
       setTimeout(() => {
         setShowSuccess(false);
-        window.location.reload();
       }, 2000);
     } catch (error) {
       console.error('Failed to approve and replace member:', error);
@@ -445,38 +437,19 @@ const SuggestionApproving = () => {
     setAddNewMemberLoading(true);
     setAddNewMemberError(null);
     try {
-      const response = await authFetchResponse(
-        `/family/member/add-user-to-family`,
-        {
-          method: 'POST',
-          skipThrow: true,
-          body: JSON.stringify({
-            userId: replaceModal.request.triggeredBy,
-            familyCode: familyCode,
-          }),
-        }
-      );
-
-      if (response.ok) {
-        // Mark the notification as read with accepted status
-        await markNotificationAsRead(replaceModal.request.id, 'accepted');
-        setAddNewMemberLoading(false);
-        setReplaceModal({ open: false, request: null });
-        setSelectedMemberId(null);
-        setShowSuccess(true);
-        setTimeout(() => {
-          setShowSuccess(false);
-          window.location.reload();
-        }, 2000);
-      } else {
-        const errorData = await response.json().catch(() => ({ message: 'Failed to add user to family' }));
-        console.error('Failed to add user to family:', errorData);
-        setAddNewMemberError(errorData?.message || 'Failed to add user to family');
-        setAddNewMemberLoading(false);
-      }
+      await respondToJoinRequest(replaceModal.request.id, 'accept');
+      removeProcessedRequest(replaceModal.request.id);
+      await refetchUser?.();
+      setReplaceModal({ open: false, request: null });
+      setSelectedMemberId(null);
+      setShowSuccess(true);
+      setTimeout(() => {
+        setShowSuccess(false);
+      }, 2000);
     } catch (error) {
       console.error('Error adding user to family:', error);
       setAddNewMemberError(error?.message || 'Network error. Please try again.');
+    } finally {
       setAddNewMemberLoading(false);
     }
   };
@@ -601,7 +574,7 @@ const SuggestionApproving = () => {
                 </button>
                 <button
                   className="bg-green-500 text-white px-4 py-2 rounded"
-                  disabled={Number(req?.triggeredBy) === Number(effectiveUserId)}
+                  disabled={Number(req?.triggeredBy) === Number(effectiveUserId) || actionRequestId === req.id}
                   onClick={() => {
                     if (Number(req?.triggeredBy) === Number(effectiveUserId)) {
                       window.alert('This join request is from your own account. You cannot replace your own account holder profile.');
@@ -784,7 +757,7 @@ const SuggestionApproving = () => {
                       <button
                         type="button"
                         className="w-full bg-blue-600 text-white px-4 py-2.5 rounded-lg disabled:opacity-50"
-                        disabled={selectedMemberId || addNewMemberLoading}
+                        disabled={selectedMemberId || addNewMemberLoading || actionRequestId === replaceModal.request?.id}
                         onClick={handleAddAsNewMember}
                       >
                         {addNewMemberLoading ? 'Adding...' : 'Add as New Member'}
@@ -792,7 +765,7 @@ const SuggestionApproving = () => {
                       <button
                         type="button"
                         className="w-full bg-green-600 text-white px-4 py-2.5 rounded-lg disabled:opacity-50"
-                        disabled={!selectedMemberId || replaceLoading}
+                        disabled={!selectedMemberId || replaceLoading || actionRequestId === replaceModal.request?.id}
                         onClick={() => setShowConfirm(true)}
                       >
                         {replaceLoading ? 'Approving...' : 'Approve & Replace'}
@@ -861,17 +834,22 @@ const SuggestionApproving = () => {
                 Cancel
               </button>
               <button
-                className="bg-red-500 text-white px-6 py-2 rounded"
+                className="bg-red-500 text-white px-6 py-2 rounded disabled:opacity-60"
+                disabled={actionRequestId === requestToReject.id}
                 onClick={async () => {
-                  // Mark notification as rejected
-                  await markNotificationAsRead(requestToReject.id, 'rejected');
-                  // Remove the request from the list
-                  setRequests(prev => prev.filter(r => r.id !== requestToReject.id));
-                  setShowRejectConfirm(false);
-                  setRequestToReject(null);
+                  try {
+                    await respondToJoinRequest(requestToReject.id, 'reject');
+                    removeProcessedRequest(requestToReject.id);
+                    await refetchUser?.();
+                    setShowRejectConfirm(false);
+                    setRequestToReject(null);
+                  } catch (error) {
+                    console.error('Failed to reject join request:', error);
+                    window.alert(error?.message || 'Failed to reject the request.');
+                  }
                 }}
               >
-                Yes, Reject
+                {actionRequestId === requestToReject.id ? 'Rejecting...' : 'Yes, Reject'}
               </button>
             </div>
           </div>

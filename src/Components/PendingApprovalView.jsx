@@ -4,9 +4,11 @@ import { FiClock, FiUsers, FiAlertCircle, FiXCircle } from 'react-icons/fi';
 
 import Swal from 'sweetalert2';
 import { authFetchResponse } from '../utils/authFetch';
+import { useUser } from '../Contexts/UserContext';
 
 const PendingApprovalView = ({ familyCode, onJoinFamily }) => {
   const [cancelling, setCancelling] = useState(false);
+  const { refetchUser } = useUser();
 
   const handleCancelRequest = async () => {
     if (!familyCode || cancelling) return;
@@ -34,12 +36,12 @@ const PendingApprovalView = ({ familyCode, onJoinFamily }) => {
         throw new Error(json?.message || 'Unable to cancel the pending request.');
       }
 
+      await refetchUser?.();
       await Swal.fire({
         icon: 'success',
         title: 'Request cancelled',
         text: json?.message || 'Your pending family request was cancelled.',
       });
-      window.location.reload();
     } catch (error) {
       await Swal.fire({
         icon: 'error',
@@ -70,7 +72,7 @@ const PendingApprovalView = ({ familyCode, onJoinFamily }) => {
       {familyCode && (
         <div className="inline-flex items-center gap-2 rounded-full bg-orange-50 text-orange-700 border border-orange-100 px-3 py-1 text-xs font-semibold">
           <FiAlertCircle className="text-orange-500" />
-          Family code: {familyCode}
+          Requested family code: {familyCode}
         </div>
       )}
 

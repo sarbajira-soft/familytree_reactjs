@@ -196,6 +196,18 @@ export const UserProvider = ({ children }) => {
         address: !!userProfile.address,
         dob: !!userProfile.dob,
       };
+      const membershipStatus = String(userProfile.familyMember?.approveStatus || '').trim().toLowerCase();
+      const directFamilyCode = String(userProfile.familyCode || '').trim();
+      const membershipFamilyCode = String(userProfile.familyMember?.familyCode || '').trim();
+      const pendingFamilyCode = membershipStatus === 'pending'
+        ? (membershipFamilyCode || directFamilyCode)
+        : '';
+      const resolvedFamilyCode = membershipStatus === 'approved'
+        ? (directFamilyCode || membershipFamilyCode)
+        : (!membershipStatus && directFamilyCode ? directFamilyCode : '');
+      const resolvedApproveStatus =
+        membershipStatus ||
+        (resolvedFamilyCode ? 'approved' : (pendingFamilyCode ? 'pending' : ''));
 
       setUserInfo({
         userId: userProfile.userId,
@@ -227,12 +239,9 @@ export const UserProvider = ({ children }) => {
         contactNumber: resolvedContactNumber,
         bio: userProfile.bio || '',
         profileUrl: userProfile.profile || '',
-        // Prefer profile.familyCode as primary; if missing, fall back to membership familyCode
-        familyCode: userProfile.familyCode || userProfile.familyMember?.familyCode || '',
-        // If no familyMember join row but profile has a familyCode, treat as approved
-        approveStatus:
-          userProfile.familyMember?.approveStatus ||
-          (userProfile.familyCode ? 'approved' : 'pending'),
+        familyCode: resolvedFamilyCode,
+        pendingFamilyCode,
+        approveStatus: resolvedApproveStatus,
         name: `${userProfile.firstName || ''} ${userProfile.lastName || ''}`.trim(),
         
         countryCode: countryCode || '',
@@ -286,6 +295,28 @@ export const UserProvider = ({ children }) => {
 
   useEffect(() => {
     fetchUserDetails();
+  }, [fetchUserDetails]);
+
+  useEffect(() => {
+    const handleWindowFocus = () => {
+      if (isAuthenticated()) {
+        fetchUserDetails();
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isAuthenticated()) {
+        fetchUserDetails();
+      }
+    };
+
+    globalThis.addEventListener('focus', handleWindowFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      globalThis.removeEventListener('focus', handleWindowFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [fetchUserDetails]);
 
   // Listen for localStorage changes (when user logs in)

@@ -320,14 +320,17 @@ const EventsPage = () => {
     return <EventsShimmer />;
   }
 
-  const accessView = !userInfo?.familyCode ? (
+  const pendingFamilyCode = userInfo?.pendingFamilyCode || '';
+  const hasPendingRequest = userInfo?.approveStatus === "pending" && Boolean(pendingFamilyCode);
+
+  const accessView = !userInfo?.familyCode && !hasPendingRequest ? (
     <NoFamilyView
       onCreateFamily={handleCreateFamily}
       onJoinFamily={handleJoinFamily}
     />
   ) : userInfo?.approveStatus !== "approved" ? (
     <PendingApprovalView
-      familyCode={userInfo.familyCode}
+      familyCode={pendingFamilyCode || userInfo.familyCode}
       onJoinFamily={handleJoinFamily}
     />
   ) : null;

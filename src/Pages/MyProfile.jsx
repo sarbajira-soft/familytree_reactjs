@@ -115,8 +115,7 @@ const ProfilePage = () => {
       email: userInfo.email || "",
       familyCode:
         userInfo.familyCode ||
-        userInfo.raw?.familyMember?.familyCode ||
-        "Not assigned",
+        "",
       postsCount: 0,
       galleryCount: 0,
     };
@@ -180,7 +179,7 @@ const ProfilePage = () => {
       formData.append("profile", file);
 
       const familyCode =
-        userInfo?.familyCode || userInfo?.raw?.familyMember?.familyCode || "";
+        userInfo?.familyCode || "";
       if (familyCode) {
         formData.append("familyCode", familyCode);
       }
@@ -262,7 +261,7 @@ const ProfilePage = () => {
       formData.append("removeProfile", "true");
 
       const familyCode =
-        userInfo?.familyCode || userInfo?.raw?.familyMember?.familyCode || "";
+        userInfo?.familyCode || "";
       if (familyCode) {
         formData.append("familyCode", familyCode);
       }
@@ -388,8 +387,7 @@ const ProfilePage = () => {
       email: userInfo.email || "",
       familyCode:
         userInfo.familyCode ||
-        userInfo.raw?.familyMember?.familyCode ||
-        "Not assigned",
+        "",
       postsCount: userPosts.length,
       galleryCount: userGalleries.length,
     };

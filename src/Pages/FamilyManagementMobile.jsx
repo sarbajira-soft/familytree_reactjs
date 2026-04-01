@@ -17,6 +17,8 @@ const FamilyManagementMobile = () => {
   const { userInfo } = useUser();
 
   const hasFamily = !!userInfo?.familyCode;
+  const pendingFamilyCode = userInfo?.pendingFamilyCode || '';
+  const hasPendingRequest = userInfo?.approveStatus === "pending" && !!pendingFamilyCode;
   const isApproved = userInfo?.approveStatus === "approved";
   const isAdmin = userInfo?.role === 2 || userInfo?.role === 3;
 
@@ -326,11 +328,11 @@ const FamilyManagementMobile = () => {
       });
   };
 
-  const accessView = !hasFamily ? (
+  const accessView = !hasFamily && !hasPendingRequest ? (
     <NoFamilyView onCreateFamily={handleCreateFamily} onJoinFamily={handleJoinFamily} />
   ) : !isApproved ? (
     <PendingApprovalView
-      familyCode={userInfo?.familyCode}
+      familyCode={pendingFamilyCode || userInfo?.familyCode}
       onJoinFamily={handleJoinFamily}
     />
   ) : null;

@@ -296,7 +296,7 @@ const ProfileFormModal = ({
             childrenCount: sourceDataRaw.childrenCount || childrenNames.length || 0,
             profileImageUrl: sourceDataRaw.profileUrl || sourceDataRaw.profile || '',
             profileImageFile: null,
-            familyCode: sourceDataRaw.familyCode || (sourceDataRaw.raw?.familyMember?.familyCode || ''),
+            familyCode: sourceDataRaw.familyCode || '',
             countryCode,
             status: safeString(sourceDataRaw.status || '1'),
             role: safeString(sourceDataRaw.role || '1'),

@@ -18,6 +18,8 @@ import { FaHome, FaSearchPlus, FaSearchMinus, FaExpand } from 'react-icons/fa';
 
 import { authFetchResponse } from '../utils/authFetch';
 import { clearAuthData } from '../utils/auth';
+import PendingApprovalView from '../Components/PendingApprovalView';
+import NoFamilyView from '../Components/NoFamilyView';
 
 const FamilyTreeHierarchical = () => {
     const [tree, setTree] = useState(null);
@@ -183,18 +185,29 @@ const FamilyTreeHierarchical = () => {
         }
     };
 
-    // Loading state
-    if (userLoading || !userInfo || userInfo.approveStatus !== 'approved' || !userInfo.familyCode) {
+    if (userLoading) {
         return (
-            <>
-                <div className="flex items-center justify-center min-h-screen bg-gray-100">
-                    <div className="text-center">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                        <p className="text-gray-600">Loading family tree...</p>
-                    </div>
+            <div className="flex items-center justify-center min-h-screen bg-gray-100">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                    <p className="text-gray-600">Loading family tree...</p>
                 </div>
-            </>
+            </div>
         );
+    }
+
+    if (!userInfo) {
+        return null;
+    }
+
+    const pendingFamilyCode = userInfo?.pendingFamilyCode || '';
+
+    if (!userInfo.familyCode && !pendingFamilyCode) {
+        return <NoFamilyView onCreateFamily={() => navigate('/my-family')} onJoinFamily={() => navigate('/my-family')} />;
+    }
+
+    if (userInfo.approveStatus !== 'approved') {
+        return <PendingApprovalView familyCode={pendingFamilyCode || userInfo.familyCode} onJoinFamily={() => navigate('/my-family')} />;
     }
 
     return (

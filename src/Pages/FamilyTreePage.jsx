@@ -421,17 +421,19 @@ const FamilyTreePage = () => {
   const showAccessLoading = userLoading || !userInfo;
 
   const hasFamily = Boolean(userInfo?.familyCode);
+  const pendingFamilyCode = userInfo?.pendingFamilyCode || '';
+  const hasPendingRequest = userInfo?.approveStatus === "pending" && Boolean(pendingFamilyCode);
 
   const isApproved = userInfo?.approveStatus === "approved";
 
-  const accessView = !hasFamily ? (
+  const accessView = !hasFamily && !hasPendingRequest ? (
     <NoFamilyView
       onCreateFamily={handleCreateFamily}
       onJoinFamily={handleJoinFamily}
     />
   ) : !isApproved ? (
     <PendingApprovalView
-      familyCode={userInfo.familyCode}
+      familyCode={pendingFamilyCode || userInfo.familyCode}
       onJoinFamily={handleJoinFamily}
     />
   ) : null;

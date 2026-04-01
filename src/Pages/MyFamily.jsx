@@ -295,17 +295,19 @@ const FamilyHubPage = () => {
   }
 
   const hasFamily = Boolean(userInfo?.familyCode);
+  const pendingFamilyCode = userInfo?.pendingFamilyCode || '';
+  const hasPendingRequest = userInfo?.approveStatus === 'pending' && Boolean(pendingFamilyCode);
   const isApproved = userInfo?.approveStatus === 'approved';
   let accessView = null;
 
-  if (hasFamily === false) {
+  if (hasFamily === false && hasPendingRequest === false) {
     accessView = (
       <NoFamilyView onCreateFamily={handleCreateFamily} onJoinFamily={handleJoinFamily} />
     );
   } else if (isApproved === false) {
     accessView = (
       <PendingApprovalView
-        familyCode={userInfo.familyCode}
+        familyCode={pendingFamilyCode || userInfo.familyCode}
         onJoinFamily={handleJoinFamily}
       />
     );
