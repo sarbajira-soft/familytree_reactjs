@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { FiTrash2, FiEye, FiLoader, FiShare2, FiSearch } from 'react-icons/fi';
 import { FaBirthdayCake, FaPhone, FaHome, FaMale, FaFemale } from 'react-icons/fa';
@@ -65,6 +65,19 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
   const [privacySavedAt, setPrivacySavedAt] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [familyFilterPage, setFamilyFilterPage] = useState(1);
+  const [isTabDropdownOpen, setIsTabDropdownOpen] = useState(false);
+  const tabDropdownRef = useRef(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (tabDropdownRef.current && !tabDropdownRef.current.contains(event.target)) {
+        setIsTabDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
   // Accordion states for Linked tab
   const [linkedAccordionOpen, setLinkedAccordionOpen] = useState({
     inTree: true,
@@ -1718,8 +1731,8 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
           <div className="max-w-7xl mx-auto">
             <div className="px-1 pb-1">
               <div className="flex items-center gap-3 w-full">
-                {/* Tabs */}
-                <div className="min-w-0 flex items-center gap-2 overflow-hidden">
+                {/* Desktop Tabs - Hidden on Mobile */}
+                <div className="hidden sm:flex min-w-0 items-center gap-2 overflow-x-auto scrollbar-hide">
                   {TABS.map((tab) => (
                     <button
                       key={tab.id}
@@ -1738,6 +1751,59 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                       )}
                     </button>
                   ))}
+                </div>
+
+                {/* Mobile Dropdown - Hidden on Desktop */}
+                <div className="sm:hidden flex-1 relative" ref={tabDropdownRef}>
+                  <button
+                    onClick={() => setIsTabDropdownOpen(!isTabDropdownOpen)}
+                    className="w-full flex items-center justify-between gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm font-semibold text-gray-700 shadow-sm"
+                  >
+                    <span className="flex items-center gap-2">
+                      {TABS.find(tab => tab.id === activeTab)?.label}
+                      {TABS.find(tab => tab.id === activeTab)?.count !== null && (
+                        <span className="px-2 py-0.5 rounded-md text-[10px] tracking-wide font-bold bg-primary-100 text-primary-600">
+                          {TABS.find(tab => tab.id === activeTab)?.count}
+                        </span>
+                      )}
+                    </span>
+                    <svg 
+                      className={`w-4 h-4 text-gray-500 transition-transform ${isTabDropdownOpen ? 'rotate-180' : ''}`}
+                      fill="none" 
+                      stroke="currentColor" 
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  
+                  {isTabDropdownOpen && (
+                    <div className="absolute z-50 mt-1 left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg py-1">
+                      {TABS.map((tab) => (
+                        <button
+                          key={tab.id}
+                          onClick={() => {
+                            setActiveTab(tab.id);
+                            setIsTabDropdownOpen(false);
+                          }}
+                          className={`w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium transition-colors ${
+                            activeTab === tab.id 
+                              ? 'bg-primary-50 text-primary-700' 
+                              : 'text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          <span>{tab.label}</span>
+                          {tab.count !== null && (
+                            <span className={`px-2 py-0.5 rounded-md text-[10px] tracking-wide font-bold ${
+                              activeTab === tab.id ? 'bg-primary-200 text-primary-800' : 'bg-gray-100 text-gray-600'
+                            }`}>
+                              {tab.count}
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Search (name-only) */}

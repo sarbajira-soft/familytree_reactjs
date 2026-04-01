@@ -14,6 +14,7 @@ const CommentItem = ({
   onEdit, 
   onDelete, 
   onReply,
+  rootCommentId,
   depth = 0,
   maxDepth = 3 
 }) => {
@@ -29,7 +30,9 @@ const CommentItem = ({
 
   const isOwner = Number(comment.userId) === Number(currentUserId);
   const hasReplies = comment.replies && comment.replies.length > 0;
-  const canReply = depth < maxDepth;
+  const replyTargetId = rootCommentId ?? comment.id;
+  const canReply = true;
+  const canRenderReplies = depth < maxDepth;
   const user = comment.user || {};
   const commenterId = user.userId || comment.userId || null;
 
@@ -108,7 +111,7 @@ const CommentItem = ({
     if (!replyText.trim()) return;
     setIsLoading(true);
     try {
-      await onReply(comment.id, replyText.trim());
+      await onReply(replyTargetId, replyText.trim());
       setReplyText('');
       setIsReplying(false);
       setShowEmojiPicker(false);
@@ -302,7 +305,7 @@ const CommentItem = ({
         )}
 
         {/* Nested Replies */}
-        {hasReplies && (
+        {hasReplies && canRenderReplies && (
           <div className="mt-2">
             {comment.replies.map((reply, index) => (
               <CommentItem
@@ -313,6 +316,7 @@ const CommentItem = ({
                 onEdit={onEdit}
                 onDelete={onDelete}
                 onReply={onReply}
+                rootCommentId={replyTargetId}
                 depth={depth + 1}
                 maxDepth={maxDepth}
               />
@@ -345,6 +349,7 @@ CommentItem.propTypes = {
   onEdit: PropTypes.func.isRequired,
   onDelete: PropTypes.func.isRequired,
   onReply: PropTypes.func.isRequired,
+  rootCommentId: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
   depth: PropTypes.number,
   maxDepth: PropTypes.number,
 };

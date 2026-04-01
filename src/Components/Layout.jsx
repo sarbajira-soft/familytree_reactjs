@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState, useEffect } from "react";
+import React, { Suspense, useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { App as CapacitorApp } from "@capacitor/app";
 import Sidebar from "./Sidebar";
@@ -374,6 +374,15 @@ const Layout = ({ noScroll = false }) => {
     window.location.reload();
   }, []);
 
+  const outletFallback = (
+    <div className="flex items-center justify-center py-10">
+      <div className="text-center">
+        <div className="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600 mb-3"></div>
+        <p className="text-gray-600 text-sm">Loading...</p>
+      </div>
+    </div>
+  );
+
   const headerNavItems = [
     {
       id: "home",
@@ -487,7 +496,7 @@ const Layout = ({ noScroll = false }) => {
     refetchUnreadCount();
   };
 
-  if (userLoading) {
+  if (userLoading && !userInfo) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-50">
         <div className="text-center">
@@ -784,13 +793,19 @@ const Layout = ({ noScroll = false }) => {
           }`}
         >
           {shouldLockScroll ? (
-            <Outlet />
+            <Suspense fallback={outletFallback}>
+              <Outlet />
+            </Suspense>
           ) : isGiftsRoute || isTreeRoute ? (
-            <Outlet />
+            <Suspense fallback={outletFallback}>
+              <Outlet />
+            </Suspense>
           ) : (
             <PullToRefresh onRefresh={handlePullRefresh} disabled={pullDisabled}>
               <div className="pt-0 px-1 md:px-2">
-                <Outlet />
+                <Suspense fallback={outletFallback}>
+                  <Outlet />
+                </Suspense>
               </div>
             </PullToRefresh>
           )}

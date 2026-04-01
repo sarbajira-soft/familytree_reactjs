@@ -625,30 +625,6 @@ const PostPage = () => {
     }
   };
 
-  // Build comment tree for nested replies (Instagram style)
-  const buildCommentTree = (comments) => {
-    const commentMap = {};
-    const rootComments = [];
-
-    // First pass: create a map of all comments
-    comments.forEach((comment) => {
-      commentMap[comment.id] = { ...comment, replies: [] };
-    });
-
-    // Second pass: build the tree
-    comments.forEach((comment) => {
-      if (comment.parentCommentId && commentMap[comment.parentCommentId]) {
-        commentMap[comment.parentCommentId].replies.push(
-          commentMap[comment.id]
-        );
-      } else {
-        rootComments.push(commentMap[comment.id]);
-      }
-    });
-
-    return rootComments;
-  };
-
   const countComments = (commentTree = []) => {
     let count = 0;
     const walk = (arr) => {
@@ -667,16 +643,13 @@ const PostPage = () => {
     const text = (newText || "").trim();
     if (!text) return;
 
-    const updatedComment = await authFetch(`/post/comment/${commentId}`, {
+    await authFetch(`/post/comment/${commentId}`, {
       method: "PUT",
       body: JSON.stringify({ comment: text }),
     });
-    setPostComments((prev) => ({
-      ...prev,
-      [postId]: (prev[postId] || []).map((c) =>
-        c.id === commentId ? updatedComment : c
-      ),
-    }));
+
+    const comments = await fetchComments(postId);
+    setPostComments((prev) => ({ ...prev, [postId]: comments }));
   };
 
   const handleDeleteCommentFromItem = async (commentId, postId) => {
@@ -685,25 +658,8 @@ const PostPage = () => {
       skipThrow: true,
     });
 
-    const getAllChildIds = (parentId, comments) => {
-      const childIds = [];
-      const children = comments.filter((c) => c.parentCommentId === parentId);
-      children.forEach((child) => {
-        childIds.push(child.id, ...getAllChildIds(child.id, comments));
-      });
-      return childIds;
-    };
-
-    setPostComments((prev) => {
-      const currentComments = prev[postId] || [];
-      const childIds = getAllChildIds(commentId, currentComments);
-      const idsToRemove = new Set([commentId, ...childIds]);
-
-      return {
-        ...prev,
-        [postId]: currentComments.filter((c) => !idsToRemove.has(c.id)),
-      };
-    });
+    const comments = await fetchComments(postId);
+    setPostComments((prev) => ({ ...prev, [postId]: comments }));
   };
 
   const handleReplyToCommentFromItem = async (parentCommentId, postId, reply) => {
@@ -1021,16 +977,15 @@ const PostPage = () => {
 
     const currentComments = postComments[post.id];
     if (currentComments?.length) {
-      const commentTree = buildCommentTree(currentComments);
-
       return (
         <div className="min-w-max space-y-3">
-          {commentTree.map((comment, index) => (
+          {currentComments.map((comment, index) => (
             <CommentItem
               key={comment.id || `comment-${index}`}
               comment={comment}
               currentUserId={userInfo?.userId}
               isPostOwner={Number(post.authorId) === Number(userInfo?.userId)}
+              maxDepth={1}
               onEdit={(id, text) => handleEditCommentFromItem(id, post.id, text)}
               onDelete={(id) => handleDeleteCommentFromItem(id, post.id)}
               onReply={(id, text) =>
@@ -1372,9 +1327,7 @@ const PostPage = () => {
                         <h4 className="text-sm font-semibold text-gray-800 mt-3 mb-2 flex items-center gap-2 flex-shrink-0">
                           <FaCommentDots size={19} className="text-gray-600" />
                           Comments (
-                          {countComments(
-                            buildCommentTree(postComments[post.id] || [])
-                          )}
+                          {countComments(postComments[post.id] || [])}
                           )
                         </h4>
 
