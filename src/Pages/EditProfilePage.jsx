@@ -20,7 +20,7 @@ const EditProfilePage = () => {
     navigate("/myprofile");
   };
 
-  if (userLoading || !userInfo) {
+  if (!userInfo) {
     return (
       <div className="flex items-center justify-center h-full py-10">
         <div className="text-center">

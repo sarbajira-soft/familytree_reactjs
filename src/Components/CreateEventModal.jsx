@@ -47,6 +47,10 @@ const CreateEventModal = ({
   const [time, setTime] = useState("");
   const [location, setLocation] = useState("");
   const [description, setDescription] = useState("");
+  const [errors, setErrors] = useState({});
+
+  const EVENT_DATE_MIN = "1900-01-01";
+  const EVENT_DATE_MAX = "2200-12-31";
   const [images, setImages] = useState([]);
   const [imagePreviews, setImagePreviews] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -97,6 +101,7 @@ const CreateEventModal = ({
       setLocation("");
       setDescription("");
       setImages([]);
+      setErrors({});
       setShowSuccess(false);
     }
   }, [isOpen]);
@@ -246,70 +251,46 @@ const CreateEventModal = ({
     setImages((prev) => (prev || []).filter((_, i) => i !== index));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-
-    if (!title || !title.trim()) {
-      Swal.fire({
-        icon: "warning",
-        title: "Missing title",
-        text: "Event title is required.",
-      });
-      setIsLoading(false);
-      return;
-    }
+  const validateForm = () => {
+    const nextErrors = {};
 
     const normalizedTitle = String(title || "").trim();
-    if (normalizedTitle.length > MAX_EVENT_TITLE_LENGTH) {
-      Swal.fire({
-        icon: "warning",
-        title: "Title too long",
-        text: `Event title must be ${MAX_EVENT_TITLE_LENGTH} characters or less.`,
-      });
-      setIsLoading(false);
-      return;
+    const normalizedDate = String(date || "").trim();
+    const normalizedTime = String(time || "").trim();
+
+    if (!normalizedTitle) {
+      nextErrors.title = "Event title is required.";
+    } else if (normalizedTitle.length > MAX_EVENT_TITLE_LENGTH) {
+      nextErrors.title = `Event title must be ${MAX_EVENT_TITLE_LENGTH} characters or less.`;
     }
 
-    if (!date || !String(date).trim()) {
-      Swal.fire({
-        icon: "warning",
-        title: "Missing date",
-        text: "Event date is required.",
-      });
-      setIsLoading(false);
-      return;
+    if (!normalizedDate) {
+      nextErrors.date = "Event date is required.";
+    } else if (!/^(\d{4})-(\d{2})-(\d{2})$/.test(normalizedDate)) {
+      nextErrors.date = "Event date is invalid. Please choose a valid date.";
+    } else if (normalizedDate < EVENT_DATE_MIN || normalizedDate > EVENT_DATE_MAX) {
+      nextErrors.date = `Event date must be between ${EVENT_DATE_MIN} and ${EVENT_DATE_MAX}.`;
     }
 
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date))) {
-      Swal.fire({
-        icon: "warning",
-        title: "Invalid date",
-        text: "Please choose a valid date.",
-      });
-      setIsLoading(false);
-      return;
+    if (!normalizedTime) {
+      nextErrors.time = "Event time is required.";
+    } else if (!/^\d{2}:\d{2}(:\d{2})?$/.test(normalizedTime)) {
+      nextErrors.time = "Event time is invalid. Please choose a valid time.";
     }
 
-    if (!time || !String(time).trim()) {
-      Swal.fire({
-        icon: "warning",
-        title: "Missing time",
-        text: "Event time is required.",
-      });
-      setIsLoading(false);
-      return;
-    }
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  };
 
-    if (time && String(time).trim() && !/^\d{2}:\d{2}(:\d{2})?$/.test(String(time).trim())) {
-      Swal.fire({
-        icon: "warning",
-        title: "Invalid time",
-        text: "Please choose a valid time.",
-      });
-      setIsLoading(false);
-      return;
-    }
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    const isValid = validateForm();
+    if (!isValid) return;
+
+    setIsLoading(true);
+
+    const normalizedTitle = String(title || "").trim();
 
     const targetFamilyCode = String(familyCode || userInfo?.familyCode || "").trim();
     if (!userInfo?.userId || !targetFamilyCode) {
@@ -464,12 +445,16 @@ const CreateEventModal = ({
               <input
                 type="text"
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => {
+                  setTitle(e.target.value);
+                  if (errors.title) setErrors((prev) => ({ ...prev, title: undefined }));
+                }}
                 required
                 maxLength={MAX_EVENT_TITLE_LENGTH}
                 className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white text-sm"
                 placeholder="Enter event title..."
               />
+              {errors.title ? <p className="text-red-600 text-xs">{errors.title}</p> : null}
               <div className="text-[11px] text-gray-500 flex items-center justify-between">
                 <span>Max {MAX_EVENT_TITLE_LENGTH} characters.</span>
                 <span className={title.length > MAX_EVENT_TITLE_LENGTH ? "text-red-600" : ""}>
@@ -489,11 +474,18 @@ const CreateEventModal = ({
                 </label>
                 <input
                   type="date"
+                  onKeyDown={(e) => e.preventDefault()}
                   value={date}
-                  onChange={(e) => setDate(e.target.value)}
+                  onChange={(e) => {
+                    setDate(e.target.value);
+                    if (errors.date) setErrors((prev) => ({ ...prev, date: undefined }));
+                  }}
                   required
+                  min={EVENT_DATE_MIN}
+                  max={EVENT_DATE_MAX}
                   className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white text-sm"
                 />
+                {errors.date ? <p className="text-red-600 text-xs">{errors.date}</p> : null}
               </div>
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-gray-700 font-semibold text-xs sm:text-sm">
@@ -505,10 +497,14 @@ const CreateEventModal = ({
                 <input
                   type="time"
                   value={time}
-                  onChange={(e) => setTime(e.target.value)}
+                  onChange={(e) => {
+                    setTime(e.target.value);
+                    if (errors.time) setErrors((prev) => ({ ...prev, time: undefined }));
+                  }}
                   required
                   className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white text-sm"
                 />
+                {errors.time ? <p className="text-red-600 text-xs">{errors.time}</p> : null}
               </div>
             </div>
 

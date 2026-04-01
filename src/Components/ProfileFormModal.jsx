@@ -1367,6 +1367,7 @@ const ProfileFormModal = ({
                     Login Mobile Number <span className="text-red-500">*</span>
                   </label>
                   <PhoneInput
+                    specialLabel={""}
                     inputClass={errors.mobile ? 'border border-red-500 focus:border-red-500' : 'border border-gray-300'}
                     country={'in'}
                     value={getFullMobile(formData.countryCode || '+91', formData.mobile || '')}
@@ -1379,7 +1380,7 @@ const ProfileFormModal = ({
                       ref: mobileRef,
                       disabled: lockEmailAndMobile,
                     }}
-                    containerStyle={{ width: '100%' }}
+                    containerStyle={{ width: '100%', border: 'none', boxShadow: 'none' }}
                     inputStyle={{
                       width: '100%',
                       height: '42px',
@@ -1399,7 +1400,7 @@ const ProfileFormModal = ({
                   {errors.mobile && <p className="text-red-500 text-xs mt-1">{errors.mobile}</p>}
                   {showFieldPrivacyControls && (
                     <div className="mt-3">
-                      <label htmlFor="phonePrivacy" className="block text-xs font-medium text-gray-600 mb-1">
+                      <label htmlFor="phonePrivacy" className={labelClassName}>
                         Phone Visibility
                       </label>
                       <select
@@ -1734,23 +1735,6 @@ const ProfileFormModal = ({
                     </div>
                   )}
                   {errors.dob && <p className="text-red-500 text-xs mt-1">{errors.dob}</p>}
-                  {showFieldPrivacyControls && (
-                    <div className="mt-3">
-                      <label htmlFor="dobPrivacy" className="block text-xs font-medium text-gray-600 mb-1">
-                        Date of Birth Visibility
-                      </label>
-                      <select
-                        id="dobPrivacy"
-                        name="dobPrivacy"
-                        value={formData.dobPrivacy || 'FAMILY'}
-                        onChange={handleChange}
-                        className={inputClassName('dobPrivacy')}
-                      >
-                        <option value="FAMILY">Visible to family</option>
-                        <option value="PRIVATE">Only me</option>
-                      </select>
-                    </div>
-                  )}
                 </div>
                 <div>
                   <label htmlFor="age" className={labelClassName}>
@@ -1765,6 +1749,23 @@ const ProfileFormModal = ({
                     className={`${inputClassName('age')} bg-gray-100 cursor-not-allowed`}
                   />
                 </div>
+                {showFieldPrivacyControls && (
+                  <div>
+                    <label htmlFor="dobPrivacy" className={labelClassName}>
+                      Date of Birth Visibility
+                    </label>
+                    <select
+                      id="dobPrivacy"
+                      name="dobPrivacy"
+                      value={formData.dobPrivacy || 'FAMILY'}
+                      onChange={handleChange}
+                      className={inputClassName('dobPrivacy')}
+                    >
+                      <option value="FAMILY">Visible to family</option>
+                      <option value="PRIVATE">Only me</option>
+                    </select>
+                  </div>
+                )}
               </div>
             </div>
 
