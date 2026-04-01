@@ -2436,7 +2436,15 @@ const FamilyTreePage = () => {
 
       <>
         {showFullScreenLoading ? (
-          <LoadingSpinner type="generic" fullScreen={true} />
+          <div
+            className="w-full min-h-[calc(100vh-3.5rem)] flex items-center justify-center bg-white/90 dark:bg-slate-950/90 backdrop-blur-sm p-4"
+            style={{
+              paddingTop:
+                "calc(3.5rem + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)))",
+            }}
+          >
+            <LoadingSpinner type="generic" />
+          </div>
         ) : accessView ? (
           <div className="min-h-[calc(100vh-6rem)] bg-gray-50 flex items-center justify-center px-4 py-6">
             {accessView}
@@ -2476,7 +2484,15 @@ const FamilyTreePage = () => {
             </div>
           </div>
         ) : !tree ? (
-          <LoadingSpinner type="generic" fullScreen={true} />
+          <div
+            className="w-full min-h-[calc(100vh-3.5rem)] flex items-center justify-center bg-white/90 dark:bg-slate-950/90 backdrop-blur-sm p-4"
+            style={{
+              paddingTop:
+                "calc(3.5rem + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)))",
+            }}
+          >
+            <LoadingSpinner type="generic" />
+          </div>
         ) : (
           <>
             {/* Main container for tree and controls */}

@@ -12,7 +12,7 @@ import { FiSmile, FiSend } from "react-icons/fi";
 import { AnimatePresence, motion } from "framer-motion";
 import EmojiPicker from "emoji-picker-react";
 import CommentItem from "./CommentItem";
-import { buildCommentTree, countComments } from "../utils/commentUtils";
+import { countComments } from "../utils/commentUtils";
 import Swal from "sweetalert2";
 
 import { authFetchResponse } from "../utils/authFetch";
@@ -443,7 +443,7 @@ const GalleryViewerModal = ({
                 {/* Comments */}
                 <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
                   <h4 className="px-4 pt-4 pb-2 font-semibold text-base text-gray-800 flex-shrink-0">
-                    Comments ({countComments(buildCommentTree(comments))})
+                    Comments ({countComments(comments)})
                   </h4>
                   <div
                     ref={commentsRef}
@@ -451,12 +451,13 @@ const GalleryViewerModal = ({
                   >
                     {comments.length > 0 ? (
                       <div className="min-w-max space-y-3">
-                        {buildCommentTree(comments).map((comment) => (
+                        {comments.map((comment) => (
                           <CommentItem
                             key={comment.id}
                             comment={comment}
                             currentUserId={currentUserId}
                             isPostOwner={isAlbumOwner}
+                            maxDepth={1}
                             onEdit={handleEditComment}
                             onDelete={handleDeleteComment}
                             onReply={handleReplyComment}

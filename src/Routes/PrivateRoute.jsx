@@ -18,8 +18,10 @@ const PrivateRoute = ({ children }) => {
   }
 
   if (userLoading) {
-    // return <LoadingSpinner fullScreen={true} text="Loading..." />;
-    return <HomePageShimmer/>
+    if (!userInfo) {
+      // return <LoadingSpinner fullScreen={true} text="Loading..." />;
+      return <HomePageShimmer />;
+    }
   }
 
   if (!userInfo) {

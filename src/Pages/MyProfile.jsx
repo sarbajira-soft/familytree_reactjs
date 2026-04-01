@@ -704,10 +704,13 @@ const ProfilePage = () => {
           throw new Error(`Failed to delete post: ${response.statusText}`);
         }
 
-        toast.success("Post deleted successfully!");
-        queryClient.invalidateQueries({
-          queryKey: ["userPosts", userInfo?.userId],
+        // Remove post from cache immediately instead of refetching
+        queryClient.setQueryData(["userPosts", userInfo?.userId], (old) => {
+          if (!old) return old;
+          return old.filter((post) => post.id !== itemToDelete.id);
         });
+        
+        toast.success("Post deleted successfully!");
       } else if (deleteType === 'gallery') {
         const response = await authFetchResponse(`/gallery/${itemToDelete.id}`, {
           method: "DELETE",
@@ -718,10 +721,13 @@ const ProfilePage = () => {
           throw new Error(`Failed to delete gallery: ${response.statusText}`);
         }
 
-        toast.success("Gallery deleted successfully!");
-        queryClient.invalidateQueries({
-          queryKey: ["userGalleries", userInfo?.userId],
+        // Remove gallery from cache immediately instead of refetching
+        queryClient.setQueryData(["userGalleries", userInfo?.userId], (old) => {
+          if (!old) return old;
+          return old.filter((gallery) => gallery.id !== itemToDelete.id);
         });
+        
+        toast.success("Gallery deleted successfully!");
       }
     } catch (error) {
       console.error(`Error deleting ${deleteType}:`, error);
