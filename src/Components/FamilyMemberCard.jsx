@@ -9,6 +9,7 @@ import { logger } from '../utils/logger';
 import { getBlockedUsers } from '../services/block.service';
 import {
   buildDefaultFamilyPrivacySettings,
+  fetchFamilyPrivacySettings,
   getFamilyPrivacySettings,
   saveFamilyPrivacySettings,
 } from '../utils/familyPrivacySettings';
@@ -1195,37 +1196,60 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
   }, [birthFamilyCode, associatedFamiliesOptions, linkedFamiliesOptions]);
 
   useEffect(() => {
+    let ignore = false;
     const userId = currentUser?.userId;
     const defaults = buildDefaultFamilyPrivacySettings(birthFamilyCode);
-    const stored = getFamilyPrivacySettings({ userId, familyCode: birthFamilyCode });
     const validCodesSet = new Set(privacyFamilyOptions.map((entry) => entry.familyCode));
 
     const normalizeContentSetting = (setting, fallbackSetting) => {
       const visibility =
         setting?.visibility === 'specific-family' ? 'specific-family' : 'all-members';
-      const requestedCodes = Array.isArray(setting?.familyCodes) 
-        ? setting.familyCodes 
+      const requestedCodes = Array.isArray(setting?.familyCodes)
+        ? setting.familyCodes
         : [setting?.familyCode || fallbackSetting?.familyCode].filter(Boolean);
-      const validCodes = requestedCodes.filter(c => validCodesSet.has(c));
-      const resolvedCodes = validCodes.length > 0 
-        ? validCodes 
-        : [fallbackSetting?.familyCode || birthFamilyCode].filter(Boolean);
+      const validCodes = requestedCodes.filter((code) => validCodesSet.has(code));
+      const resolvedCodes = visibility === 'specific-family'
+        ? validCodes
+        : (validCodes.length > 0
+          ? validCodes
+          : [fallbackSetting?.familyCode || birthFamilyCode].filter(Boolean));
+
       return {
         visibility,
         familyCodes: resolvedCodes,
       };
     };
 
-    const next = {
-      ...defaults,
-      posts: normalizeContentSetting(stored?.posts, defaults.posts),
-      albums: normalizeContentSetting(stored?.albums, defaults.albums),
-      events: normalizeContentSetting(stored?.events, defaults.events),
-      updatedAt: stored?.updatedAt || '',
+    const applyPrivacySettings = (stored) => {
+      const next = {
+        ...defaults,
+        posts: normalizeContentSetting(stored?.posts, defaults.posts),
+        albums: normalizeContentSetting(stored?.albums, defaults.albums),
+        events: normalizeContentSetting(stored?.events, defaults.events),
+        updatedAt: stored?.updatedAt || '',
+      };
+
+      if (!ignore) {
+        setPrivacySettings(next);
+        setPrivacySavedAt(stored?.updatedAt || '');
+      }
     };
 
-    setPrivacySettings(next);
-    setPrivacySavedAt(stored?.updatedAt || '');
+    applyPrivacySettings(
+      getFamilyPrivacySettings({ userId, familyCode: birthFamilyCode }),
+    );
+
+    if (userId) {
+      fetchFamilyPrivacySettings({ userId, familyCode: birthFamilyCode }).then(
+        (stored) => {
+          applyPrivacySettings(stored);
+        },
+      );
+    }
+
+    return () => {
+      ignore = true;
+    };
   }, [currentUser?.userId, birthFamilyCode, privacyFamilyOptions]);
 
   const updatePrivacySetting = (contentType, key, value) => {
@@ -1238,30 +1262,56 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
     }));
   };
 
+  const [isSavingPrivacySettings, setIsSavingPrivacySettings] = useState(false);
+
   const handleSavePrivacySettings = async () => {
     const userId = currentUser?.userId;
     if (!userId) return;
+    if (isSavingPrivacySettings) return;
 
-    const saved = saveFamilyPrivacySettings({
-      userId,
-      settings: privacySettings,
-    });
-    setPrivacySettings(saved);
-    setPrivacySavedAt(saved?.updatedAt || '');
+    try {
+      setIsSavingPrivacySettings(true);
+      await Swal.fire({
+        title: 'Saving... ',
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        showConfirmButton: false,
+        didOpen: () => {
+          Swal.showLoading();
+        },
+      });
 
-    window.dispatchEvent(
-      new CustomEvent('family-privacy-settings-updated', {
-        detail: { userId, settings: saved },
-      }),
-    );
+      const saved = await saveFamilyPrivacySettings({
+        userId,
+        settings: privacySettings,
+        familyCode: birthFamilyCode,
+      });
+      setPrivacySettings(saved);
+      setPrivacySavedAt(saved?.updatedAt || '');
 
-    await Swal.fire({
-      icon: 'success',
-      title: 'Privacy Saved',
-      text: 'Your content privacy settings have been updated.',
-      timer: 1400,
-      showConfirmButton: false,
-    });
+      window.dispatchEvent(
+        new CustomEvent('family-privacy-settings-updated', {
+          detail: { userId, settings: saved },
+        }),
+      );
+
+      await Swal.fire({
+        icon: 'success',
+        title: 'Privacy Saved',
+        text: 'Your content privacy settings have been updated.',
+        timer: 1400,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      logger.error('Failed to save content privacy settings', error);
+      await Swal.fire({
+        icon: 'error',
+        title: 'Save Failed',
+        text: error?.message || 'Unable to update your content privacy settings.',
+      });
+    } finally {
+      setIsSavingPrivacySettings(false);
+    }
   };
 
   // BLOCK OVERRIDE: Keep blocked users out of active grid and move them to blocked section only.
@@ -1500,12 +1550,22 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
           <button
             type="button"
             onClick={handleSavePrivacySettings}
-            className="flex items-center gap-2 px-5 py-2.5 bg-white text-primary-700 font-semibold rounded-lg hover:bg-primary-50 transition-all shadow-lg"
+            disabled={isSavingPrivacySettings}
+            className={`flex items-center gap-2 px-5 py-2.5 bg-white text-primary-700 font-semibold rounded-lg transition-all shadow-lg ${
+              isSavingPrivacySettings ? 'opacity-70 cursor-not-allowed' : 'hover:bg-primary-50'
+            }`}
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-            Save Settings
+            {isSavingPrivacySettings ? (
+              <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" strokeWidth="4" />
+                <path className="opacity-75" d="M4 12a8 8 0 018-8" strokeWidth="4" strokeLinecap="round" />
+              </svg>
+            ) : (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            )}
+            {isSavingPrivacySettings ? 'Saving...' : 'Save Settings'}
           </button>
         </div>
       </div>

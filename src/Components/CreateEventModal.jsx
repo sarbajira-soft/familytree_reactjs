@@ -15,7 +15,10 @@ import Swal from "sweetalert2";
 import { useUser } from "../Contexts/UserContext";
 import { getToken } from "../utils/auth";
 import { authFetchResponse } from "../utils/authFetch";
-import { getFamilyPrivacyContentSetting } from "../utils/familyPrivacySettings";
+import {
+  fetchFamilyPrivacySettings,
+  getFamilyPrivacyContentSetting,
+} from "../utils/familyPrivacySettings";
 
 const CreateEventModal = ({
   isOpen,
@@ -69,7 +72,9 @@ const CreateEventModal = ({
       familyCode: fallbackCode,
       contentType: "events",
     });
-    return String(setting?.familyCode || fallbackCode).trim();
+    return String(
+      setting?.familyCode || setting?.familyCodes?.[0] || fallbackCode,
+    ).trim();
   };
 
   const getImageKey = (file) => `${file?.name || ""}-${file?.size || 0}-${file?.lastModified || 0}`;
@@ -107,11 +112,35 @@ const CreateEventModal = ({
   }, [isOpen]);
 
   useEffect(() => {
-    if (!isOpen) return;
+    let ignore = false;
+    if (!isOpen) return () => {
+      ignore = true;
+    };
+
     const preferredCode = getPreferredFamilyCode();
     if (preferredCode) {
       setFamilyCode(preferredCode);
     }
+
+    fetchFamilyPrivacySettings({
+      userId: userInfo?.userId,
+      familyCode: String(userInfo?.familyCode || "").trim(),
+    }).then((fetched) => {
+      const nextPreferredCode = String(
+        fetched?.events?.familyCode ||
+          fetched?.events?.familyCodes?.[0] ||
+          userInfo?.familyCode ||
+          "",
+      ).trim();
+
+      if (!ignore && nextPreferredCode) {
+        setFamilyCode(nextPreferredCode);
+      }
+    });
+
+    return () => {
+      ignore = true;
+    };
   }, [isOpen, userInfo?.familyCode, userInfo?.userId]);
 
   useEffect(() => {

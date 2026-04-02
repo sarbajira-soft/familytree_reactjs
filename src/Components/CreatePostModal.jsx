@@ -18,7 +18,10 @@ import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { fetchFile, toBlobURL } from "@ffmpeg/util";
 import SparkMD5 from "spark-md5";
 import { throwIfNotOk } from "../utils/apiMessages";
-import { getFamilyPrivacyContentSetting } from "../utils/familyPrivacySettings";
+import {
+  fetchFamilyPrivacySettings,
+  getFamilyPrivacyContentSetting,
+} from "../utils/familyPrivacySettings";
 
 const CreatePostModal = ({
   isOpen,
@@ -67,7 +70,9 @@ const CreatePostModal = ({
       familyCode: fallbackCode,
       contentType: "posts",
     });
-    return String(setting?.familyCode || fallbackCode).trim();
+    return String(
+      setting?.familyCode || setting?.familyCodes?.[0] || fallbackCode,
+    ).trim();
   };
 
   // State for form fields
@@ -162,6 +167,45 @@ const CreatePostModal = ({
       setIsTrimming(false);
     }
   }, [isOpen, mode, postData, currentUser, userInfo]);
+
+  useEffect(() => {
+    let ignore = false;
+
+    const warmPrivacySettings = async () => {
+      if (!isOpen || mode === "edit") return;
+
+      const userId = currentUser?.userId || userInfo?.userId;
+      const fallbackCode = String(
+        currentUser?.familyCode || userInfo?.familyCode || "",
+      ).trim();
+      const fetched = await fetchFamilyPrivacySettings({
+        userId,
+        familyCode: fallbackCode,
+      });
+      const preferredCode = String(
+        fetched?.posts?.familyCode ||
+          fetched?.posts?.familyCodes?.[0] ||
+          fallbackCode,
+      ).trim();
+
+      if (!ignore && preferredCode) {
+        setFamilyCode((prev) => String(prev || "").trim() || preferredCode);
+      }
+    };
+
+    warmPrivacySettings();
+
+    return () => {
+      ignore = true;
+    };
+  }, [
+    isOpen,
+    mode,
+    currentUser?.userId,
+    currentUser?.familyCode,
+    userInfo?.userId,
+    userInfo?.familyCode,
+  ]);
 
   // When editing a public post and switching privacy to Family, the post itself has no familyCode yet.
   // Auto-fill from the current user so the backend can store it correctly.

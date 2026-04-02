@@ -3,7 +3,10 @@ import { FaTimes, FaUpload, FaImage, FaTrashAlt, FaPlus } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 import { throwIfNotOk } from '../utils/apiMessages';
 import { useUser } from '../Contexts/UserContext';
-import { getFamilyPrivacyContentSetting } from '../utils/familyPrivacySettings';
+import {
+    fetchFamilyPrivacySettings,
+    getFamilyPrivacyContentSetting,
+} from '../utils/familyPrivacySettings';
 
 const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authToken, mode = 'create', albumData = null }) => {
     const { userInfo } = useUser();
@@ -21,7 +24,7 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
             familyCode: fallbackCode,
             contentType: 'albums',
         });
-        return String(setting?.familyCode || fallbackCode).trim();
+        return String(setting?.familyCode || setting?.familyCodes?.[0] || fallbackCode).trim();
     };
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
@@ -75,6 +78,41 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
             }
         }
     }, [isOpen, mode, albumData, currentUser, userInfo]);
+
+    useEffect(() => {
+        let ignore = false;
+
+        const warmPrivacySettings = async () => {
+            if (!isOpen || mode === 'edit') return;
+
+            const userId = currentUser?.userId || userInfo?.userId;
+            const fallbackCode = String(currentUser?.familyCode || userInfo?.familyCode || '').trim();
+            const fetched = await fetchFamilyPrivacySettings({
+                userId,
+                familyCode: fallbackCode,
+            });
+            const preferredCode = String(
+                fetched?.albums?.familyCode || fetched?.albums?.familyCodes?.[0] || fallbackCode,
+            ).trim();
+
+            if (!ignore && preferredCode) {
+                setFamilyCode((prev) => String(prev || '').trim() || preferredCode);
+            }
+        };
+
+        warmPrivacySettings();
+
+        return () => {
+            ignore = true;
+        };
+    }, [
+        isOpen,
+        mode,
+        currentUser?.userId,
+        currentUser?.familyCode,
+        userInfo?.userId,
+        userInfo?.familyCode,
+    ]);
 
     useEffect(() => {
         if (privacy === 'family' && !familyCode.trim()) {
