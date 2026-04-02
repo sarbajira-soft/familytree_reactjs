@@ -7,6 +7,8 @@ import EmojiPicker from 'emoji-picker-react';
 import { useNavigate } from 'react-router-dom';
 import { logger } from '../utils/logger';
 
+const DEFAULT_AVATAR = '/assets/user.png';
+
 const CommentItem = ({ 
   comment, 
   currentUserId, 
@@ -122,7 +124,7 @@ const CommentItem = ({
     }
   };
   const fullName = `${user.firstName || 'Unknown'} ${user.lastName || ''}`.trim();
-  const profileUrl = user.profile || '/assets/user.png';
+  const profileUrl = user.profile || DEFAULT_AVATAR;
   const commentText = comment.comment || comment.content || '';
 
   const goToUserProfile = (targetUserId) => {
@@ -151,6 +153,10 @@ const CommentItem = ({
           src={profileUrl}
           alt={fullName}
           className="w-9 h-9 rounded-full object-cover border border-gray-300 flex-shrink-0"
+          onError={(e) => {
+            e.currentTarget.onerror = null;
+            e.currentTarget.src = DEFAULT_AVATAR;
+          }}
         />
       </button>
 
