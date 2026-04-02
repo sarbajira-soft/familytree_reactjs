@@ -361,27 +361,40 @@ const FamilyTreePage = () => {
   // Set initial zoom based on screen size
 
   useEffect(() => {
-    const setInitialZoom = () => {
-      if (window.innerWidth <= 640) {
-        // Mobile: start with smaller zoom
+    const bucketRef = { current: null };
+    let rafId = null;
 
-        setZoom(0.7);
-      } else if (window.innerWidth <= 1024) {
-        // Tablet: slightly smaller
-
-        setZoom(0.85);
-      } else {
-        // Desktop: normal zoom
-
-        setZoom(1);
-      }
+    const computeBucketAndZoom = () => {
+      const w = window.innerWidth;
+      if (w <= 640) return { bucket: "mobile", zoom: 0.7 };
+      if (w <= 1024) return { bucket: "tablet", zoom: 0.85 };
+      return { bucket: "desktop", zoom: 1 };
     };
 
-    setInitialZoom();
+    const applyZoomForViewport = () => {
+      const next = computeBucketAndZoom();
+      if (bucketRef.current === next.bucket) return;
+      bucketRef.current = next.bucket;
+      setZoom((prev) => (prev === next.zoom ? prev : next.zoom));
+    };
 
-    window.addEventListener("resize", setInitialZoom);
+    const handleResize = () => {
+      if (rafId) return;
+      rafId = window.requestAnimationFrame(() => {
+        rafId = null;
+        applyZoomForViewport();
+      });
+    };
 
-    return () => window.removeEventListener("resize", setInitialZoom);
+    applyZoomForViewport();
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      if (rafId) {
+        window.cancelAnimationFrame(rafId);
+      }
+    };
   }, []);
 
   // Check approval status and familyCode
@@ -3014,20 +3027,6 @@ const FamilyTreePage = () => {
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
               >
-                {treeLoading && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-50">
-                    <div className="text-center">
-                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-
-                      <p className="text-gray-600 font-medium">
-                        {tree && tree.people.size > 50
-                          ? "Loading large family tree..."
-                          : "Loading family tree..."}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
                 <div
                   ref={treeCanvasRef}
                   className="tree-canvas   relative w-max h-max mx-auto flex flex-col items-start justify-start sm:items-center sm:justify-center"

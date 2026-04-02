@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, useContext, useCallback, useMemo } from 'react';
+import React, { createContext, useState, useEffect, useContext, useCallback, useMemo, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { 
   getToken, 
@@ -19,6 +19,11 @@ export const UserProvider = ({ children }) => {
     // Initialize with user info from localStorage if available
     return getUserInfo();
   });
+
+  const userInfoRef = useRef(userInfo);
+  useEffect(() => {
+    userInfoRef.current = userInfo;
+  }, [userInfo]);
   
   const [userLoading, setUserLoading] = useState(() => {
     // Initialize as true if there's a token (indicating we need to fetch user data)
@@ -118,7 +123,12 @@ export const UserProvider = ({ children }) => {
     [clearUserData, redirectToLogin],
   );
 
-  const fetchUserDetails = useCallback(async () => {
+  const profileRefreshRef = useRef({
+    lastRefreshAt: 0,
+    inFlight: false,
+  });
+
+  const fetchUserDetails = useCallback(async (options = {}) => {
     const token = getToken();
     if (!token) {
       console.warn('Authentication token not found or expired.');
@@ -126,8 +136,27 @@ export const UserProvider = ({ children }) => {
       return;
     }
 
+    const now = Date.now();
+    const state = profileRefreshRef.current;
+    const throttleMs = Number.isFinite(options?.throttleMs)
+      ? Number(options.throttleMs)
+      : 0;
+    const hasCachedUser = !!userInfoRef.current;
+
+    if (state.inFlight) return;
+    if (throttleMs > 0 && hasCachedUser && now - state.lastRefreshAt < throttleMs) {
+      return;
+    }
+
+    state.inFlight = true;
+    state.lastRefreshAt = now;
+
     try {
-      setUserLoading(true);
+      const silent = !!options?.silent;
+      const didSetLoading = !silent || !userInfoRef.current;
+      if (didSetLoading) {
+        setUserLoading(true);
+      }
 
       const response = await authFetchResponse(`/user/myProfile`, {
         method: 'GET',
@@ -289,7 +318,15 @@ export const UserProvider = ({ children }) => {
         console.warn('Failed to recover user from storage:', storageError);
       }
     } finally {
-      setUserLoading(false);
+      // Only flip loading off if we turned it on for this request.
+      // This avoids app-wide loading flashes on focus/restore.
+      const silent = !!options?.silent;
+      const didSetLoading = !silent || !userInfoRef.current;
+      if (didSetLoading) {
+        setUserLoading(false);
+      }
+
+      profileRefreshRef.current.inFlight = false;
     }
   }, [buildMinimalUser, clearUserData, handleUnauthorized, parseChildrenNames, persistAuthData, toIntOrZero]);
 
@@ -298,16 +335,28 @@ export const UserProvider = ({ children }) => {
   }, [fetchUserDetails]);
 
   useEffect(() => {
+    const MIN_REFRESH_INTERVAL_MS = 60 * 1000;
+
+    const maybeRefreshProfile = () => {
+      if (!isAuthenticated()) return;
+      if (document.visibilityState !== 'visible') return;
+
+      const now = Date.now();
+      const state = profileRefreshRef.current;
+
+      if (state.inFlight) return;
+      if (now - state.lastRefreshAt < MIN_REFRESH_INTERVAL_MS) return;
+
+      // Silent refresh: keep UI stable on minimize/restore.
+      fetchUserDetails({ silent: true, throttleMs: MIN_REFRESH_INTERVAL_MS });
+    };
+
     const handleWindowFocus = () => {
-      if (isAuthenticated()) {
-        fetchUserDetails();
-      }
+      maybeRefreshProfile();
     };
 
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && isAuthenticated()) {
-        fetchUserDetails();
-      }
+      maybeRefreshProfile();
     };
 
     globalThis.addEventListener('focus', handleWindowFocus);

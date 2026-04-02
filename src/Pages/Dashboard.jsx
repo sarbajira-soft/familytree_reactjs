@@ -316,7 +316,7 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: ["dashboardData", userInfo?.familyCode],
     queryFn: async () => {
-      const [posts, stats, events, gallery] = await Promise.all([
+      const [posts, stats, events] = await Promise.all([
         authFetch(
           // Bug 51: show family feed across linked families (spouse-connected families may have different codes)
           `${apiBaseUrl}/post/by-options?privacy=private`,
@@ -326,11 +326,19 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
           method: "GET",
         }),
         authFetch(`${apiBaseUrl}/event/upcoming/all`, { method: "GET" }),
-        authFetch(`${apiBaseUrl}/gallery/by-options?privacy=public`, { method: "GET" }),
       ]);
-      return { posts, stats, events, gallery };
+      return { posts, stats, events };
     },
     enabled: !!userInfo?.familyCode && !!token,
+  });
+
+  const { data: galleryData, isLoading: isGalleryLoading } = useQuery({
+    queryKey: ["dashboardGallery"],
+    queryFn: async () =>
+      authFetch(`${apiBaseUrl}/gallery/by-options?privacy=public`, {
+        method: "GET",
+      }),
+    enabled: !!token,
   });
 
   const upcomingEventsPreview = useMemo(() => {
@@ -343,11 +351,11 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
   const productSuggestionsPool = medusaProducts;
 
   const galleryPreview = useMemo(() => {
-    if (!dashboardData?.gallery) return [];
-    const rawGallery = dashboardData.gallery;
+    if (!galleryData) return [];
+    const rawGallery = galleryData;
     const list = Array.isArray(rawGallery?.data) ? rawGallery.data : rawGallery;
     return Array.isArray(list) ? list.slice(0, 3) : [];
-  }, [dashboardData]);
+  }, [galleryData]);
 
   const formatAlbumForModal = (album) => {
     return {
@@ -510,7 +518,7 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
     return event.eventTitle || event.title || "Special Event";
   };
 
-  if (isLoading) {
+  if (isLoading || isGalleryLoading) {
     return <DashboardShimmer />;
   }
 

@@ -30,6 +30,7 @@ import { authFetch, authFetchResponse } from "../utils/authFetch";
 import { getToken } from "../utils/auth";
 
 const EMPTY_VTT_TRACK_SRC = "data:text/vtt,WEBVTT";
+const DEFAULT_AVATAR = "/assets/user.png";
 
 const logger = console;
 
@@ -187,7 +188,7 @@ const PostPage = () => {
     if (!userInfo) return;
     setUser({
       id: userInfo.userId,
-      avatar: userInfo.profileUrl || "/assets/user.png",
+      avatar: userInfo.profileUrl || DEFAULT_AVATAR,
       name: userInfo.name || "Username",
       bio: userInfo.bio || "No bio yet",
       familyCode: userInfo.familyCode || "Not assigned",
@@ -251,7 +252,7 @@ const PostPage = () => {
           id: p.id,
           author: p.user?.name || "Unknown",
           authorId: p.user?.userId || p.createdBy || null,
-          avatar: p.user?.profile || "/assets/user.png",
+          avatar: p.user?.profile || DEFAULT_AVATAR,
           time: new Date(p.createdAt).toLocaleString(),
           caption: p.caption,
           fullImageUrl: p.postImage,
@@ -539,7 +540,7 @@ const PostPage = () => {
       user: {
         firstName: userInfo?.firstName || "You",
         lastName: userInfo?.lastName || "",
-        profile: userInfo?.profile || "/assets/user.png",
+        profile: userInfo?.profile || DEFAULT_AVATAR,
       },
       isTemp: true,
     };
@@ -660,6 +661,11 @@ const PostPage = () => {
 
     const comments = await fetchComments(postId);
     setPostComments((prev) => ({ ...prev, [postId]: comments }));
+    setPosts((prev) =>
+      prev.map((p) =>
+        p.id === postId ? { ...p, comments: countComments(comments || []) } : p
+      )
+    );
   };
 
   const handleReplyToCommentFromItem = async (parentCommentId, postId, reply) => {
@@ -737,17 +743,27 @@ const PostPage = () => {
           return childIds;
         };
 
-        // Remove comment and all its children from state
+        // Remove comment and all its children from state, and decrement displayed count.
         setPostComments((prev) => {
           const currentComments = prev[postId] || [];
           const childIds = getAllChildIds(commentId, currentComments);
           const idsToRemove = new Set([commentId, ...childIds]);
+          const removedCount = idsToRemove.size;
+
+          setPosts((prevPosts) =>
+            prevPosts.map((p) => {
+              if (p.id !== postId) return p;
+              const currentCount = Number(p.comments || 0);
+              return {
+                ...p,
+                comments: Math.max(0, currentCount - removedCount),
+              };
+            })
+          );
 
           return {
             ...prev,
-            [postId]: currentComments.filter(
-              (c) => !idsToRemove.has(c.id)
-            ),
+            [postId]: currentComments.filter((c) => !idsToRemove.has(c.id)),
           };
         });
       }
@@ -825,9 +841,13 @@ const PostPage = () => {
       <div key={cmt.id} className={isReply ? "ml-10 mt-2" : ""}>
         <div className="flex items-start gap-2.5 opacity-0 animate-fadeIn">
           <img
-            src={cmt.user?.profile || "/assets/user.png"}
+            src={cmt.user?.profile || DEFAULT_AVATAR}
             alt="User"
             className="w-8 h-8 rounded-full object-cover border border-gray-200"
+            onError={(e) => {
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = DEFAULT_AVATAR;
+            }}
           />
           <div className="flex-1">
             {editingCommentId === cmt.id ? (
@@ -1017,6 +1037,10 @@ const PostPage = () => {
             src={user.avatar}
             alt="User"
             className="w-9 h-9 sm:w-10 sm:h-10 rounded-full border border-blue-200 object-cover"
+            onError={(e) => {
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = DEFAULT_AVATAR;
+            }}
           />
 
           <button
@@ -1130,6 +1154,10 @@ const PostPage = () => {
                       alt={post.author}
                       className="w-8 h-8 sm:w-9 sm:h-9 rounded-full border object-cover cursor-pointer"
                       onClick={() => goToUserProfile(post.authorId)}
+                      onError={(e) => {
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = DEFAULT_AVATAR;
+                      }}
                     />
                     <div>
                       <p

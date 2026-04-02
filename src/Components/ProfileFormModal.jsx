@@ -885,7 +885,7 @@ const ProfileFormModal = ({
       'email',
       'mobile',
       'countryCode',
-      'role',
+      ...(mode !== 'edit-profile' ? ['role'] : []),
       'status',
     ]));
 
@@ -1441,17 +1441,34 @@ const ProfileFormModal = ({
                       <label htmlFor="role" className={labelClassName}>
                         Role <span className="text-red-500">*</span>
                       </label>
-                      <select
-                        id="role"
-                        name="role"
-                        value={formData.role || '1'} // FIXED: Ensure never undefined
-                        onChange={handleChange}
-                        className={inputClassName('role')}
-                      >
-                        <option value="1">Member</option>
-                        <option value="2">Admin</option>
-                        {userInfo?.role === 3 && <option value="3">Superadmin</option>}
-                      </select>
+                      {mode === 'edit-profile' ? (
+                        <input
+                          id="role"
+                          name="role"
+                          type="text"
+                          value={
+                            String(formData.role || '1') === '3'
+                              ? 'Superadmin'
+                              : String(formData.role || '1') === '2'
+                                ? 'Admin'
+                                : 'Member'
+                          }
+                          readOnly
+                          className={`${inputClassName('role')} bg-gray-100 cursor-not-allowed`}
+                        />
+                      ) : (
+                        <select
+                          id="role"
+                          name="role"
+                          value={formData.role || '1'} // FIXED: Ensure never undefined
+                          onChange={handleChange}
+                          className={inputClassName('role')}
+                        >
+                          <option value="1">Member</option>
+                          <option value="2">Admin</option>
+                          {userInfo?.role === 3 && <option value="3">Superadmin</option>}
+                        </select>
+                      )}
                     </div>
                   </>
                 )}
@@ -1690,14 +1707,10 @@ const ProfileFormModal = ({
                       type="date"
                       value={formData.dob || ''} // FIXED: Ensure never undefined
                       onChange={handleChange}
-                      max={new Date().toISOString().split('T')[0]}
+                      min="1900-01-01"
+                      max="2100-12-31"
                       className={`${inputClassName('dob')} pr-10`}
                     />
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                    </div>
                     {formData.dob && (
                       <div className="absolute inset-y-0 right-8 flex items-center pr-2">
                         <button
