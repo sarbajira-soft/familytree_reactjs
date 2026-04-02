@@ -39,6 +39,25 @@ const Login = () => {
     );
   };
 
+  const isNotVerifiedError = (message) => {
+    const lower = String(message || '').toLowerCase();
+    return lower.includes('not verified') || lower.includes('not verified.');
+  };
+
+  const buildResendOtpPayload = (rawIdentifier = '') => {
+    const identifier = normalizeIdentifier(rawIdentifier);
+    if (!identifier) return { email: '', mobile: '' };
+    if (identifier.includes('@')) {
+      return { email: identifier, mobile: '' };
+    }
+    const digits = identifier.replace(/\s+/g, '');
+    if (!digits) return { email: '', mobile: '' };
+    if (digits.startsWith('+')) {
+      return { email: '', mobile: digits };
+    }
+    return { email: '', mobile: `+91${digits}` };
+  };
+
   const routeToRecovery = (rawIdentifier = '') => {
     const identifier = normalizeIdentifier(rawIdentifier);
     try {
@@ -112,6 +131,33 @@ const Login = () => {
         if (response.status === 403 && isPendingDeletionError(errorMessage)) {
           setApiError('Account scheduled for deletion. Redirecting to recovery.');
           routeToRecovery(formData.username);
+          return;
+        }
+
+        if (response.status === 403 && isNotVerifiedError(errorMessage)) {
+          const payload = buildResendOtpPayload(formData.username);
+          try {
+            await fetch(`${import.meta.env.VITE_API_BASE_URL}/user/resend-otp`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            });
+          } catch (err) {
+            console.error('Failed to resend OTP after unverified login attempt:', err);
+          }
+
+          try {
+            localStorage.setItem('otp_sent_time', Date.now().toString());
+          } catch (_) {
+            // ignore
+          }
+
+          navigate('/verify-otp', {
+            state: {
+              email: payload.email,
+              mobile: payload.mobile,
+            },
+          });
           return;
         }
         setApiError(errorMessage || 'Login failed. Please check credentials.');

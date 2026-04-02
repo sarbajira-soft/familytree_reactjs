@@ -74,7 +74,16 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
                 setPrivacy(getDefaultPrivacy());
             }
         }
-    }, [isOpen, mode, albumData, currentUser, userInfo]);
+    }, [
+        isOpen,
+        mode,
+        albumData,
+        currentUser?.userId,
+        currentUser?.familyCode,
+        userInfo?.userId,
+        userInfo?.familyCode,
+        userInfo?.approveStatus,
+    ]);
 
     useEffect(() => {
         if (privacy === 'family' && !familyCode.trim()) {

@@ -813,7 +813,13 @@ const Layout = ({ noScroll = false }) => {
 
         {/* Bottom Navbar for Mobile */}
         {isMobile && (
-          <BottomNavBar activeTab={activeTab} setActiveTab={setActiveTab} />
+          <BottomNavBar
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            onNavigate={() => {
+              setNotificationOpen(false);
+            }}
+          />
         )}
       </main>
 

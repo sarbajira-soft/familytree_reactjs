@@ -161,7 +161,16 @@ const CreatePostModal = ({
       setShowSuccess(false);
       setIsTrimming(false);
     }
-  }, [isOpen, mode, postData, currentUser, userInfo]);
+  }, [
+    isOpen,
+    mode,
+    postData,
+    currentUser?.userId,
+    currentUser?.familyCode,
+    userInfo?.userId,
+    userInfo?.familyCode,
+    userInfo?.approveStatus,
+  ]);
 
   // When editing a public post and switching privacy to Family, the post itself has no familyCode yet.
   // Auto-fill from the current user so the backend can store it correctly.
@@ -292,7 +301,14 @@ const CreatePostModal = ({
       setTrimmedVideoFile(null);
       setUploadProgress(0);
       setImageFile(file);
-      setImagePreview(URL.createObjectURL(file));
+      setImagePreview((prev) => {
+        if (prev) {
+          try {
+            URL.revokeObjectURL(prev);
+          } catch {}
+        }
+        return URL.createObjectURL(file);
+      });
       setMessage("");
     } else {
       setImageFile(null);
