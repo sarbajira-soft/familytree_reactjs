@@ -8,6 +8,8 @@ const CreateFamilyModal = ({ isOpen, onClose, token, onFamilyCreated, mode = "cr
     const [familyPhoto, setFamilyPhoto] = useState(null);
     const [preview, setPreview] = useState('');
     const [loading, setLoading] = useState(false);
+    const [familyNameError, setFamilyNameError] = useState('');
+    const [familyBioError, setFamilyBioError] = useState('');
 
     const generateFamilyCode = () => `FAM${Date.now().toString().slice(-6)}`;
 
@@ -33,6 +35,7 @@ const CreateFamilyModal = ({ isOpen, onClose, token, onFamilyCreated, mode = "cr
         const bioTrimmed = (familyBio || '').trim();
 
         if (!nameTrimmed) {
+          setFamilyNameError('Family Name cannot be empty.');
           await Swal.fire({
             icon: 'warning',
             title: 'Invalid Family Name',
@@ -41,7 +44,10 @@ const CreateFamilyModal = ({ isOpen, onClose, token, onFamilyCreated, mode = "cr
           return;
         }
 
+        if (familyNameError) setFamilyNameError('');
+
         if (!bioTrimmed) {
+          setFamilyBioError('Family Bio cannot be empty.');
           await Swal.fire({
             icon: 'warning',
             title: 'Invalid Family Bio',
@@ -49,6 +55,8 @@ const CreateFamilyModal = ({ isOpen, onClose, token, onFamilyCreated, mode = "cr
           });
           return;
         }
+
+        if (familyBioError) setFamilyBioError('');
 
         const formData = new FormData();
         formData.append('familyName', nameTrimmed);
@@ -199,23 +207,47 @@ const CreateFamilyModal = ({ isOpen, onClose, token, onFamilyCreated, mode = "cr
             <input
               type="text"
               value={familyName}
-              onChange={(e) => setFamilyName(e.target.value)}
+              onChange={(e) => {
+                const next = e.target.value;
+                setFamilyName(next);
+                const trimmed = String(next || '').trim();
+                if (!trimmed) {
+                  setFamilyNameError('Family Name cannot be empty.');
+                } else if (familyNameError) {
+                  setFamilyNameError('');
+                }
+              }}
               required
               className="w-full border rounded-lg px-4 py-2 focus:ring-primary-500 focus:outline-none"
               placeholder="The Singhs"
             />
+            {familyNameError ? (
+              <p className="text-red-600 text-xs mt-1">{familyNameError}</p>
+            ) : null}
           </div>
 
           <div>
             <label className="block mb-1 font-medium text-gray-700">Family Bio</label>
             <textarea
               value={familyBio}
-              onChange={(e) => setFamilyBio(e.target.value)}
+              onChange={(e) => {
+                const next = e.target.value;
+                setFamilyBio(next);
+                const trimmed = String(next || '').trim();
+                if (!trimmed) {
+                  setFamilyBioError('Family Bio cannot be empty.');
+                } else if (familyBioError) {
+                  setFamilyBioError('');
+                }
+              }}
               rows={3}
               required
               className="w-full border rounded-lg px-4 py-2 focus:ring-primary-500 focus:outline-none"
               placeholder="A united and respected family from Chennai."
             />
+            {familyBioError ? (
+              <p className="text-red-600 text-xs mt-1">{familyBioError}</p>
+            ) : null}
           </div>
 
           <div>

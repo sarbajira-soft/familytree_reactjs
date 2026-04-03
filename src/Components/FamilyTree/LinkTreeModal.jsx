@@ -81,7 +81,7 @@ export default function LinkTreeModal({
   };
 
   const [receiverFamilyCodeDigits, setReceiverFamilyCodeDigits] = useState("");
-  const [relationshipType, setRelationshipType] = useState("parent");
+  const [relationshipType, setRelationshipType] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [peopleLoading, setPeopleLoading] = useState(false);
@@ -105,9 +105,11 @@ export default function LinkTreeModal({
 
   const relationshipOptions = React.useMemo(() => {
     if (senderHasParents) {
-      return ["sibling", "child"];
+      // return ["sibling", "child"];
+      return ["sibling"];
     }
-    return ["parent", "child"];
+    // return ["parent", "child"];
+    return ["sibling"];
   }, [senderHasParents]);
 
   const normalizeGender = (g) => {
