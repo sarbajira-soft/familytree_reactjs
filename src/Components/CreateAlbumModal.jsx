@@ -3,10 +3,6 @@ import { FaTimes, FaUpload, FaImage, FaTrashAlt, FaPlus } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 import { throwIfNotOk } from '../utils/apiMessages';
 import { useUser } from '../Contexts/UserContext';
-import {
-    fetchFamilyPrivacySettings,
-    getFamilyPrivacyContentSetting,
-} from '../utils/familyPrivacySettings';
 
 const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authToken, mode = 'create', albumData = null }) => {
     const { userInfo } = useUser();
@@ -17,15 +13,8 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
         return hasFamily && isApproved ? 'family' : 'public';
     };
 
-    const getPreferredFamilyCode = () => {
-        const fallbackCode = String(currentUser?.familyCode || userInfo?.familyCode || '').trim();
-        const setting = getFamilyPrivacyContentSetting({
-            userId: currentUser?.userId || userInfo?.userId,
-            familyCode: fallbackCode,
-            contentType: 'albums',
-        });
-        return String(setting?.familyCode || setting?.familyCodes?.[0] || fallbackCode).trim();
-    };
+    const getPreferredFamilyCode = () =>
+        String(currentUser?.familyCode || userInfo?.familyCode || '').trim();
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [privacy, setPrivacy] = useState(getDefaultPrivacy());
@@ -49,86 +38,53 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
         String(familyCode || currentUser?.familyCode || userInfo?.familyCode || '').trim();
 
     // Effect to initialize form fields when modal opens or mode/albumData changes
+
     useEffect(() => {
-        if (isOpen) {
-            if (mode === 'edit' && albumData) {
-                setTitle(albumData.title || '');
-                setDescription(albumData.description || '');
-                setPrivacy(albumData.privacy === 'private' ? 'family' : albumData.privacy || 'family');
-                setFamilyCode(albumData.familyCode || '');
+        if (!isOpen) return;
 
-                setCurrentCoverPhotoUrl(albumData.coverPhotoUrl ? 
-                                         albumData.coverPhotoUrl : null);
-                
-                const formattedExistingPhotos = albumData.galleryPhotos?.map(photo => ({
-                    ...photo,
-                    url: photo.url
-                })) || [];
-                setCurrentGalleryPhotos(formattedExistingPhotos);
-
-                setCoverPhotoFile(null);
-                setGalleryPhotoFiles([]);
-                if (coverPhotoInputRef.current) coverPhotoInputRef.current.value = '';
-                if (galleryPhotoInputRef.current) galleryPhotoInputRef.current.value = '';
-            } else {
-                resetForm();
-                setFamilyCode(getPreferredFamilyCode());
-
-                setPrivacy(getDefaultPrivacy());
-            }
+        if (mode === 'edit' && albumData) {
+            setTitle(albumData.galleryTitle || albumData.title || '');
+            setDescription(albumData.galleryDescription || albumData.description || '');
+            setPrivacy(albumData.privacy === 'private' || albumData.privacy === 'family' ? 'family' : 'public');
+            setFamilyCode(String(albumData.familyCode || getPreferredFamilyCode() || '').trim());
+            setCoverPhotoFile(null);
+            setGalleryPhotoFiles([]);
+            setCurrentCoverPhotoUrl(albumData.coverPhoto || null);
+            setCurrentGalleryPhotos(
+                Array.isArray(albumData.images)
+                    ? albumData.images
+                    : Array.isArray(albumData.galleryPhotos)
+                        ? albumData.galleryPhotos
+                        : [],
+            );
+            setRemovedImageIds([]);
+            setIsSubmitting(false);
+            if (coverPhotoInputRef.current) coverPhotoInputRef.current.value = '';
+            if (galleryPhotoInputRef.current) galleryPhotoInputRef.current.value = '';
+            return;
         }
-    }, [
-        isOpen,
-        mode,
-        albumData,
-        currentUser?.userId,
-        currentUser?.familyCode,
-        userInfo?.userId,
-        userInfo?.familyCode,
-        userInfo?.approveStatus,
-    ]);
+
+        setTitle('');
+        setDescription('');
+        setPrivacy(getDefaultPrivacy());
+        setFamilyCode(getDefaultPrivacy() === 'family' ? getPreferredFamilyCode() : '');
+        setCoverPhotoFile(null);
+        setGalleryPhotoFiles([]);
+        setCurrentCoverPhotoUrl(null);
+        setCurrentGalleryPhotos([]);
+        setRemovedImageIds([]);
+        setIsSubmitting(false);
+        if (coverPhotoInputRef.current) coverPhotoInputRef.current.value = '';
+        if (galleryPhotoInputRef.current) galleryPhotoInputRef.current.value = '';
+    }, [isOpen, mode, albumData, currentUser?.familyCode, userInfo?.familyCode, userInfo?.approveStatus]);
 
     useEffect(() => {
-        let ignore = false;
-
-        const warmPrivacySettings = async () => {
-            if (!isOpen || mode === 'edit') return;
-
-            const userId = currentUser?.userId || userInfo?.userId;
-            const fallbackCode = String(currentUser?.familyCode || userInfo?.familyCode || '').trim();
-            const fetched = await fetchFamilyPrivacySettings({
-                userId,
-                familyCode: fallbackCode,
-            });
-            const preferredCode = String(
-                fetched?.albums?.familyCode || fetched?.albums?.familyCodes?.[0] || fallbackCode,
-            ).trim();
-
-            if (!ignore && preferredCode) {
-                setFamilyCode((prev) => String(prev || '').trim() || preferredCode);
-            }
-        };
-
-        warmPrivacySettings();
-
-        return () => {
-            ignore = true;
-        };
-    }, [
-        isOpen,
-        mode,
-        currentUser?.userId,
-        currentUser?.familyCode,
-        userInfo?.userId,
-        userInfo?.familyCode,
-    ]);
-
-    useEffect(() => {
+        if (!isOpen) return;
         if (privacy === 'family' && !familyCode.trim()) {
             const resolved = getResolvedFamilyCode();
             if (resolved) setFamilyCode(resolved);
         }
-    }, [privacy, familyCode, currentUser?.familyCode, userInfo?.familyCode]);
+    }, [isOpen, privacy, familyCode, currentUser?.familyCode, userInfo?.familyCode]);
 
     const resetForm = () => {
         setTitle('');

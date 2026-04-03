@@ -18,10 +18,6 @@ import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { fetchFile, toBlobURL } from "@ffmpeg/util";
 import SparkMD5 from "spark-md5";
 import { throwIfNotOk } from "../utils/apiMessages";
-import {
-  fetchFamilyPrivacySettings,
-  getFamilyPrivacyContentSetting,
-} from "../utils/familyPrivacySettings";
 
 const CreatePostModal = ({
   isOpen,
@@ -34,188 +30,154 @@ const CreatePostModal = ({
 }) => {
   const { userInfo } = useUser();
 
-  useEffect(() => {
-    if (!isOpen) return;
-    if (typeof onClose !== "function") return;
-    if (!window.__appModalBackStack) window.__appModalBackStack = [];
-
-    const handler = () => {
-      onClose();
-    };
-
-    window.__appModalBackStack.push(handler);
-
-    return () => {
-      const stack = window.__appModalBackStack;
-      if (!Array.isArray(stack)) return;
-      const idx = stack.lastIndexOf(handler);
-      if (idx >= 0) stack.splice(idx, 1);
-    };
-  }, [isOpen, onClose]);
-
   const getDefaultPrivacy = () => {
-    const hasFamily = Boolean(currentUser?.familyCode || userInfo?.familyCode);
-
+    const hasFamily = Boolean(
+      String(currentUser?.familyCode || userInfo?.familyCode || "").trim(),
+    );
     const isApproved = userInfo?.approveStatus === "approved";
-
     return hasFamily && isApproved ? "family" : "public";
   };
 
-  const getPreferredFamilyCode = () => {
-    const fallbackCode = String(
-      currentUser?.familyCode || userInfo?.familyCode || "",
-    ).trim();
-    const setting = getFamilyPrivacyContentSetting({
-      userId: currentUser?.userId || userInfo?.userId,
-      familyCode: fallbackCode,
-      contentType: "posts",
-    });
-    return String(
-      setting?.familyCode || setting?.familyCodes?.[0] || fallbackCode,
-    ).trim();
-  };
+  const getPreferredFamilyCode = () =>
+    String(currentUser?.familyCode || userInfo?.familyCode || "").trim();
 
-  // State for form fields
   const [content, setContent] = useState("");
+  const [privacy, setPrivacy] = useState(getDefaultPrivacy());
+  const [familyCode, setFamilyCode] = useState("");
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
-  const [currentPostImageUrl, setCurrentPostImageUrl] = useState(null);
   const [videoFile, setVideoFile] = useState(null);
   const [videoPreview, setVideoPreview] = useState(null);
+  const [showPrivacyDropdown, setShowPrivacyDropdown] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [message, setMessage] = useState("");
+  const [currentPostImageUrl, setCurrentPostImageUrl] = useState(null);
   const [currentPostVideoUrl, setCurrentPostVideoUrl] = useState(null);
   const [videoDurationSec, setVideoDurationSec] = useState(null);
   const [trimStartSec, setTrimStartSec] = useState(0);
   const [trimEndSec, setTrimEndSec] = useState(0);
   const [trimmedVideoFile, setTrimmedVideoFile] = useState(null);
-  const [isTrimming, setIsTrimming] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [privacy, setPrivacy] = useState(getDefaultPrivacy());
-  const [familyCode, setFamilyCode] = useState("");
-
-  // UI/logic states
-  const [isLoading, setIsLoading] = useState(false);
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [showPrivacyDropdown, setShowPrivacyDropdown] = useState(false);
-  const [message, setMessage] = useState("");
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [ffmpegLoaded, setFfmpegLoaded] = useState(false);
-  const [ffmpegLoading, setFfmpegLoading] = useState(false);
+  const [isTrimming, setIsTrimming] = useState(false);
   const [trimProgress, setTrimProgress] = useState(0);
   const [trimStage, setTrimStage] = useState("");
+  const [ffmpegLoaded, setFfmpegLoaded] = useState(false);
+  const [ffmpegLoading, setFfmpegLoading] = useState(false);
 
-  // Refs
   const modalRef = useRef(null);
+  const privacyDropdownRef = useRef(null);
+  const emojiPickerRef = useRef(null);
   const textareaRef = useRef(null);
   const fileInputRef = useRef(null);
   const videoInputRef = useRef(null);
-  const privacyDropdownRef = useRef(null);
-  const emojiPickerRef = useRef(null);
   const ffmpegRef = useRef(new FFmpeg());
 
-  function handleClose() {
-    setShowEmojiPicker(false);
+  const revokeObjectUrl = (url) => {
+    if (typeof url === "string" && url.startsWith("blob:")) {
+      try {
+        URL.revokeObjectURL(url);
+      } catch {}
+    }
+  };
+
+  const resetForm = () => {
+    revokeObjectUrl(imagePreview);
+    revokeObjectUrl(videoPreview);
+    setContent("");
+    setPrivacy(getDefaultPrivacy());
+    setFamilyCode("");
+    setImageFile(null);
+    setImagePreview(null);
+    setVideoFile(null);
+    setVideoPreview(null);
     setShowPrivacyDropdown(false);
-    setMessage("");
+    setShowEmojiPicker(false);
+    setIsLoading(false);
     setShowSuccess(false);
+    setMessage("");
+    setCurrentPostImageUrl(null);
+    setCurrentPostVideoUrl(null);
+    setVideoDurationSec(null);
+    setTrimStartSec(0);
+    setTrimEndSec(0);
+    setTrimmedVideoFile(null);
+    setUploadProgress(0);
+    setIsTrimming(false);
+    setTrimProgress(0);
+    setTrimStage("");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+    if (videoInputRef.current) {
+      videoInputRef.current.value = "";
+    }
+  };
+
+  const handleClose = () => {
+    resetForm();
     onClose?.();
-  }
+  };
 
-  // Initialize form fields when modal opens
   useEffect(() => {
-    if (isOpen) {
-      if (mode === "edit" && postData) {
-        setContent(postData.caption || "");
-        setPrivacy(
-          postData.privacy === "private"
-            ? "family"
-            : postData.privacy || "family",
-        );
+    if (!isOpen) return;
 
-        setFamilyCode(postData.familyCode || "");
-        setCurrentPostImageUrl(postData.url || null);
-        setCurrentPostVideoUrl(postData.postVideo || postData.videoUrl || null);
-        setImageFile(null);
-        setImagePreview(null);
-        setVideoFile(null);
-        setVideoPreview(null);
-        setVideoDurationSec(null);
-        setTrimStartSec(0);
-        setTrimEndSec(0);
-        setTrimmedVideoFile(null);
-        setUploadProgress(0);
-      } else {
-        setContent("");
-        setPrivacy(getDefaultPrivacy());
-        setFamilyCode(getPreferredFamilyCode());
-        setImageFile(null);
-        setImagePreview(null);
-        setCurrentPostImageUrl(null);
-        setVideoFile(null);
-        setVideoPreview(null);
-        setCurrentPostVideoUrl(null);
-        setVideoDurationSec(null);
-        setTrimStartSec(0);
-        setTrimEndSec(0);
-        setTrimmedVideoFile(null);
-        setUploadProgress(0);
-      }
+    const preferredFamilyCode = getPreferredFamilyCode();
 
-      setMessage("");
-      setShowEmojiPicker(false);
-      setShowPrivacyDropdown(false);
-      setShowSuccess(false);
+    if (mode === "edit" && postData) {
+      revokeObjectUrl(imagePreview);
+      revokeObjectUrl(videoPreview);
+      const nextPrivacy =
+        postData.privacy === "private" || postData.privacy === "family"
+          ? "family"
+          : "public";
+
+      setContent(String(postData.caption || ""));
+      setPrivacy(nextPrivacy);
+      setFamilyCode(String(postData.familyCode || preferredFamilyCode || "").trim());
+      setImageFile(null);
+      setImagePreview(null);
+      setVideoFile(null);
+      setVideoPreview(null);
+      setCurrentPostImageUrl(postData.postImage || null);
+      setCurrentPostVideoUrl(postData.postVideo || null);
+      setVideoDurationSec(null);
+      setTrimStartSec(0);
+      setTrimEndSec(0);
+      setTrimmedVideoFile(null);
+      setUploadProgress(0);
       setIsTrimming(false);
+      setTrimProgress(0);
+      setTrimStage("");
+      setMessage("");
+      setShowSuccess(false);
+      setShowPrivacyDropdown(false);
+      setShowEmojiPicker(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+      if (videoInputRef.current) {
+        videoInputRef.current.value = "";
+      }
+      return;
+    }
+
+    resetForm();
+    const defaultCode = getPreferredFamilyCode();
+    if (getDefaultPrivacy() === "family" && defaultCode) {
+      setFamilyCode(defaultCode);
     }
   }, [
     isOpen,
     mode,
     postData,
-    currentUser?.userId,
     currentUser?.familyCode,
-    userInfo?.userId,
     userInfo?.familyCode,
     userInfo?.approveStatus,
   ]);
 
-  useEffect(() => {
-    let ignore = false;
-
-    const warmPrivacySettings = async () => {
-      if (!isOpen || mode === "edit") return;
-
-      const userId = currentUser?.userId || userInfo?.userId;
-      const fallbackCode = String(
-        currentUser?.familyCode || userInfo?.familyCode || "",
-      ).trim();
-      const fetched = await fetchFamilyPrivacySettings({
-        userId,
-        familyCode: fallbackCode,
-      });
-      const preferredCode = String(
-        fetched?.posts?.familyCode ||
-          fetched?.posts?.familyCodes?.[0] ||
-          fallbackCode,
-      ).trim();
-
-      if (!ignore && preferredCode) {
-        setFamilyCode((prev) => String(prev || "").trim() || preferredCode);
-      }
-    };
-
-    warmPrivacySettings();
-
-    return () => {
-      ignore = true;
-    };
-  }, [
-    isOpen,
-    mode,
-    currentUser?.userId,
-    currentUser?.familyCode,
-    userInfo?.userId,
-    userInfo?.familyCode,
-  ]);
-
+  // When editing a public post and switching privacy to Family, the post itself has no familyCode yet.
   // When editing a public post and switching privacy to Family, the post itself has no familyCode yet.
   // Auto-fill from the current user so the backend can store it correctly.
   useEffect(() => {

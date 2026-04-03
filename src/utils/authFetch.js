@@ -70,6 +70,7 @@ export const authFetchResponse = async (endpoint, options = {}) => {
   try {
     response = await fetch(url, {
       ...fetchOptions,
+      cache: token ? 'no-store' : fetchOptions.cache,
       headers,
     });
   } catch (_) {
@@ -117,3 +118,5 @@ export const authFetch = async (endpoint, options = {}) => {
     return null;
   }
 };
+
+

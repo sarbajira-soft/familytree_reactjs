@@ -10,15 +10,10 @@ import {
   FiLoader,
   FiCheckCircle,
 } from "react-icons/fi";
-import { jwtDecode } from "jwt-decode";
 import Swal from "sweetalert2";
 import { useUser } from "../Contexts/UserContext";
 import { getToken } from "../utils/auth";
 import { authFetchResponse } from "../utils/authFetch";
-import {
-  fetchFamilyPrivacySettings,
-  getFamilyPrivacyContentSetting,
-} from "../utils/familyPrivacySettings";
 
 const CreateEventModal = ({
   isOpen,
@@ -26,184 +21,68 @@ const CreateEventModal = ({
   apiBaseUrl = import.meta.env.VITE_API_BASE_URL,
 }) => {
   const MAX_EVENT_TITLE_LENGTH = 50;
+  const EVENT_DATE_MIN = "1900-01-01";
+  const EVENT_DATE_MAX = "2100-12-31";
+  const { userInfo } = useUser();
 
-  useEffect(() => {
-    if (!isOpen) return;
-    if (typeof onClose !== "function") return;
-    if (!window.__appModalBackStack) window.__appModalBackStack = [];
-
-    const handler = () => {
-      onClose();
-    };
-
-    window.__appModalBackStack.push(handler);
-
-    return () => {
-      const stack = window.__appModalBackStack;
-      if (!Array.isArray(stack)) return;
-      const idx = stack.lastIndexOf(handler);
-      if (idx >= 0) stack.splice(idx, 1);
-    };
-  }, [isOpen, onClose]);
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [location, setLocation] = useState("");
   const [description, setDescription] = useState("");
-  const [errors, setErrors] = useState({});
-
-  const EVENT_DATE_MIN = "1900-01-01";
-  const EVENT_DATE_MAX = "2200-12-31";
   const [images, setImages] = useState([]);
   const [imagePreviews, setImagePreviews] = useState([]);
+  const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
-  // NEW: State for success popup
   const [showSuccess, setShowSuccess] = useState(false);
+  const [familyCode, setFamilyCode] = useState("");
 
-  const [userId, setUserId] = useState(null);
-  const [familyCode, setFamilyCode] = useState(null);
+  const getPreferredFamilyCode = () => String(userInfo?.familyCode || "").trim();
 
-  const { userInfo } = useUser();
-
-  const getPreferredFamilyCode = () => {
-    const fallbackCode = String(userInfo?.familyCode || "").trim();
-    const setting = getFamilyPrivacyContentSetting({
-      userId: userInfo?.userId,
-      familyCode: fallbackCode,
-      contentType: "events",
-    });
-    return String(
-      setting?.familyCode || setting?.familyCodes?.[0] || fallbackCode,
-    ).trim();
-  };
-
-  const getImageKey = (file) => `${file?.name || ""}-${file?.size || 0}-${file?.lastModified || 0}`;
+  const getImageKey = (file) =>
+    [file?.name, file?.size, file?.lastModified, file?.type].join(":");
 
   useEffect(() => {
-    setImagePreviews((prev) => {
-      prev.forEach((url) => {
-        try {
-          URL.revokeObjectURL(url);
-        } catch (e) {
-        }
-      });
-      return images.map((file) => URL.createObjectURL(file));
-    });
-  }, [images]);
-
-  useEffect(() => {
-    console.log("User Info in CreateEventModal:", userInfo);
-    // console.log('🔗 API Base URL:', apiBaseUrl);
-    // console.log('🌍 Environment VITE_API_BASE_URL:', import.meta.env.VITE_API_BASE_URL);
-  }, [apiBaseUrl]);
-
-  // NEW: Reset form when modal closes
-  useEffect(() => {
-    if (!isOpen) {
-      setTitle("");
-      setDate("");
-      setTime("");
-      setLocation("");
-      setDescription("");
-      setImages([]);
-      setErrors({});
-      setShowSuccess(false);
-    }
-  }, [isOpen]);
-
-  useEffect(() => {
-    let ignore = false;
-    if (!isOpen) return () => {
-      ignore = true;
-    };
-
+    if (!isOpen) return;
     const preferredCode = getPreferredFamilyCode();
     if (preferredCode) {
       setFamilyCode(preferredCode);
     }
-
-    fetchFamilyPrivacySettings({
-      userId: userInfo?.userId,
-      familyCode: String(userInfo?.familyCode || "").trim(),
-    }).then((fetched) => {
-      const nextPreferredCode = String(
-        fetched?.events?.familyCode ||
-          fetched?.events?.familyCodes?.[0] ||
-          userInfo?.familyCode ||
-          "",
-      ).trim();
-
-      if (!ignore && nextPreferredCode) {
-        setFamilyCode(nextPreferredCode);
-      }
-    });
-
-    return () => {
-      ignore = true;
-    };
-  }, [isOpen, userInfo?.familyCode, userInfo?.userId]);
+    setErrors({});
+    setShowSuccess(false);
+  }, [isOpen, userInfo?.familyCode]);
 
   useEffect(() => {
-    const fetchUserData = async () => {
-      try {
-        const token = getToken();
+    const nextPreviews = (images || []).map((file) => URL.createObjectURL(file));
+    setImagePreviews(nextPreviews);
 
-        if (!token) {
-          Swal.fire({
-            icon: "warning",
-            title: "No access token",
-            text: "Please sign in again.",
-          });
-          return;
-        }
-
-        const decoded = jwtDecode(token);
-
-        const uid = decoded.id || decoded.userId;
-        if (!uid) {
-          Swal.fire({
-            icon: "error",
-            title: "User ID not found",
-            text: "Please sign in again.",
-          });
-          return;
-        }
-        setUserId(uid);
-
-        const userEndpoint = `${apiBaseUrl}/user/profile/${uid}`;
-
-        const res = await authFetchResponse(userEndpoint, {
-          method: "GET",
-        });
-
-        const userData = await res.json();
-
-        const fc =
-          userData?.data?.userProfile?.familyMember?.familyCode ||
-          userData?.data?.userProfile?.familyCode;
-
-        if (fc) {
-          setFamilyCode(fc);
-          console.log("✅ Family Code set:", fc);
-        } else {
-          console.warn("❌ No familyCode found in API response");
-        }
-      } catch (err) {
-        console.error("💥 Fetch user error:", err);
-        Swal.fire({
-          icon: "error",
-          title: "Fetch failed",
-          text: `Error fetching user data: ${err.message}`,
-        });
-      }
+    return () => {
+      nextPreviews.forEach((url) => {
+        try {
+          URL.revokeObjectURL(url);
+        } catch {}
+      });
     };
+  }, [images]);
 
-    // if (isOpen) {
-    //   fetchUserData();
-    // }
-  }, [isOpen, apiBaseUrl]);
+  const resetForm = () => {
+    setTitle("");
+    setDate("");
+    setTime("");
+    setLocation("");
+    setDescription("");
+    setImages([]);
+    setErrors({});
+    setIsLoading(false);
+    setShowSuccess(false);
+    setFamilyCode(getPreferredFamilyCode());
+  };
 
-  if (!isOpen) return null;
+  const handleClose = () => {
+    if (isLoading) return;
+    resetForm();
+    onClose?.();
+  };
 
   const getFriendlyError = (status, rawText) => {
     const text = String(rawText || "");
@@ -398,6 +277,8 @@ const CreateEventModal = ({
     }
   };
 
+  if (!isOpen) return null;
+
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start sm:items-center justify-center px-2 sm:px-4 pt-8 pb-24 sm:pt-4 sm:pb-6 z-50 font-inter">
       <div
@@ -419,17 +300,7 @@ const CreateEventModal = ({
               </p>
               <button
                 className="bg-green-600 text-white px-8 py-2 rounded-full font-semibold text-lg shadow hover:bg-green-700 transition"
-                onClick={() => {
-                  setShowSuccess(false);
-                  // Reset form
-                  setTitle("");
-                  setDate("");
-                  setTime("");
-                  setLocation("");
-                  setDescription("");
-                  setImages([]);
-                  onClose();
-                }}
+                onClick={handleClose}
               >
                 OK
               </button>
@@ -440,8 +311,9 @@ const CreateEventModal = ({
         {/* Header */}
         <div className="bg-gradient-to-r from-primary-600 to-primary-700 text-white px-4 py-3 sm:p-4 relative">
           <button
-            onClick={onClose}
-            className="absolute top-3 right-3 text-white/80 hover:text-white transition-colors p-1.5 rounded-full hover:bg-white/10"
+            onClick={handleClose}
+            disabled={isLoading}
+            className="absolute top-3 right-3 text-white/80 hover:text-white transition-colors p-1.5 rounded-full hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <FiX size={20} />
           </button>
@@ -654,7 +526,7 @@ const CreateEventModal = ({
           <div className="flex flex-row gap-3">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               disabled={isLoading}
               className="flex-1 py-2.5 px-4 border bg-white border-gray-300 text-gray-700 rounded-xl font-medium text-sm sm:text-base hover:bg-gray-100 transition-colors disabled:opacity-50"
             >

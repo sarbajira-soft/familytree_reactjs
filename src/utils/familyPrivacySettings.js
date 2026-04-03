@@ -1,86 +1,60 @@
-const STORAGE_KEY_PREFIX = 'familyss.privacy.settings.v1';
+import { authFetch } from './authFetch';
 
-const UI_VISIBILITY = {
-  ALL_MEMBERS: 'all-members',
-  SPECIFIC_FAMILIES: 'specific-family',
+const STORAGE_KEY_PREFIX = 'familyss.content.visibility.v1';
+
+const DEFAULT_ENTRY = {
+  visibility: 'all-members',
+  familyCodes: [],
 };
 
-const normalizeFamilyCode = (code) => String(code || '').trim().toUpperCase();
+const DEFAULT_SETTINGS = {
+  posts: { ...DEFAULT_ENTRY },
+  albums: { ...DEFAULT_ENTRY },
+  events: { ...DEFAULT_ENTRY },
+  updatedAt: '',
+};
 
 const getStorageKey = (userId) =>
-  `${STORAGE_KEY_PREFIX}:${String(userId || 'guest').trim()}`;
+  STORAGE_KEY_PREFIX + ':' + String(userId || 'guest').trim();
 
-const withPrimaryFamilyCode = (setting = {}) => ({
-  visibility: setting.visibility || 'all-members',
-  familyCodes: Array.isArray(setting.familyCodes) ? setting.familyCodes : [],
-  familyCode:
-    Array.isArray(setting.familyCodes) && setting.familyCodes.length > 0
-      ? setting.familyCodes[0]
-      : '',
-});
+const normalizeFamilyCode = (value) => String(value || '').trim().toUpperCase();
 
-const normalizeCodes = (codes, fallbackCodes = []) => {
-  const normalized = Array.isArray(codes)
-    ? codes.filter(Boolean).map(normalizeFamilyCode)
-    : typeof codes === 'string' && codes.trim()
-      ? [normalizeFamilyCode(codes)]
-      : [];
-
-  const deduped = Array.from(new Set(normalized.filter(Boolean)));
-  return deduped.length > 0 ? deduped : fallbackCodes;
-};
-
-const normalizeVisibility = (value) => {
-  const normalized = String(value || '').trim().toUpperCase();
-
-  if (
-    normalized === 'SPECIFIC_FAMILIES' ||
-    normalized === 'SPECIFIC_FAMILY' ||
-    normalized === 'SPECIFIC-FAMILY' ||
-    normalized === 'SPECIFIC-FAMILIES' ||
-    value === 'specific-family'
-  ) {
-    return 'specific-family';
+const normalizeFamilyCodes = (value) => {
+  if (!Array.isArray(value)) {
+    return [];
   }
 
-  return 'all-members';
+  return Array.from(new Set(value.map(normalizeFamilyCode).filter(Boolean)));
 };
 
-const normalizeUiSetting = (setting, fallback) => {
-  const visibility = normalizeVisibility(setting?.visibility);
-  const inputCodes = Array.isArray(setting?.familyCodes)
-    ? setting.familyCodes
-    : setting?.familyCode;
+const normalizeEntry = (value) => {
+  if (typeof value === 'boolean') {
+    return value
+      ? { visibility: 'all-members', familyCodes: [] }
+      : { visibility: 'specific-family', familyCodes: [] };
+  }
 
-  const familyCodes = visibility === UI_VISIBILITY.SPECIFIC_FAMILIES
-    ? normalizeCodes(inputCodes, [])
-    : normalizeCodes(inputCodes, fallback.familyCodes);
-
-  return withPrimaryFamilyCode({
-    visibility,
-    familyCodes,
-  });
+  const source = value && typeof value === 'object' ? value : {};
+  return {
+    visibility: source.visibility === 'specific-family' ? 'specific-family' : 'all-members',
+    familyCodes: normalizeFamilyCodes(source.familyCodes),
+  };
 };
 
-const buildNormalizedSettings = (value, familyCode = '') => {
-  const defaults = buildDefaultFamilyPrivacySettings(familyCode);
+const normalizeSettings = (value) => {
   const source = value && typeof value === 'object' ? value : {};
 
   return {
-    ...defaults,
-    posts: normalizeUiSetting(source.posts, defaults.posts),
-    albums: normalizeUiSetting(source.albums, defaults.albums),
-    events: normalizeUiSetting(source.events, defaults.events),
-    updatedAt: typeof source.updatedAt === 'string' ? source.updatedAt : '',
-    version: 2,
+    posts: normalizeEntry(source.posts),
+    albums: normalizeEntry(source.albums),
+    events: normalizeEntry(source.events),
+    updatedAt:
+      typeof source.updatedAt === 'string' ? source.updatedAt : DEFAULT_SETTINGS.updatedAt,
   };
 };
 
 const persistSettings = ({ userId, settings }) => {
-  const next = buildNormalizedSettings(
-    settings,
-    settings?.posts?.familyCode || settings?.posts?.familyCodes?.[0] || '',
-  );
+  const next = normalizeSettings(settings);
 
   if (typeof window !== 'undefined' && window.localStorage) {
     window.localStorage.setItem(getStorageKey(userId), JSON.stringify(next));
@@ -89,64 +63,72 @@ const persistSettings = ({ userId, settings }) => {
   return next;
 };
 
-export const buildDefaultFamilyPrivacySettings = (familyCode = '') => {
-  const normalizedCode = normalizeFamilyCode(familyCode);
-  const defaultCodes = normalizedCode ? [normalizedCode] : [];
+export const buildDefaultFamilyPrivacySettings = () => ({
+  ...DEFAULT_SETTINGS,
+  posts: { ...DEFAULT_ENTRY },
+  albums: { ...DEFAULT_ENTRY },
+  events: { ...DEFAULT_ENTRY },
+});
 
-  return {
-    version: 2,
-    posts: withPrimaryFamilyCode({
-      visibility: 'all-members',
-      familyCodes: defaultCodes,
-    }),
-    albums: withPrimaryFamilyCode({
-      visibility: 'all-members',
-      familyCodes: defaultCodes,
-    }),
-    events: withPrimaryFamilyCode({
-      visibility: 'all-members',
-      familyCodes: defaultCodes,
-    }),
-    updatedAt: '',
-  };
-};
-
-export const getFamilyPrivacySettings = ({ userId, familyCode = '' } = {}) => {
-  const defaults = buildDefaultFamilyPrivacySettings(familyCode);
+export const getFamilyPrivacySettings = ({ userId } = {}) => {
   if (typeof window === 'undefined' || !window.localStorage) {
-    return defaults;
+    return buildDefaultFamilyPrivacySettings();
   }
 
   try {
     const raw = window.localStorage.getItem(getStorageKey(userId));
-    if (!raw) return defaults;
+    if (!raw) return buildDefaultFamilyPrivacySettings();
 
-    const parsed = JSON.parse(raw);
-    return buildNormalizedSettings(parsed, familyCode);
+    return normalizeSettings(JSON.parse(raw));
   } catch (_) {
-    return defaults;
+    return buildDefaultFamilyPrivacySettings();
   }
 };
 
-export const fetchFamilyPrivacySettings = async ({ userId, familyCode = '' } = {}) => {
-  return getFamilyPrivacySettings({ userId, familyCode });
+export const fetchFamilyPrivacySettings = async ({ userId } = {}) => {
+  const cached = getFamilyPrivacySettings({ userId });
+  if (!userId) {
+    return cached;
+  }
+
+  try {
+    const response = await authFetch('/user/content-visibility-settings', {
+      method: 'GET',
+    });
+
+    return persistSettings({
+      userId,
+      settings: {
+        ...response?.data,
+        updatedAt: cached.updatedAt || '',
+      },
+    });
+  } catch (_) {
+    return cached;
+  }
 };
 
-export const saveFamilyPrivacySettings = async ({ userId, settings, familyCode = '' } = {}) => {
-  const normalizedInput = buildNormalizedSettings(settings, familyCode);
-  const next = {
-    ...normalizedInput,
-    updatedAt: new Date().toISOString(),
-  };
+export const saveFamilyPrivacySettings = async ({ userId, settings } = {}) => {
+  const normalizedInput = normalizeSettings(settings);
+  const response = await authFetch('/user/content-visibility-settings', {
+    method: 'PATCH',
+    body: JSON.stringify({
+      posts: normalizedInput.posts,
+      albums: normalizedInput.albums,
+      events: normalizedInput.events,
+    }),
+  });
 
-  return persistSettings({ userId, settings: next });
+  return persistSettings({
+    userId,
+    settings: {
+      ...response?.data,
+      updatedAt: new Date().toISOString(),
+    },
+  });
 };
 
-export const getFamilyPrivacyContentSetting = ({
-  userId,
-  familyCode = '',
-  contentType = 'posts',
-} = {}) => {
-  const settings = getFamilyPrivacySettings({ userId, familyCode });
-  return settings?.[contentType] || buildDefaultFamilyPrivacySettings(familyCode)?.[contentType];
+export const getFamilyPrivacyContentSetting = ({ userId, contentType = 'posts' } = {}) => {
+  const settings = getFamilyPrivacySettings({ userId });
+  return settings?.[contentType] || { ...DEFAULT_ENTRY };
 };

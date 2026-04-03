@@ -6,6 +6,8 @@ import Swal from 'sweetalert2';
 import { BlockButton } from './block/BlockButton';
 import { BlockedBadge } from './block/BlockedBadge';
 import { logger } from '../utils/logger';
+import { authFetch } from '../utils/authFetch';
+import { fetchFamilyTree, deleteFamilyMember, getMembersNotInTree, replaceDummyUser, selfRemoveFromFamily } from '../utils/familyTreeApi';
 import { getBlockedUsers } from '../services/block.service';
 import {
   buildDefaultFamilyPrivacySettings,
@@ -26,10 +28,6 @@ const relationColors = {
   Superadmin: 'bg-green-100 text-green-800',
 };
 
-const PRIVACY_VISIBILITY_OPTIONS = [
-  { value: 'all-members', label: 'All Members (Except Blocked)' },
-  { value: 'specific-family', label: 'Specific Family' },
-];
 
 const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -71,1188 +69,81 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
 
   // Close dropdown when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (tabDropdownRef.current && !tabDropdownRef.current.contains(event.target)) {
-        setIsTabDropdownOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-  // Accordion states for Linked tab
-  const [linkedAccordionOpen, setLinkedAccordionOpen] = useState({
-    inTree: true,
-    allLinked: false,
-    readyToLink: false,
-  });
-  // Accordion states for Associated tab
-  const [associatedAccordionOpen, setAssociatedAccordionOpen] = useState({
-    inTree: true,
-    allAssociated: false,
-    readyToAssociate: false,
-  });
-  const itemsPerPage = 10;
-  const familiesPerPage = 5;
-
-  // Reset page when tab or filters change
-  useEffect(() => {
-    setCurrentPage(1);
-    setFamilyFilterPage(1);
-  }, [activeTab, searchTerm, selectedAssociatedFamilyCode, selectedLinkedFamilyCode]);
-
-  const BASE_URL = import.meta.env.VITE_API_BASE_URL;
-  const normalizeFamilyCode = (code) => String(code || '').trim().toUpperCase();
-  const birthFamilyCode = normalizeFamilyCode(familyCode);
-  const currentUserFamilyCode = currentUser?.userProfile?.familyCode || currentUser?.familyCode;
-  const currentUserIsFamilyAdmin =
-    (currentUser?.role === 2 || currentUser?.role === 3) &&
-    normalizeFamilyCode(currentUserFamilyCode) === normalizeFamilyCode(familyCode);
-
-  const fetchMembers = async () => {
-    try {
-      const res = await fetch(`${BASE_URL}/family/member/${familyCode}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!res.ok) throw new Error('Failed to fetch members');
-      const json = await res.json().catch(() => null);
-      const list = Array.isArray(json?.data) ? json.data : [];
-      const members = list.map((item) => ({
-        id: item.id,
-        memberId: item.memberId,
-        userId: item.user?.id,
-        membershipType: item.membershipType || 'member',
-        user: item.user, // Preserve user object for isAppUser badge
-        name: (item?.user?.fullName && !/\bnull\b|\bundefined\b/i.test(item.user.fullName))
-          ? item.user.fullName
-            .replaceAll(/\bnull\b|\bundefined\b/gi, '')
-            .replaceAll(/\s+/g, ' ')
-            .trim()
-          : (
-            [item?.user?.userProfile?.firstName, item?.user?.userProfile?.lastName]
-              .filter(val => val && val !== 'null' && val !== 'undefined')
-              .join(' ') || 'Unknown Name'
-          ),
-        gender: item?.user?.userProfile?.gender || 'N/A',
-        role: item.familyRole || roleMapping[item?.user?.role] || 'Member',
-        contact: item?.user?.userProfile?.contactNumber,
-        address: item?.user?.userProfile?.address || '',
-        dob: item?.user?.userProfile?.dob || '',
-        age: item?.user?.userProfile?.age || '',
-        profilePic: item?.user?.profileImage,
-        isAdmin: item.isFamilyAdmin ?? item?.user?.role > 1,
-        // BLOCK OVERRIDE: Use new bidirectional block status payload.
-        blockStatus: item.blockStatus || {
-          isBlockedByMe: false,
-          isBlockedByThem: false,
-        },
-        lastUpdated: item.updatedAt
-          ? new Date(item.updatedAt).toLocaleDateString('en-IN')
-          : '-',
-        sourceFamilyCode: normalizeFamilyCode(item?.user?.userProfile?.familyCode || item?.familyCode),
-      }));
-      setFamilyMembers(members);
-    } catch (err) {
-      logger.error('BLOCK OVERRIDE: Failed to load family members', err);
-      setFamilyMembers([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchNonAppUsers = async () => {
-    if (!familyCode || !token || !currentUserIsFamilyAdmin) {
-      setNonAppUsers([]);
-      return;
-    }
-
-    setLoadingNonAppUsers(true);
-    try {
-      const res = await fetch(`${BASE_URL}/family/member/${familyCode}/non-app-users`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-        },
-      });
-
-      const json = await res.json().catch(() => null);
-      if (!res.ok) {
-        throw new Error(json?.message || 'Failed to fetch non-app users');
-      }
-
-      const rows = Array.isArray(json?.data) ? json.data : [];
-      setNonAppUsers(rows);
-    } catch (error) {
-      logger.error('Failed to load non-app users', error);
-      setNonAppUsers([]);
-    } finally {
-      setLoadingNonAppUsers(false);
-    }
-  };
-
-  const fetchLinkedFamilies = async () => {
-    if (!familyCode || !token) return;
-
-    try {
-      const res = await fetch(`${BASE_URL}/family/linked-families`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-        },
-      });
-
-      if (!res.ok) throw new Error('Failed to load linked families');
-      const data = await res.json().catch(() => []);
-      const normalized = Array.isArray(data)
-        ? data
-          .map((entry) => ({
-            familyCode: normalizeFamilyCode(entry?.familyCode),
-            familyName: entry?.familyName || null,
-          }))
-          .filter((entry) => Boolean(entry.familyCode))
-        : [];
-      setLinkedFamilies(normalized);
-    } catch (error) {
-      logger.error('Failed to load linked families', error);
-      setLinkedFamilies([]);
-    }
-  };
-
-  const fetchFamilyNameByCode = async (code) => {
-    try {
-      const res = await fetch(`${BASE_URL}/family/code/${encodeURIComponent(code)}`, {
-        headers: {
-          Accept: 'application/json',
-        },
-      });
-      if (!res.ok) return null;
-      const data = await res.json().catch(() => null);
-      return data?.familyName || null;
-    } catch (error) {
-      return null;
-    }
-  };
-
-  // BLOCK OVERRIDE: Fetch blocked users from API
-  const fetchBlockedUsersData = async () => {
-    if (!token) return;
-    
-    setLoadingBlocked(true);
-    try {
-      const response = await getBlockedUsers();
-      const users = response?.data || [];
-      console.log('[FamilyMemberCard] Blocked users fetched:', users.length);
-      
-      // Transform blocked users to match member format
-      const formattedBlockedUsers = users.map((item) => ({
-        id: `blocked-${item.id}`,
-        memberId: null,
-        userId: item.blockedUserId,
-        membershipType: 'blocked',
-        user: item.user,
-        name: item.user?.name || 'Unknown User',
-        gender: item.user?.userProfile?.gender || 'N/A',
-        role: 'Blocked Member',
-        contact: item.user?.mobile || item.user?.email || '',
-        address: item.user?.userProfile?.address || '',
-        dob: item.user?.userProfile?.dob || '',
-        age: item.user?.userProfile?.age || '',
-        profilePic: item.user?.profilePhoto || null,
-        isAdmin: false,
-        blockStatus: { isBlockedByMe: true, isBlockedByThem: false },
-        sourceFamilyCode: item.user?.familyCode || '',
-        blockedDate: item.createdAt,
-      }));
-      
-      setBlockedUsers(formattedBlockedUsers);
-    } catch (err) {
-      logger.error('[FamilyMemberCard] Failed to load blocked users:', err);
-      setBlockedUsers([]);
-    } finally {
-      setLoadingBlocked(false);
-    }
-  };
-
-  useEffect(() => {
-    if (familyCode && token) {
-      setLoading(true);
-      fetchMembers();
-    }
-  }, [familyCode, token]);
-
-  useEffect(() => {
-    if (familyCode && token && currentUserIsFamilyAdmin) {
-      fetchNonAppUsers();
-    } else {
-      setNonAppUsers([]);
-    }
-  }, [familyCode, token, currentUserIsFamilyAdmin]);
-
-  useEffect(() => {
-    setReplacementSelections((prev) => {
-      const validDummyIds = new Set(nonAppUsers.map((row) => Number(row?.dummyUserId)));
-      const next = {};
-      Object.keys(prev).forEach((key) => {
-        const dummyId = Number(key);
-        if (validDummyIds.has(dummyId)) {
-          next[dummyId] = prev[key];
-        }
-      });
-      return next;
-    });
-  }, [nonAppUsers]);
-
-  useEffect(() => {
-    if (familyCode && token) {
-      fetchLinkedFamilies();
-    }
-  }, [familyCode, token]);
-
-  const calculateAge = (dob) => {
-    if (!dob) return 'N/A';
-    const birthDate = new Date(dob);
-    const today = new Date();
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const m = today.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
-    return age;
-  };
-
-  const handleViewMember = async (userId, e) => {
-    e.stopPropagation();
-
-    // Set loading state for this specific member
-    setViewLoadingStates(prev => ({ ...prev, [userId]: true }));
-
-    try {
-      await onViewMember(userId);
-    } finally {
-      // Clear loading state after a short delay to ensure smooth transition
-      setTimeout(() => {
-        setViewLoadingStates(prev => ({ ...prev, [userId]: false }));
-      }, 500);
-    }
-  };
-
-  const handleDeleteMember = async (memberId, familyCode, userId, e) => {
-    if (e?.stopPropagation) e.stopPropagation();
-
-    const inTree = memberIdsInTree.has(Number(userId));
-
-    const confirm = await Swal.fire({
-      icon: 'warning',
-      title: 'Delete Member?',
-      text: inTree
-        ? 'This member is in the family tree. Deleting will convert the tree card into a Non-App user.'
-        : 'This will remove the member from this family.',
-      showCancelButton: true,
-      confirmButtonText: 'Yes, remove member',
-      cancelButtonText: 'Cancel',
-      confirmButtonColor: '#e53e3e',
-    });
-
-    if (!confirm.isConfirmed) return;
-
-    setDeletedMemberIds((prev) => {
-      const next = new Set(prev);
-      next.add(memberId);
-      return next;
-    });
-
-    try {
-      const res = await fetch(
-        `${BASE_URL}/family/member/delete/${memberId}/${familyCode}`,
-        {
-          method: 'DELETE',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      const json = await res.json().catch(() => null);
-
-      if (!res.ok) {
-        const msg = json?.message || 'Failed to delete member';
-        throw new Error(msg);
-      }
-
-      const successTitle = json?.alreadyProcessed
-        ? 'Already Removed'
-        : json?.action === 'moved_to_members_not_in_tree'
-          ? 'Moved Out Of Tree'
-          : json?.action === 'converted_to_dummy'
-            ? 'Converted To Non-App User'
-            : json?.action === 'deleted_non_app_user'
-              ? 'Non-App User Deleted'
-              : 'Member Removed';
-
-      await Swal.fire({
-        icon: 'success',
-        title: successTitle,
-        text: json?.message || 'Family member removed successfully.',
-      });
-
-      await fetchMembers();
-      await fetchNonAppUsers();
-    } catch (err) {
-      logger.error('BLOCK OVERRIDE: Failed to delete member', err);
-      await Swal.fire({
-        icon: 'error',
-        title: 'Delete Failed',
-        text: err?.message || 'Unable to delete this member. Please try again.',
-      });
-    } finally {
-      setDeletedMemberIds((prev) => {
-        const next = new Set(prev);
-        next.delete(memberId);
-        return next;
-      });
-    }
-  };
-
-  const handleSelfRemove = async () => {
-    if (!familyCode || !token) return;
-
-    const confirm = await Swal.fire({
-      icon: 'warning',
-      title: 'Leave Family?',
-      text: 'Type LEAVE to confirm removing yourself from this family tree.',
-      input: 'text',
-      inputPlaceholder: 'Type LEAVE',
-      showCancelButton: true,
-      confirmButtonText: 'Leave family',
-      cancelButtonText: 'Cancel',
-      confirmButtonColor: '#dc2626',
-      preConfirm: (value) => {
-        if (String(value || '').trim().toUpperCase() !== 'LEAVE') {
-          Swal.showValidationMessage('Type LEAVE exactly to continue.');
-          return false;
-        }
-        return true;
-      },
-    });
-    if (!confirm.isConfirmed) return;
-
-    try {
-      setSelfRemoving(true);
-      const res = await fetch(`${BASE_URL}/family/member/self/${familyCode}`, {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      const json = await res.json().catch(() => null);
-      if (!res.ok) {
-        throw new Error(json?.message || 'Failed to leave family');
-      }
-
-      await Swal.fire({
-        icon: 'success',
-        title: 'Removed From Family',
-        text: json?.message || 'You were removed from this family successfully.',
-      });
-      
-      // Clear cached user info to force fresh fetch after reload
-      try {
-        localStorage.removeItem('userInfo');
-        sessionStorage.removeItem('userInfo');
-      } catch (e) {
-        // ignore storage errors
-      }
-      
-      window.location.reload();
-    } catch (error) {
-      await Swal.fire({
-        icon: 'error',
-        title: 'Unable to Leave Family',
-        text: error?.message || 'Please try again.',
-      });
-    } finally {
-      setSelfRemoving(false);
-    }
-  };
-
-  const handleReplaceDummy = async (dummyUserId) => {
-    const replacementUserId = Number(replacementSelections?.[dummyUserId]);
-    if (!Number.isFinite(replacementUserId) || replacementUserId <= 0) {
-      await Swal.fire({
-        icon: 'warning',
-        title: 'Select Replacement',
-        text: 'Choose a valid app user to replace this non-app user.',
-      });
-      return;
-    }
-
-    setReplacingDummyIds((prev) => new Set(prev).add(dummyUserId));
-
-    try {
-      const res = await fetch(
-        `${BASE_URL}/family/member/${familyCode}/non-app-users/${dummyUserId}/replace/${replacementUserId}`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        },
-      );
-      const json = await res.json().catch(() => null);
-      if (!res.ok) {
-        throw new Error(json?.message || 'Failed to replace dummy user');
-      }
-
-      await Swal.fire({
-        icon: 'success',
-        title: 'Replacement Complete',
-        text: json?.message || 'Dummy user replaced successfully.',
-      });
-
-      setReplacementSelections((prev) => {
-        const next = { ...prev };
-        delete next[dummyUserId];
-        return next;
-      });
-
-      await fetchMembers();
-      await fetchNonAppUsers();
-    } catch (error) {
-      await Swal.fire({
-        icon: 'error',
-        title: 'Replacement Failed',
-        text: error?.message || 'Unable to replace non-app user.',
-      });
-    } finally {
-      setReplacingDummyIds((prev) => {
-        const next = new Set(prev);
-        next.delete(dummyUserId);
-        return next;
-      });
-    }
-  };
-
-  const handleShareInvite = async (member, e) => {
-    e.stopPropagation();
-
-    const inviteUrl = `${window.location.origin}/edit-profile?familyCode=${familyCode}&memberId=${member.memberId}`;
-    try {
-      if (navigator.share) {
-        await navigator.share({
-          title: 'Family Tree Invitation',
-          text: 'Update your family tree profile using this secure link.',
-          url: inviteUrl,
-        });
-      } else {
-        await navigator.clipboard.writeText(inviteUrl);
-        await Swal.fire({
-          icon: 'success',
-          title: 'Invite Link Copied',
-          text: 'The profile invite link has been copied to your clipboard. You can share it via WhatsApp or any app.',
-        });
-      }
-    } catch (err) {
-      logger.error('BLOCK OVERRIDE: Failed to share invite link', err);
-      await Swal.fire({
-        icon: 'error',
-        title: 'Share Failed',
-        text: 'Unable to share the invite link. Please try again.',
-      });
-    }
-  };
-
-  const handleMemberBlockStatusChange = (memberUserId, nextStatus) => {
-    // BLOCK OVERRIDE: Apply local optimistic block status updates using new block contract.
-    // Update ALL member arrays that might contain this user
-    
-    // Update main family members
-    setFamilyMembers((prevMembers) =>
-      prevMembers.map((member) =>
-        Number(member.userId) === Number(memberUserId)
-          ? { ...member, blockStatus: nextStatus }
-          : member,
-      ),
-    );
-    
-    // Update selected associated family members
-    setSelectedAssociatedFamilyMembersAll((prevMembers) =>
-      prevMembers.map((member) =>
-        Number(member.userId) === Number(memberUserId)
-          ? { ...member, blockStatus: nextStatus }
-          : member,
-      ),
-    );
-    
-    // Update selected linked family members
-    setSelectedLinkedFamilyMembersAll((prevMembers) =>
-      prevMembers.map((member) =>
-        Number(member.userId) === Number(memberUserId)
-          ? { ...member, blockStatus: nextStatus }
-          : member,
-      ),
-    );
-    
-    // Update tree people (associated from tree)
-    setTreeAllPeople((prevMembers) =>
-      prevMembers.map((member) =>
-        Number(member.userId) === Number(memberUserId)
-          ? { ...member, blockStatus: nextStatus }
-          : member,
-      ),
-    );
-    
-    // Update members not in tree
-    setMembersNotInTree((prevMembers) =>
-      prevMembers.map((member) =>
-        Number(member.userId) === Number(memberUserId)
-          ? { ...member, blockStatus: nextStatus }
-          : member,
-      ),
-    );
-  };
-
-  const filteredMembers = useMemo(
-    () =>
-      familyMembers.filter((member) =>
-        member.name && member.name.toLowerCase().includes(searchTerm.toLowerCase())
-      ),
-    [familyMembers, searchTerm],
-  );
-
-  const birthFamilyMembers = useMemo(
-    () =>
-      familyMembers.filter(
-        (member) =>
-          member.membershipType === 'member' &&
-          member.sourceFamilyCode === birthFamilyCode &&
-          member.name &&
-          member.name.toLowerCase().includes(searchTerm.toLowerCase()),
-      ),
-    [familyMembers, birthFamilyCode, searchTerm],
-  );
-
-  const associatedMembersAll = useMemo(() => {
-    const fromApi = familyMembers.filter((member) =>
-      member.membershipType === 'associated' && normalizeFamilyCode(member.sourceFamilyCode) !== birthFamilyCode,
-    );
-    const fromTree = treeAllPeople.filter((m) =>
-      m.membershipType === 'associated' && normalizeFamilyCode(m.sourceFamilyCode) !== birthFamilyCode,
-    );
-    
-    // Deduplicate by userId - prefer API data over tree data
-    const seenUserIds = new Set();
-    const deduped = [];
-    
-    // First add API members
-    fromApi.forEach((member) => {
-      if (member.userId) {
-        seenUserIds.add(Number(member.userId));
-      }
-      deduped.push(member);
-    });
-    
-    // Then add tree members only if not already seen
-    fromTree.forEach((member) => {
-      const userId = Number(member.userId);
-      if (userId && !seenUserIds.has(userId)) {
-        seenUserIds.add(userId);
-        deduped.push(member);
-      }
-    });
-    
-    return deduped;
-  }, [familyMembers, treeAllPeople]);
-
-  const linkedMembersAll = useMemo(
-    () => familyMembers.filter((member) => member.membershipType === 'linked'),
-    [familyMembers],
-  );
-
-  const allBirthFamilyMembers = useMemo(
-    () => familyMembers.filter((member) => member.membershipType === 'member'),
-    [familyMembers],
-  );
-
-  const associatedFamilyCodes = useMemo(() =>
-      Array.from(
-        new Set(
-          associatedMembersAll
-            .map((member) => normalizeFamilyCode(member.sourceFamilyCode))
-            .filter(Boolean),
-        ),
-      ),
-    [associatedMembersAll],
-  );
-
-  const linkedFamilyCodesFromMembers = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          linkedMembersAll
-            .map((member) => normalizeFamilyCode(member.sourceFamilyCode))
-            .filter(Boolean),
-        ),
-      ),
-    [linkedMembersAll],
-  );
-
-  const linkedFamiliesOptions = useMemo(() => {
-    const map = new Map();
-    Object.keys(treeLinkedFamilyMap || {}).forEach((code) => {
-      const normalizedCode = normalizeFamilyCode(code);
-      if (!normalizedCode) return;
-      map.set(normalizedCode, {
-        familyCode: normalizedCode,
-        familyName: linkedFamilyNameMap[normalizedCode] || null,
-      });
-    });
-
-    linkedFamilies.forEach((family) => {
-      const code = normalizeFamilyCode(family.familyCode);
-      if (!code) return;
-      map.set(code, {
-        familyCode: code,
-        familyName: family.familyName || linkedFamilyNameMap[code] || null,
-      });
-    });
-
-    linkedFamilyCodesFromMembers.forEach((code) => {
-      if (!map.has(code)) {
-        map.set(code, {
-          familyCode: code,
-          familyName: linkedFamilyNameMap[code] || null,
-        });
-      }
-    });
-
-    return Array.from(map.values());
-  }, [linkedFamilies, linkedFamilyCodesFromMembers, treeLinkedFamilyMap, linkedFamilyNameMap]);
-
-  const associatedFamiliesOptions = useMemo(
-    () =>
-      associatedFamilyCodes.map((code) => ({
-        familyCode: code,
-        familyName: associatedFamilyNameMap[code] || null,
-      })),
-    [associatedFamilyCodes, associatedFamilyNameMap],
-  );
-
-  const linkedFamilyCodesForLookup = useMemo(
-    () =>
-      Array.from(
-        new Set([
-          ...linkedFamilyCodesFromMembers,
-          ...Object.keys(treeLinkedFamilyMap || {}).map((code) => normalizeFamilyCode(code)),
-          ...linkedFamilies.map((entry) => normalizeFamilyCode(entry.familyCode)),
-        ].filter(Boolean)),
-      ),
-    [linkedFamilyCodesFromMembers, treeLinkedFamilyMap, linkedFamilies],
-  );
-
-  useEffect(() => {
-    let ignore = false;
-
-    const loadAssociatedFamilyNames = async () => {
-      if (!associatedFamilyCodes.length) {
-        if (!ignore) {
-          setAssociatedFamilyNameMap({});
-        }
-        return;
-      }
-
-      const entries = await Promise.all(
-        associatedFamilyCodes.map(async (code) => {
-          const name = await fetchFamilyNameByCode(code);
-          return [code, name];
-        }),
-      );
-
-      if (ignore) return;
-      setAssociatedFamilyNameMap((prev) => {
-        const next = { ...prev };
-        entries.forEach(([code, name]) => {
-          next[code] = name || prev[code] || null;
-        });
-        return next;
-      });
-    };
-
-    loadAssociatedFamilyNames();
-    return () => {
-      ignore = true;
-    };
-  }, [associatedFamilyCodes]);
-
-  useEffect(() => {
-    let ignore = false;
-
-    const loadLinkedFamilyNames = async () => {
-      if (!linkedFamilyCodesForLookup.length) {
-        if (!ignore) {
-          setLinkedFamilyNameMap({});
-        }
-        return;
-      }
-
-      const entries = await Promise.all(
-        linkedFamilyCodesForLookup.map(async (code) => {
-          const fromLinkedEndpoint = linkedFamilies.find(
-            (entry) => normalizeFamilyCode(entry.familyCode) === code,
-          )?.familyName;
-          if (fromLinkedEndpoint) return [code, fromLinkedEndpoint];
-
-          const name = await fetchFamilyNameByCode(code);
-          return [code, name];
-        }),
-      );
-
-      if (ignore) return;
-      setLinkedFamilyNameMap((prev) => {
-        const next = { ...prev };
-        entries.forEach(([code, name]) => {
-          next[code] = name || prev[code] || null;
-        });
-        return next;
-      });
-    };
-
-    loadLinkedFamilyNames();
-    return () => {
-      ignore = true;
-    };
-  }, [linkedFamilyCodesForLookup, linkedFamilies]);
-
-  useEffect(() => {
-    if (!associatedFamiliesOptions.length) {
-      setSelectedAssociatedFamilyCode('');
-      return;
-    }
-
-    if (
-      !selectedAssociatedFamilyCode ||
-      !associatedFamiliesOptions.some((entry) => entry.familyCode === selectedAssociatedFamilyCode)
-    ) {
-      setSelectedAssociatedFamilyCode(associatedFamiliesOptions[0].familyCode);
-    }
-  }, [associatedFamiliesOptions, selectedAssociatedFamilyCode]);
-
-  useEffect(() => {
-    if (!linkedFamiliesOptions.length) {
-      setSelectedLinkedFamilyCode('');
-      return;
-    }
-
-    if (
-      !selectedLinkedFamilyCode ||
-      !linkedFamiliesOptions.some((entry) => entry.familyCode === selectedLinkedFamilyCode)
-    ) {
-      setSelectedLinkedFamilyCode(linkedFamiliesOptions[0].familyCode);
-    }
-  }, [linkedFamiliesOptions, selectedLinkedFamilyCode]);
-
-  const selectedAssociatedFamilyMembers = useMemo(() => {
-    if (!selectedAssociatedFamilyCode) return [];
-    return associatedMembersAll.filter(
-      (member) =>
-        normalizeFamilyCode(member.sourceFamilyCode) === selectedAssociatedFamilyCode &&
-        member.name &&
-        member.name.toLowerCase().includes(searchTerm.toLowerCase()),
-    );
-  }, [associatedMembersAll, selectedAssociatedFamilyCode, searchTerm]);
-
-  // Fetch all members of selected associated family
-  useEffect(() => {
-    const fetchAssociatedFamilyMembers = async () => {
-      if (!selectedAssociatedFamilyCode || !token) {
-        setSelectedAssociatedFamilyMembersAll([]);
-        return;
-      }
-      
-      setLoadingAssociatedFamily(true);
-      try {
-        const res = await fetch(`${BASE_URL}/family/member/${selectedAssociatedFamilyCode}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        
-        if (!res.ok) throw new Error('Failed to fetch associated family members');
-        
-        const json = await res.json().catch(() => null);
-        const list = Array.isArray(json?.data) ? json.data : [];
-        
-        const members = list.map((item) => ({
-          id: item.id,
-          memberId: item.memberId,
-          userId: item.user?.id,
-          membershipType: item.membershipType || 'member',
-          user: item.user,
-          name: (item?.user?.fullName && !/\bnull\b|\bundefined\b/i.test(item.user.fullName))
-            ? item.user.fullName
-              .replaceAll(/\bnull\b|\bundefined\b/gi, '')
-              .replaceAll(/\s+/g, ' ')
-              .trim()
-            : (
-              [item?.user?.userProfile?.firstName, item?.user?.userProfile?.lastName]
-                .filter(val => val && val !== 'null' && val !== 'undefined')
-                .join(' ') || 'Unknown Name'
-            ),
-          gender: item?.user?.userProfile?.gender || 'N/A',
-          role: item.familyRole || roleMapping[item?.user?.role] || 'Member',
-          contact: item?.user?.userProfile?.contactNumber,
-          address: item?.user?.userProfile?.address || '',
-          dob: item?.user?.userProfile?.dob || '',
-          age: item?.user?.userProfile?.age || '',
-          profilePic: item?.user?.profileImage,
-          isAdmin: item.isFamilyAdmin ?? item?.user?.role > 1,
-          blockStatus: item.blockStatus || { isBlockedByMe: false, isBlockedByThem: false },
-          sourceFamilyCode: normalizeFamilyCode(item?.user?.userProfile?.familyCode || item?.familyCode),
-        }));
-        
-        setSelectedAssociatedFamilyMembersAll(members);
-      } catch (err) {
-        logger.error('Failed to load associated family members', err);
-        setSelectedAssociatedFamilyMembersAll([]);
-      } finally {
-        setLoadingAssociatedFamily(false);
-      }
-    };
-    
-    fetchAssociatedFamilyMembers();
-  }, [selectedAssociatedFamilyCode, token, BASE_URL]);
-
-  // Fetch all members of selected linked family
-  useEffect(() => {
-    const fetchLinkedFamilyMembers = async () => {
-      if (!selectedLinkedFamilyCode || !token) {
-        setSelectedLinkedFamilyMembersAll([]);
-        return;
-      }
-      
-      setLoadingLinkedFamily(true);
-      try {
-        const res = await fetch(`${BASE_URL}/family/member/${selectedLinkedFamilyCode}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        
-        if (!res.ok) throw new Error('Failed to fetch linked family members');
-        
-        const json = await res.json().catch(() => null);
-        const list = Array.isArray(json?.data) ? json.data : [];
-        
-        const members = list.map((item) => ({
-          id: item.id,
-          memberId: item.memberId,
-          userId: item.user?.id,
-          membershipType: item.membershipType || 'member',
-          user: item.user, // Preserve user object for isAppUser badge
-          name: (item?.user?.fullName && !/\bnull\b|\bundefined\b/i.test(item.user.fullName))
-            ? item.user.fullName
-              .replaceAll(/\bnull\b|\bundefined\b/gi, '')
-              .replaceAll(/\s+/g, ' ')
-              .trim()
-            : (
-              [item?.user?.userProfile?.firstName, item?.user?.userProfile?.lastName]
-                .filter(val => val && val !== 'null' && val !== 'undefined')
-                .join(' ') || 'Unknown Name'
-            ),
-          gender: item?.user?.userProfile?.gender || 'N/A',
-          role: item.familyRole || roleMapping[item?.user?.role] || 'Member',
-          contact: item?.user?.userProfile?.contactNumber,
-          address: item?.user?.userProfile?.address || '',
-          dob: item?.user?.userProfile?.dob || '',
-          age: item?.user?.userProfile?.age || '',
-          profilePic: item?.user?.profileImage,
-          isAdmin: item.isFamilyAdmin ?? item?.user?.role > 1,
-          blockStatus: item.blockStatus || { isBlockedByMe: false, isBlockedByThem: false },
-          sourceFamilyCode: normalizeFamilyCode(item?.user?.userProfile?.familyCode || item?.familyCode),
-        }));
-        
-        setSelectedLinkedFamilyMembersAll(members);
-      } catch (err) {
-        logger.error('Failed to load linked family members', err);
-        setSelectedLinkedFamilyMembersAll([]);
-      } finally {
-        setLoadingLinkedFamily(false);
-      }
-    };
-    
-    fetchLinkedFamilyMembers();
-  }, [selectedLinkedFamilyCode, token, BASE_URL]);
-
-  const selectedLinkedFamilyMembers = useMemo(() => {
-    if (!selectedLinkedFamilyCode) return [];
-    return selectedLinkedFamilyMembersAll.filter(
-      (member) =>
-        member.name &&
-        member.name.toLowerCase().includes(searchTerm.toLowerCase()),
-    );
-  }, [selectedLinkedFamilyMembersAll, selectedLinkedFamilyCode, searchTerm]);
-
-  useEffect(() => {
-    let ignore = false;
-
-    const loadMembersNotInTree = async () => {
-      if (!familyCode || !token) {
-        setMembersNotInTree([]);
-        setMemberIdsInTree(new Set());
-        setTreeLinkedFamilyMap({});
-        return;
-      }
-
-      setNotInTreeLoading(true);
-      try {
-        const res = await fetch(`${BASE_URL}/family/tree/${familyCode}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: 'application/json',
-          },
-        });
-        if (!res.ok) throw new Error('Failed to fetch family tree');
-
-        const json = await res.json().catch(() => null);
-        const people = Array.isArray(json?.people)
-          ? json.people
-          : Array.isArray(json?.data?.people)
-            ? json.data.people
-            : [];
-
-        const idsInTree = new Set(
-          people
-            .map((person) => Number(person?.userId || person?.memberId))
-            .filter((id) => Number.isFinite(id) && id > 0),
-        );
-
-        const linkedFromTree = {};
-        people
-          .filter((person) => Boolean(person?.isExternalLinked))
-          .forEach((person, index) => {
-            const linkedCode = normalizeFamilyCode(person?.canonicalFamilyCode);
-            if (!linkedCode) return;
-            if (!linkedFromTree[linkedCode]) linkedFromTree[linkedCode] = [];
-
-            linkedFromTree[linkedCode].push({
-              id: `tree-linked-${linkedCode}-${index}`,
-              memberId: Number(person?.memberId) || null,
-              userId: Number(person?.userId || person?.memberId) || null,
-              membershipType: 'linked',
-              user: { isAppUser: Boolean(person?.isAppUser) }, // Preserve isAppUser for badge
-              name: person?.name || 'Unknown',
-              gender: person?.gender || 'N/A',
-              role: 'Member',
-              contact: person?.contactNumber || person?.mobile || '',
-              address: '',
-              dob: '',
-              age: person?.age || '',
-              profilePic: person?.img || null,
-              isAdmin: false,
-              blockStatus: person?.blockStatus || {
-                isBlockedByMe: false,
-                isBlockedByThem: false,
-              },
-              lastUpdated: '-',
-              sourceFamilyCode: linkedCode,
-            });
-          });
-
-        const notInTreeMembers = allBirthFamilyMembers.filter(
-          (member) => !idsInTree.has(Number(member.userId)),
-        );
-
-        const associatedFromTree = people
-          .filter((person) => 
-            person?.associatedFamilyCodes?.includes(birthFamilyCode) &&
-            normalizeFamilyCode(person?.primaryFamilyCode) !== birthFamilyCode
-          )
-          .map((person, index) => ({
-            id: `tree-associated-${index}`,
-            memberId: Number(person?.memberId) || null,
-            userId: Number(person?.userId || person?.memberId) || null,
-            membershipType: 'associated',
-            user: { isAppUser: Boolean(person?.isAppUser) },
-            name: person?.name || 'Unknown',
-            gender: person?.gender || 'N/A',
-            role: 'Member',
-            contact: person?.contactNumber || person?.mobile || '',
-            address: '',
-            dob: '',
-            age: person?.age || '',
-            profilePic: person?.img || null,
-            isAdmin: false,
-            blockStatus: person?.blockStatus || {
-              isBlockedByMe: false,
-              isBlockedByThem: false,
-            },
-            lastUpdated: '-',
-            sourceFamilyCode: normalizeFamilyCode(person?.primaryFamilyCode),
-          }));
-
-        if (!ignore) {
-          setMemberIdsInTree(idsInTree);
-          setTreeLinkedFamilyMap(linkedFromTree);
-          setMembersNotInTree(notInTreeMembers);
-          setTreeAllPeople([...associatedFromTree]);
-        }
-      } catch (error) {
-        logger.error('Failed to compute members not in tree', error);
-        if (!ignore) {
-          setMemberIdsInTree(new Set());
-          setTreeLinkedFamilyMap({});
-          setMembersNotInTree([]);
-        }
-      } finally {
-        if (!ignore) {
-          setNotInTreeLoading(false);
-        }
-      }
-    };
-
-    loadMembersNotInTree();
-    return () => {
-      ignore = true;
-    };
-  }, [familyCode, token, allBirthFamilyMembers]);
-
-  // Non-linked family members (app users only - those who have a userId from the backend)
-  const nonLinkedFamilyMembers = useMemo(() => {
-    return familyMembers.filter((member) => 
-      member.membershipType === 'member' && 
-      member.userId && 
-      !memberIdsInTree.has(Number(member.userId))
-    );
-  }, [familyMembers, memberIdsInTree]);
-
-  const replacementCandidates = useMemo(() => {
-    const unique = new Map();
-    familyMembers.forEach((member) => {
-      const userId = Number(member?.userId);
-      if (!Number.isFinite(userId) || userId <= 0) return;
-      if (member?.membershipType !== 'member') return;
-      if (!member?.user?.isAppUser) return;
-      if (memberIdsInTree.has(userId)) return;
-      if (unique.has(userId)) return;
-      unique.set(userId, {
-        userId,
-        name: member?.name || `User ${userId}`,
-      });
-    });
-    return Array.from(unique.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [familyMembers, memberIdsInTree]);
-
-  const filteredMembersNotInTree = useMemo(
-    () =>
-      membersNotInTree.filter((member) =>
-        member.name && member.name.toLowerCase().includes(searchTerm.toLowerCase())
-      ),
-    [membersNotInTree, searchTerm],
-  );
-
-  // BLOCK OVERRIDE: Add filtered blocked members
-  const filteredBlockedMembers = useMemo(
-    () =>
-      blockedUsers.filter((member) =>
-        member.name && member.name.toLowerCase().includes(searchTerm.toLowerCase())
-      ),
-    [blockedUsers, searchTerm],
-  );
-
-  const privacyFamilyOptions = useMemo(() => {
-    const map = new Map();
-    if (birthFamilyCode) {
-      map.set(birthFamilyCode, {
-        familyCode: birthFamilyCode,
-        familyName: 'Birth Family',
-      });
-    }
-
-    associatedFamiliesOptions.forEach((entry) => {
-      map.set(entry.familyCode, {
-        familyCode: entry.familyCode,
-        familyName: entry.familyName || 'Associated Family',
-      });
-    });
-
-    linkedFamiliesOptions.forEach((entry) => {
-      map.set(entry.familyCode, {
-        familyCode: entry.familyCode,
-        familyName: entry.familyName || 'Linked Family',
-      });
-    });
-
-    return Array.from(map.values());
-  }, [birthFamilyCode, associatedFamiliesOptions, linkedFamiliesOptions]);
-
-  useEffect(() => {
     let ignore = false;
     const userId = currentUser?.userId;
-    const defaults = buildDefaultFamilyPrivacySettings(birthFamilyCode);
-    const validCodesSet = new Set(privacyFamilyOptions.map((entry) => entry.familyCode));
-
-    const normalizeContentSetting = (setting, fallbackSetting) => {
-      const visibility =
-        setting?.visibility === 'specific-family' ? 'specific-family' : 'all-members';
-      const requestedCodes = Array.isArray(setting?.familyCodes)
-        ? setting.familyCodes
-        : [setting?.familyCode || fallbackSetting?.familyCode].filter(Boolean);
-      const validCodes = requestedCodes.filter((code) => validCodesSet.has(code));
-      const resolvedCodes = visibility === 'specific-family'
-        ? validCodes
-        : (validCodes.length > 0
-          ? validCodes
-          : [fallbackSetting?.familyCode || birthFamilyCode].filter(Boolean));
-
-      return {
-        visibility,
-        familyCodes: resolvedCodes,
-      };
-    };
 
     const applyPrivacySettings = (stored) => {
       const next = {
-        ...defaults,
-        posts: normalizeContentSetting(stored?.posts, defaults.posts),
-        albums: normalizeContentSetting(stored?.albums, defaults.albums),
-        events: normalizeContentSetting(stored?.events, defaults.events),
+        ...buildDefaultFamilyPrivacySettings(),
+        ...stored,
         updatedAt: stored?.updatedAt || '',
       };
 
       if (!ignore) {
         setPrivacySettings(next);
-        setPrivacySavedAt(stored?.updatedAt || '');
+        setPrivacySavedAt(next.updatedAt || '');
       }
     };
 
-    applyPrivacySettings(
-      getFamilyPrivacySettings({ userId, familyCode: birthFamilyCode }),
-    );
+    applyPrivacySettings(getFamilyPrivacySettings({ userId }));
 
     if (userId) {
-      fetchFamilyPrivacySettings({ userId, familyCode: birthFamilyCode }).then(
-        (stored) => {
-          applyPrivacySettings(stored);
-        },
-      );
+      fetchFamilyPrivacySettings({ userId }).then((stored) => {
+        applyPrivacySettings(stored);
+      });
     }
 
     return () => {
       ignore = true;
     };
-  }, [currentUser?.userId, birthFamilyCode, privacyFamilyOptions]);
+  }, [currentUser?.userId]);
 
-  const updatePrivacySetting = (contentType, key, value) => {
-    setPrivacySettings((prev) => ({
-      ...prev,
-      [contentType]: {
-        ...prev[contentType],
-        [key]: value,
-      },
-    }));
+  const updatePrivacySetting = (contentType, value) => {
+    setPrivacySettings((prev) => {
+      const currentEntry = prev?.[contentType] || { visibility: 'all-members', familyCodes: [] };
+      const nextEntry =
+        value && typeof value === 'object'
+          ? {
+              visibility:
+                value.visibility === 'specific-family' ? 'specific-family' : 'all-members',
+              familyCodes: Array.isArray(value.familyCodes)
+                ? Array.from(
+                    new Set(
+                      value.familyCodes
+                        .map((code) => normalizeFamilyCode(code))
+                        .filter(Boolean),
+                    ),
+                  )
+                : currentEntry.familyCodes || [],
+            }
+          : currentEntry;
+
+      return {
+        ...prev,
+        [contentType]: nextEntry,
+      };
+    });
+  };
+
+  const togglePrivacyFamilyCode = (contentType, familyCode) => {
+    const normalizedCode = normalizeFamilyCode(familyCode);
+    if (!normalizedCode) return;
+
+    setPrivacySettings((prev) => {
+      const currentEntry = prev?.[contentType] || { visibility: 'specific-family', familyCodes: [] };
+      const currentCodes = Array.isArray(currentEntry.familyCodes) ? currentEntry.familyCodes : [];
+      const nextCodes = currentCodes.includes(normalizedCode)
+        ? currentCodes.filter((code) => code !== normalizedCode)
+        : [...currentCodes, normalizedCode];
+
+      return {
+        ...prev,
+        [contentType]: {
+          visibility: 'specific-family',
+          familyCodes: nextCodes,
+        },
+      };
+    });
   };
 
   const [isSavingPrivacySettings, setIsSavingPrivacySettings] = useState(false);
@@ -1277,7 +168,6 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
       const saved = await saveFamilyPrivacySettings({
         userId,
         settings: privacySettings,
-        familyCode: birthFamilyCode,
       });
       setPrivacySettings(saved);
       setPrivacySavedAt(saved?.updatedAt || '');
@@ -1306,6 +196,393 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
       setIsSavingPrivacySettings(false);
     }
   };
+
+
+  const itemsPerPage = 10;
+  const familiesPerPage = 8;
+  const [associatedAccordionOpen, setAssociatedAccordionOpen] = useState({ inTree: true, allAssociated: true });
+  const [linkedAccordionOpen, setLinkedAccordionOpen] = useState({ inTree: true, allLinked: true });
+
+  const normalizeFamilyCode = (value) => String(value || '').trim().toUpperCase();
+  const birthFamilyCode = normalizeFamilyCode(
+    familyCode || currentUser?.familyCode || currentUser?.userProfile?.familyCode,
+  );
+
+  const calculateAge = (dob) => {
+    if (!dob) return 'N/A';
+    const birthDate = new Date(dob);
+    if (Number.isNaN(birthDate.getTime())) return 'N/A';
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age -= 1;
+    }
+    return age >= 0 ? age : 'N/A';
+  };
+
+  const normalizeMember = (raw) => {
+    const user = raw?.user || {};
+    const profile = user?.userProfile || {};
+    const resolvedUserId = Number(user?.id || raw?.userId || raw?.memberId || 0);
+    const primaryCode = normalizeFamilyCode(profile?.familyCode || raw?.familyCode);
+    return {
+      id: raw?.id ?? resolvedUserId ?? raw?.memberId,
+      memberId: raw?.memberId ?? null,
+      userId: resolvedUserId,
+      name:
+        user?.fullName ||
+        [profile?.firstName, profile?.lastName].filter(Boolean).join(' ').trim() ||
+        'Family Member',
+      profilePic: user?.profileImage || profile?.profile || null,
+      age: calculateAge(profile?.dob),
+      dob: profile?.dob || null,
+      gender: profile?.gender || '',
+      contact: profile?.contactNumber || user?.mobile || '',
+      address: profile?.address || '',
+      role: raw?.familyRole || roleMapping[user?.role] || 'Member',
+      sourceFamilyCode: primaryCode,
+      membershipType: raw?.membershipType || 'member',
+      isFamilyAdmin: Boolean(raw?.isFamilyAdmin),
+      familyCode: normalizeFamilyCode(raw?.familyCode || birthFamilyCode),
+      user: {
+        ...user,
+        isAppUser: user?.isAppUser !== false,
+      },
+      blockStatus: raw?.blockStatus || { isBlockedByMe: false, isBlockedByThem: false },
+    };
+  };
+
+  useEffect(() => {
+    let ignore = false;
+
+    const loadMembers = async () => {
+      if (!birthFamilyCode) {
+        if (!ignore) {
+          setFamilyMembers([]);
+          setLoading(false);
+        }
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const response = await authFetch('/family/member/' + birthFamilyCode, { method: 'GET' });
+        const nextMembers = Array.isArray(response?.data)
+          ? response.data.map(normalizeMember)
+          : [];
+        if (!ignore) {
+          setFamilyMembers(nextMembers);
+        }
+      } catch (error) {
+        logger.error('Failed to load family members', error);
+        if (!ignore) {
+          setFamilyMembers([]);
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadMembers();
+    return () => {
+      ignore = true;
+    };
+  }, [birthFamilyCode]);
+
+  useEffect(() => {
+    let ignore = false;
+
+    const loadMembersNotInTree = async () => {
+      if (!birthFamilyCode) {
+        if (!ignore) setMembersNotInTree([]);
+        return;
+      }
+      try {
+        setNotInTreeLoading(true);
+        const response = await getMembersNotInTree(birthFamilyCode);
+        const nextMembers = Array.isArray(response?.data)
+          ? response.data.map(normalizeMember)
+          : [];
+        if (!ignore) {
+          setMembersNotInTree(nextMembers);
+        }
+      } catch (error) {
+        logger.error('Failed to load members not in tree', error);
+        if (!ignore) setMembersNotInTree([]);
+      } finally {
+        if (!ignore) setNotInTreeLoading(false);
+      }
+    };
+
+    loadMembersNotInTree();
+    return () => {
+      ignore = true;
+    };
+  }, [birthFamilyCode]);
+
+  useEffect(() => {
+    let ignore = false;
+
+    const loadTreePeople = async () => {
+      if (!birthFamilyCode) {
+        if (!ignore) {
+          setTreeAllPeople([]);
+          setMemberIdsInTree(new Set());
+        }
+        return;
+      }
+      try {
+        const people = await fetchFamilyTree(birthFamilyCode);
+        const normalizedPeople = Array.isArray(people) ? people : [];
+        const ids = new Set(
+          normalizedPeople
+            .map((person) => Number(person?.userId || person?.memberId || person?.id))
+            .filter((value) => Number.isFinite(value) && value > 0),
+        );
+        if (!ignore) {
+          setTreeAllPeople(normalizedPeople);
+          setMemberIdsInTree(ids);
+        }
+      } catch (error) {
+        logger.error('Failed to load family tree people', error);
+        if (!ignore) {
+          setTreeAllPeople([]);
+          setMemberIdsInTree(new Set());
+        }
+      }
+    };
+
+    loadTreePeople();
+    return () => {
+      ignore = true;
+    };
+  }, [birthFamilyCode]);
+
+  const fetchNonAppUsers = async () => {
+    if (!birthFamilyCode) return;
+    try {
+      setLoadingNonAppUsers(true);
+      const response = await authFetch('/family/member/' + birthFamilyCode + '/non-app-users', { method: 'GET' });
+      setNonAppUsers(Array.isArray(response?.data) ? response.data : []);
+    } catch (error) {
+      logger.error('Failed to load non-app users', error);
+      setNonAppUsers([]);
+    } finally {
+      setLoadingNonAppUsers(false);
+    }
+  };
+
+  const handleReplaceDummy = async (dummyUserId) => {
+    const replacementUserId = Number(replacementSelections?.[dummyUserId] || 0);
+    if (!birthFamilyCode || !dummyUserId || !replacementUserId) return;
+    try {
+      setReplacingDummyIds((prev) => new Set(prev).add(dummyUserId));
+      await replaceDummyUser(birthFamilyCode, dummyUserId, replacementUserId);
+      await fetchNonAppUsers();
+      const response = await getMembersNotInTree(birthFamilyCode);
+      setMembersNotInTree(Array.isArray(response?.data) ? response.data.map(normalizeMember) : []);
+    } catch (error) {
+      logger.error('Failed to replace dummy user', error);
+      await Swal.fire({ icon: 'error', title: 'Replace Failed', text: error?.message || 'Unable to replace this dummy user right now.' });
+    } finally {
+      setReplacingDummyIds((prev) => {
+        const next = new Set(prev);
+        next.delete(dummyUserId);
+        return next;
+      });
+    }
+  };
+
+  const handleShareInvite = async (member, event) => {
+    event?.stopPropagation?.();
+    const inviteLink = window.location.origin + '/edit-profile?familyCode=' + encodeURIComponent(birthFamilyCode) + '&memberId=' + member.memberId;
+    try {
+      if (navigator?.share) {
+        await navigator.share({ title: 'Join our family tree', url: inviteLink });
+        return;
+      }
+      await navigator.clipboard.writeText(inviteLink);
+      await Swal.fire({ icon: 'success', title: 'Invite Copied', text: 'The family invite link has been copied.' });
+    } catch (error) {
+      logger.error('Failed to share invite', error);
+    }
+  };
+
+  const handleDeleteMember = async (memberId, targetFamilyCode, memberUserId, event) => {
+    event?.stopPropagation?.();
+    if (!memberId || !birthFamilyCode) return;
+    const isSelf = Number(memberUserId) === Number(currentUser?.userId || currentUser?.id);
+    try {
+      if (isSelf) {
+        await selfRemoveFromFamily(birthFamilyCode);
+      } else {
+        await deleteFamilyMember(memberId, targetFamilyCode || birthFamilyCode);
+      }
+      setDeletedMemberIds((prev) => new Set(prev).add(memberId));
+      setFamilyMembers((prev) => prev.filter((member) => Number(member.memberId) !== Number(memberId)));
+      setMembersNotInTree((prev) => prev.filter((member) => Number(member.memberId) !== Number(memberId)));
+    } catch (error) {
+      logger.error('Failed to delete family member', error);
+      await Swal.fire({ icon: 'error', title: 'Action Failed', text: error?.message || 'Unable to update this family member right now.' });
+    }
+  };
+
+  const filteredMembers = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+    if (!query) return familyMembers;
+    return familyMembers.filter((member) =>
+      [member?.name, member?.sourceFamilyCode, member?.role]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query)),
+    );
+  }, [familyMembers, searchTerm]);
+
+  const birthFamilyMembers = useMemo(
+    () => filteredMembers.filter((member) => member.membershipType === 'member'),
+    [filteredMembers],
+  );
+
+  const associatedMembersAll = useMemo(
+    () => filteredMembers.filter((member) => member.membershipType === 'associated'),
+    [filteredMembers],
+  );
+
+  const linkedMembersAll = useMemo(
+    () => filteredMembers.filter((member) => member.membershipType === 'linked'),
+    [filteredMembers],
+  );
+
+  const buildFamilyOptions = (members) => {
+    const map = new Map();
+    members.forEach((member) => {
+      const code = normalizeFamilyCode(member?.sourceFamilyCode);
+      if (!code) return;
+      if (!map.has(code)) {
+        map.set(code, { familyCode: code, familyName: code });
+      }
+    });
+    return Array.from(map.values());
+  };
+
+  const associatedFamiliesOptions = useMemo(
+    () => buildFamilyOptions(associatedMembersAll),
+    [associatedMembersAll],
+  );
+
+  const linkedFamiliesOptions = useMemo(
+    () => buildFamilyOptions(linkedMembersAll),
+    [linkedMembersAll],
+  );
+
+  const privacyFamilyOptions = useMemo(() => {
+    const options = [];
+    const seen = new Set();
+
+    const pushOption = (familyCode, familyName, group) => {
+      const normalizedCode = normalizeFamilyCode(familyCode);
+      if (!normalizedCode || seen.has(normalizedCode)) return;
+      seen.add(normalizedCode);
+      options.push({
+        familyCode: normalizedCode,
+        familyName: String(familyName || normalizedCode).trim() || normalizedCode,
+        group,
+      });
+    };
+
+    if (birthFamilyCode) {
+      pushOption(birthFamilyCode, birthFamilyCode, 'Birth Family');
+    }
+
+    associatedFamiliesOptions.forEach((family) => {
+      pushOption(
+        family.familyCode,
+        associatedFamilyNameMap?.[family.familyCode] || family.familyName || family.familyCode,
+        'Associated Family',
+      );
+    });
+
+    linkedFamiliesOptions.forEach((family) => {
+      pushOption(
+        family.familyCode,
+        linkedFamilyNameMap?.[family.familyCode] || family.familyName || family.familyCode,
+        'Linked Family',
+      );
+    });
+
+    return options;
+  }, [
+    associatedFamiliesOptions,
+    associatedFamilyNameMap,
+    birthFamilyCode,
+    linkedFamiliesOptions,
+    linkedFamilyNameMap,
+  ]);
+
+  useEffect(() => {
+    if (!selectedAssociatedFamilyCode && associatedFamiliesOptions.length > 0) {
+      setSelectedAssociatedFamilyCode(associatedFamiliesOptions[0].familyCode);
+    }
+  }, [selectedAssociatedFamilyCode, associatedFamiliesOptions]);
+
+  useEffect(() => {
+    if (!selectedLinkedFamilyCode && linkedFamiliesOptions.length > 0) {
+      setSelectedLinkedFamilyCode(linkedFamiliesOptions[0].familyCode);
+    }
+  }, [selectedLinkedFamilyCode, linkedFamiliesOptions]);
+
+  useEffect(() => {
+    setSelectedAssociatedFamilyMembersAll(associatedMembersAll);
+  }, [associatedMembersAll]);
+
+  useEffect(() => {
+    setSelectedLinkedFamilyMembersAll(linkedMembersAll);
+    setLinkedFamilies(linkedFamiliesOptions);
+  }, [linkedMembersAll, linkedFamiliesOptions]);
+
+  useEffect(() => {
+    setTreeLinkedFamilyMap(
+      linkedMembersAll
+        .filter((member) => memberIdsInTree.has(Number(member.userId)))
+        .reduce((acc, member) => {
+          const code = normalizeFamilyCode(member.sourceFamilyCode);
+          if (!code) return acc;
+          if (!acc[code]) acc[code] = [];
+          acc[code].push(member);
+          return acc;
+        }, {}),
+    );
+  }, [linkedMembersAll, memberIdsInTree]);
+
+  const currentUserIsFamilyAdmin = useMemo(() => {
+    const currentUserId = Number(currentUser?.userId || currentUser?.id);
+    return familyMembers.some(
+      (member) =>
+        Number(member.userId) === currentUserId &&
+        (member.isFamilyAdmin || member.role === 'Admin' || member.role === 'Superadmin'),
+    );
+  }, [familyMembers, currentUser?.userId, currentUser?.id]);
+
+  const replacementCandidates = useMemo(
+    () =>
+      birthFamilyMembers.filter(
+        (member) =>
+          member.user?.isAppUser &&
+          !memberIdsInTree.has(Number(member.userId)) &&
+          !member?.blockStatus?.isBlockedByMe,
+      ),
+    [birthFamilyMembers, memberIdsInTree],
+  );
+
+  const filteredMembersNotInTree = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+    if (!query) return membersNotInTree;
+    return membersNotInTree.filter((member) =>
+      String(member?.name || '').toLowerCase().includes(query),
+    );
+  }, [membersNotInTree, searchTerm]);
 
   // BLOCK OVERRIDE: Keep blocked users out of active grid and move them to blocked section only.
   const activeBirthMembers = birthFamilyMembers.filter(
@@ -1531,132 +808,138 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
 
   const PrivacyControls = () => (
     <section className="w-full rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-      {/* Header */}
       <div className="bg-gradient-to-r from-primary-600 to-primary-700 px-6 py-5">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h2 className="text-xl font-bold text-white">Privacy Settings</h2>
             <p className="text-sm text-primary-100 mt-1">
-              Control who can see your posts, albums, and events
+              Choose whether your family-only posts, galleries, and events are visible to all connected families or only to selected families.
             </p>
           </div>
           <button
             type="button"
             onClick={handleSavePrivacySettings}
             disabled={isSavingPrivacySettings}
-            className={`flex items-center gap-2 px-5 py-2.5 bg-white text-primary-700 font-semibold rounded-lg transition-all shadow-lg ${
-              isSavingPrivacySettings ? 'opacity-70 cursor-not-allowed' : 'hover:bg-primary-50'
-            }`}
+            className={
+              'flex items-center gap-2 px-5 py-2.5 bg-white text-primary-700 font-semibold rounded-lg transition-all shadow-lg ' +
+              (isSavingPrivacySettings ? 'opacity-70 cursor-not-allowed' : 'hover:bg-primary-50')
+            }
           >
-            {isSavingPrivacySettings ? (
-              <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" strokeWidth="4" />
-                <path className="opacity-75" d="M4 12a8 8 0 018-8" strokeWidth="4" strokeLinecap="round" />
-              </svg>
-            ) : (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            )}
             {isSavingPrivacySettings ? 'Saving...' : 'Save Settings'}
           </button>
         </div>
       </div>
 
-      {/* Content Cards */}
       <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
         {[
-          { key: 'posts', label: 'Posts', icon: '📝', desc: 'Photos, videos, and status updates' },
-          { key: 'albums', label: 'Albums', icon: '📷', desc: 'Photo collections and galleries' },
-          { key: 'events', label: 'Events', icon: '📅', desc: 'Family gatherings and occasions' },
-        ].map((entry) => (
-          <div key={entry.key} className="rounded-xl border border-gray-200 bg-white shadow-sm hover:shadow-md transition-shadow">
-            {/* Card Header */}
-            <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50 rounded-t-xl">
-              <div className="flex items-center gap-3">
-                <span className="text-2xl">{entry.icon}</span>
-                <div>
-                  <h3 className="font-bold text-gray-900">{entry.label}</h3>
-                  <p className="text-xs text-gray-500">{entry.desc}</p>
-                </div>
-              </div>
-            </div>
+          { key: 'posts', label: 'Posts', icon: '📝', desc: 'Family-only posts and status updates' },
+          { key: 'albums', label: 'Gallery', icon: '📷', desc: 'Family-only albums and gallery items' },
+          { key: 'events', label: 'Events', icon: '📅', desc: 'Family-only events and celebrations' },
+        ].map((entry) => {
+          const setting = privacySettings?.[entry.key] || { visibility: 'all-members', familyCodes: [] };
+          const selectedCodes = Array.isArray(setting.familyCodes) ? setting.familyCodes : [];
 
-            {/* Card Body */}
-            <div className="p-5 space-y-5">
-              {/* Visibility Toggle */}
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
-                  Visibility
-                </label>
-                <div className="flex bg-gray-100 p-1 rounded-lg">
-                  {[
-                    { value: 'all-members', label: 'All Members' },
-                    { value: 'specific-family', label: 'Specific Families' },
-                  ].map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() => updatePrivacySetting(entry.key, 'visibility', option.value)}
-                      className={`flex-1 py-2 px-3 text-sm font-medium rounded-md transition-all ${
-                        (privacySettings?.[entry.key]?.visibility || 'all-members') === option.value
-                          ? 'bg-white text-primary-700 shadow-sm'
-                          : 'text-gray-600 hover:text-gray-900'
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Family Selection - Show only when specific-family is selected */}
-              {(privacySettings?.[entry.key]?.visibility === 'specific-family') && (
-                <div className="animate-in slide-in-from-top-2 duration-200">
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
-                    Select Families
-                  </label>
-                  <div className="space-y-2 max-h-48 overflow-y-auto rounded-lg border border-gray-200 p-2 bg-gray-50">
-                    {privacyFamilyOptions.map((familyOption) => {
-                      const isSelected = (privacySettings?.[entry.key]?.familyCodes || []).includes(familyOption.familyCode);
-                      return (
-                        <button
-                          key={`${entry.key}-${familyOption.familyCode}`}
-                          onClick={() => {
-                            const currentCodes = privacySettings?.[entry.key]?.familyCodes || [];
-                            const newCodes = isSelected
-                              ? currentCodes.filter(c => c !== familyOption.familyCode)
-                              : [...currentCodes, familyOption.familyCode];
-                            updatePrivacySetting(entry.key, 'familyCodes', newCodes);
-                          }}
-                          className={`w-full flex items-center gap-3 p-3 rounded-lg text-left transition-all ${
-                            isSelected 
-                              ? 'bg-primary-50 border border-primary-200' 
-                              : 'bg-white border border-transparent hover:bg-gray-100'
-                          }`}
-                        >
-                          {/* Toggle Switch */}
-                          <div className={`relative w-11 h-6 rounded-full transition-colors ${
-                            isSelected ? 'bg-primary-600' : 'bg-gray-300'
-                          }`}>
-                            <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                              isSelected ? 'translate-x-5' : 'translate-x-0'
-                            }`} />
-                          </div>
-                          <span className={`text-sm font-medium ${isSelected ? 'text-primary-900' : 'text-gray-700'}`}>
-                            {familyOption.familyName} ({familyOption.familyCode})
-                          </span>
-                        </button>
-                      );
-                    })}
+          return (
+            <div key={entry.key} className="rounded-xl border border-gray-200 bg-white shadow-sm hover:shadow-md transition-shadow">
+              <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50 rounded-t-xl">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">{entry.icon}</span>
+                  <div>
+                    <h3 className="font-bold text-gray-900">{entry.label}</h3>
+                    <p className="text-xs text-gray-500">{entry.desc}</p>
                   </div>
                 </div>
-              )}
+              </div>
+
+              <div className="p-5 space-y-4">
+                <div>
+                  <p className="text-xs font-semibold tracking-wide uppercase text-gray-500 mb-2">Visibility</p>
+                  <div className="grid grid-cols-2 gap-2 rounded-xl bg-gray-100 p-1">
+                    <button
+                      type="button"
+                      onClick={() => updatePrivacySetting(entry.key, { visibility: 'all-members', familyCodes: [] })}
+                      className={
+                        'rounded-lg px-3 py-2 text-sm font-semibold transition-all ' +
+                        (setting.visibility === 'all-members'
+                          ? 'bg-white text-primary-600 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900')
+                      }
+                    >
+                      All Members
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updatePrivacySetting(entry.key, { visibility: 'specific-family' })}
+                      className={
+                        'rounded-lg px-3 py-2 text-sm font-semibold transition-all ' +
+                        (setting.visibility === 'specific-family'
+                          ? 'bg-white text-primary-600 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900')
+                      }
+                    >
+                      Specific Families
+                    </button>
+                  </div>
+                </div>
+
+                {setting.visibility === 'all-members' ? (
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-4">
+                    <p className="text-sm font-semibold text-gray-900">All connected families can view this family content</p>
+                    <p className="mt-1 text-xs text-gray-500">
+                      This includes your birth family plus linked and associated families that already have access to your family network.
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="text-xs font-semibold tracking-wide uppercase text-gray-500 mb-2">Select Families</p>
+                    <div className="space-y-2">
+                      {privacyFamilyOptions.map((family) => {
+                        const isSelected = selectedCodes.includes(family.familyCode);
+                        return (
+                          <button
+                            key={entry.key + '-' + family.familyCode}
+                            type="button"
+                            onClick={() => togglePrivacyFamilyCode(entry.key, family.familyCode)}
+                            className={
+                              'w-full text-left rounded-xl border px-4 py-3 transition-all ' +
+                              (isSelected
+                                ? 'border-primary-300 bg-primary-50 shadow-sm'
+                                : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50')
+                            }
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <p className="text-sm font-semibold text-gray-900">{family.familyName}</p>
+                                <p className="text-xs text-gray-500">{family.group} · {family.familyCode}</p>
+                              </div>
+                              <span
+                                className={
+                                  'inline-flex h-5 w-5 items-center justify-center rounded-full border text-xs font-bold ' +
+                                  (isSelected
+                                    ? 'border-primary-600 bg-primary-600 text-white'
+                                    : 'border-gray-300 text-transparent')
+                                }
+                              >
+                                ✓
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="mt-2 text-xs text-gray-500">
+                      {selectedCodes.length > 0
+                        ? selectedCodes.length + ' family code' + (selectedCodes.length > 1 ? 's are' : ' is') + ' selected.'
+                        : 'No family selected yet. Until you select a family, only you will be able to view this family content.'}
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
-      {/* Footer */}
       {privacySavedAt && (
         <div className="px-6 py-3 bg-gray-50 border-t border-gray-200">
           <p className="text-xs text-gray-500 text-center">
@@ -1666,7 +949,6 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
       )}
     </section>
   );
-
   const TABS = [
     { id: 'birth', label: 'Birth Family', count: activeBirthMembers.length, color: 'text-slate-700 bg-slate-100', emptyMessage: 'No birth family members found.' },
     { id: 'associated', label: 'Associated', count: associatedFamiliesOptions.length, color: 'text-sky-700 bg-sky-100', emptyMessage: 'No associated families linked.' },
@@ -2493,3 +1775,4 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
 };
 
 export default FamilyMemberCard;
+

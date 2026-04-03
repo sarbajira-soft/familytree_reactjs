@@ -65,7 +65,7 @@ const FamilyGalleryPage = () => {
 
       // Determine the API URL based on the active feed
       if (activeFeed === 'family') {
-        endpoint = `/gallery/by-options?familyCode=${userInfo.familyCode}&privacy=private`;
+        endpoint = `/gallery/by-options?privacy=private`;
       } else {
         endpoint = `/gallery/by-options?privacy=public`;
       }

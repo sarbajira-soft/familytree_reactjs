@@ -314,7 +314,7 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
   const [selectedAlbum, setSelectedAlbum] = useState(null);
   // Dashboard data query
   const { data: dashboardData, isLoading } = useQuery({
-    queryKey: ["dashboardData", userInfo?.familyCode],
+    queryKey: ["dashboardData", userInfo?.userId, userInfo?.familyCode],
     queryFn: async () => {
       const [posts, stats, events] = await Promise.all([
         authFetch(
@@ -333,7 +333,7 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
   });
 
   const { data: galleryData, isLoading: isGalleryLoading } = useQuery({
-    queryKey: ["dashboardGallery"],
+    queryKey: ["dashboardGallery", userInfo?.userId],
     queryFn: async () =>
       authFetch(`${apiBaseUrl}/gallery/by-options?privacy=public`, {
         method: "GET",

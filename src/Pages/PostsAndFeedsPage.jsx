@@ -119,7 +119,7 @@ const PostsAndFeedsPage = () => {
         setLoadingFeed(true);
         try {
             let url = activeFeed === 'family'
-                ? `${import.meta.env.VITE_API_BASE_URL}/post/by-options?familyCode=${userInfo.familyCode}&privacy=private`
+                ? `${import.meta.env.VITE_API_BASE_URL}/post/by-options?privacy=private`
                 : `${import.meta.env.VITE_API_BASE_URL}/post/by-options?privacy=public`;
 
             if (captionSearch.trim()) {

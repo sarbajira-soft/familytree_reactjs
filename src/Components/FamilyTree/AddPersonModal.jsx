@@ -108,7 +108,13 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
               method: 'GET',
             });
             const sameFamily = Boolean(data?.user?.familyCode) && data.user.familyCode === familyCode;
-            setPhoneInvite(prev => ({ ...prev, result: { ...data, sameFamily }, loading: false }));
+            const alreadyInTree = Boolean(data?.user?.id)
+                && existingMemberIds?.some?.((memberId) => Number(memberId) === Number(data.user.id));
+            setPhoneInvite(prev => ({
+                ...prev,
+                result: { ...data, sameFamily, alreadyInTree },
+                loading: false,
+            }));
         } catch (err) {
             setPhoneInvite(prev => ({ ...prev, loading: false }));
             Swal.fire({ icon: 'error', title: 'Lookup failed', text: 'Please try again.' });
@@ -140,6 +146,15 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
             Swal.fire({ icon: 'warning', title: 'Invalid user data', text: 'Cannot send association request.' });
             return;
         }
+
+        if (phoneInvite.result?.alreadyInTree) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Already in tree',
+                text: 'This person is already in the family tree, so you cannot send another request.',
+            });
+            return;
+        }
         
         try {
             setPhoneInvite(prev => ({ ...prev, requesting: true }));
@@ -169,7 +184,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                 headers: {
                     accept: 'application/json',
                 },
-                body: JSON.stringify({ targetUserId, requesterUserId })
+                body: JSON.stringify({ targetUserId, requesterUserId, familyCode })
             });
 
             const responseData = await response.json();
@@ -2606,7 +2621,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                                   .familyCode || "N/A"}
                                               </div>
                                               {!phoneInvite.result
-                                                .sameFamily && (
+                                                .sameFamily && !phoneInvite.result.alreadyInTree && (
                                                 <div
                                                   style={{
                                                     display: "flex",
@@ -2663,6 +2678,18 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                                 </div>
                                               )}
                                               {phoneInvite.result
+                                                .alreadyInTree && (
+                                                <span
+                                                  style={{
+                                                    color: PRIMARY_COLOR,
+                                                    fontWeight: 600,
+                                                  }}
+                                                >
+                                                  Already in this family tree
+                                                </span>
+                                              )}
+                                              {!phoneInvite.result
+                                                .alreadyInTree && phoneInvite.result
                                                 .sameFamily && (
                                                 <span
                                                   style={{
@@ -3272,3 +3299,4 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
 };
 
 export default AddPersonModal;
+

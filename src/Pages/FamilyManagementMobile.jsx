@@ -176,10 +176,8 @@ const FamilyManagementMobile = () => {
           return [
             'FAMILY_JOIN_REQUEST',
             'FAMILY_JOIN_REQUEST_UPDATED',
-            'FAMILY_ASSOCIATION_REQUEST',
             'family_join_request',
             'family_join_request_updated',
-            'family_association_request',
           ].includes(normalizedType);
         };
 
@@ -660,3 +658,4 @@ const FamilyManagementMobile = () => {
 };
 
 export default FamilyManagementMobile;
+
