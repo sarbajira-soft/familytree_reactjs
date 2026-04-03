@@ -35,6 +35,9 @@ const ProfilePage = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
+  const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+  const [profilePhotoError, setProfilePhotoError] = useState("");
+
   const profileFileInputRef = useRef(null);
 
   const [showPosts, setShowPosts] = useState(true);
@@ -168,6 +171,25 @@ const ProfilePage = () => {
   const handleProfilePhotoSelected = async (e) => {
     const file = e?.target?.files?.[0];
     if (!file) return;
+
+    if (Number(file?.size || 0) > MAX_IMAGE_BYTES) {
+      setProfilePhotoError(
+        "Image is too large. Please select an image less than 5MB.",
+      );
+      Swal.fire({
+        icon: "warning",
+        title: "Image too large",
+        text: "Image is too large. Please select an image less than 5MB.",
+        confirmButtonColor: "#d33",
+      });
+
+      if (e?.target) {
+        e.target.value = "";
+      }
+      return;
+    }
+
+    if (profilePhotoError) setProfilePhotoError("");
 
     try {
       const userId = userInfo?.userId || userInfo?.id;
@@ -777,6 +799,12 @@ const ProfilePage = () => {
                           onChange={handleProfilePhotoSelected}
                           className="hidden"
                         />
+
+                        {profilePhotoError ? (
+                          <p className="text-red-600 text-xs text-center max-w-[260px]">
+                            {profilePhotoError}
+                          </p>
+                        ) : null}
                       </div>
                     </div>
 

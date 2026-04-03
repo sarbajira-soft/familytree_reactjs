@@ -23,6 +23,7 @@ const EditEventModal = ({
   apiBaseUrl = import.meta.env.VITE_API_BASE_URL,
 }) => {
   const MAX_EVENT_TITLE_LENGTH = 50;
+  const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
   const EVENT_DATE_MIN = "1900-01-01";
   const EVENT_DATE_MAX = "2200-12-31";
 
@@ -234,8 +235,25 @@ const EditEventModal = ({
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
 
+    const validFiles = files.filter((file) => Number(file?.size || 0) <= MAX_IMAGE_BYTES);
+    const hasOversize = validFiles.length !== files.length;
+
+    if (hasOversize) {
+      setErrors((prev) => ({
+        ...(prev || {}),
+        images: "Image is too large. Please select an image less than 5MB.",
+      }));
+    } else if (errors.images) {
+      setErrors((prev) => ({ ...(prev || {}), images: undefined }));
+    }
+
+    if (!validFiles.length) {
+      e.target.value = null;
+      return;
+    }
+
     setImages((prev) => {
-      const merged = [...(prev || []), ...files];
+      const merged = [...(prev || []), ...validFiles];
       const seen = new Set();
       const unique = [];
       for (const f of merged) {
@@ -544,6 +562,10 @@ const EditEventModal = ({
                 </div>
                 Add New Images
               </label>
+
+              {errors.images ? (
+                <p className="text-red-600 text-xs">{errors.images}</p>
+              ) : null}
 
               {imagePreviews.length > 0 ? (
                 <div className="space-y-3">
