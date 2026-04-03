@@ -4,6 +4,10 @@ const DashboardShimmer = () => {
   const shimmerCard = Array(4).fill(null);
   const shimmerButtons = Array(3).fill(null);
 
+
+
+
+  
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-5 py-6 pt-3 space-y-7 shimmer">
       {/* Cards Section */}
