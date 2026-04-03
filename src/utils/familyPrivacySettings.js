@@ -1,15 +1,8 @@
-import { authFetch } from './authFetch';
-
 const STORAGE_KEY_PREFIX = 'familyss.privacy.settings.v1';
 
 const UI_VISIBILITY = {
   ALL_MEMBERS: 'all-members',
   SPECIFIC_FAMILIES: 'specific-family',
-};
-
-const API_VISIBILITY = {
-  'all-members': 'ALL_MEMBERS',
-  'specific-family': 'SPECIFIC_FAMILIES',
 };
 
 const normalizeFamilyCode = (code) => String(code || '').trim().toUpperCase();
@@ -96,29 +89,6 @@ const persistSettings = ({ userId, settings }) => {
   return next;
 };
 
-const toApiPayload = (settings) => ({
-  posts: {
-    visibility: API_VISIBILITY[settings?.posts?.visibility] || 'ALL_MEMBERS',
-    familyCodes: normalizeCodes(settings?.posts?.familyCodes, []),
-  },
-  albums: {
-    visibility: API_VISIBILITY[settings?.albums?.visibility] || 'ALL_MEMBERS',
-    familyCodes: normalizeCodes(settings?.albums?.familyCodes, []),
-  },
-  events: {
-    visibility: API_VISIBILITY[settings?.events?.visibility] || 'ALL_MEMBERS',
-    familyCodes: normalizeCodes(settings?.events?.familyCodes, []),
-  },
-});
-
-const areSettingSectionsEqual = (left, right) => {
-  try {
-    return JSON.stringify(toApiPayload(left)) === JSON.stringify(toApiPayload(right));
-  } catch (_) {
-    return false;
-  }
-};
-
 export const buildDefaultFamilyPrivacySettings = (familyCode = '') => {
   const normalizedCode = normalizeFamilyCode(familyCode);
   const defaultCodes = normalizedCode ? [normalizedCode] : [];
@@ -159,37 +129,13 @@ export const getFamilyPrivacySettings = ({ userId, familyCode = '' } = {}) => {
 };
 
 export const fetchFamilyPrivacySettings = async ({ userId, familyCode = '' } = {}) => {
-  const cached = getFamilyPrivacySettings({ userId, familyCode });
-  if (!userId) {
-    return cached;
-  }
-
-  try {
-    const response = await authFetch('/user/content-privacy-settings', {
-      method: 'GET',
-    });
-
-    const nextBase = buildNormalizedSettings(response?.data, familyCode);
-    const next = {
-      ...nextBase,
-      updatedAt: areSettingSectionsEqual(cached, nextBase) ? cached.updatedAt || '' : '',
-    };
-
-    return persistSettings({ userId, settings: next });
-  } catch (_) {
-    return cached;
-  }
+  return getFamilyPrivacySettings({ userId, familyCode });
 };
 
 export const saveFamilyPrivacySettings = async ({ userId, settings, familyCode = '' } = {}) => {
   const normalizedInput = buildNormalizedSettings(settings, familyCode);
-  const response = await authFetch('/user/content-privacy-settings', {
-    method: 'PUT',
-    body: JSON.stringify(toApiPayload(normalizedInput)),
-  });
-
   const next = {
-    ...buildNormalizedSettings(response?.data, familyCode),
+    ...normalizedInput,
     updatedAt: new Date().toISOString(),
   };
 
