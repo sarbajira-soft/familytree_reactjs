@@ -24,8 +24,8 @@ const VerifyOtp = () => {
     const stateEmail = location.state?.email;
     const stateMobile = location.state?.mobile;
 
-    if (stateEmail || stateMobile) {
-      if (stateEmail) setEmail(stateEmail);
+    if (stateEmail) {
+      setEmail(stateEmail);
       if (stateMobile) setMobile(stateMobile);
       return;
     }
@@ -59,9 +59,8 @@ const VerifyOtp = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const userName = email || mobile;
-  if (!userName) {
-    return null;
+  if (!email) {
+    return null; // Don't show UI if email not present
   }
 
   const handleVerifyOtp = async (e) => {
@@ -79,7 +78,7 @@ const VerifyOtp = () => {
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/user/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userName, otp }),
+        body: JSON.stringify({ userName:email, otp }),
       });
 
       if (!response.ok) {
@@ -125,7 +124,7 @@ const VerifyOtp = () => {
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/user/resend-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, mobile }),
+        body: JSON.stringify({ email, mobile  }),
       });
 
       if (!response.ok) {
@@ -155,9 +154,9 @@ const VerifyOtp = () => {
 
         {/* Title */}
         <div className="text-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-800">Verify Your Account</h2>
+          <h2 className="text-2xl font-bold text-gray-800">Verify Your Email</h2>
           <p className="text-sm text-gray-500 mt-1">
-            We've sent a verification code to {email || mobile}
+            We've sent a verification code to {email} {mobile ? ' or ' + mobile : ''}
           </p>
         </div>
 

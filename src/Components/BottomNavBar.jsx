@@ -10,7 +10,7 @@ import {
 } from "react-icons/fi";
 
 import { RiGitMergeLine } from "react-icons/ri";
-const BottomNavBar = ({ activeTab, setActiveTab, onNavigate }) => {
+const BottomNavBar = ({ activeTab, setActiveTab }) => {
   const navigate = useNavigate();
 
   const tabs = [
@@ -54,9 +54,6 @@ const BottomNavBar = ({ activeTab, setActiveTab, onNavigate }) => {
   ];
 
   const handleItemClick = (item) => {
-    if (typeof onNavigate === "function") {
-      onNavigate(item);
-    }
     setActiveTab(item.id);
     if (item.path) {
       navigate(item.path);

@@ -1592,8 +1592,7 @@ const BasicSection = ({
             name="dob"
             value={formData.dob || ""}
             onChange={handleChange}
-            min="1900-01-01"
-            max="2100-12-31"
+            max={new Date().toISOString().split("T")[0]}
             className={`w-full px-4 py-2.5 pr-16 border rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 ${errors.dob
                 ? "border-red-500 focus:ring-red-300"
                 : "border-gray-300 focus:ring-[var(--color-primary)]"
@@ -1807,8 +1806,7 @@ const BasicSection = ({
               name="marriageDate"
               value={formData.marriageDate || ""}
               onChange={handleChange}
-              min="1900-01-01"
-              max="2100-12-31"
+              max={new Date().toISOString().split("T")[0]}
               className="w-full px-4 py-2.5 pr-16 border border-gray-300 rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
               placeholder="Select marriage date"
             />

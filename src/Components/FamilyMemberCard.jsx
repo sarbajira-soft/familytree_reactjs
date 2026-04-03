@@ -310,6 +310,13 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
     }
   }, [familyCode, token]);
 
+  // BLOCK OVERRIDE: Fetch blocked users when Blocked tab is active
+  useEffect(() => {
+    if (activeTab === 'blocked' && token) {
+      fetchBlockedUsersData();
+    }
+  }, [activeTab, token]);
+
   const calculateAge = (dob) => {
     if (!dob) return 'N/A';
     const birthDate = new Date(dob);
@@ -1672,6 +1679,7 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
     { id: 'associated', label: 'Associated', count: associatedFamiliesOptions.length, color: 'text-sky-700 bg-sky-100', emptyMessage: 'No associated families linked.' },
     { id: 'linked', label: 'Linked', count: linkedFamiliesOptions.length, color: 'text-emerald-700 bg-emerald-100', emptyMessage: 'No linked families discovered yet.' },
     { id: 'pending', label: 'Members Not in Tree', count: filteredMembersNotInTree.length, color: 'text-amber-700 bg-amber-100', emptyMessage: 'All birth family members are already placed in the family tree.' },
+    { id: 'blocked', label: 'Blocked', count: blockedMembers.length, color: 'text-red-700 bg-red-100', emptyMessage: 'No blocked members.' },
     { id: 'privacy', label: 'Privacy', count: null, color: null, emptyMessage: null },
   ];
 
@@ -2475,6 +2483,63 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                   <div className="flex flex-col items-center justify-center py-12 bg-gray-50 rounded-xl border border-gray-100">
                     <p className="text-gray-500 text-sm font-medium">All birth family members are already placed in the family tree.</p>
                     <p className="text-gray-400 text-xs mt-1">New members who haven't been added to the tree will appear here.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'blocked' && (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <h2 className="text-xl font-bold text-red-600 mb-1">Blocked Profiles</h2>
+                <p className="text-sm text-gray-500 mb-6">Manage restricted users. Blocked users cannot see your posts or interact with you.</p>
+                {loadingBlocked ? (
+                  <div className="flex flex-col items-center justify-center py-12 bg-gray-50 rounded-xl border border-gray-100">
+                    <p className="text-gray-500 text-sm font-medium">Loading blocked members...</p>
+                  </div>
+                ) : filteredBlockedMembers.length > 0 ? (
+                  <>
+                    <div className="flex flex-col gap-3">
+                      {paginateData(filteredBlockedMembers).map((member) => (
+                        <div
+                          key={`blocked-member-${member.id}`}
+                          className="flex items-center gap-4 rounded-xl border border-red-100 bg-red-50/30 p-4 shadow-sm"
+                        >
+                          <img
+                            src={member.profilePic || 'https://placehold.co/48x48/e2e8f0/64748b?text=👤'}
+                            alt={member.name}
+                            className="h-12 w-12 flex-shrink-0 rounded-full object-cover ring-2 ring-red-100"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="truncate text-sm font-bold text-gray-900">{member.name}</span>
+                              <BlockedBadge />
+                            </div>
+                            <span className={`mt-1 inline-flex items-center rounded-md px-2 py-0.5 text-[10px] uppercase font-bold tracking-wider ${relationColors[member.role] || 'bg-gray-100 text-gray-800'}`}>
+                              {member.role}
+                            </span>
+                          </div>
+                          {currentUserIsFamilyAdmin && (
+                            <div className="flex-shrink-0 scale-90">
+                              <BlockButton
+                                userId={member.userId}
+                                isBlockedByMe
+                                location="profile"
+                                userName={member.name}
+                                onStatusChange={(nextStatus) =>
+                                  handleMemberBlockStatusChange(member.userId, nextStatus)
+                                }
+                              />
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <PaginationControls totalItems={filteredBlockedMembers.length} />
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12 bg-gray-50 rounded-xl border border-gray-100">
+                    <p className="text-gray-500 text-sm font-medium">No blocked members.</p>
+                    <p className="text-gray-400 text-xs mt-1">Blocked users will appear here. You can unblock them anytime.</p>
                   </div>
                 )}
               </div>

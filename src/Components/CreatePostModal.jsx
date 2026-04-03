@@ -166,16 +166,7 @@ const CreatePostModal = ({
       setShowSuccess(false);
       setIsTrimming(false);
     }
-  }, [
-    isOpen,
-    mode,
-    postData,
-    currentUser?.userId,
-    currentUser?.familyCode,
-    userInfo?.userId,
-    userInfo?.familyCode,
-    userInfo?.approveStatus,
-  ]);
+  }, [isOpen, mode, postData, currentUser, userInfo]);
 
   useEffect(() => {
     let ignore = false;
@@ -345,14 +336,7 @@ const CreatePostModal = ({
       setTrimmedVideoFile(null);
       setUploadProgress(0);
       setImageFile(file);
-      setImagePreview((prev) => {
-        if (prev) {
-          try {
-            URL.revokeObjectURL(prev);
-          } catch {}
-        }
-        return URL.createObjectURL(file);
-      });
+      setImagePreview(URL.createObjectURL(file));
       setMessage("");
     } else {
       setImageFile(null);

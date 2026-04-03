@@ -499,7 +499,7 @@ const EventsPage = () => {
                     <div
                       key={event.id}
                       className={`group bg-white dark:bg-slate-900 rounded-2xl shadow-lg transition-all duration-300 border h-full flex flex-col ${eventStyle.borderColor
-                        } dark:border-slate-800 ${event.eventType === "custom"
+                        } dark:border-slate-800 overflow-hidden ${event.eventType === "custom"
                           ? "cursor-pointer hover:shadow-xl transform hover:scale-105"
                           : "cursor-default"
                         }`}

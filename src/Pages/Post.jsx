@@ -466,18 +466,6 @@ const PostPage = () => {
          const currentComments = prev[postId] || [];
          const childIds = getAllChildIds(commentId, currentComments);
          const idsToRemove = new Set([commentId, ...childIds]);
-         const removedCount = idsToRemove.size;
-
-         setPosts((prevPosts) =>
-           prevPosts.map((p) => {
-             if (p.id !== postId) return p;
-             const currentCount = Number(p.comments || 0);
-             return {
-               ...p,
-               comments: Math.max(0, currentCount - removedCount),
-             };
-           })
-         );
 
          return {
            ...prev,
