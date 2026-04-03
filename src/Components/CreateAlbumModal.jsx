@@ -7,6 +7,9 @@ import { useUser } from '../Contexts/UserContext';
 const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authToken, mode = 'create', albumData = null }) => {
     const { userInfo } = useUser();
 
+    const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+    const MAX_IMAGE_ERROR = 'Image is too large. Please select an image less than 5MB.';
+
     const getDefaultPrivacy = () => {
         const hasFamily = Boolean(currentUser?.familyCode || userInfo?.familyCode);
         const isApproved = userInfo?.approveStatus === 'approved';
@@ -28,6 +31,9 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
     const [currentCoverPhotoUrl, setCurrentCoverPhotoUrl] = useState(null);
     const [currentGalleryPhotos, setCurrentGalleryPhotos] = useState([]);
     const [removedImageIds, setRemovedImageIds] = useState([]);
+
+    const [coverPhotoError, setCoverPhotoError] = useState('');
+    const [galleryPhotosError, setGalleryPhotosError] = useState('');
 
     // Duplicate prevention state
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -96,6 +102,8 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
         setCurrentCoverPhotoUrl(null);
         setCurrentGalleryPhotos([]);
         setRemovedImageIds([]);
+        setCoverPhotoError('');
+        setGalleryPhotosError('');
         setIsSubmitting(false); // Reset submission state
         if (coverPhotoInputRef.current) coverPhotoInputRef.current.value = '';
         if (galleryPhotoInputRef.current) galleryPhotoInputRef.current.value = '';
@@ -110,22 +118,44 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
     };
 
     const handleCoverPhotoChange = (e) => {
-        if (e.target.files && e.target.files[0]) {
-            setCoverPhotoFile(e.target.files[0]);
-            setCurrentCoverPhotoUrl(null);
+        const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
+        if (!file) return;
+
+        if (Number(file?.size || 0) > MAX_IMAGE_BYTES) {
+            setCoverPhotoError(MAX_IMAGE_ERROR);
+            setCoverPhotoFile(null);
+            if (coverPhotoInputRef.current) coverPhotoInputRef.current.value = '';
+            e.target.value = null;
+            return;
         }
+
+        if (coverPhotoError) setCoverPhotoError('');
+        setCoverPhotoFile(file);
+        setCurrentCoverPhotoUrl(null);
     };
 
     const handleRemoveCoverPhoto = () => {
         setCoverPhotoFile(null);
         setCurrentCoverPhotoUrl(null);
+        setCoverPhotoError('');
         if (coverPhotoInputRef.current) coverPhotoInputRef.current.value = '';
     };
 
     const handleGalleryPhotosChange = (e) => {
         if (e.target.files) {
             const newFiles = Array.from(e.target.files);
-            setGalleryPhotoFiles((prevFiles) => [...prevFiles, ...newFiles]);
+            const validFiles = newFiles.filter((file) => Number(file?.size || 0) <= MAX_IMAGE_BYTES);
+            const hasOversize = validFiles.length !== newFiles.length;
+
+            if (hasOversize) {
+                setGalleryPhotosError(MAX_IMAGE_ERROR);
+            } else if (galleryPhotosError) {
+                setGalleryPhotosError('');
+            }
+
+            if (validFiles.length > 0) {
+                setGalleryPhotoFiles((prevFiles) => [...prevFiles, ...validFiles]);
+            }
             e.target.value = null;
         }
     };
@@ -427,6 +457,11 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
                         <label htmlFor="coverPhoto" className="block text-sm font-medium text-gray-700 mb-2">
                             Album Cover Photo (Optional)
                         </label>
+
+                        {coverPhotoError ? (
+                            <p className="text-red-600 text-xs mb-2">{coverPhotoError}</p>
+                        ) : null}
+
                         <input
                             type="file"
                             id="coverPhoto"
@@ -474,6 +509,11 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
                         <label htmlFor="galleryPhotos" className="block text-sm font-medium text-gray-700 mb-2">
                             Add Photos to Album
                         </label>
+
+                        {galleryPhotosError ? (
+                            <p className="text-red-600 text-xs mb-2">{galleryPhotosError}</p>
+                        ) : null}
+
                         <input
                             type="file"
                             id="galleryPhotos"
