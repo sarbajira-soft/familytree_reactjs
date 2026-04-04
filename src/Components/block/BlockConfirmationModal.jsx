@@ -121,9 +121,7 @@ export const BlockConfirmationModal = ({
           <button
             type="button"
             aria-label={`${confirmLabel} user`}
-            className={`rounded-lg px-4 py-2 text-sm text-white ${
-              action === 'block' ? 'bg-red-500' : 'bg-green-600'
-            } ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
+            className={`rounded-lg px-4 py-2 text-sm text-white bg-secondary-500 ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
             disabled={loading}
             onClick={handleConfirmClick}
           >

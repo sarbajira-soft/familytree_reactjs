@@ -16,17 +16,17 @@ const DeleteConfirmationModal = ({
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-opacity duration-300">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-auto transform transition-all duration-300 scale-100 opacity-100 animate-slideUp">
         {/* Header */}
-        <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+        <div className="p-6 border-b rounded-t-2xl bg-primary-500 border-gray-100 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
               <FiAlertTriangle className="text-red-600" size={20} />
             </div>
-            <h2 className="text-xl font-bold text-gray-800">{title}</h2>
+            <h2 className="text-xl font-bold text-white">{title}</h2>
           </div>
           <button
             onClick={onClose}
             disabled={isDeleting}
-            className="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-gray-100 transition-colors disabled:opacity-50"
+            className="text-gray-600 hover:text-gray-700 p-2 rounded-full hover:bg-gray-100 transition-colors disabled:opacity-50"
           >
             <FiX size={20} />
           </button>
@@ -56,7 +56,7 @@ const DeleteConfirmationModal = ({
           <button
             onClick={onConfirm}
             disabled={isDeleting}
-            className="flex-1 px-4 py-2.5 rounded-xl bg-red-500 text-white font-medium hover:bg-red-600 transition-colors shadow-lg shadow-red-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="flex-1 px-4 py-2.5 rounded-xl bg-secondary-500 text-white font-medium hover:bg-red-600 transition-colors shadow-lg shadow-red-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {isDeleting ? (
               <>
