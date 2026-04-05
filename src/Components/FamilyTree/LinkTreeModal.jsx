@@ -105,11 +105,9 @@ export default function LinkTreeModal({
 
   const relationshipOptions = React.useMemo(() => {
     if (senderHasParents) {
-      // return ["sibling", "child"];
-      return ["sibling"];
+      return ["sibling", "child"];
     }
-    // return ["parent", "child"];
-    return ["sibling"];
+    return ["parent", "child"];
   }, [senderHasParents]);
 
   const normalizeGender = (g) => {

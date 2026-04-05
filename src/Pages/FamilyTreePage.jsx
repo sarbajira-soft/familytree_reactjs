@@ -49,7 +49,13 @@ import Swal from "sweetalert2";
 
 import { FaPlus, FaSave, FaArrowLeft, FaHome, FaMinus } from "react-icons/fa";
 
-import { deletePerson as deletePersonApi } from "../utils/familyTreeApi";
+import {
+  deletePerson as deletePersonApi,
+  fetchFamilyTreeAggregate,
+  getMembersNotInTree,
+  permanentlyDeleteStructuralDummy as permanentlyDeleteStructuralDummyApi,
+  replaceStructuralDummy as replaceStructuralDummyApi,
+} from "../utils/familyTreeApi";
 
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 
@@ -1131,24 +1137,137 @@ const FamilyTreePage = () => {
     }
   }, [useHierarchical]);
 
+  const hydrateTreeFromPeople = useCallback(
+    (people, preferredRootId = null) => {
+      if (!Array.isArray(people) || people.length === 0) {
+        setTree(null);
+        setStats({ total: 0, male: 0, female: 0, generations: 0 });
+        setSelectedPersonId(null);
+        return null;
+      }
+
+      const newTree = new FamilyTree();
+      newTree.people = new Map();
+
+      people.forEach((person) => {
+        const normalizedId = Number(person?.id);
+        if (!Number.isFinite(normalizedId)) return;
+
+        newTree.people.set(normalizedId, {
+          ...person,
+          id: normalizedId,
+          isExternalLinked: normalizeExternalLinked(person?.isExternalLinked),
+          memberId: person?.memberId !== undefined ? person.memberId : null,
+          userId:
+            person?.userId !== undefined
+              ? person.userId
+              : person?.memberId !== undefined
+                ? person.memberId
+                : null,
+          name:
+            typeof person?.name === "string"
+              ? person.name.trim()
+              : person?.name,
+          parents: new Set((person?.parents || []).map((id) => Number(id))),
+          children: new Set((person?.children || []).map((id) => Number(id))),
+          spouses: new Set((person?.spouses || []).map((id) => Number(id))),
+          siblings: new Set((person?.siblings || []).map((id) => Number(id))),
+        });
+      });
+
+      const personIds = Array.from(newTree.people.keys());
+      newTree.nextId = personIds.length ? Math.max(...personIds) + 1 : 1;
+
+      const preferredId = Number(preferredRootId);
+      const currentRootId = Number(tree?.rootId);
+      if (Number.isFinite(preferredId) && newTree.people.has(preferredId)) {
+        newTree.rootId = preferredId;
+      } else if (Number.isFinite(currentRootId) && newTree.people.has(currentRootId)) {
+        newTree.rootId = currentRootId;
+      } else {
+        newTree.rootId = personIds[0] || null;
+      }
+
+      updateStats(newTree);
+      setSelectedPersonId((prev) => {
+        const currentSelected = Number(prev);
+        if (Number.isFinite(currentSelected) && newTree.people.has(currentSelected)) {
+          return currentSelected;
+        }
+        return newTree.rootId || null;
+      });
+      setTree((prev) => {
+        const arranged = arrangeTree(newTree);
+        return arranged || newTree;
+      });
+      return newTree;
+    },
+    [arrangeTree, tree?.rootId],
+  );
+
+  const refreshTreeFromServer = useCallback(
+    async (preferredRootId = null) => {
+      if (!familyCodeToUse) return null;
+      const data = await fetchFamilyTreeAggregate(familyCodeToUse);
+      const people = Array.isArray(data?.nodes)
+        ? data.nodes
+        : Array.isArray(data?.people)
+          ? data.people
+          : [];
+      hydrateTreeFromPeople(people, preferredRootId);
+      setHasUnsavedChanges(false);
+      return data;
+    },
+    [familyCodeToUse, hydrateTreeFromPeople],
+  );
+
+  const getMissingParentTypes = useCallback((person) => {
+    if (!tree || !person) {
+      return [];
+    }
+
+    const parentIds = Array.from(person?.parents || []).map((id) => Number(id));
+    if (!parentIds.length) {
+      return ["father", "mother"];
+    }
+
+    const presentRoles = new Set();
+    parentIds.forEach((parentId) => {
+      const parent = tree.people.get(parentId);
+      const gender = String(parent?.gender || "").trim().toLowerCase();
+      if (gender === "male" || gender === "m" || gender === "man") {
+        presentRoles.add("father");
+      } else if (gender === "female" || gender === "f" || gender === "woman") {
+        presentRoles.add("mother");
+      }
+    });
+
+    const missing = [];
+    if (!presentRoles.has("father")) missing.push("father");
+    if (!presentRoles.has("mother")) missing.push("mother");
+
+    if (!missing.length && parentIds.length < 2) {
+      return ["father", "mother"];
+    }
+
+    return parentIds.length >= 2 ? [] : missing;
+  }, [tree]);
+
   const handlePersonClick = (personId) => {
     if (!tree) return;
 
     const person = tree.people.get(personId);
-
     if (!person) return;
 
     let relationshipCodeToRoot = "";
 
     try {
       const calculator = new RelationshipCalculator(tree);
-
       const rel = calculator.calculateRelationship(tree.rootId, personId);
-
       relationshipCodeToRoot = rel?.relationshipCode
         ? String(rel.relationshipCode)
         : "";
-    } catch (_) { }
+    } catch (_) {}
 
     const isSpouseCard =
       typeof relationshipCodeToRoot === "string" &&
@@ -1156,14 +1275,15 @@ const FamilyTreePage = () => {
         relationshipCodeToRoot.endsWith("W"));
 
     const isMaternalAncestorCard =
-      typeof relationshipCodeToRoot === "string" &&
-      /^M+$/.test(relationshipCodeToRoot);
+      typeof relationshipCodeToRoot === "string" && /^M+$/.test(relationshipCodeToRoot);
 
     const isRestrictedCard = isSpouseCard || isMaternalAncestorCard;
-
     const isExternalLinkedCard =
       Boolean(person.isExternalLinked) ||
       Boolean(person.canonicalFamilyCode && person.canonicalNodeUid);
+    const isStructuralDummyCard =
+      Boolean(person?.isStructuralDummy) ||
+      person?.nodeType === "structural_dummy";
 
     const canEditSelectedPersonDetails = !(
       person?.isAppUser &&
@@ -1172,99 +1292,91 @@ const FamilyTreePage = () => {
       Number(person.memberId) !== Number(userInfo.userId)
     );
 
-    // Set selected person for relationship display
-
     setSelectedPersonId(personId);
-
-    // Set up icons with English labels (no translation except for relationships)
 
     const icons = {
       "Add Parents": `<svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4zM20 10h-2V8h-2v2h-2v2h2v2h2v-2h2v-2z"/></svg>`,
-
       "Add Spouse": `<svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>`,
-
       "Add Child": `<svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>`,
-
       "Add Sibling": `<svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14zM12 10h-2v2H8v-2H6V8h2V6h2v2h2v2z"/></svg>`,
-
       "Link Tree": `<svg viewBox="0 0 24 24"><path d="M3.9 12a5 5 0 015-5h3v2h-3a3 3 0 000 6h3v2h-3a5 5 0 01-5-5zm7.1 1h2v-2h-2v2zm4-6h3a5 5 0 010 10h-3v-2h3a3 3 0 000-6h-3V7z"/></svg>`,
-
       Edit: `<svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>`,
-
       Delete: `<svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>`,
-
-      Unlink: `<svg viewBox="0 0 24 24"><path d="M17 7h-2V5h2a5 5 0 010 10h-2v-2h2a3 3 0 000-6zM9 7V5H7a5 5 0 000 10h2v-2H7a3 3 0 010-6h2zm1 6h4v-2h-4v2z"/></svg>`,
+      "Replace Removed Member": `<svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.95 7.95 0 0012 4V1L7 6l5 5V7a5 5 0 11-4.9 6h-2.02A7 7 0 1017.65 6.35z"/></svg>`,
+      "Delete Permanently": `<svg viewBox="0 0 24 24"><path d="M9 3h6l1 1h4v2H4V4h4l1-1zm1 6h2v8h-2V9zm4 0h2v8h-2V9zM6 9h2v8H6V9z"/></svg>`,
     };
 
     const items = [];
 
-    if (isRestrictedCard) {
+    if (isStructuralDummyCard) {
+      if (canEdit) {
+        items.push({
+          label: "Replace Removed Member",
+          action: () => replaceStructuralDummyCard(person),
+          icon: icons["Replace Removed Member"],
+        });
+        items.push({
+          label: "Delete Permanently",
+          action: () => permanentlyDeleteStructuralDummyCard(person),
+          icon: icons["Delete Permanently"],
+        });
+      }
+    } else if (isRestrictedCard) {
       items.push({
         label: "Add Spouse",
-
-        action: () => { },
-
+        action: () => {},
         icon: icons["Add Spouse"],
-
         disabled: true,
       });
 
       items.push({
         label: "Add Child",
-
         action: () =>
           setModal({ isOpen: true, action: { type: "children", person } }),
-
         icon: icons["Add Child"],
       });
 
       if (canEdit && !person?.isAppUser) {
         items.push({
           label: "Edit",
-
           action: () =>
             setModal({ isOpen: true, action: { type: "edit", person } }),
-
           icon: icons["Edit"],
         });
       }
     } else {
-      if (person.parents.size === 0) {
+      const missingParentTypes = getMissingParentTypes(person);
+      if (missingParentTypes.length > 0) {
         items.push({
           label: "Add Parents",
-
           action: () =>
-            setModal({ isOpen: true, action: { type: "parents", person } }),
-
+            setModal({
+              isOpen: true,
+              action: { type: "parents", person, missingParentTypes },
+            }),
           icon: icons["Add Parents"],
         });
       }
 
       items.push({
         label: "Add Spouse",
-
         action: () =>
           setModal({ isOpen: true, action: { type: "spouse", person } }),
-
         icon: icons["Add Spouse"],
       });
 
       items.push({
         label: "Add Child",
-
         action: () =>
           setModal({ isOpen: true, action: { type: "children", person } }),
-
         icon: icons["Add Child"],
       });
 
       if (person.parents.size > 0) {
         items.push({
           label: "Add Sibling",
-
           action: () =>
             setModal({ isOpen: true, action: { type: "siblings", person } }),
-
           icon: icons["Add Sibling"],
         });
       }
@@ -1272,16 +1384,13 @@ const FamilyTreePage = () => {
       if (canEditSelectedPersonDetails) {
         items.push({
           label: "Edit",
-
           action: () =>
             setModal({ isOpen: true, action: { type: "edit", person } }),
-
           icon: icons["Edit"],
         });
       }
     }
 
-    // Link Tree (admin only): request a cross-family link from this local card.
     if (
       canEdit &&
       !isExternalLinkedCard &&
@@ -1295,43 +1404,25 @@ const FamilyTreePage = () => {
       });
     }
 
-    if (person.id !== tree?.rootId) {
-      if (isExternalLinkedCard) {
-        if (canEdit) {
-          if (isRestrictedCard) {
-            items.push({
-              label: "Delete",
-
-              action: () => unlinkExternalCard(person),
-
-              icon: icons["Delete"],
-            });
-          } else {
-            items.push({
-              label: "Unlink",
-
-              action: () => unlinkExternalCard(person),
-
-              icon: icons["Unlink"],
-            });
-          }
-        }
-      } else {
-        items.push({
-          label: "Delete",
-
-          action: () => deletePerson(personId),
-
-          icon: icons["Delete"],
-        });
-      }
+    if (canEdit) {
+      items.push({
+        label: "Delete",
+        action: () => deletePerson(personId),
+        icon: icons["Delete"],
+      });
     }
 
-    // Calculate position for radial menu
+    if (!items.length) {
+      setRadialMenu({
+        isActive: false,
+        position: { x: 0, y: 0 },
+        items: [],
+        activePersonId: null,
+      });
+      return;
+    }
 
-    const personElement = document.querySelector(
-      `[data-person-id="${personId}"]`,
-    );
+    const personElement = document.querySelector(`[data-person-id="${personId}"]`);
 
     if (personElement) {
       const actionButton = personElement.querySelector(".radial-menu-button");
@@ -1341,15 +1432,11 @@ const FamilyTreePage = () => {
 
       setRadialMenu({
         isActive: true,
-
         position: {
           x: rect.left + rect.width / 2 + window.scrollX,
-
           y: rect.top + rect.height / 2 + window.scrollY,
         },
-
         items,
-
         activePersonId: personId,
       });
     }
@@ -1519,21 +1606,32 @@ const FamilyTreePage = () => {
     }
 
     if (type === "parents") {
-      persons.forEach((personData) => {
-        const parentId = personIdMap.get(personData);
+      const existingParentIds = Array.from(basePersonInNewTree.parents || []).map((id) => Number(id));
+      const incomingParentIds = persons
+        .map((personData) => personIdMap.get(personData))
+        .filter((id) => Number.isFinite(Number(id)))
+        .map((id) => Number(id));
+      const combinedParentIds = Array.from(
+        new Set([...existingParentIds, ...incomingParentIds]),
+      );
 
-        if (parentId) {
+      if (combinedParentIds.length > 2) {
+        Swal.fire({
+          icon: "warning",
+          title: "Parents already complete",
+          text: "This child already has two parents in the tree. Remove or permanently delete a placeholder first if you need to change them.",
+        });
+        return;
+      }
+
+      incomingParentIds.forEach((parentId) => {
+        if (!existingParentIds.includes(parentId)) {
           newTree.addRelation(parentId, basePersonInNewTree.id, "parent-child");
         }
       });
 
-      // If two parents, add spouse relation
-
-      if (persons.length === 2) {
-        const parent1 = personIdMap.get(persons[0]);
-
-        const parent2 = personIdMap.get(persons[1]);
-
+      if (combinedParentIds.length === 2) {
+        const [parent1, parent2] = combinedParentIds;
         if (parent1 && parent2) {
           newTree.addRelation(parent1, parent2, "spouse");
         }
@@ -1586,123 +1684,181 @@ const FamilyTreePage = () => {
     setHasUnsavedChanges(true); // Mark as changed
   };
 
-  const deletePerson = async (personId) => {
-    if (!tree) return;
+  const replaceStructuralDummyCard = async (person) => {
+    if (!person?.id || !familyCodeToUse) return;
 
-    const currentPerson = tree.people.get(personId);
+    try {
+      const response = await getMembersNotInTree(familyCodeToUse);
+      const candidates = Array.isArray(response?.data) ? response.data : [];
 
-    if (currentPerson && currentPerson.isExternalLinked) {
-      Swal.fire({
-        icon: "info",
+      if (!candidates.length) {
+        await Swal.fire({
+          icon: "info",
+          title: "No replacement members available",
+          text: "There are no approved members outside the tree right now. You can permanently delete this placeholder and add a brand-new member from the tree instead.",
+        });
+        return;
+      }
 
-        title: "Cannot Delete Linked Card",
+      const inputOptions = candidates.reduce((acc, candidate) => {
+        const candidateUserId = Number(candidate?.user?.id || candidate?.userId || candidate?.memberId);
+        if (!candidateUserId) return acc;
+        const candidateName =
+          String(candidate?.user?.fullName || candidate?.name || "").trim() ||
+          `Member #${candidateUserId}`;
+        acc[candidateUserId] = `${candidateName} (${candidateUserId})`;
+        return acc;
+      }, {});
 
-        text: "This card is a linked/external card. It is protected from deletion during normal save.",
+      if (!Object.keys(inputOptions).length) {
+        await Swal.fire({
+          icon: "info",
+          title: "No replacement members available",
+          text: "There are no approved members outside the tree right now.",
+        });
+        return;
+      }
+
+      const { value: replacementUserId } = await Swal.fire({
+        icon: "question",
+        title: "Replace removed member",
+        text: "Choose an approved member who is not already placed in this tree.",
+        input: "select",
+        inputOptions,
+        inputPlaceholder: "Select a member",
+        showCancelButton: true,
+        confirmButtonText: "Replace",
+        inputValidator: (value) => (!value ? "Please select a member" : undefined),
       });
 
+      if (!replacementUserId) {
+        return;
+      }
+
+      const result = await replaceStructuralDummyApi(
+        person.id,
+        familyCodeToUse,
+        Number(replacementUserId),
+      );
+      await refreshTreeFromServer(
+        Number(person.id) === Number(tree?.rootId) ? person.id : tree?.rootId,
+      );
+
+      await Swal.fire({
+        icon: "success",
+        title: "Tree Updated",
+        text: result?.message || "Removed member replaced successfully.",
+        timer: 2200,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      console.error("Error replacing structural dummy:", error);
+      await Swal.fire({
+        icon: "error",
+        title: "Replace Failed",
+        text: error?.message || "Unable to replace this removed member right now.",
+      });
+    }
+  };
+
+  const permanentlyDeleteStructuralDummyCard = async (person) => {
+    if (!person?.id || !familyCodeToUse) return;
+
+    const result = await Swal.fire({
+      icon: "warning",
+      title: "Delete this placeholder permanently?",
+      text: "This removes the placeholder card from the tree completely. Use this when you want to add a fresh new person instead of keeping the removed-member slot.",
+      showCancelButton: true,
+      confirmButtonText: "Delete permanently",
+      cancelButtonText: "Cancel",
+    });
+
+    if (!result.isConfirmed) {
       return;
     }
 
-    if (personId === tree.rootId) {
-      Swal.fire({
-        icon: "info",
+    try {
+      const response = await permanentlyDeleteStructuralDummyApi(person.id, familyCodeToUse);
+      await refreshTreeFromServer(
+        Number(person.id) === Number(tree?.rootId) ? null : tree?.rootId,
+      );
 
-        title: "Cannot Delete Root",
-
-        text: "Cannot delete the root person.",
+      await Swal.fire({
+        icon: "success",
+        title: "Placeholder Removed",
+        text: response?.message || "Removed-member placeholder deleted permanently.",
+        timer: 2200,
+        showConfirmButton: false,
       });
+    } catch (error) {
+      console.error("Error deleting structural dummy permanently:", error);
+      await Swal.fire({
+        icon: "error",
+        title: "Delete Failed",
+        text: error?.message || "Unable to delete this placeholder right now.",
+      });
+    }
+  };
 
+  const deletePerson = async (personId) => {
+    if (!tree || !familyCodeToUse) return;
+
+    const currentPerson = tree.people.get(personId);
+    if (!currentPerson) return;
+
+    if (
+      currentPerson?.isStructuralDummy ||
+      currentPerson?.nodeType === "structural_dummy"
+    ) {
+      await Swal.fire({
+        icon: "info",
+        title: "Tree Placeholder",
+        text: "This structural dummy only exists to preserve the tree layout.",
+      });
       return;
     }
 
     const result = await Swal.fire({
       icon: "warning",
 
-      title: "Are you sure?",
+      title: "Delete this member?",
 
-      text: "You are about to delete this person. This action cannot be undone.",
+      text: "This will convert the card into a structural placeholder in the tree and remove the real member from other modules.",
 
       showCancelButton: true,
 
-      confirmButtonText: "Yes, delete it!",
+      confirmButtonText: "Yes, delete",
 
-      cancelButtonText: "No, cancel!",
+      cancelButtonText: "Cancel",
     });
 
-    if (result.isConfirmed) {
-      // Call backend API to persist deletion
-      try {
-        await deletePersonApi(personId, familyCodeToUse);
+    if (!result.isConfirmed) {
+      return;
+    }
 
-        // Backend deletion successful, now update local state
-        const newTree = new FamilyTree();
+    try {
+      const response = await deletePersonApi(personId, familyCodeToUse);
+      await refreshTreeFromServer(
+        Number(personId) === Number(tree?.rootId) ? personId : tree?.rootId,
+      );
+      setSelectedPersonId(personId);
 
-        newTree.people = new Map(tree.people);
-
-        newTree.nextId = tree.nextId;
-
-        newTree.rootId = tree.rootId;
-
-        const personToDelete = newTree.people.get(personId);
-
-        if (!personToDelete) return;
-
-        const relatives = new Set([
-          ...personToDelete.parents,
-
-          ...personToDelete.children,
-
-          ...personToDelete.spouses,
-
-          ...personToDelete.siblings,
-        ]);
-
-        relatives.forEach((relId) => {
-          const relative = newTree.people.get(relId);
-
-          if (relative) {
-            relative.parents.delete(personId);
-
-            relative.children.delete(personId);
-
-            relative.spouses.delete(personId);
-
-            relative.siblings.delete(personId);
-          }
-        });
-
-        newTree.people.delete(personId);
-
-        setTree((prev) => {
-          const arranged = arrangeTree(newTree);
-          return arranged || newTree;
-        });
-
-        updateStats(newTree);
-
-        setHasUnsavedChanges(true); // Mark as changed
-
-        if (selectedPersonId === personId) {
-          setSelectedPersonId(null);
-        }
-
-        // Show success message
-        await Swal.fire({
-          icon: "success",
-          title: "Deleted",
-          text: "Person has been removed from the family tree.",
-          timer: 2000,
-          showConfirmButton: false,
-        });
-
-      } catch (error) {
-        console.error("Error deleting person:", error);
-        await Swal.fire({
-          icon: "error",
-          title: "Delete Failed",
-          text: error?.message || "Failed to delete person. Please try again.",
-        });
-      }
+      await Swal.fire({
+        icon: "success",
+        title: "Tree Updated",
+        text:
+          response?.message ||
+          "Member deleted and replaced with a structural placeholder.",
+        timer: 2200,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      console.error("Error deleting person:", error);
+      await Swal.fire({
+        icon: "error",
+        title: "Delete Failed",
+        text: error?.message || "Failed to delete person. Please try again.",
+      });
     }
   };
 
@@ -2206,7 +2362,18 @@ const FamilyTreePage = () => {
       );
 
       if (!response) return;
-      if (!response.ok) throw new Error("Failed to save");
+      if (!response.ok) {
+        let saveErrorMessage = "Failed to save family tree.";
+        try {
+          const errorBody = await response.json();
+          if (errorBody?.message) {
+            saveErrorMessage = Array.isArray(errorBody.message)
+              ? errorBody.message.join(", ")
+              : String(errorBody.message);
+          }
+        } catch (_) { }
+        throw new Error(saveErrorMessage);
+      }
 
       // RELOAD TREE DATA FROM SERVER AFTER SUCCESSFUL SAVE
 
@@ -2390,7 +2557,7 @@ const FamilyTreePage = () => {
 
       setSaveStatus("error");
 
-      setSaveMessage("Failed to save family tree.");
+      setSaveMessage(err?.message || "Failed to save family tree.");
     }
   }, [tree, saveStatus, userInfo, hasUnsavedChanges]); // Dependencies for useCallback
 
@@ -2411,12 +2578,12 @@ const FamilyTreePage = () => {
 
         title: "Error",
 
-        text: "Failed to save family tree.",
+        text: saveMessage || "Failed to save family tree.",
       });
 
       setSaveStatus("idle");
     }
-  }, [saveStatus]);
+  }, [saveStatus, saveMessage]);
 
   // One-shot autosave for first-time root bootstrap when no tree exists in DB.
   useEffect(() => {
@@ -3268,4 +3435,7 @@ const FamilyTreePage = () => {
 };
 
 export default FamilyTreePage;
+
+
+
 

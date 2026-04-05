@@ -361,6 +361,35 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
     };
   }, [birthFamilyCode]);
 
+  const refreshFamilyManagementState = async () => {
+    if (!birthFamilyCode) return;
+
+    const [membersResponse, notInTreeResponse, people] = await Promise.all([
+      authFetch('/family/member/' + birthFamilyCode, { method: 'GET' }),
+      getMembersNotInTree(birthFamilyCode),
+      fetchFamilyTree(birthFamilyCode),
+    ]);
+
+    const nextMembers = Array.isArray(membersResponse?.data)
+      ? membersResponse.data.map(normalizeMember)
+      : [];
+    const nextMembersNotInTree = Array.isArray(notInTreeResponse?.data)
+      ? notInTreeResponse.data.map(normalizeMember)
+      : [];
+    const normalizedPeople = Array.isArray(people) ? people : [];
+    const ids = new Set(
+      normalizedPeople
+        .map((person) => Number(person?.userId || person?.memberId || person?.id))
+        .filter((value) => Number.isFinite(value) && value > 0),
+    );
+
+    setFamilyMembers(nextMembers);
+    setMembersNotInTree(nextMembersNotInTree);
+    setTreeAllPeople(normalizedPeople);
+    setMemberIdsInTree(ids);
+
+    await fetchNonAppUsers();
+  };
   const fetchNonAppUsers = async () => {
     if (!birthFamilyCode) return;
     try {
@@ -381,9 +410,7 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
     try {
       setReplacingDummyIds((prev) => new Set(prev).add(dummyUserId));
       await replaceDummyUser(birthFamilyCode, dummyUserId, replacementUserId);
-      await fetchNonAppUsers();
-      const response = await getMembersNotInTree(birthFamilyCode);
-      setMembersNotInTree(Array.isArray(response?.data) ? response.data.map(normalizeMember) : []);
+      await refreshFamilyManagementState();
     } catch (error) {
       logger.error('Failed to replace dummy user', error);
       await Swal.fire({ icon: 'error', title: 'Replace Failed', text: error?.message || 'Unable to replace this dummy user right now.' });
@@ -410,7 +437,6 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
       logger.error('Failed to share invite', error);
     }
   };
-
   const handleDeleteMember = async (memberId, targetFamilyCode, memberUserId, event) => {
     event?.stopPropagation?.();
     if (!memberId || !birthFamilyCode) return;
@@ -418,18 +444,18 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
     try {
       if (isSelf) {
         await selfRemoveFromFamily(birthFamilyCode);
-      } else {
-        await deleteFamilyMember(memberId, targetFamilyCode || birthFamilyCode);
+        window.location.reload();
+        return;
       }
+
+      await deleteFamilyMember(memberId, targetFamilyCode || birthFamilyCode);
       setDeletedMemberIds((prev) => new Set(prev).add(memberId));
-      setFamilyMembers((prev) => prev.filter((member) => Number(member.memberId) !== Number(memberId)));
-      setMembersNotInTree((prev) => prev.filter((member) => Number(member.memberId) !== Number(memberId)));
+      await refreshFamilyManagementState();
     } catch (error) {
       logger.error('Failed to delete family member', error);
       await Swal.fire({ icon: 'error', title: 'Action Failed', text: error?.message || 'Unable to update this family member right now.' });
     }
   };
-
   const filteredMembers = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
     if (!query) return familyMembers;
@@ -1775,4 +1801,7 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
 };
 
 export default FamilyMemberCard;
+
+
+
 

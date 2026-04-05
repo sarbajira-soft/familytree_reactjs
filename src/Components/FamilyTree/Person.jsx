@@ -437,13 +437,13 @@ function renderRadialMenu({ effectiveViewOnly, memberCount, canShowMoreActionsBu
         </button>
       )}
       <button
-        className="radial-menu-button w-4 h-4 md:w-5 md:h-5 bg-gradient-to-br from-cyan-500 to-sky-600 hover:from-cyan-600 hover:to-sky-700 text-white rounded-full flex items-center justify-center font-bold text-[9px] shadow-lg hover:shadow-xl border-2 border-white"
-        onClick={handleRadialMenuClick}
-        style={{ boxShadow: "0 4px 14px rgba(6, 182, 212, 0.45)", width: memberCount > 50 ? "12px" : "18px", height: memberCount > 50 ? "12px" : "18px" }}
-        title="Add family member"
-      >
-        +
-      </button>
+          className="radial-menu-button w-4 h-4 md:w-5 md:h-5 bg-gradient-to-br from-cyan-500 to-sky-600 hover:from-cyan-600 hover:to-sky-700 text-white rounded-full flex items-center justify-center font-bold text-[9px] shadow-lg hover:shadow-xl border-2 border-white"
+          onClick={handleRadialMenuClick}
+          style={{ boxShadow: "0 4px 14px rgba(6, 182, 212, 0.45)", width: memberCount > 50 ? "12px" : "18px", height: memberCount > 50 ? "12px" : "18px" }}
+          title="Tree actions"
+        >
+          +
+        </button>
     </div>
   );
 }
@@ -903,3 +903,4 @@ Person.propTypes = {
 };
 
 export default Person;
+

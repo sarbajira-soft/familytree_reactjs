@@ -6,12 +6,20 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001
 const API_BASE = `${API_BASE_URL}/family-tree`;
 const FAMILY_API_BASE = `${API_BASE_URL}/family`;
 
-export async function fetchFamilyTree(familyCode) {
+export async function fetchFamilyTreeAggregate(familyCode) {
   if (!familyCode) throw new Error('familyCode is required');
-  const data = await authFetch(`${API_BASE}?familyCode=${familyCode}`, {
+  return await authFetch(`${FAMILY_API_BASE}/tree/${familyCode}`, {
     method: 'GET',
   });
-  return data.people;
+}
+
+export async function fetchFamilyTree(familyCode) {
+  const data = await fetchFamilyTreeAggregate(familyCode);
+  return Array.isArray(data?.nodes)
+    ? data.nodes
+    : Array.isArray(data?.people)
+      ? data.people
+      : [];
 }
 
 export async function addPerson(person, familyCode) {
@@ -45,10 +53,29 @@ export async function editPerson(id, person, familyCode) {
 
 export async function deletePerson(id, familyCode) {
   if (!familyCode) throw new Error('familyCode is required');
-  await authFetch(`${FAMILY_API_BASE}/tree/${familyCode}/person/${id}`, {
+  return await authFetch(`${FAMILY_API_BASE}/tree/${familyCode}/person/${id}`, {
     method: 'DELETE',
   });
-  return true;
+}
+
+export async function replaceStructuralDummy(id, familyCode, replacementUserId) {
+  if (!familyCode) throw new Error('familyCode is required');
+  if (!id) throw new Error('id is required');
+  if (!replacementUserId) throw new Error('replacementUserId is required');
+  return await authFetch(
+    `${FAMILY_API_BASE}/tree/${familyCode}/person/${id}/replace/${replacementUserId}`,
+    {
+      method: 'POST',
+    },
+  );
+}
+
+export async function permanentlyDeleteStructuralDummy(id, familyCode) {
+  if (!familyCode) throw new Error('familyCode is required');
+  if (!id) throw new Error('id is required');
+  return await authFetch(`${FAMILY_API_BASE}/tree/${familyCode}/person/${id}/permanent`, {
+    method: 'DELETE',
+  });
 }
 
 export async function saveFamilyTree(people, familyCode) {
@@ -174,3 +201,4 @@ export async function confirmAccountRecovery(token, identifier) {
   });
   return response;
 }
+

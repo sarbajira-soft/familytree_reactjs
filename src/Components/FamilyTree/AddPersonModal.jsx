@@ -510,10 +510,16 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
         const newForms = [];
         
         if (action.type === 'parents') {
-            newForms.push(
-                { type: 'father', index: 0, gender: 'male' },
-                { type: 'mother', index: 1, gender: 'female' }
-            );
+            const missingParentTypes = Array.isArray(action?.missingParentTypes) && action.missingParentTypes.length > 0
+                ? action.missingParentTypes
+                : ['father', 'mother'];
+            missingParentTypes.forEach((parentType, index) => {
+                newForms.push({
+                    type: parentType,
+                    index,
+                    gender: parentType === 'father' ? 'male' : 'female',
+                });
+            });
         } else if (action.type === 'spouse') {
             newForms.push({ type: 'spouse', index: 0 });
             // Reset phone invite state with all required fields
