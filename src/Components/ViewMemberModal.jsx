@@ -122,7 +122,7 @@ const ViewFamilyMemberModal = ({ isOpen, onClose, member, isLoading = false }) =
       onClick={handleClose}
     >
       <div 
-        className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[95vh] overflow-hidden relative transform transition-all duration-300 ease-out modal-content-animate"
+        className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl mx-auto max-h-[95vh] overflow-hidden relative transform transition-all duration-300 ease-out modal-content-animate flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Loading Overlay */}
@@ -179,16 +179,18 @@ const ViewFamilyMemberModal = ({ isOpen, onClose, member, isLoading = false }) =
         </div>
 
         {/* Content Section */}
-        <div className="p-6 overflow-y-auto max-h-[65vh]">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div className="p-6 overflow-y-auto flex-1">
+          <div className="space-y-6">
             {/* Contact Information */}
             <div className="space-y-3">
               <h3 className="text-base font-bold text-gray-800 mb-3 flex items-center">
                 <FiUser className="mr-2 text-primary-600" />
                 Contact Information
               </h3>
-              <DetailCard icon={<FiMail />} label="Email" value={normalized.email} />
-              <DetailCard icon={<FiPhone />} label="Contact Number" value={`${normalized.countryCode} ${normalized.mobile}`} />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <DetailCard icon={<FiMail />} label="Email" value={normalized.email} />
+                <DetailCard icon={<FiPhone />} label="Contact Number" value={`${normalized.countryCode} ${normalized.mobile}`} />
+              </div>
             </div>
 
             {/* Personal Information */}
@@ -197,10 +199,12 @@ const ViewFamilyMemberModal = ({ isOpen, onClose, member, isLoading = false }) =
                 <FiUser className="mr-2 text-primary-600" />
                 Personal Information
               </h3>
-              <DetailCard icon={<FiCalendar />} label="Date of Birth" value={formatDate(normalized.dob)} />
-              <DetailCard icon={<FiGlobe />} label="Religion" value={normalized.religion} />
-              <DetailCard icon={<FiBookOpen />} label="Language" value={normalized.language} />
-              <DetailCard icon={<FiMapPin />} label="Region" value={normalized.region} />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <DetailCard icon={<FiCalendar />} label="Date of Birth" value={formatDate(normalized.dob)} />
+                <DetailCard icon={<FiGlobe />} label="Religion" value={normalized.religion} />
+                <DetailCard icon={<FiBookOpen />} label="Language" value={normalized.language} />
+                <DetailCard icon={<FiMapPin />} label="Region" value={normalized.region} />
+              </div>
             </div>
 
             {/* Family Information */}
@@ -209,24 +213,28 @@ const ViewFamilyMemberModal = ({ isOpen, onClose, member, isLoading = false }) =
                 <FiUsers className="mr-2 text-primary-600" />
                 Family Information
               </h3>
-              <DetailCard icon={<FiUser />} label="Father's Name" value={normalized.fatherName} />
-              <DetailCard icon={<FiUser />} label="Mother's Name" value={normalized.motherName} />
-              <DetailCard icon={<FiHeart />} label="Marital Status" value={normalized.maritalStatus} />
-              
-              {normalized.maritalStatus === 'Married' && (
-                <>
-                  <DetailCard icon={<FiCalendar />} label="Marriage Date" value={formatDate(normalized.marriageDate)} />
-                  <DetailCard icon={<FiUserCheck />} label="Spouse Name" value={normalized.spouseName} />
-                  <DetailCard icon={<FiUsers />} label="Children Count" value={normalized.childrenCount} />
-                  {normalized.childrenNames.length > 0 && (
-                    <DetailCard 
-                      icon={<FiUserPlus />} 
-                      label="Children Names" 
-                      value={normalized.childrenNames.join(', ')} 
-                    />
-                  )}
-                </>
-              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <DetailCard icon={<FiUser />} label="Father's Name" value={normalized.fatherName} />
+                <DetailCard icon={<FiUser />} label="Mother's Name" value={normalized.motherName} />
+                <DetailCard icon={<FiHeart />} label="Marital Status" value={normalized.maritalStatus} />
+
+                {normalized.maritalStatus === 'Married' && (
+                  <>
+                    <DetailCard icon={<FiCalendar />} label="Marriage Date" value={formatDate(normalized.marriageDate)} />
+                    <DetailCard icon={<FiUserCheck />} label="Spouse Name" value={normalized.spouseName} />
+                    <DetailCard icon={<FiUsers />} label="Children Count" value={normalized.childrenCount} />
+                    {normalized.childrenNames.length > 0 && (
+                      <div className="md:col-span-2">
+                        <DetailCard
+                          icon={<FiUserPlus />}
+                          label="Children Names"
+                          value={normalized.childrenNames.join(', ')}
+                        />
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
 
             {/* Family Details */}
@@ -235,19 +243,23 @@ const ViewFamilyMemberModal = ({ isOpen, onClose, member, isLoading = false }) =
                 <FiHome className="mr-2 text-primary-600" />
                 Family Details
               </h3>
-              <DetailCard 
-                icon={<FiUsers />} 
-                label="Family Code" 
-                value={member?.raw?.userProfile?.familyCode || member?.familyCode || 'N/A'} 
-              />
-              <DetailCard 
-                icon={<FiUserCheck />} 
-                label="Approval Status" 
-                value={formatApprovalStatus(member?.raw?.userProfile?.familyMember?.approveStatus)} 
-                customValueClass={getStatusColor(member?.raw?.userProfile?.familyMember?.approveStatus)}
-              />
-              <DetailCard icon={<FiMapPin />} label="Region" value={normalized.region} />
-              <DetailCard icon={<FiLocation />} label="Address" value={normalized.address} />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <DetailCard
+                  icon={<FiUsers />}
+                  label="Family Code"
+                  value={member?.raw?.userProfile?.familyCode || member?.familyCode || 'N/A'}
+                />
+                <DetailCard
+                  icon={<FiUserCheck />}
+                  label="Approval Status"
+                  value={formatApprovalStatus(member?.raw?.userProfile?.familyMember?.approveStatus)}
+                  customValueClass={getStatusColor(member?.raw?.userProfile?.familyMember?.approveStatus)}
+                />
+                <DetailCard icon={<FiMapPin />} label="Region" value={normalized.region} />
+                <div className="md:col-span-2">
+                  <DetailCard icon={<FiLocation />} label="Address" value={normalized.address} />
+                </div>
+              </div>
             </div>
 
             {/* Cultural Information */}
@@ -256,13 +268,15 @@ const ViewFamilyMemberModal = ({ isOpen, onClose, member, isLoading = false }) =
                 <FiBookOpen className="mr-2 text-primary-600" />
                 Cultural Information
               </h3>
-              <DetailCard icon={<FiBookOpen />} label="Caste" value={normalized.caste} />
-              <DetailCard icon={<FiBookOpen />} label="Gothram" value={normalized.gothram} />
-              <DetailCard icon={<FiBookOpen />} label="Kuladevata" value={normalized.kuladevata} />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <DetailCard icon={<FiBookOpen />} label="Caste" value={normalized.caste} />
+                <DetailCard icon={<FiBookOpen />} label="Gothram" value={normalized.gothram} />
+                <DetailCard icon={<FiBookOpen />} label="Kuladevata" value={normalized.kuladevata} />
+              </div>
             </div>
 
             {/* Preferences & Interests */}
-            <div className="space-y-3 lg:col-span-2">
+            <div className="space-y-3">
               <h3 className="text-base font-bold text-gray-800 mb-3 flex items-center">
                 <FiSmile className="mr-2 text-primary-600" />
                 Preferences & Interests
@@ -277,7 +291,7 @@ const ViewFamilyMemberModal = ({ isOpen, onClose, member, isLoading = false }) =
 
             {/* Bio */}
             {normalized.bio && normalized.bio !== 'N/A' && (
-              <div className="lg:col-span-2 space-y-3">
+              <div className="space-y-3">
                 <h3 className="text-base font-bold text-gray-800 mb-3 flex items-center">
                   <FiBookOpen className="mr-2 text-primary-600" />
                   Bio
@@ -289,7 +303,7 @@ const ViewFamilyMemberModal = ({ isOpen, onClose, member, isLoading = false }) =
             )}
 
             {/* Last Updated */}
-            <div className="lg:col-span-2">
+            <div>
               <div className="flex items-center justify-center text-xs text-gray-500 bg-gray-50 rounded-lg p-2 transition-smooth">
                 <FiClock className="mr-2" />
                 Last updated: {formatDate(normalized.updatedAt)}

@@ -997,8 +997,8 @@ const CreatePostModal = ({
 
         {/* Header */}
 
-        <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-gray-200 flex justify-between items-center bg-gradient-to-r from-blue-50 via-purple-50 to-pink-50">
-          <h2 className="text-lg sm:text-2xl font-bold bg-gradient-to-r from-primary-600  to-primary-800 bg-clip-text text-transparent">
+        <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-gray-200 flex justify-between items-center bg-primary-500">
+          <h2 className="text-lg sm:text-2xl font-bold  b text-white">
             {mode === "create" ? "Create New Post" : "Edit Post"}
           </h2>
 
@@ -1306,7 +1306,8 @@ const CreatePostModal = ({
 
           {/* Action Buttons */}
 
-          <div className="bg-gradient-to-r from-blue-50 via-purple-50 to-pink-50 rounded-xl p-3 sm:p-4 border border-blue-100">
+          {/* <div className="bg-gradient-to-r from-blue-50 via-purple-50 to-pink-50 rounded-xl p-3 sm:p-4 border border-blue-100"> */}
+          <div className="bg-gray-100 rounded-xl p-3 sm:p-4 border border-blue-100">
             <p className="text-xs sm:text-sm font-semibold text-gray-700 mb-2 sm:mb-3">
               Add to your post
             </p>

@@ -56,6 +56,23 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
   const [associatedFamilyNameMap, setAssociatedFamilyNameMap] = useState({});
   const [linkedFamilyNameMap, setLinkedFamilyNameMap] = useState({});
   // BLOCK OVERRIDE: Add state for blocked users from API
+
+  const handleViewMember = async (userId, e) => {
+    e?.stopPropagation?.();
+
+    const key = String(userId ?? '');
+    if (!key) return;
+    if (viewLoadingStates[key]) return;
+
+    setViewLoadingStates((prev) => ({ ...prev, [key]: true }));
+    try {
+      if (typeof onViewMember === 'function') {
+        await onViewMember(userId);
+      }
+    } finally {
+      setViewLoadingStates((prev) => ({ ...prev, [key]: false }));
+    }
+  };
   const [blockedUsers, setBlockedUsers] = useState([]);
   const [loadingBlocked, setLoadingBlocked] = useState(false);
   const [privacySettings, setPrivacySettings] = useState(() =>

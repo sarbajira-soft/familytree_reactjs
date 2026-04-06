@@ -37,6 +37,7 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
 
     // Duplicate prevention state
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [showSuccess, setShowSuccess] = useState(false);
 
     const coverPhotoInputRef = useRef(null);
     const galleryPhotoInputRef = useRef(null);
@@ -80,6 +81,7 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
         setCurrentGalleryPhotos([]);
         setRemovedImageIds([]);
         setIsSubmitting(false);
+        setShowSuccess(false);
         if (coverPhotoInputRef.current) coverPhotoInputRef.current.value = '';
         if (galleryPhotoInputRef.current) galleryPhotoInputRef.current.value = '';
     }, [isOpen, mode, albumData, currentUser?.familyCode, userInfo?.familyCode, userInfo?.approveStatus]);
@@ -105,6 +107,7 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
         setCoverPhotoError('');
         setGalleryPhotosError('');
         setIsSubmitting(false); // Reset submission state
+        setShowSuccess(false);
         if (coverPhotoInputRef.current) coverPhotoInputRef.current.value = '';
         if (galleryPhotoInputRef.current) galleryPhotoInputRef.current.value = '';
     };
@@ -288,16 +291,11 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
 
             // Wait for the parent to handle the update (refetch data)
             await onCreateAlbum(result);
-            handleClose();
-
-            Swal.fire({
-                icon: 'success',
-                title: mode === 'create' ? 'Album created' : 'Album updated',
-                text: mode === 'create'
-                    ? 'Your album is now visible based on the privacy you selected.'
-                    : 'Your changes have been saved.',
-                confirmButtonColor: '#3f982c',
-            });
+            setShowSuccess(true);
+            setTimeout(() => {
+                setShowSuccess(false);
+                handleClose();
+            }, 2000);
 
         } catch (err) {
             console.error(err);
@@ -318,10 +316,52 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
 
     return (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 transition-opacity duration-300 overflow-hidden">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-auto transform transition-all duration-300 scale-100 opacity-100 max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-auto transform transition-all duration-300 scale-100 opacity-100 max-h-[90vh] overflow-hidden flex flex-col relative">
+                {showSuccess && (
+                    <div className="absolute inset-0 bg-white/95 backdrop-blur-sm flex flex-col items-center justify-center z-50 p-4 sm:p-6 text-center animate-fadeIn">
+                        <div className="bg-white rounded-3xl p-6 sm:p-10 shadow-2xl max-w-sm w-full border-4 border-green-500 transform animate-scaleIn">
+                            <div className="w-20 h-20 sm:w-24 sm:h-24 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center mb-5 sm:mb-6 mx-auto shadow-lg animate-bounce">
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    className="h-12 w-12 sm:h-14 sm:w-14 text-white"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={3}
+                                        d="M5 13l4 4L19 7"
+                                    />
+                                </svg>
+                            </div>
+
+                            <h3 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-3">
+                                Success!
+                            </h3>
+
+                            <p className="text-gray-600 mb-6 text-base sm:text-lg">
+                                {mode === 'create'
+                                    ? 'Gallery created successfully!'
+                                    : 'Gallery updated successfully!'}
+                            </p>
+
+                            <button
+                                className="bg-gradient-to-r from-green-500 to-green-600 text-white px-8 sm:px-10 py-3 rounded-full font-semibold text-base sm:text-lg shadow-lg hover:shadow-xl hover:from-green-600 hover:to-green-700 transition-all transform hover:scale-105 active:scale-95"
+                                onClick={() => {
+                                    setShowSuccess(false);
+                                    handleClose();
+                                }}
+                            >
+                                OK
+                            </button>
+                        </div>
+                    </div>
+                )}
                 {/* Header */}
-                <div className="p-5 border-b border-gray-100 flex justify-between items-center">
-                    <h2 className="text-xl font-bold text-gray-800">{mode === 'create' ? 'Create New Album' : 'Edit Album'}</h2>
+                <div className="p-5 border-b bg-primary-500 border-gray-100 flex justify-between items-center">
+                    <h2 className="text-xl font-bold text-white">{mode === 'create' ? 'Create New Album' : 'Edit Album'}</h2>
                     <button
                         onClick={handleClose}
                         disabled={isSubmitting}
