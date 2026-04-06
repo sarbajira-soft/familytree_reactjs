@@ -7,6 +7,8 @@ import { useUser } from '../Contexts/UserContext';
 const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authToken, mode = 'create', albumData = null }) => {
     const { userInfo } = useUser();
 
+    const MAX_CAPTION_LENGTH = 250;
+
     const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
     const MAX_IMAGE_ERROR = 'Image is too large. Please select an image less than 5MB.';
 
@@ -68,6 +70,16 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
             setIsSubmitting(false);
             if (coverPhotoInputRef.current) coverPhotoInputRef.current.value = '';
             if (galleryPhotoInputRef.current) galleryPhotoInputRef.current.value = '';
+            return;
+        }
+
+        if (String(description || '').length > MAX_CAPTION_LENGTH) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Caption too long',
+                text: `Caption must be ${MAX_CAPTION_LENGTH} characters or less.`,
+                confirmButtonColor: '#d33',
+            });
             return;
         }
 
@@ -204,6 +216,16 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
                 icon: 'warning',
                 title: 'Missing Title',
                 text: 'Album title is required!',
+                confirmButtonColor: '#d33',
+            });
+            return;
+        }
+
+        if (String(description || '').length > MAX_CAPTION_LENGTH) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Caption too long',
+                text: `Caption must be ${MAX_CAPTION_LENGTH} characters or less.`,
                 confirmButtonColor: '#d33',
             });
             return;
@@ -403,14 +425,18 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
                         <textarea
                             id="albumDescription"
                             value={description}
-                            onChange={(e) => setDescription(e.target.value)}
+                            onChange={(e) => setDescription(e.target.value.slice(0, MAX_CAPTION_LENGTH))}
+                            maxLength={MAX_CAPTION_LENGTH}
                             disabled={isSubmitting}
                             rows="3"
                             className={`w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-300 text-gray-800 placeholder-gray-400 resize-none transition-all ${
                                 isSubmitting ? 'opacity-50 cursor-not-allowed' : ''
                             }`}
-                            placeholder="Describe your album..."
-                        ></textarea>
+                        />
+
+                        <div className="mt-1 text-xs text-gray-400 text-right">
+                            {String(description || '').length} / {MAX_CAPTION_LENGTH}
+                        </div>
                     </div>
 
                     {/* Privacy Setting */}

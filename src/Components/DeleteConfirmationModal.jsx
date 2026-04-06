@@ -56,7 +56,7 @@ const DeleteConfirmationModal = ({
           <button
             onClick={onConfirm}
             disabled={isDeleting}
-            className="flex-1 px-4 py-2.5 rounded-xl bg-secondary-500 text-white font-medium hover:bg-red-600 transition-colors shadow-lg shadow-red-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="flex-1 px-4 py-2.5 rounded-xl bg-secondary-500 text-white font-medium hover:bg-secondary-600 transition-colors shadow-lg shadow-red-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {isDeleting ? (
               <>
