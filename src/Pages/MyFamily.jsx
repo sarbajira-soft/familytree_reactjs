@@ -192,6 +192,14 @@ const FamilyHubPage = () => {
   const handleLeaveFamily = async () => {
     const familyCode = userInfo?.familyCode || familyData?.familyCode;
     if (!familyCode || !token) return;
+    if (!canLeaveFamily) {
+      await Swal.fire({
+        icon: 'info',
+        title: 'Leave Family Unavailable',
+        text: 'Family admins cannot use Leave Family. Please transfer or remove admin access first.',
+      });
+      return;
+    }
 
     const confirm = await Swal.fire({
       icon: 'warning',
@@ -275,6 +283,7 @@ const FamilyHubPage = () => {
 
 
   const hasAuthToken = Boolean(getToken());
+  const canLeaveFamily = ![2, 3].includes(Number(userInfo?.role || 0));
   const userInfoResolved =
     userInfo != null &&
     (typeof userInfo.approveStatus !== 'undefined' ||
@@ -365,6 +374,7 @@ const FamilyHubPage = () => {
                   onShareFamilyCode={handleShareFamilyCode}
                   onLeaveFamily={handleLeaveFamily}
                   leavingFamily={leavingFamily}
+                  canLeaveFamily={canLeaveFamily}
                 />
 
                 <FamilyOverView
