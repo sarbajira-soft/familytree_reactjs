@@ -15,6 +15,8 @@ import Swal from 'sweetalert2';
 import { authFetch, authFetchResponse } from '../utils/authFetch';
 import { getToken } from '../utils/auth';
 
+const normalizeFamilyCode = (value) => String(value || '').trim().toUpperCase();
+
 const FamilyHubPage = () => {
   const navigate = useNavigate();
   const [token, setToken] = useState(null);
@@ -191,7 +193,25 @@ const FamilyHubPage = () => {
 
   const handleLeaveFamily = async () => {
     const familyCode = userInfo?.familyCode || familyData?.familyCode;
-    if (!familyCode || !token) return;
+    const accessToken = token || getToken();
+
+    if (!familyCode) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Family Not Available',
+        text: 'Your family code could not be found. Please refresh and try again.',
+      });
+      return;
+    }
+
+    if (!accessToken) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Session Expired',
+        text: 'Please sign in again and then try Leave Family.',
+      });
+      return;
+    }
     if (!canLeaveFamily) {
       await Swal.fire({
         icon: 'info',
@@ -227,7 +247,7 @@ const FamilyHubPage = () => {
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/family/member/self/${familyCode}`, {
         method: 'DELETE',
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
         },
       });
@@ -283,7 +303,21 @@ const FamilyHubPage = () => {
 
 
   const hasAuthToken = Boolean(getToken());
-  const canLeaveFamily = ![2, 3].includes(Number(userInfo?.role || 0));
+  const isAccountAdmin = [2, 3].includes(Number(userInfo?.role || 0));
+  const currentFamilyCode = normalizeFamilyCode(familyData?.familyCode || userInfo?.familyCode);
+  const isFamilyCreator = Number(familyData?.createdBy || 0) === Number(userInfo?.userId || 0);
+  const isOwnFamilyAdmin = Boolean(
+    isFamilyCreator ||
+      (isAccountAdmin &&
+        currentFamilyCode &&
+        currentFamilyCode === normalizeFamilyCode(userInfo?.familyCode))
+  );
+  const canLeaveFamily = Boolean(
+    userInfo?.approveStatus === 'approved' &&
+      userInfo?.familyCode &&
+      familyData &&
+      !isOwnFamilyAdmin
+  );
   const userInfoResolved =
     userInfo != null &&
     (typeof userInfo.approveStatus !== 'undefined' ||

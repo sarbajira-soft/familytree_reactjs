@@ -8,9 +8,12 @@ import JoinFamilyModal from "../Components/JoinFamilyModal";
 import NoFamilyView from "../Components/NoFamilyView";
 import PendingApprovalView from "../Components/PendingApprovalView";
 import FamilyManagementShimmer from "./FamilyManagementShimmer";
+import Swal from "sweetalert2";
 
 import { authFetchResponse } from "../utils/authFetch";
 import { getToken } from "../utils/auth";
+
+const normalizeFamilyCode = (value) => String(value || "").trim().toUpperCase();
 
 const FamilyManagementMobile = () => {
   const navigate = useNavigate();
@@ -20,7 +23,7 @@ const FamilyManagementMobile = () => {
   const pendingFamilyCode = userInfo?.pendingFamilyCode || '';
   const hasPendingRequest = userInfo?.approveStatus === "pending" && !!pendingFamilyCode;
   const isApproved = userInfo?.approveStatus === "approved";
-  const isAdmin = userInfo?.role === 2 || userInfo?.role === 3;
+  const isAccountAdmin = Number(userInfo?.role) === 2 || Number(userInfo?.role) === 3;
 
   const [familyData, setFamilyData] = useState(null);
   const [familyLoading, setFamilyLoading] = useState(false);
@@ -42,6 +45,17 @@ const FamilyManagementMobile = () => {
   const [pendingRequestsList, setPendingRequestsList] = useState([]);
   const [pendingLoading, setPendingLoading] = useState(false);
   const [inviteCopySuccess, setInviteCopySuccess] = useState(false);
+  const [leavingFamily, setLeavingFamily] = useState(false);
+
+  const currentFamilyCode = normalizeFamilyCode(familyData?.familyCode || userInfo?.familyCode);
+  const isFamilyCreator = Number(familyData?.createdBy || 0) === Number(userInfo?.userId || 0);
+  const isOwnFamilyAdmin = Boolean(
+    isFamilyCreator ||
+      (isAccountAdmin &&
+        currentFamilyCode &&
+        currentFamilyCode === normalizeFamilyCode(userInfo?.familyCode))
+  );
+  const canLeaveFamily = Boolean(isApproved && hasFamily && familyData && !isOwnFamilyAdmin);
 
   useEffect(() => {
     const storedToken = getToken();
@@ -159,7 +173,7 @@ const FamilyManagementMobile = () => {
     };
 
     const loadPendingRequests = async () => {
-      if (!isApproved || !isAdmin) {
+      if (!isApproved || !isOwnFamilyAdmin) {
         setPendingRequestsCount(null);
         return;
       }
@@ -276,7 +290,7 @@ const FamilyManagementMobile = () => {
     return () => {
       controller.abort();
     };
-  }, [hasFamily, isApproved, isAdmin, userInfo?.familyCode]);
+  }, [hasFamily, isApproved, isOwnFamilyAdmin, userInfo?.familyCode]);
 
   const handleManageMembers = () => {
     navigate("/my-family-member");
@@ -326,6 +340,98 @@ const FamilyManagementMobile = () => {
       });
   };
 
+  const handleLeaveFamily = async () => {
+    const familyCode = userInfo?.familyCode || familyData?.familyCode;
+    const accessToken = token || getToken();
+
+    if (!familyCode) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Family Not Available',
+        text: 'Your family code could not be found. Please refresh and try again.',
+      });
+      return;
+    }
+
+    if (!accessToken) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Session Expired',
+        text: 'Please sign in again and then try Leave Family.',
+      });
+      return;
+    }
+
+    if (!canLeaveFamily) {
+      await Swal.fire({
+        icon: 'info',
+        title: 'Leave Family Unavailable',
+        text: 'Family admins cannot use Leave Family. Please transfer or remove admin access first.',
+      });
+      return;
+    }
+
+    const confirm = await Swal.fire({
+      icon: 'warning',
+      title: 'Leave Family?',
+      text: 'Type LEAVE to confirm removing yourself from this family tree.',
+      input: 'text',
+      inputPlaceholder: 'Type LEAVE',
+      showCancelButton: true,
+      confirmButtonText: 'Leave family',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#dc2626',
+      preConfirm: (value) => {
+        if (String(value || '').trim().toUpperCase() !== 'LEAVE') {
+          Swal.showValidationMessage('Type LEAVE exactly to continue.');
+          return false;
+        }
+        return true;
+      },
+    });
+
+    if (!confirm.isConfirmed) return;
+
+    try {
+      setLeavingFamily(true);
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/family/member/self/${familyCode}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(data?.message || 'Failed to leave family');
+      }
+
+      await Swal.fire({
+        icon: 'success',
+        title: 'Removed From Family',
+        text: data?.message || 'You were removed from this family successfully.',
+      });
+
+      try {
+        localStorage.removeItem('userInfo');
+        sessionStorage.removeItem('userInfo');
+      } catch (error) {
+        // Ignore storage cleanup errors.
+      }
+
+      window.location.reload();
+    } catch (error) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Unable to Leave Family',
+        text: error?.message || 'Please try again.',
+      });
+    } finally {
+      setLeavingFamily(false);
+    }
+  };
+
   const accessView = !hasFamily && !hasPendingRequest ? (
     <NoFamilyView onCreateFamily={handleCreateFamily} onJoinFamily={handleJoinFamily} />
   ) : !isApproved ? (
@@ -369,6 +475,9 @@ const FamilyManagementMobile = () => {
                 onManageGifts={handleManageGifts}
                 onEditFamily={handleEditFamily}
                 onShareFamilyCode={handleShareFamilyCode}
+                onLeaveFamily={handleLeaveFamily}
+                leavingFamily={leavingFamily}
+                canLeaveFamily={canLeaveFamily}
               />
               {showCopyMessage && (
                 <div className="mt-2 text-xs text-green-600 dark:text-green-400">
@@ -556,7 +665,7 @@ const FamilyManagementMobile = () => {
                   )}
 
                   {/* Pending Requests List */}
-                  {isAdmin && !pendingLoading && (
+                  {isOwnFamilyAdmin && !pendingLoading && (
                     <div className="group relative bg-white/80 dark:bg-slate-900/80 backdrop-blur-md rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] border border-white dark:border-slate-800 p-6 sm:p-8 transition-all duration-300 hover:shadow-[0_15px_40px_rgba(0,0,0,0.08)] mt-2">
                       <div className="flex flex-col mb-4">
                         <div className="flex items-center justify-between w-full mb-2">

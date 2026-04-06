@@ -1763,6 +1763,16 @@ const FamilyTreePage = () => {
       userInfo?.userId &&
       Number(person.memberId) !== Number(userInfo.userId)
     );
+    const currentTreeFamilyCode = String(familyCodeToUse || "").trim().toUpperCase();
+    const personSourceFamilyCode = String(
+      person?.sourceFamilyCode || person?.primaryFamilyCode || person?.familyCode || "",
+    )
+      .trim()
+      .toUpperCase();
+    const isCurrentFamilyAdminCard =
+      Number(person?.role || 0) >= 2 &&
+      Boolean(currentTreeFamilyCode) &&
+      personSourceFamilyCode === currentTreeFamilyCode;
 
     setSelectedPersonId(personId);
 
@@ -1886,7 +1896,7 @@ const FamilyTreePage = () => {
       });
     }
 
-    if (canEdit && !isStructuralDummyCard) {
+    if (canEdit && !isStructuralDummyCard && !isCurrentFamilyAdminCard) {
       items.push({
         label: "Remove Member",
         action: () => deletePerson(personId),
