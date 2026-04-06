@@ -274,6 +274,25 @@ const FamilyHubPage = () => {
   };
 
 
+  const hasAuthToken = Boolean(getToken());
+  const userInfoResolved =
+    userInfo != null &&
+    (typeof userInfo.approveStatus !== 'undefined' ||
+      typeof userInfo.familyCode !== 'undefined' ||
+      typeof userInfo.pendingFamilyCode !== 'undefined');
+
+  if (hasAuthToken && !userInfoResolved) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-8 md:px-6 lg:px-8">
+        <div className="flex flex-col items-center justify-center py-20">
+          <FiLoader className="text-6xl text-primary-600 animate-spin mb-4" />
+          <h2 className="text-2xl font-semibold text-gray-700 mb-2">Loading User Data...</h2>
+          <p className="text-gray-500">Please wait while we fetch your information.</p>
+        </div>
+      </div>
+    );
+  }
+
   if (userLoading) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-8 md:px-6 lg:px-8">
