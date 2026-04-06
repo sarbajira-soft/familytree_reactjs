@@ -7,7 +7,7 @@ import { BlockButton } from './block/BlockButton';
 import { BlockedBadge } from './block/BlockedBadge';
 import { logger } from '../utils/logger';
 import { authFetch } from '../utils/authFetch';
-import { fetchFamilyTree, deleteFamilyMember, getMembersNotInTree, replaceDummyUser, selfRemoveFromFamily } from '../utils/familyTreeApi';
+import { fetchFamilyTree, deleteFamilyMember, getMembersNotInTree, replaceDummyUser, replaceStructuralDummy as replaceStructuralDummySlot, selfRemoveFromFamily } from '../utils/familyTreeApi';
 import { getBlockedUsers } from '../services/block.service';
 import {
   buildDefaultFamilyPrivacySettings,
@@ -421,12 +421,34 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
     }
   };
 
-  const handleReplaceDummy = async (dummyUserId) => {
-    const replacementUserId = Number(replacementSelections?.[dummyUserId] || 0);
-    if (!birthFamilyCode || !dummyUserId || !replacementUserId) return;
+  const getReplacementKey = (dummy) => {
+    if (dummy?.isStructuralDummy) {
+      return `slot:${Number(dummy?.personId || 0)}`;
+    }
+    return `dummy:${Number(dummy?.dummyUserId || 0)}`;
+  };
+
+  const handleReplaceDummy = async (dummy) => {
+    const replacementKey = getReplacementKey(dummy);
+    const replacementUserId = Number(replacementSelections?.[replacementKey] || 0);
+    const dummyUserId = Number(dummy?.dummyUserId || 0);
+    const personId = Number(dummy?.personId || 0);
+
+    if (!birthFamilyCode || !replacementUserId) return;
+
     try {
-      setReplacingDummyIds((prev) => new Set(prev).add(dummyUserId));
-      await replaceDummyUser(birthFamilyCode, dummyUserId, replacementUserId);
+      setReplacingDummyIds((prev) => new Set(prev).add(replacementKey));
+      if (dummy?.isStructuralDummy) {
+        if (!personId) {
+          throw new Error('Removed-member slot is missing a tree person id.');
+        }
+        await replaceStructuralDummySlot(personId, birthFamilyCode, replacementUserId);
+      } else {
+        if (!dummyUserId) {
+          throw new Error('Dummy user id is missing.');
+        }
+        await replaceDummyUser(birthFamilyCode, dummyUserId, replacementUserId);
+      }
       await refreshFamilyManagementState();
     } catch (error) {
       logger.error('Failed to replace dummy user', error);
@@ -434,12 +456,11 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
     } finally {
       setReplacingDummyIds((prev) => {
         const next = new Set(prev);
-        next.delete(dummyUserId);
+        next.delete(replacementKey);
         return next;
       });
     }
   };
-
   const handleShareInvite = async (member, event) => {
     event?.stopPropagation?.();
     const inviteLink = window.location.origin + '/edit-profile?familyCode=' + encodeURIComponent(birthFamilyCode) + '&memberId=' + member.memberId;
@@ -1238,6 +1259,7 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                           key={`birth-${member.id}`}
                           member={member}
                           allowManageActions
+                          allowDelete
                           memberIdsInTree={memberIdsInTree}
                           showWhatsAppInvite
                           showNotInTreeBadge
@@ -1257,9 +1279,9 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                   <div className="mt-8 pt-6 border-t border-gray-100">
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                       <div>
-                        <h3 className="text-lg font-bold text-gray-900">Non-App Users In Tree</h3>
+                        <h3 className="text-lg font-bold text-gray-900">Non-App Users And Removed Slots</h3>
                         <p className="text-sm text-gray-500">
-                          Replace dummy cards with active app members not already placed in the tree.
+                          Replace non-app users and removed-member slots with active app members not already placed in the tree.
                         </p>
                       </div>
                       <button
@@ -1275,24 +1297,37 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                       <div className="py-8 text-sm text-gray-500">Loading non-app users...</div>
                     ) : nonAppUsers.length === 0 ? (
                       <div className="py-8 text-sm text-gray-500 bg-gray-50 rounded-lg border border-gray-100 px-4">
-                        No non-app users found in this family tree.
+                        No non-app users or removed-member slots found in this family tree.
                       </div>
                     ) : (
                       <div className="flex flex-col gap-3">
                         {nonAppUsers.map((dummy) => {
                           const dummyUserId = Number(dummy?.dummyUserId);
-                          const selectedReplacement = Number(replacementSelections?.[dummyUserId] || 0);
-                          const isReplacing = replacingDummyIds.has(dummyUserId);
+                          const replacementKey = getReplacementKey(dummy);
+                          const selectedReplacement = Number(replacementSelections?.[replacementKey] || 0);
+                          const isReplacing = replacingDummyIds.has(replacementKey);
                           return (
-                            <div key={`dummy-${dummyUserId}`} className="rounded-lg border border-gray-200 p-4 bg-gray-50/40">
+                            <div key={`dummy-${replacementKey}`} className="rounded-lg border border-gray-200 p-4 bg-gray-50/40">
                               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
                                 <div>
-                                  <p className="text-sm font-semibold text-gray-900">
-                                    {dummy?.name || 'Familyss User'}
-                                  </p>
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <p className="text-sm font-semibold text-gray-900">
+                                      {dummy?.name || 'Familyss User'}
+                                    </p>
+                                    {dummy?.isStructuralDummy && (
+                                      <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+                                        Removed Slot
+                                      </span>
+                                    )}
+                                  </div>
                                   <p className="text-xs text-gray-500">
                                     Dummy ID: {dummyUserId} | Node: {dummy?.nodeUid || '-'} | Generation: {dummy?.generation ?? '-'}
                                   </p>
+                                  {dummy?.isStructuralDummy && (
+                                    <p className="mt-1 text-xs text-amber-700">
+                                      This slot came from a removed family member and can be filled directly from here.
+                                    </p>
+                                  )}
                                 </div>
                                 <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
                                   <select
@@ -1301,21 +1336,21 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                                       const nextValue = Number(e.target.value || 0);
                                       setReplacementSelections((prev) => ({
                                         ...prev,
-                                        [dummyUserId]: nextValue || '',
+                                        [replacementKey]: nextValue || '',
                                       }));
                                     }}
                                     className="min-w-[220px] rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700"
                                   >
                                     <option value="">Select replacement member</option>
                                     {replacementCandidates.map((candidate) => (
-                                      <option key={`replace-${dummyUserId}-${candidate.userId}`} value={candidate.userId}>
+                                      <option key={`replace-${replacementKey}-${candidate.userId}`} value={candidate.userId}>
                                         {candidate.name} (#{candidate.userId})
                                       </option>
                                     ))}
                                   </select>
                                   <button
                                     type="button"
-                                    onClick={() => handleReplaceDummy(dummyUserId)}
+                                    onClick={() => handleReplaceDummy(dummy)}
                                     disabled={isReplacing || !selectedReplacement}
                                     className="inline-flex items-center justify-center px-3 py-2 rounded-lg bg-primary-600 text-white text-sm font-semibold hover:bg-primary-700 disabled:opacity-60 disabled:cursor-not-allowed"
                                   >
@@ -1818,6 +1853,8 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
 };
 
 export default FamilyMemberCard;
+
+
 
 
 

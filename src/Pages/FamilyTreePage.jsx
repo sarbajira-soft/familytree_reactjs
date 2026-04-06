@@ -98,6 +98,17 @@ const authFetch = async (url, options = {}) => {
 const normalizeExternalLinked = (value) =>
   value === true || value === 1 || value === "true" || value === "1";
 
+const createStructuralDummyDialogState = () => ({
+  isOpen: false,
+  mode: "",
+  person: null,
+  candidates: [],
+  loadingCandidates: false,
+  selectedReplacementUserId: "",
+  submitting: false,
+  error: "",
+});
+
 const FamilyTreePage = () => {
   const [tree, setTree] = useState(null);
 
@@ -233,6 +244,9 @@ const FamilyTreePage = () => {
     isOpen: false,
     person: null,
   });
+  const [structuralDummyDialog, setStructuralDummyDialog] = useState(
+    createStructuralDummyDialogState,
+  );
 
   const [isCreateFamilyModalOpen, setIsCreateFamilyModalOpen] = useState(false);
 
@@ -1253,6 +1267,464 @@ const FamilyTreePage = () => {
     return parentIds.length >= 2 ? [] : missing;
   }, [tree]);
 
+  const canPermanentlyDeletePlaceholder = useCallback((person) => {
+    if (!tree || !person) {
+      return false;
+    }
+    const childCount = Array.from(person?.children || []).filter((id) => Number.isFinite(Number(id))).length;
+    if (childCount > 0) {
+      return false;
+    }
+    return tree.people.size > 1;
+  }, [tree]);
+
+  const getPlaceholderProtectionMessage = useCallback((person) => {
+    if (!tree || !person) {
+      return "This empty slot must stay in the tree for now.";
+    }
+
+    const childCount = Array.from(person?.children || []).filter((id) => Number.isFinite(Number(id))).length;
+    if (tree.people.size <= 1) {
+      return "This empty slot is the only remaining card in the tree, so it cannot be cleared.";
+    }
+    if (childCount > 0) {
+      return "This empty slot still protects children or descendants. Replace it with a real member instead of clearing it.";
+    }
+    return "This empty slot can be cleared safely.";
+  }, [tree]);
+
+  const closeStructuralDummyDialog = useCallback(() => {
+    setStructuralDummyDialog(createStructuralDummyDialogState());
+  }, []);
+
+  const openStructuralDummyDialog = useCallback((mode, person) => {
+    if (!person) return;
+    setStructuralDummyDialog({
+      ...createStructuralDummyDialogState(),
+      isOpen: true,
+      mode,
+      person,
+      loadingCandidates: mode === "replace",
+    });
+  }, []);
+
+  const showStructuralDummyProtectionInfo = useCallback((person) => {
+    openStructuralDummyDialog("info", person);
+  }, [openStructuralDummyDialog]);
+
+  const structuralDummyDialogDetails = useMemo(() => {
+    const person = structuralDummyDialog?.person;
+    const childIds = Array.from(person?.children || [])
+      .map((id) => Number(id))
+      .filter((id) => Number.isFinite(id));
+    const childNames = childIds
+      .map((id) => tree?.people?.get?.(id)?.name || `#${id}`)
+      .filter(Boolean)
+      .slice(0, 4);
+
+    return {
+      person,
+      childCount: childIds.length,
+      childNames,
+      hasMoreChildren: childIds.length > childNames.length,
+      canDelete: person ? canPermanentlyDeletePlaceholder(person) : false,
+      protectionMessage: person ? getPlaceholderProtectionMessage(person) : "",
+    };
+  }, [
+    canPermanentlyDeletePlaceholder,
+    getPlaceholderProtectionMessage,
+    structuralDummyDialog?.person,
+    tree,
+  ]);
+
+  const loadStructuralDummyCandidates = useCallback(async (person) => {
+    if (!person?.id || !familyCodeToUse) {
+      return;
+    }
+
+    setStructuralDummyDialog((prev) => {
+      if (
+        !prev?.isOpen ||
+        prev?.mode !== "replace" ||
+        Number(prev?.person?.id) !== Number(person.id)
+      ) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        loadingCandidates: true,
+        error: "",
+      };
+    });
+
+    try {
+      const response = await getMembersNotInTree(familyCodeToUse);
+      const rawCandidates = Array.isArray(response?.data) ? response.data : [];
+      const seenUserIds = new Set();
+      const candidates = rawCandidates.reduce((acc, candidate) => {
+        const candidateUserId = Number(
+          candidate?.user?.id || candidate?.userId || candidate?.memberId,
+        );
+        if (
+          !candidateUserId ||
+          candidateUserId === Number(person?.userId) ||
+          seenUserIds.has(candidateUserId)
+        ) {
+          return acc;
+        }
+
+        seenUserIds.add(candidateUserId);
+        const candidateProfile = candidate?.user?.userProfile || {};
+        const candidateName =
+          String(candidate?.user?.fullName || candidate?.name || "").trim() ||
+          [candidateProfile?.firstName, candidateProfile?.lastName]
+            .filter(Boolean)
+            .join(" ")
+            .trim() ||
+          `Member #${candidateUserId}`;
+
+        acc.push({
+          userId: candidateUserId,
+          name: candidateName,
+          familyRole: candidate?.familyRole || "Member",
+          contact:
+            candidateProfile?.contactNumber ||
+            candidate?.user?.mobile ||
+            candidate?.mobile ||
+            "",
+        });
+        return acc;
+      }, []);
+
+      setStructuralDummyDialog((prev) => {
+        if (
+          !prev?.isOpen ||
+          prev?.mode !== "replace" ||
+          Number(prev?.person?.id) !== Number(person.id)
+        ) {
+          return prev;
+        }
+
+        return {
+          ...prev,
+          candidates,
+          loadingCandidates: false,
+          selectedReplacementUserId:
+            prev?.selectedReplacementUserId ||
+            String(candidates?.[0]?.userId || ""),
+          error: candidates.length
+            ? ""
+            : "No approved members outside the tree are available right now.",
+        };
+      });
+    } catch (error) {
+      setStructuralDummyDialog((prev) => {
+        if (
+          !prev?.isOpen ||
+          prev?.mode !== "replace" ||
+          Number(prev?.person?.id) !== Number(person.id)
+        ) {
+          return prev;
+        }
+
+        return {
+          ...prev,
+          candidates: [],
+          loadingCandidates: false,
+          error:
+            error?.message ||
+            "Unable to load approved members for this removed slot right now.",
+        };
+      });
+    }
+  }, [familyCodeToUse]);
+
+  useEffect(() => {
+    if (
+      !structuralDummyDialog?.isOpen ||
+      structuralDummyDialog?.mode !== "replace" ||
+      !structuralDummyDialog?.person?.id
+    ) {
+      return;
+    }
+
+    loadStructuralDummyCandidates(structuralDummyDialog.person);
+  }, [
+    loadStructuralDummyCandidates,
+    structuralDummyDialog?.isOpen,
+    structuralDummyDialog?.mode,
+    structuralDummyDialog?.person,
+  ]);
+
+  const submitStructuralDummyReplacement = useCallback(async () => {
+    const person = structuralDummyDialog?.person;
+    const replacementUserId = Number(
+      structuralDummyDialog?.selectedReplacementUserId || 0,
+    );
+
+    if (!person?.id || !familyCodeToUse) {
+      return;
+    }
+
+    if (!replacementUserId) {
+      setStructuralDummyDialog((prev) => ({
+        ...prev,
+        error: "Select a member to replace this removed slot.",
+      }));
+      return;
+    }
+
+    setStructuralDummyDialog((prev) => ({
+      ...prev,
+      submitting: true,
+      error: "",
+    }));
+
+    try {
+      const result = await replaceStructuralDummyApi(
+        person.id,
+        familyCodeToUse,
+        replacementUserId,
+      );
+      await refreshTreeFromServer(
+        Number(person.id) === Number(tree?.rootId) ? person.id : tree?.rootId,
+      );
+      closeStructuralDummyDialog();
+      await Swal.fire({
+        icon: "success",
+        title: "Removed Member Replaced",
+        text:
+          result?.message ||
+          "The removed-member slot was filled successfully.",
+        timer: 2200,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      setStructuralDummyDialog((prev) => ({
+        ...prev,
+        submitting: false,
+        error:
+          error?.message ||
+          "Unable to replace this removed-member slot right now.",
+      }));
+    }
+  }, [
+    closeStructuralDummyDialog,
+    familyCodeToUse,
+    refreshTreeFromServer,
+    structuralDummyDialog?.person,
+    structuralDummyDialog?.selectedReplacementUserId,
+    tree?.rootId,
+  ]);
+
+  const submitStructuralDummyDelete = useCallback(async () => {
+    const person = structuralDummyDialog?.person;
+
+    if (!person?.id || !familyCodeToUse) {
+      return;
+    }
+
+    if (!canPermanentlyDeletePlaceholder(person)) {
+      setStructuralDummyDialog((prev) => ({
+        ...prev,
+        error: getPlaceholderProtectionMessage(person),
+      }));
+      return;
+    }
+
+    setStructuralDummyDialog((prev) => ({
+      ...prev,
+      submitting: true,
+      error: "",
+    }));
+
+    try {
+      const response = await permanentlyDeleteStructuralDummyApi(
+        person.id,
+        familyCodeToUse,
+      );
+      await refreshTreeFromServer(
+        Number(person.id) === Number(tree?.rootId) ? null : tree?.rootId,
+      );
+      closeStructuralDummyDialog();
+      await Swal.fire({
+        icon: "success",
+        title: "Slot Deleted",
+        text:
+          response?.message ||
+          "The empty slot was cleared safely from the tree.",
+        timer: 2200,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      setStructuralDummyDialog((prev) => ({
+        ...prev,
+        submitting: false,
+        error:
+          error?.message ||
+          "Unable to delete this removed-member slot right now.",
+      }));
+    }
+  }, [
+    canPermanentlyDeletePlaceholder,
+    closeStructuralDummyDialog,
+    familyCodeToUse,
+    getPlaceholderProtectionMessage,
+    refreshTreeFromServer,
+    structuralDummyDialog?.person,
+    tree?.rootId,
+  ]);
+
+  const validateTreeBeforeSave = useCallback(() => {
+    if (!tree) {
+      return "No tree data available to save.";
+    }
+
+    const people = Array.from(tree.people.values());
+    if (!people.length) {
+      return "Add at least one member before saving the tree.";
+    }
+
+    const peopleById = new Map();
+    const adjacency = new Map();
+    const parentSets = new Map();
+
+    const ensureAdjacency = (id) => {
+      if (!adjacency.has(id)) {
+        adjacency.set(id, new Set());
+      }
+      return adjacency.get(id);
+    };
+
+    const normalizeIds = (collection) => {
+      const source = Array.isArray(collection)
+        ? collection
+        : collection instanceof Set
+          ? Array.from(collection)
+          : [];
+      const seen = new Set();
+      return source
+        .map((value) => Number(value))
+        .filter((value) => Number.isFinite(value) && value > 0 && !seen.has(value) && seen.add(value));
+    };
+
+    const addUndirectedEdge = (a, b) => {
+      if (!Number.isFinite(a) || !Number.isFinite(b) || a === b) return;
+      ensureAdjacency(a).add(b);
+      ensureAdjacency(b).add(a);
+    };
+
+    const addParent = (childId, parentId) => {
+      if (!parentSets.has(childId)) {
+        parentSets.set(childId, new Set());
+      }
+      parentSets.get(childId).add(parentId);
+    };
+
+    for (const person of people) {
+      const personId = Number(person?.id);
+      const personName = String(person?.name || "").trim() || `Member #${personId || "?"}`;
+      if (!Number.isFinite(personId) || personId <= 0) {
+        return "One of the tree cards has an invalid id. Refresh the tree and try again.";
+      }
+      if (peopleById.has(personId)) {
+        return "The tree contains duplicate cards. Refresh the tree and try saving again.";
+      }
+      peopleById.set(personId, person);
+      ensureAdjacency(personId);
+
+      const validateRefs = (refs, relationLabel, onValidRef) => {
+        for (const refId of refs) {
+          if (refId === personId) {
+            return `${personName} cannot be connected to the same card.`;
+          }
+          if (!peopleById.has(refId) && !people.some((candidate) => Number(candidate?.id) === refId)) {
+            return `${personName} has a ${relationLabel} link to a missing card. Refresh the tree and try again.`;
+          }
+          addUndirectedEdge(personId, refId);
+          onValidRef?.(refId);
+        }
+        return null;
+      };
+
+      const parents = normalizeIds(person?.parents);
+      const children = normalizeIds(person?.children);
+      const spouses = normalizeIds(person?.spouses);
+      const siblings = normalizeIds(person?.siblings);
+
+      const relationError =
+        validateRefs(parents, "parent", (refId) => addParent(personId, refId)) ||
+        validateRefs(children, "child", (refId) => addParent(refId, personId)) ||
+        validateRefs(spouses, "spouse") ||
+        validateRefs(siblings, "sibling");
+
+      if (relationError) {
+        return relationError;
+      }
+    }
+
+    const relationPairs = [
+      { sourceKey: "parents", targetKey: "children", sourceLabel: "parent", targetLabel: "child" },
+      { sourceKey: "children", targetKey: "parents", sourceLabel: "child", targetLabel: "parent" },
+      { sourceKey: "spouses", targetKey: "spouses", sourceLabel: "spouse", targetLabel: "spouse" },
+      { sourceKey: "siblings", targetKey: "siblings", sourceLabel: "sibling", targetLabel: "sibling" },
+    ];
+
+    for (const person of people) {
+      const personId = Number(person?.id);
+      const personName = String(person?.name || "").trim() || `Member #${personId || "?"}`;
+
+      for (const pair of relationPairs) {
+        const relatedIds = normalizeIds(person?.[pair.sourceKey]);
+        for (const relatedId of relatedIds) {
+          const relatedPerson = peopleById.get(relatedId);
+          if (!relatedPerson) {
+            continue;
+          }
+          const relatedName = String(relatedPerson?.name || "").trim() || `Member #${relatedId}`;
+          const reciprocalIds = normalizeIds(relatedPerson?.[pair.targetKey]);
+          if (!reciprocalIds.includes(personId)) {
+            return `${personName} lists ${relatedName} as a ${pair.sourceLabel}, but ${relatedName} does not list ${personName} as a ${pair.targetLabel}. Refresh the tree and try again.`;
+          }
+        }
+      }
+    }
+
+    for (const [childId, parentIds] of parentSets.entries()) {
+      if (parentIds.size > 2) {
+        const child = peopleById.get(childId);
+        const childName = String(child?.name || "").trim() || `Member #${childId}`;
+        return `${childName} has more than two parents. Keep only the valid father and/or mother cards before saving.`;
+      }
+    }
+
+    if (people.length > 1) {
+      const startId = Number(people[0]?.id);
+      const queue = [startId];
+      const visited = new Set();
+
+      while (queue.length > 0) {
+        const current = queue.shift();
+        if (visited.has(current)) continue;
+        visited.add(current);
+        (adjacency.get(current) || new Set()).forEach((nextId) => {
+          if (!visited.has(nextId)) {
+            queue.push(nextId);
+          }
+        });
+      }
+
+      if (visited.size !== people.length) {
+        const disconnected = people.find((person) => !visited.has(Number(person?.id)));
+        const disconnectedName = String(disconnected?.name || "").trim() || `Member #${disconnected?.id || "?"}`;
+        return `The tree has disconnected cards. ${disconnectedName} is not connected to the main family. Connect every card before saving.`;
+      }
+    }
+
+    return null;
+  }, [tree]);
+
   const handlePersonClick = (personId) => {
     if (!tree) return;
 
@@ -1303,23 +1775,32 @@ const FamilyTreePage = () => {
       Edit: `<svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.9959.9959 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>`,
       Delete: `<svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>`,
       "Replace Removed Member": `<svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.95 7.95 0 0012 4V1L7 6l5 5V7a5 5 0 11-4.9 6h-2.02A7 7 0 1017.65 6.35z"/></svg>`,
-      "Delete Permanently": `<svg viewBox="0 0 24 24"><path d="M9 3h6l1 1h4v2H4V4h4l1-1zm1 6h2v8h-2V9zm4 0h2v8h-2V9zM6 9h2v8H6V9z"/></svg>`,
+      "Delete Slot": `<svg viewBox="0 0 24 24"><path d="M9 3h6l1 1h4v2H4V4h4l1-1zm1 6h2v8h-2V9zm4 0h2v8h-2V9zM6 9h2v8H6V9z"/></svg>`,
+      "Why Slot Is Locked": `<svg viewBox="0 0 24 24"><path d="M11 17h2v2h-2zm0-10h2v8h-2zm1-5C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/></svg>`,
     };
 
     const items = [];
 
     if (isStructuralDummyCard) {
       if (canEdit) {
+        const slotCanBeDeleted = canPermanentlyDeletePlaceholder(person);
         items.push({
           label: "Replace Removed Member",
           action: () => replaceStructuralDummyCard(person),
           icon: icons["Replace Removed Member"],
         });
         items.push({
-          label: "Delete Permanently",
+          label: "Delete Slot",
           action: () => permanentlyDeleteStructuralDummyCard(person),
-          icon: icons["Delete Permanently"],
+          icon: icons["Delete Slot"],
         });
+        if (!slotCanBeDeleted) {
+          items.push({
+            label: "Why Slot Is Locked",
+            action: () => showStructuralDummyProtectionInfo(person),
+            icon: icons["Why Slot Is Locked"],
+          });
+        }
       }
     } else if (isRestrictedCard) {
       items.push({
@@ -1393,6 +1874,7 @@ const FamilyTreePage = () => {
 
     if (
       canEdit &&
+      !isStructuralDummyCard &&
       !isExternalLinkedCard &&
       !isSpouseCard &&
       String(person?.nodeUid || "").trim()
@@ -1404,9 +1886,9 @@ const FamilyTreePage = () => {
       });
     }
 
-    if (canEdit) {
+    if (canEdit && !isStructuralDummyCard) {
       items.push({
-        label: "Delete",
+        label: "Remove Member",
         action: () => deletePerson(personId),
         icon: icons["Delete"],
       });
@@ -1442,8 +1924,8 @@ const FamilyTreePage = () => {
     }
   };
 
-  const handleRadialMenuItemClick = (item) => {
-    item.action();
+  const handleRadialMenuItemClick = async (item) => {
+    await Promise.resolve(item?.action?.());
   };
 
   const handleAddPersons = (persons) => {
@@ -1619,7 +2101,7 @@ const FamilyTreePage = () => {
         Swal.fire({
           icon: "warning",
           title: "Parents already complete",
-          text: "This child already has two parents in the tree. Remove or permanently delete a placeholder first if you need to change them.",
+          text: "This child already has two parents in the tree. Remove the member or clear the empty slot first if you need to change them.",
         });
         return;
       }
@@ -1684,121 +2166,13 @@ const FamilyTreePage = () => {
     setHasUnsavedChanges(true); // Mark as changed
   };
 
-  const replaceStructuralDummyCard = async (person) => {
-    if (!person?.id || !familyCodeToUse) return;
+  const replaceStructuralDummyCard = useCallback((person) => {
+    openStructuralDummyDialog("replace", person);
+  }, [openStructuralDummyDialog]);
 
-    try {
-      const response = await getMembersNotInTree(familyCodeToUse);
-      const candidates = Array.isArray(response?.data) ? response.data : [];
-
-      if (!candidates.length) {
-        await Swal.fire({
-          icon: "info",
-          title: "No replacement members available",
-          text: "There are no approved members outside the tree right now. You can permanently delete this placeholder and add a brand-new member from the tree instead.",
-        });
-        return;
-      }
-
-      const inputOptions = candidates.reduce((acc, candidate) => {
-        const candidateUserId = Number(candidate?.user?.id || candidate?.userId || candidate?.memberId);
-        if (!candidateUserId) return acc;
-        const candidateName =
-          String(candidate?.user?.fullName || candidate?.name || "").trim() ||
-          `Member #${candidateUserId}`;
-        acc[candidateUserId] = `${candidateName} (${candidateUserId})`;
-        return acc;
-      }, {});
-
-      if (!Object.keys(inputOptions).length) {
-        await Swal.fire({
-          icon: "info",
-          title: "No replacement members available",
-          text: "There are no approved members outside the tree right now.",
-        });
-        return;
-      }
-
-      const { value: replacementUserId } = await Swal.fire({
-        icon: "question",
-        title: "Replace removed member",
-        text: "Choose an approved member who is not already placed in this tree.",
-        input: "select",
-        inputOptions,
-        inputPlaceholder: "Select a member",
-        showCancelButton: true,
-        confirmButtonText: "Replace",
-        inputValidator: (value) => (!value ? "Please select a member" : undefined),
-      });
-
-      if (!replacementUserId) {
-        return;
-      }
-
-      const result = await replaceStructuralDummyApi(
-        person.id,
-        familyCodeToUse,
-        Number(replacementUserId),
-      );
-      await refreshTreeFromServer(
-        Number(person.id) === Number(tree?.rootId) ? person.id : tree?.rootId,
-      );
-
-      await Swal.fire({
-        icon: "success",
-        title: "Tree Updated",
-        text: result?.message || "Removed member replaced successfully.",
-        timer: 2200,
-        showConfirmButton: false,
-      });
-    } catch (error) {
-      console.error("Error replacing structural dummy:", error);
-      await Swal.fire({
-        icon: "error",
-        title: "Replace Failed",
-        text: error?.message || "Unable to replace this removed member right now.",
-      });
-    }
-  };
-
-  const permanentlyDeleteStructuralDummyCard = async (person) => {
-    if (!person?.id || !familyCodeToUse) return;
-
-    const result = await Swal.fire({
-      icon: "warning",
-      title: "Delete this placeholder permanently?",
-      text: "This removes the placeholder card from the tree completely. Use this when you want to add a fresh new person instead of keeping the removed-member slot.",
-      showCancelButton: true,
-      confirmButtonText: "Delete permanently",
-      cancelButtonText: "Cancel",
-    });
-
-    if (!result.isConfirmed) {
-      return;
-    }
-
-    try {
-      const response = await permanentlyDeleteStructuralDummyApi(person.id, familyCodeToUse);
-      await refreshTreeFromServer(
-        Number(person.id) === Number(tree?.rootId) ? null : tree?.rootId,
-      );
-
-      await Swal.fire({
-        icon: "success",
-        title: "Placeholder Removed",
-        text: response?.message || "Removed-member placeholder deleted permanently.",
-        timer: 2200,
-        showConfirmButton: false,
-      });
-    } catch (error) {
-      console.error("Error deleting structural dummy permanently:", error);
-      await Swal.fire({
-        icon: "error",
-        title: "Delete Failed",
-        text: error?.message || "Unable to delete this placeholder right now.",
-      });
-    }
-  };
+  const permanentlyDeleteStructuralDummyCard = useCallback((person) => {
+    openStructuralDummyDialog("delete", person);
+  }, [openStructuralDummyDialog]);
 
   const deletePerson = async (personId) => {
     if (!tree || !familyCodeToUse) return;
@@ -1812,8 +2186,10 @@ const FamilyTreePage = () => {
     ) {
       await Swal.fire({
         icon: "info",
-        title: "Tree Placeholder",
-        text: "This structural dummy only exists to preserve the tree layout.",
+        title: "Removed Member Slot",
+        text: canPermanentlyDeletePlaceholder(currentPerson)
+          ? "This card is an empty slot that keeps the tree structure stable. You can replace it with a real member, or delete the slot if it is no longer needed."
+          : `${getPlaceholderProtectionMessage(currentPerson)} Use Replace Removed Member to put a real member here, or open Delete Slot to see why it is protected.`,
       });
       return;
     }
@@ -1821,13 +2197,13 @@ const FamilyTreePage = () => {
     const result = await Swal.fire({
       icon: "warning",
 
-      title: "Delete this member?",
+      title: "Remove this member?",
 
-      text: "This will convert the card into a structural placeholder in the tree and remove the real member from other modules.",
+      text: "The real member will be removed from family pages, but an empty slot will stay in the tree so the family structure does not break. You can later replace that slot with another member.",
 
       showCancelButton: true,
 
-      confirmButtonText: "Yes, delete",
+      confirmButtonText: "Remove member",
 
       cancelButtonText: "Cancel",
     });
@@ -1845,10 +2221,10 @@ const FamilyTreePage = () => {
 
       await Swal.fire({
         icon: "success",
-        title: "Tree Updated",
+        title: "Member Removed",
         text:
           response?.message ||
-          "Member deleted and replaced with a structural placeholder.",
+          "The member was removed and an empty slot was left in the tree to protect the structure.",
         timer: 2200,
         showConfirmButton: false,
       });
@@ -1856,8 +2232,8 @@ const FamilyTreePage = () => {
       console.error("Error deleting person:", error);
       await Swal.fire({
         icon: "error",
-        title: "Delete Failed",
-        text: error?.message || "Failed to delete person. Please try again.",
+        title: "Remove Failed",
+        text: error?.message || "Unable to remove this member from the tree right now.",
       });
     }
   };
@@ -2245,6 +2621,16 @@ const FamilyTreePage = () => {
       return;
     }
 
+    const localValidationMessage = validateTreeBeforeSave();
+    if (localValidationMessage) {
+      await Swal.fire({
+        icon: "warning",
+        title: "Fix Tree Before Saving",
+        text: localValidationMessage,
+      });
+      return;
+    }
+
     console.log(` Starting save for ${tree.people.size} members`);
 
     setSaveStatus("loading");
@@ -2338,8 +2724,8 @@ const FamilyTreePage = () => {
 
       formData.append("person_count", index);
 
-      if (userInfo && userInfo.familyCode) {
-        formData.append("familyCode", userInfo.familyCode);
+      if (familyCodeToUse) {
+        formData.append("familyCode", familyCodeToUse);
       }
 
       const apiStartTime = Date.now();
@@ -2380,7 +2766,7 @@ const FamilyTreePage = () => {
       // PRESERVE EXISTING POSITIONS - No recalculation needed!
       try {
         const treeResponse = await authFetch(
-          `${import.meta.env.VITE_API_BASE_URL}/family/tree/${userInfo.familyCode
+          `${import.meta.env.VITE_API_BASE_URL}/family/tree/${familyCodeToUse
           }`,
 
           {
@@ -2547,7 +2933,7 @@ const FamilyTreePage = () => {
 
       setSaveStatus("success");
 
-      setSaveMessage("Family tree saved successfully!");
+      setSaveMessage("Family tree saved successfully without breaking the structure.");
 
       setHasUnsavedChanges(false); // Reset changes flag
 
@@ -2566,9 +2952,9 @@ const FamilyTreePage = () => {
       Swal.fire({
         icon: "success",
 
-        title: "Success",
+        title: "Tree Saved",
 
-        text: "Family tree saved successfully!",
+        text: saveMessage || "Family tree saved successfully.",
       });
 
       setSaveStatus("idle");
@@ -2576,7 +2962,7 @@ const FamilyTreePage = () => {
       Swal.fire({
         icon: "error",
 
-        title: "Error",
+        title: "Tree Needs Attention",
 
         text: saveMessage || "Failed to save family tree.",
       });
@@ -3324,6 +3710,287 @@ const FamilyTreePage = () => {
               }
             />
 
+            {structuralDummyDialog.isOpen && (
+              <div className="fixed inset-0 z-[1200] flex items-end justify-center bg-slate-950/50 p-3 backdrop-blur-sm sm:items-center sm:p-6">
+                <div className="w-full max-w-2xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.24)]">
+                  <div className="flex items-start justify-between gap-4 bg-gradient-to-r from-sky-600 via-blue-600 to-indigo-600 px-5 py-4 text-white">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-100">
+                        Removed Member Slot
+                      </p>
+                      <h3 className="mt-1 text-xl font-bold">
+                        {structuralDummyDialog.mode === "replace"
+                          ? "Replace removed member"
+                          : structuralDummyDialog.mode === "delete"
+                            ? "Delete empty slot"
+                            : "Why this slot is locked"}
+                      </h3>
+                      <p className="mt-1 text-sm text-sky-50">
+                        {structuralDummyDialogDetails.person?.name
+                          ? `Slot: ${structuralDummyDialogDetails.person.name}`
+                          : "Review this structural slot before making changes."}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={closeStructuralDummyDialog}
+                      className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-sm font-semibold text-white transition hover:bg-white/20"
+                    >
+                      Close
+                    </button>
+                  </div>
+
+                  <div className="space-y-5 p-5 sm:p-6">
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Slot
+                        </p>
+                        <p className="mt-1 text-base font-semibold text-slate-900">
+                          {structuralDummyDialogDetails.person?.name || "Removed member"}
+                        </p>
+                      </div>
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Linked Children
+                        </p>
+                        <p className="mt-1 text-base font-semibold text-slate-900">
+                          {structuralDummyDialogDetails.childCount}
+                        </p>
+                      </div>
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Slot Status
+                        </p>
+                        <p
+                          className={`mt-1 text-base font-semibold ${
+                            structuralDummyDialogDetails.canDelete
+                              ? "text-emerald-700"
+                              : "text-amber-700"
+                          }`}
+                        >
+                          {structuralDummyDialogDetails.canDelete
+                            ? "Can be deleted"
+                            : "Protected"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {(structuralDummyDialog.mode === "delete" ||
+                      structuralDummyDialog.mode === "info") && (
+                      <>
+                        <div
+                          className={`rounded-2xl border px-4 py-4 ${
+                            structuralDummyDialogDetails.canDelete
+                              ? "border-emerald-200 bg-emerald-50"
+                              : "border-amber-200 bg-amber-50"
+                          }`}
+                        >
+                          <p className="text-sm font-semibold text-slate-900">
+                            {structuralDummyDialog.mode === "info"
+                              ? "This slot is protected for a reason"
+                              : structuralDummyDialogDetails.canDelete
+                                ? "This slot can be deleted safely"
+                                : "This slot cannot be deleted yet"}
+                          </p>
+                          <p className="mt-2 text-sm leading-6 text-slate-700">
+                            {structuralDummyDialogDetails.protectionMessage}
+                          </p>
+                        </div>
+
+                        {structuralDummyDialogDetails.childNames.length > 0 && (
+                          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                            <p className="text-sm font-semibold text-slate-900">
+                              Children linked to this slot
+                            </p>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {structuralDummyDialogDetails.childNames.map((childName) => (
+                                <span
+                                  key={childName}
+                                  className="inline-flex items-center rounded-full border border-sky-200 bg-white px-3 py-1 text-sm font-medium text-sky-700"
+                                >
+                                  {childName}
+                                </span>
+                              ))}
+                              {structuralDummyDialogDetails.hasMoreChildren && (
+                                <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-medium text-slate-600">
+                                  +{structuralDummyDialogDetails.childCount - structuralDummyDialogDetails.childNames.length} more
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {structuralDummyDialog.error && (
+                          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                            {structuralDummyDialog.error}
+                          </div>
+                        )}
+
+                        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                          <button
+                            type="button"
+                            onClick={closeStructuralDummyDialog}
+                            className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                          >
+                            Close
+                          </button>
+                          {structuralDummyDialog.mode === "delete" && (
+                            <button
+                              type="button"
+                              onClick={submitStructuralDummyDelete}
+                              disabled={
+                                structuralDummyDialog.submitting ||
+                                !structuralDummyDialogDetails.canDelete
+                              }
+                              className={`rounded-2xl px-5 py-3 text-sm font-semibold text-white transition ${
+                                structuralDummyDialog.submitting ||
+                                !structuralDummyDialogDetails.canDelete
+                                  ? "cursor-not-allowed bg-slate-300"
+                                  : "bg-rose-600 hover:bg-rose-700"
+                              }`}
+                            >
+                              {structuralDummyDialog.submitting
+                                ? "Deleting..."
+                                : structuralDummyDialogDetails.canDelete
+                                  ? "Delete Slot"
+                                  : "Delete Unavailable"}
+                            </button>
+                          )}
+                        </div>
+                      </>
+                    )}
+
+                    {structuralDummyDialog.mode === "replace" && (
+                      <>
+                        <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-4">
+                          <p className="text-sm font-semibold text-slate-900">
+                            Choose a replacement member
+                          </p>
+                          <p className="mt-2 text-sm leading-6 text-slate-700">
+                            Only approved family members who are not already placed in this tree can fill this removed-member slot.
+                          </p>
+                        </div>
+
+                        {structuralDummyDialog.loadingCandidates ? (
+                          <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-600">
+                            <div className="h-5 w-5 animate-spin rounded-full border-2 border-sky-200 border-t-sky-600" />
+                            Loading approved members...
+                          </div>
+                        ) : structuralDummyDialog.candidates.length > 0 ? (
+                          <div className="max-h-[320px] space-y-3 overflow-y-auto pr-1">
+                            {structuralDummyDialog.candidates.map((candidate) => {
+                              const isSelected =
+                                String(structuralDummyDialog.selectedReplacementUserId || "") ===
+                                String(candidate.userId);
+                              return (
+                                <label
+                                  key={candidate.userId}
+                                  className={`flex cursor-pointer items-start gap-3 rounded-2xl border px-4 py-4 transition ${
+                                    isSelected
+                                      ? "border-sky-300 bg-sky-50 shadow-sm"
+                                      : "border-slate-200 bg-white hover:border-sky-200 hover:bg-slate-50"
+                                  }`}
+                                >
+                                  <input
+                                    type="radio"
+                                    name="replacementUserId"
+                                    className="mt-1 h-4 w-4 accent-sky-600"
+                                    checked={isSelected}
+                                    onChange={() =>
+                                      setStructuralDummyDialog((prev) => ({
+                                        ...prev,
+                                        selectedReplacementUserId: String(candidate.userId),
+                                        error: "",
+                                      }))
+                                    }
+                                  />
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <span className="text-base font-semibold text-slate-900">
+                                        {candidate.name}
+                                      </span>
+                                      <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-500">
+                                        #{candidate.userId}
+                                      </span>
+                                      <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                                        {candidate.familyRole}
+                                      </span>
+                                    </div>
+                                    <p className="mt-2 text-sm text-slate-500">
+                                      {candidate.contact || "No contact number available"}
+                                    </p>
+                                  </div>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-600">
+                            {structuralDummyDialog.error ||
+                              "No approved members outside the tree are available right now."}
+                          </div>
+                        )}
+
+                        {structuralDummyDialog.error &&
+                          structuralDummyDialog.candidates.length > 0 && (
+                            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                              {structuralDummyDialog.error}
+                            </div>
+                          )}
+
+                        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                          <button
+                            type="button"
+                            onClick={closeStructuralDummyDialog}
+                            className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              loadStructuralDummyCandidates(
+                                structuralDummyDialogDetails.person,
+                              )
+                            }
+                            disabled={structuralDummyDialog.loadingCandidates}
+                            className={`rounded-2xl border px-5 py-3 text-sm font-semibold transition ${
+                              structuralDummyDialog.loadingCandidates
+                                ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
+                                : "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100"
+                            }`}
+                          >
+                            Refresh List
+                          </button>
+                          <button
+                            type="button"
+                            onClick={submitStructuralDummyReplacement}
+                            disabled={
+                              structuralDummyDialog.loadingCandidates ||
+                              structuralDummyDialog.submitting ||
+                              !structuralDummyDialog.selectedReplacementUserId
+                            }
+                            className={`rounded-2xl px-5 py-3 text-sm font-semibold text-white transition ${
+                              structuralDummyDialog.loadingCandidates ||
+                              structuralDummyDialog.submitting ||
+                              !structuralDummyDialog.selectedReplacementUserId
+                                ? "cursor-not-allowed bg-slate-300"
+                                : "bg-sky-600 hover:bg-sky-700"
+                            }`}
+                          >
+                            {structuralDummyDialog.submitting
+                              ? "Replacing..."
+                              : "Replace Member"}
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             <AddPersonModal
               isOpen={modal.isOpen}
               onClose={() => setModal({ isOpen: false, action: null })}
@@ -3367,6 +4034,7 @@ const FamilyTreePage = () => {
                     .filter(Boolean)
                   : []
               }
+              allowedRelationshipTypes={["sibling"]}
             />
 
             {/* Debug Panel */}
@@ -3435,6 +4103,7 @@ const FamilyTreePage = () => {
 };
 
 export default FamilyTreePage;
+
 
 
 

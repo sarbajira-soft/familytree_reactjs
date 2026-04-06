@@ -1,7 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 
-import { UserPlus, Users, Edit, Trash2, Plus, User, UserMinus, Link2 } from 'lucide-react';
+import { UserPlus, Users, Edit, Trash2, Plus, User, UserMinus, Link2, Info } from 'lucide-react';
 
 
 
@@ -24,6 +24,14 @@ const iconMap = {
   'Delete': { icon: Trash2 },
 
   'Unlink': { icon: UserMinus },
+
+  'Replace Removed Member': { icon: Users },
+
+  'Delete Slot': { icon: Trash2 },
+
+  'Why Slot Is Locked': { icon: Info },
+
+  'Remove Member': { icon: Trash2 },
 
 };
 
@@ -296,18 +304,27 @@ const RadialMenu = ({
 
                             style={itemStyle}
 
-                            onClick={e => {
+                            onClick={async e => {
 
                                 e.stopPropagation();
 
                                 if (isDisabled) return;
 
-                                onItemClick(item);
+                                try {
 
-                                onClose();
+                                    await Promise.resolve(onItemClick(item));
+
+                                } catch (_) {
+
+                                    // Parent handlers show their own errors.
+
+                                } finally {
+
+                                    onClose();
+
+                                }
 
                             }}
-
                             disabled={isDisabled}
 
                             aria-disabled={isDisabled}
@@ -424,3 +441,4 @@ RadialMenu.propTypes = {
 
 
 export default RadialMenu;
+

@@ -28,6 +28,7 @@ export default function LinkTreeModal({
   currentFamilyCode,
   existingMemberIds = [],
   existingCanonicalKeys = [],
+  allowedRelationshipTypes = null,
 }) {
   const senderNodeUid = String(senderPerson?.nodeUid || "").trim();
 
@@ -95,6 +96,7 @@ export default function LinkTreeModal({
 
   const receiverNodeUid = String(selectedPerson?.nodeUid || "").trim();
   const receiverIsAppUser = Boolean(selectedPerson?.isAppUser || selectedPerson?.memberId);
+  const senderUserId = Number(senderPerson?.memberId || senderPerson?.userId || 0);
 
   const senderParents = asList(senderPerson?.parents);
   const receiverParents = asList(selectedPerson?.parents);
@@ -104,11 +106,33 @@ export default function LinkTreeModal({
   const siblingAllowed = senderHasParents && receiverHasParents;
 
   const relationshipOptions = React.useMemo(() => {
-    if (senderHasParents) {
-      return ["sibling", "child"];
-    }
-    return ["parent", "child"];
-  }, [senderHasParents]);
+    const baseOptions = senderHasParents ? ["sibling", "child"] : ["parent", "child"];
+    const requestedOptions = Array.isArray(allowedRelationshipTypes)
+      ? allowedRelationshipTypes
+          .map((value) => String(value || "").trim().toLowerCase())
+          .filter((value, index, arr) => value && arr.indexOf(value) === index)
+      : [];
+
+    const filteredOptions = requestedOptions.filter((value) => baseOptions.includes(value));
+    return filteredOptions.length ? filteredOptions : baseOptions;
+  }, [allowedRelationshipTypes, senderHasParents]);
+
+  const relationshipFieldLocked = relationshipOptions.length <= 1;
+  const siblingModeActive =
+    relationshipType === "sibling" || (relationshipFieldLocked && relationshipOptions.includes("sibling"));
+  const siblingValidationMessage =
+    !relationshipOptions.includes("sibling") || !siblingModeActive
+      ? ""
+      : !selectedPerson
+      ? "Select a receiver person to check sibling eligibility."
+      : !senderHasParents && !receiverHasParents
+      ? "Sibling link needs saved parents on both sender and receiver cards."
+      : !senderHasParents
+      ? "Sender card has no saved parents yet. Save/add parents first."
+      : !receiverHasParents
+      ? "Selected receiver card has no saved parents in that family tree yet. Ask that family to save the parents first."
+      : "";
+  const siblingValidationVisible = Boolean(siblingValidationMessage);
 
   const normalizeGender = (g) => {
     const s = String(g || "").toLowerCase().trim();
@@ -143,49 +167,58 @@ export default function LinkTreeModal({
     relationshipType === "child" && receiverNodeUid && !derivedParentRole;
 
   React.useEffect(() => {
-    // Keep the selected relationship valid as sender/receiver changes.
-    // This mirrors the radial menu behavior:
-    // - sender has no parents => allow parent + child
-    // - sender has parents    => allow sibling + child
     setRelationshipType((prev) => {
-      // If current selection is still valid, keep it.
       if (relationshipOptions.includes(prev)) {
-        // Extra safety: if sibling is selected but receiver doesn't have parents, fallback to child.
-        if (prev === "sibling" && !siblingAllowed) return "child";
-        // If parent is selected but sender already has parents, fallback to child.
-        if (prev === "parent" && !parentAllowed) return "child";
+        if (prev === "sibling" && !siblingAllowed) {
+          return relationshipOptions.find((option) => option !== "sibling") || prev;
+        }
+        if (prev === "parent" && !parentAllowed) {
+          return relationshipOptions.find((option) => option !== "parent") || prev;
+        }
         return prev;
       }
 
-      // Otherwise choose a sensible default.
-      if (senderHasParents) {
-        return siblingAllowed ? "sibling" : "child";
-      }
-      return "parent";
+      const preferredOption = relationshipOptions.find((option) => {
+        if (option === "sibling") return siblingAllowed;
+        if (option === "parent") return parentAllowed;
+        return true;
+      });
+
+      return preferredOption || relationshipOptions[0] || "";
     });
-  }, [relationshipOptions, siblingAllowed, parentAllowed, senderHasParents]);
+  }, [relationshipOptions, siblingAllowed, parentAllowed]);
 
   const formattedReceiverFamilyCode = formatFamilyCodeFromDigits(receiverFamilyCodeDigits);
+  const normalizedCurrentFamilyCode = normalizeFamilyCode(currentFamilyCode);
+  const sameFamilyReceiverCode =
+    Boolean(formattedReceiverFamilyCode) &&
+    normalizeFamilyCode(formattedReceiverFamilyCode) === normalizedCurrentFamilyCode;
   const canSubmit = Boolean(
     senderNodeUid &&
       formattedReceiverFamilyCode &&
+      !sameFamilyReceiverCode &&
       receiverNodeUid &&
       ["parent", "child", "sibling"].includes(relationshipType) &&
       receiverIsAppUser &&
       (!needsParentRole || Boolean(derivedParentRole)),
   );
 
-  const canSearchReceiverFamily = extractDigits(receiverFamilyCodeDigits).length === 6;
+  const canSearchReceiverFamily =
+    extractDigits(receiverFamilyCodeDigits).length === 6 && !sameFamilyReceiverCode;
   const searchDisabledReason = !receiverFamilyCodeDigits
     ? "Enter receiver family code"
     : extractDigits(receiverFamilyCodeDigits).length !== 6
     ? "Family code must be 6 digits"
+    : sameFamilyReceiverCode
+    ? "Link Tree works only with a different family code"
     : "";
 
   const submitDisabledReason = !senderNodeUid
     ? "Select a valid sender card"
     : !formattedReceiverFamilyCode
     ? "Enter receiver family code"
+    : sameFamilyReceiverCode
+    ? "Link Tree works only with a different family code"
     : !hasSearched
     ? "Search receiver family first"
     : !receiverNodeUid
@@ -204,7 +237,7 @@ export default function LinkTreeModal({
     if (!isOpen) return;
     // Reset form every time modal opens (prevents stale values).
     setReceiverFamilyCodeDigits("");
-    setRelationshipType(asList(senderPerson?.parents).length > 0 ? "child" : "parent");
+    setRelationshipType("");
     setPeople([]);
     setPersonSearch("");
     setSelectedPerson(null);
@@ -257,11 +290,14 @@ export default function LinkTreeModal({
     };
 
     const withDisabledState = eligible.map((p) => {
-      const isSelectable = notAlreadyInTree(p);
+      const candidateUserId = Number(p?.memberId || p?.userId || 0);
+      const isSameAccount =
+        senderUserId > 0 && candidateUserId > 0 && Number(senderUserId) === Number(candidateUserId);
+      const isSelectable = !isSameAccount && notAlreadyInTree(p);
       return {
         person: p,
         disabled: !isSelectable,
-        disabledReason: !isSelectable ? "Already in tree" : "",
+        disabledReason: isSameAccount ? "Same account" : !isSelectable ? "Already in tree" : "",
       };
     });
 
@@ -277,7 +313,7 @@ export default function LinkTreeModal({
         return name.includes(q) || id.includes(q) || phoneMatch;
       })
       .slice(0, 30);
-  }, [people, personSearch, existingMemberIds, existingCanonicalKeys]);
+  }, [people, personSearch, existingMemberIds, existingCanonicalKeys, senderUserId]);
 
   React.useEffect(() => {
     // If the current selection becomes disallowed (already in tree), clear it.
@@ -294,16 +330,18 @@ export default function LinkTreeModal({
     );
     const mid = Number(selectedPerson?.memberId || selectedPerson?.userId || 0);
     const key = `${String(selectedPerson?.canonicalFamilyCode || "").trim()}|${String(selectedPerson?.canonicalNodeUid || "").trim()}`;
+    const isSameAccount =
+      senderUserId > 0 && mid > 0 && Number(senderUserId) === Number(mid);
     const alreadyInTree =
       (mid && existingMemberSet.has(mid)) ||
       (String(selectedPerson?.canonicalFamilyCode || "").trim() &&
         String(selectedPerson?.canonicalNodeUid || "").trim() &&
         existingCanonicalSet.has(key));
 
-    if (alreadyInTree) {
+    if (alreadyInTree || isSameAccount) {
       setSelectedPerson(null);
     }
-  }, [selectedPerson, existingMemberIds, existingCanonicalKeys]);
+  }, [selectedPerson, existingMemberIds, existingCanonicalKeys, senderUserId]);
 
   const fetchReceiverFamilyPeople = async (digitsOverride) => {
     const digits = extractDigits(digitsOverride ?? receiverFamilyCodeDigits).slice(0, 6);
@@ -318,6 +356,15 @@ export default function LinkTreeModal({
       return [];
     }
 
+    if (normalizeFamilyCode(code) === normalizedCurrentFamilyCode) {
+      setHasSearched(true);
+      setPeople([]);
+      setPersonSearch("");
+      setSelectedPerson(null);
+      setReceiverSearchMessage("Link Tree works only between different families. Choose another family code.");
+      return [];
+    }
+
     try {
       setHasSearched(true);
       setReceiverSearchMessage("");
@@ -325,7 +372,7 @@ export default function LinkTreeModal({
       const authToken = token || getToken();
       if (!authToken) throw new Error("Your session has expired. Please log in again.");
 
-      const res = await authFetchResponse(`/family/tree/${encodeURIComponent(code)}`, {
+      const res = await authFetchResponse(`/family/tree-link-candidates/${encodeURIComponent(code)}`, {
         method: "GET",
         skipThrow: true,
         headers: {
@@ -337,9 +384,44 @@ export default function LinkTreeModal({
       }
       const data = await res.json();
       const nextPeople = Array.isArray(data?.people) ? data.people : [];
+      const existingMemberSet = new Set(
+        (Array.isArray(existingMemberIds) ? existingMemberIds : [])
+          .map((x) => Number(x))
+          .filter((x) => Number.isFinite(x) && x > 0),
+      );
+      const existingCanonicalSet = new Set(
+        (Array.isArray(existingCanonicalKeys) ? existingCanonicalKeys : [])
+          .map((x) => String(x || "").trim())
+          .filter(Boolean),
+      );
+      const eligibleReceivers = nextPeople.filter((person) => {
+        if (!person?.isAppUser) return false;
+        const primary = normalizeFamilyCode(person?.primaryFamilyCode || person?.familyCode);
+        const treeCode = normalizeFamilyCode(person?.treeFamilyCode || person?.familyCode);
+        if (primary && treeCode && primary !== treeCode) return false;
+
+        const candidateUserId = Number(person?.memberId || person?.userId || 0);
+        if (senderUserId > 0 && candidateUserId > 0 && Number(senderUserId) === Number(candidateUserId)) {
+          return false;
+        }
+        if (candidateUserId && existingMemberSet.has(candidateUserId)) {
+          return false;
+        }
+
+        const key = `${String(person?.canonicalFamilyCode || "").trim()}|${String(person?.canonicalNodeUid || "").trim()}`;
+        if (
+          String(person?.canonicalFamilyCode || "").trim() &&
+          String(person?.canonicalNodeUid || "").trim() &&
+          existingCanonicalSet.has(key)
+        ) {
+          return false;
+        }
+
+        return true;
+      });
       setPeople(nextPeople);
       setPersonSearch("");
-      setSelectedPerson(null);
+      setSelectedPerson(eligibleReceivers.length === 1 ? eligibleReceivers[0] : null);
 
       if (!nextPeople.length) {
         setReceiverSearchMessage(
@@ -814,6 +896,7 @@ export default function LinkTreeModal({
                   const next = e.target.value;
                   setRelationshipType(next);
                 }}
+                disabled={relationshipFieldLocked}
                 style={{
                   width: "100%",
                   borderRadius: 12,
@@ -821,24 +904,27 @@ export default function LinkTreeModal({
                   padding: "12px 14px",
                   outline: "none",
                   fontWeight: 700,
-                  background: "#fff",
+                  background: relationshipFieldLocked ? "#f8fafc" : "#fff",
+                  color: relationshipFieldLocked ? "#374151" : "#111827",
+                  cursor: relationshipFieldLocked ? "not-allowed" : "pointer",
+                  opacity: 1,
                 }}
               >
                 {relationshipOptions.includes("sibling") && (
-                  <option value="sibling" disabled={!siblingAllowed}>
+                  <option value="sibling" disabled={!relationshipFieldLocked && !siblingAllowed}>
                     sibling
                   </option>
                 )}
                 {relationshipOptions.includes("parent") && (
-                  <option value="parent" disabled={!parentAllowed}>
+                  <option value="parent" disabled={!relationshipFieldLocked && !parentAllowed}>
                     parent
                   </option>
                 )}
                 {relationshipOptions.includes("child") && <option value="child">child</option>}
               </select>
-              {relationshipOptions.includes("sibling") && !siblingAllowed && (
+              {siblingValidationVisible && (
                 <div style={{ marginTop: 6, fontSize: 12, color: "#b45309", fontWeight: 600 }}>
-                  Sibling is enabled only when both sender and receiver have parents.
+                  {siblingValidationMessage}
                 </div>
               )}
             </div>
@@ -1067,3 +1153,6 @@ export default function LinkTreeModal({
     </div>
   );
 }
+
+
+
