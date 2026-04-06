@@ -1009,7 +1009,7 @@ const ProfilePage = () => {
                         />
                       ) : (
                         <div className="text-black text-center text-lg italic">
-                          No media available
+                          {/* No media available */}
                         </div>
                       )}
 

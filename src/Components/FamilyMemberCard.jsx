@@ -629,15 +629,23 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
     );
   }, [familyMembers, currentUser?.userId, currentUser?.id]);
 
+  const membersNotInTreeUserIds = useMemo(() => {
+    return new Set(
+      (membersNotInTree || [])
+        .map((m) => Number(m?.userId || m?.memberId || 0))
+        .filter((id) => Number.isFinite(id) && id > 0),
+    );
+  }, [membersNotInTree]);
+
   const replacementCandidates = useMemo(
     () =>
       birthFamilyMembers.filter(
         (member) =>
           member.user?.isAppUser &&
-          !memberIdsInTree.has(Number(member.userId)) &&
+          membersNotInTreeUserIds.has(Number(member.userId)) &&
           !member?.blockStatus?.isBlockedByMe,
       ),
-    [birthFamilyMembers, memberIdsInTree],
+    [birthFamilyMembers, membersNotInTreeUserIds],
   );
 
   const filteredMembersNotInTree = useMemo(() => {
@@ -741,7 +749,7 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                 </span>
               )}
               {/* Show NOT IN TREE badge for members not yet added to tree - only in Birth Family Directory */}
-              {showNotInTreeBadge && member.membershipType === 'member' && !memberIdsInTree.has(Number(member.userId)) && (
+              {showNotInTreeBadge && member.membershipType === 'member' && membersNotInTreeUserIds.has(Number(member.userId)) && (
                 <span className="inline-block text-[10px] sm:text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-200">
                   Not in Tree
                 </span>

@@ -30,6 +30,8 @@ const CreatePostModal = ({
 }) => {
   const { userInfo } = useUser();
 
+  const MAX_CAPTION_LENGTH = 250;
+
   const getDefaultPrivacy = () => {
     const hasFamily = Boolean(
       String(currentUser?.familyCode || userInfo?.familyCode || "").trim(),
@@ -802,6 +804,11 @@ const CreatePostModal = ({
 
     setMessage("");
 
+    if (content.length > MAX_CAPTION_LENGTH) {
+      setMessage(`Caption must be ${MAX_CAPTION_LENGTH} characters or less.`);
+      return;
+    }
+
     if (
       !content.trim() &&
       !imageFile &&
@@ -1092,14 +1099,14 @@ const CreatePostModal = ({
                 currentUser.firstName?.split("_")[0] || "there"
               }?`}
               value={content}
-              onChange={(e) => setContent(e.target.value)}
-              maxLength={5000}
+              onChange={(e) => setContent(e.target.value.slice(0, MAX_CAPTION_LENGTH))}
+              maxLength={MAX_CAPTION_LENGTH}
             />
 
             {/* Character count */}
 
             <div className="absolute bottom-2 sm:bottom-3 right-2 sm:right-3 text-xs text-gray-400">
-              {content.length} / 5000
+              {content.length} / {MAX_CAPTION_LENGTH}
             </div>
 
             {/* Emoji Picker */}

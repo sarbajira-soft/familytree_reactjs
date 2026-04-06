@@ -21,6 +21,7 @@ const CreateEventModal = ({
   apiBaseUrl = import.meta.env.VITE_API_BASE_URL,
 }) => {
   const MAX_EVENT_TITLE_LENGTH = 50;
+  const MAX_EVENT_DESCRIPTION_LENGTH = 250;
   const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
   const EVENT_DATE_MIN = "1900-01-01";
   const EVENT_DATE_MAX = "2100-12-31";
@@ -183,6 +184,7 @@ const CreateEventModal = ({
     const normalizedTitle = String(title || "").trim();
     const normalizedDate = String(date || "").trim();
     const normalizedTime = String(time || "").trim();
+    const normalizedDescription = String(description || "").trim();
 
     if (!normalizedTitle) {
       nextErrors.title = "Event title is required.";
@@ -202,6 +204,10 @@ const CreateEventModal = ({
       nextErrors.time = "Event time is required.";
     } else if (!/^\d{2}:\d{2}(:\d{2})?$/.test(normalizedTime)) {
       nextErrors.time = "Event time is invalid. Please choose a valid time.";
+    }
+
+    if (normalizedDescription.length > MAX_EVENT_DESCRIPTION_LENGTH) {
+      nextErrors.description = `Description must be ${MAX_EVENT_DESCRIPTION_LENGTH} characters or less.`;
     }
 
     setErrors(nextErrors);
@@ -455,11 +461,30 @@ const CreateEventModal = ({
               </label>
               <textarea
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                onChange={(e) => {
+                  setDescription(e.target.value.slice(0, MAX_EVENT_DESCRIPTION_LENGTH));
+                  if (errors.description) {
+                    setErrors((prev) => ({ ...prev, description: undefined }));
+                  }
+                }}
+                maxLength={MAX_EVENT_DESCRIPTION_LENGTH}
                 rows="4"
                 className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white resize-none text-sm"
                 placeholder="Tell us about your event..."
               ></textarea>
+              {errors.description ? (
+                <p className="text-red-600 text-xs">{errors.description}</p>
+              ) : null}
+              <div className="text-[11px] text-gray-500 flex items-center justify-between">
+                <span>Max {MAX_EVENT_DESCRIPTION_LENGTH} characters.</span>
+                <span
+                  className={
+                    description.length > MAX_EVENT_DESCRIPTION_LENGTH ? "text-red-600" : ""
+                  }
+                >
+                  {description.length}/{MAX_EVENT_DESCRIPTION_LENGTH}
+                </span>
+              </div>
             </div>
 
             {/* Image Upload */}
