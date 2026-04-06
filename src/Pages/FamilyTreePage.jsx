@@ -2697,6 +2697,20 @@ const FamilyTreePage = () => {
           isExternalLinked ? person.canonicalNodeUid || "" : "",
         );
 
+        const isStructuralDummy =
+          Boolean(person?.isStructuralDummy) ||
+          person?.nodeType === "structural_dummy";
+        formData.append(
+          `person_${index}_isStructuralDummy`,
+          isStructuralDummy ? "true" : "false",
+        );
+        formData.append(
+          `person_${index}_nodeType`,
+          isStructuralDummy
+            ? "structural_dummy"
+            : person?.nodeType || (isExternalLinked ? "linked" : "birth"),
+        );
+
         formData.append(
           `person_${index}_parents`,
           person.parents ? Array.from(person.parents).join(",") : "",
