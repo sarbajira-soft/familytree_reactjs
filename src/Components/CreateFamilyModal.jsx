@@ -10,8 +10,17 @@ const CreateFamilyModal = ({ isOpen, onClose, token, onFamilyCreated, mode = "cr
     const [loading, setLoading] = useState(false);
     const [familyNameError, setFamilyNameError] = useState('');
     const [familyBioError, setFamilyBioError] = useState('');
+    const [familyPhotoError, setFamilyPhotoError] = useState('');
     const [showSuccess, setShowSuccess] = useState(false);
     const [successData, setSuccessData] = useState(null);
+
+    const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+    const ALLOWED_IMAGE_TYPES = new Set([
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'image/gif',
+    ]);
 
     const generateFamilyCode = () => `FAM${Date.now().toString().slice(-6)}`;
 
@@ -37,13 +46,42 @@ const CreateFamilyModal = ({ isOpen, onClose, token, onFamilyCreated, mode = "cr
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
-    if (file) {
-      setFamilyPhoto(file);
-      setPreview(URL.createObjectURL(file));
-    } else {
+    if (!file) {
       setFamilyPhoto(null);
       setPreview('');
+      if (familyPhotoError) setFamilyPhotoError('');
+      return;
     }
+
+    const nextType = String(file?.type || '');
+    const isImage = nextType.startsWith('image/');
+    const isAllowed = ALLOWED_IMAGE_TYPES.has(nextType);
+
+    if (!isImage || !isAllowed) {
+      setFamilyPhoto(null);
+      setPreview('');
+      setFamilyPhotoError('Only image files (jpeg, jpg, png, gif) are allowed.');
+      try {
+        const input = document.getElementById('family-image-input');
+        if (input) input.value = '';
+      } catch {}
+      return;
+    }
+
+    if (Number(file?.size || 0) > MAX_IMAGE_BYTES) {
+      setFamilyPhoto(null);
+      setPreview('');
+      setFamilyPhotoError('Image size should be less than 5MB.');
+      try {
+        const input = document.getElementById('family-image-input');
+        if (input) input.value = '';
+      } catch {}
+      return;
+    }
+
+    if (familyPhotoError) setFamilyPhotoError('');
+    setFamilyPhoto(file);
+    setPreview(URL.createObjectURL(file));
   };
 
     const handleSubmit = async (e) => {
@@ -326,11 +364,14 @@ const CreateFamilyModal = ({ isOpen, onClose, token, onFamilyCreated, mode = "cr
               <input
                 id="family-image-input"
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/jpg,image/gif"
                 className="hidden"
                 onChange={handleImageChange}
               />
             </div>
+            {familyPhotoError ? (
+              <p className="text-red-600 text-xs mt-1">{familyPhotoError}</p>
+            ) : null}
           </div>
 
           <button
