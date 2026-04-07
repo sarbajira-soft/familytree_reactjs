@@ -10,6 +10,7 @@ const ResetPassword = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState('');
 
@@ -41,6 +42,17 @@ const ResetPassword = () => {
   }, [location.state, navigate]);
 
   useEffect(() => {
+    return () => {
+      try {
+        if (window.__resetPasswordSuccessTimeout) {
+          clearTimeout(window.__resetPasswordSuccessTimeout);
+          window.__resetPasswordSuccessTimeout = null;
+        }
+      } catch {}
+    };
+  }, []);
+
+  useEffect(() => {
     const otpSent = parseInt(localStorage.getItem('otp_sent_time'), 10);
     if (otpSent) {
       const checkTimeLeft = () => {
@@ -68,6 +80,7 @@ const ResetPassword = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
 
     if (!otp || !newPassword || !confirmPassword) {
       setError('Please fill in all fields');
@@ -104,7 +117,20 @@ const ResetPassword = () => {
         return;
       }
 
-      navigate('/');
+      setSuccess('Password updated successfully');
+      setIsLoading(false);
+      try {
+        if (window.__resetPasswordSuccessTimeout) {
+          clearTimeout(window.__resetPasswordSuccessTimeout);
+        }
+        window.__resetPasswordSuccessTimeout = setTimeout(() => {
+          navigate('/login');
+        }, 2000);
+      } catch {
+        setTimeout(() => {
+          navigate('/login');
+        }, 2000);
+      }
     } catch (err) {
       setError('Reset failed. Please try again.');
       setIsLoading(false);
@@ -149,6 +175,12 @@ const ResetPassword = () => {
             Enter the OTP and your new password
           </p>
         </div>
+
+        {success && (
+          <div className="mb-4 p-3 text-sm rounded border text-green-700 bg-green-100 border-green-300">
+            {success}
+          </div>
+        )}
 
         {error && (
           <div className={`mb-4 p-3 text-sm rounded border ${

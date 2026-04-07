@@ -35,6 +35,10 @@ const ProfilePage = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
+  const [localIsPrivate, setLocalIsPrivate] = useState(
+    Boolean(userInfo?.isPrivate),
+  );
+
   const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
   const [profilePhotoError, setProfilePhotoError] = useState("");
 
@@ -79,22 +83,20 @@ const ProfilePage = () => {
 
       return response.json();
     },
-    onSuccess: async () => {
-      await refetchUser();
-      Swal.fire({
-        icon: 'success',
-        title: 'Updated',
-        text: 'Privacy updated successfully.',
-        timer: 1500,
-        showConfirmButton: false,
-      });
+    onMutate: async (nextIsPrivate) => {
+      const previous = localIsPrivate;
+      setLocalIsPrivate(Boolean(nextIsPrivate));
+      return { previous };
     },
-    onError: (err) => {
-      Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: err?.message || 'Failed to update privacy',
-      });
+    onSuccess: async () => {
+      await refetchUser({ silent: true });
+      toast.success('Privacy updated successfully.');
+    },
+    onError: (err, _variables, context) => {
+      if (context && typeof context.previous !== 'undefined') {
+        setLocalIsPrivate(Boolean(context.previous));
+      }
+      toast.error(err?.message || 'Failed to update privacy');
     },
   });
 
@@ -107,6 +109,10 @@ const ProfilePage = () => {
 
   useEffect(() => {
     if (!userInfo) return;
+
+    if (typeof userInfo?.isPrivate === 'boolean') {
+      setLocalIsPrivate(Boolean(userInfo.isPrivate));
+    }
 
     const userObj = {
       profileImage: userInfo.profileUrl || "/assets/user.png",
@@ -172,16 +178,28 @@ const ProfilePage = () => {
     const file = e?.target?.files?.[0];
     if (!file) return;
 
+    const allowedImageTypes = new Set([
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'image/gif',
+    ]);
+
+    if (!allowedImageTypes.has(String(file?.type || '').toLowerCase())) {
+      const msg = 'Only image files (jpeg, jpg, png, gif) are allowed.';
+      setProfilePhotoError(msg);
+      toast.error(msg);
+      if (e?.target) {
+        e.target.value = '';
+      }
+      return;
+    }
+
     if (Number(file?.size || 0) > MAX_IMAGE_BYTES) {
       setProfilePhotoError(
         "Image is too large. Please select an image less than 5MB.",
       );
-      Swal.fire({
-        icon: "warning",
-        title: "Image too large",
-        text: "Image is too large. Please select an image less than 5MB.",
-        confirmButtonColor: "#d33",
-      });
+      toast.error("Image is too large. Please select an image less than 5MB.");
 
       if (e?.target) {
         e.target.value = "";
@@ -220,22 +238,10 @@ const ProfilePage = () => {
         throw new Error(errText || "Failed to update profile picture");
       }
 
-      await refetchUser();
-
-      Swal.fire({
-        icon: "success",
-        title: "Updated",
-        text: "Profile picture updated successfully.",
-        timer: 1500,
-        showConfirmButton: false,
-      });
+      await refetchUser({ silent: true });
+      toast.success('Profile picture updated successfully.');
     } catch (error) {
-      Swal.fire({
-        icon: "error",
-        title: "Error",
-        text: error?.message || "Failed to update profile picture",
-        confirmButtonColor: "#d33",
-      });
+      toast.error(error?.message || 'Failed to update profile picture');
     } finally {
       if (e?.target) {
         e.target.value = "";
@@ -302,22 +308,10 @@ const ProfilePage = () => {
         throw new Error(errText || "Failed to remove profile picture");
       }
 
-      await refetchUser();
-
-      Swal.fire({
-        icon: "success",
-        title: "Removed",
-        text: "Profile picture removed successfully.",
-        timer: 1500,
-        showConfirmButton: false,
-      });
+      await refetchUser({ silent: true });
+      toast.success('Profile picture removed successfully.');
     } catch (error) {
-      Swal.fire({
-        icon: "error",
-        title: "Error",
-        text: error?.message || "Failed to remove profile picture",
-        confirmButtonColor: "#d33",
-      });
+      toast.error(error?.message || 'Failed to remove profile picture');
     }
   };
 
@@ -543,6 +537,7 @@ const ProfilePage = () => {
         caption: data.data.caption,
         privacy: data.data.privacy,
         familyCode: data.data.familyCode,
+        postImage: data.data.postImage,
         url: data.data.postImage,
         postVideo: data.data.postVideo,
       };
@@ -795,7 +790,7 @@ const ProfilePage = () => {
                         <input
                           ref={profileFileInputRef}
                           type="file"
-                          accept="image/*"
+                          accept="image/jpeg,image/jpg,image/png,image/gif"
                           onChange={handleProfilePhotoSelected}
                           className="hidden"
                         />
@@ -863,22 +858,22 @@ const ProfilePage = () => {
                             <button
                               type="button"
                               onClick={() =>
-                                privacyMutation.mutate(!Boolean(userInfo?.isPrivate))
+                                privacyMutation.mutate(!Boolean(localIsPrivate))
                               }
                               disabled={
                                 privacyMutation.isPending ||
                                 !token ||
-                                typeof userInfo?.isPrivate !== 'boolean'
+                                typeof localIsPrivate !== 'boolean'
                               }
-                              className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-opacity-75 ${userInfo?.isPrivate ? 'bg-primary-600' : 'bg-gray-300'
+                              className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-opacity-75 ${localIsPrivate ? 'bg-primary-600' : 'bg-gray-300'
                                 } ${privacyMutation.isPending || !token
                                   ? 'opacity-60 cursor-not-allowed'
                                   : 'cursor-pointer'
                                 }`}
-                              aria-pressed={Boolean(userInfo?.isPrivate)}
+                              aria-pressed={Boolean(localIsPrivate)}
                             >
                               <span
-                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${userInfo?.isPrivate
+                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${localIsPrivate
                                     ? 'translate-x-5'
                                     : 'translate-x-1'
                                   }`}

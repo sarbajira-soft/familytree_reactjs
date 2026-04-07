@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import PhoneInput from 'react-phone-input-2';
 import Swal from 'sweetalert2';
 import { FiArrowLeft } from 'react-icons/fi';
+import { toast } from 'react-toastify';
 import { useUser } from '../Contexts/UserContext';
 
 import { clearAuthData, getToken } from '../utils/auth';
@@ -620,14 +621,13 @@ const ProfileFormModal = ({
         'image/jpg',
         'image/png',
         'image/gif',
-        'image/webp',
       ]);
 
       if (!allowedImageTypes.has(String(file.type || '').toLowerCase())) {
         Swal.fire({
           icon: 'warning',
           title: 'Invalid file',
-          text: 'Only image files (jpeg, jpg, png, gif, webp) are allowed.',
+          text: 'Only image files (jpeg, jpg, png, gif) are allowed.',
           confirmButtonColor: '#3f982c',
         });
         e.target.value = '';
@@ -1004,6 +1004,9 @@ const ProfileFormModal = ({
           ? errorData.message.join('\n')
           : (errorData.message || 'Operation failed. Please try again.');
         setApiError(errorMessage);
+        if (mode === 'edit-profile' && variant === 'page') {
+          toast.error(errorMessage);
+        }
         return;
       }
 
@@ -1050,17 +1053,21 @@ const ProfileFormModal = ({
           // Regular profile update
           const alertTitle = mode === 'edit-profile' ? 'Profile Updated!' : 'Member Updated!';
           const alertText = mode === 'edit-profile' ? 'Your profile has been updated successfully.' : 'Family member has been updated successfully.';
-          
-          Swal.fire({
-            icon: 'success',
-            title: alertTitle,
-            text: alertText,
-            confirmButtonColor: '#3f982c',
-          }).then(() => {
-            if (variant !== 'page') {
-              window.location.reload();
-            }
-          });
+
+          if (mode === 'edit-profile' && variant === 'page') {
+            toast.success('Profile updated successfully!');
+          } else {
+            Swal.fire({
+              icon: 'success',
+              title: alertTitle,
+              text: alertText,
+              confirmButtonColor: '#3f982c',
+            }).then(() => {
+              if (variant !== 'page') {
+                window.location.reload();
+              }
+            });
+          }
         }
       }
       if (variant !== 'page') {
@@ -1070,6 +1077,9 @@ const ProfileFormModal = ({
     } catch (error) {
       const errorMessage = 'Network error or server unreachable. Please try again.';
       setApiError(errorMessage);
+      if (mode === 'edit-profile' && variant === 'page') {
+        toast.error(errorMessage);
+      }
       Swal.fire({
         icon: 'error',
         title: 'Oops...',

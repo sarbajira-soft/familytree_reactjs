@@ -12,7 +12,7 @@ import { FiSmile, FiSend } from "react-icons/fi";
 import { AnimatePresence, motion } from "framer-motion";
 import EmojiPicker from "emoji-picker-react";
 import CommentItem from "./CommentItem";
-import { countComments } from "../utils/commentUtils";
+import { buildCommentTree, countComments } from "../utils/commentUtils";
 import Swal from "sweetalert2";
 
 import { authFetchResponse } from "../utils/authFetch";
@@ -64,6 +64,7 @@ const GalleryViewerModal = ({
   const [newComment, setNewComment] = useState("");
   const [commentLoading, setCommentLoading] = useState(false);
   const [comments, setComments] = useState([]);
+  const [isCommentsFetching, setIsCommentsFetching] = useState(false);
   const commentsRef = useRef(null);
   const carouselRef = useRef(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -119,16 +120,44 @@ const GalleryViewerModal = ({
 
 
 
+  const fetchComments = async (galleryId) => {
+    const targetId = Number(galleryId);
+    if (!Number.isFinite(targetId) || Number.isNaN(targetId) || targetId <= 0) {
+      return;
+    }
+
+    setIsCommentsFetching(true);
+    try {
+      const res = await authFetchResponse(`/gallery/${targetId}/comments`, {
+        method: "GET",
+        skipThrow: true,
+      });
+      const data = await res.json().catch(() => ({}));
+      const next = Array.isArray(data?.comments) ? data.comments : [];
+      setComments(buildCommentTree(next));
+      setTimeout(() => {
+        if (commentsRef.current) {
+          commentsRef.current.scrollTop = commentsRef.current.scrollHeight;
+        }
+      }, 100);
+    } catch (err) {
+      console.error("Fetching comments failed", err);
+    } finally {
+      setIsCommentsFetching(false);
+    }
+  };
+
   useEffect(() => {
     if (isOpen) setCurrentPhotoIndex(0);
   }, [isOpen]);
+
   useEffect(() => {
-    if (album) {
-      setIsLiked(album.isLiked || false);
-      setTotalLikes(album.likes || 0);
-      fetchComments();
-    }
-  }, [album]);
+    if (!isOpen || !album?.id) return;
+    setIsLiked(album.isLiked || false);
+    setTotalLikes(album.likes || 0);
+    setComments([]);
+    fetchComments(album.id);
+  }, [isOpen, album?.id]);
 
   useEffect(() => {
     const handleClickOutsideEmoji = (event) => {
@@ -205,33 +234,6 @@ const GalleryViewerModal = ({
     }, 0);
   };
 
-  // Fetch comments
-  async function fetchComments() {
-    try {
-      const res = await authFetchResponse(`/gallery/${album.id}/comments`, {
-        method: "GET",
-        skipThrow: true,
-      });
-      if (!res.ok) {
-        throw new Error("Unable to load comments.");
-      }
-      const data = await res.json();
-      setComments(data.comments || []);
-      setTimeout(() => {
-        if (commentsRef.current) {
-          commentsRef.current.scrollTop = commentsRef.current.scrollHeight;
-        }
-      }, 100);
-    } catch (err) {
-      console.error("Fetching comments failed", err);
-      Swal.fire({
-        icon: "error",
-        title: "Can’t load comments",
-        text: err?.message || "Unable to load comments right now.",
-      });
-    }
-  }
-
   // Post comment
   const handlePostComment = async () => {
     if (!newComment.trim()) return;
@@ -253,7 +255,7 @@ const GalleryViewerModal = ({
       }
       setNewComment("");
       setShowEmojiPicker(false);
-      await fetchComments();
+      await fetchComments(album.id);
     } catch (err) {
       console.error("Post failed", err);
       Swal.fire({
@@ -277,7 +279,7 @@ const GalleryViewerModal = ({
     if (!res.ok) {
       throw new Error("Unable to update your comment.");
     }
-    fetchComments();
+    fetchComments(album.id);
   };
   const handleDeleteComment = async (commentId) => {
     const res = await authFetchResponse(`/gallery/comment/${commentId}`, {
@@ -287,7 +289,7 @@ const GalleryViewerModal = ({
     if (!res.ok) {
       throw new Error("Unable to delete your comment.");
     }
-    fetchComments();
+    fetchComments(album.id);
   };
   const handleReplyComment = async (parentCommentId, replyText) => {
     const res = await authFetchResponse(`/gallery/comment/reply`, {
@@ -305,7 +307,7 @@ const GalleryViewerModal = ({
     if (!res.ok) {
       throw new Error("Unable to post your reply.");
     }
-    fetchComments();
+    fetchComments(album.id);
   };
 
   // Scroll listener: update current image index

@@ -12,6 +12,7 @@ import {
 } from "react-icons/fi";
 import { jwtDecode } from "jwt-decode";
 import Swal from "sweetalert2";
+import { toast } from "react-toastify";
 import { getToken } from "../utils/auth";
 import { authFetchResponse } from "../utils/authFetch";
 
@@ -131,6 +132,7 @@ const EditEventModal = ({
             text: "No access token found.",
             confirmButtonColor: "#10b981",
           });
+          toast.error("No access token found.");
           return;
         }
 
@@ -143,6 +145,7 @@ const EditEventModal = ({
             text: "User ID not found in token.",
             confirmButtonColor: "#10b981",
           });
+          toast.error("User ID not found in token.");
           return;
         }
         setUserId(uid);
@@ -171,6 +174,7 @@ const EditEventModal = ({
           text: `Error fetching user data: ${err.message}`,
           confirmButtonColor: "#10b981",
         });
+        toast.error(`Error fetching user data: ${err.message}`);
       }
     };
 
@@ -295,6 +299,7 @@ const EditEventModal = ({
         text: "User ID or Family Code missing.",
         confirmButtonColor: "#10b981",
       });
+      toast.error("User ID or Family Code missing.");
       setIsLoading(false);
       return;
     }
@@ -308,6 +313,7 @@ const EditEventModal = ({
           text: "No access token found.",
           confirmButtonColor: "#10b981",
         });
+        toast.error("No access token found.");
         setIsLoading(false);
         return;
       }
@@ -345,12 +351,14 @@ const EditEventModal = ({
 
       if (!response.ok) {
         const errText = await response.text().catch(() => "");
+        const friendly = getFriendlyError(response.status, errText);
         Swal.fire({
           icon: "error",
           title: "Can’t update event",
-          text: getFriendlyError(response.status, errText),
+          text: friendly,
           confirmButtonColor: "#10b981",
         });
+        toast.error(friendly);
         setIsLoading(false);
         return;
       }
@@ -364,6 +372,7 @@ const EditEventModal = ({
         text: "Your changes have been saved.",
         confirmButtonColor: "#10b981",
       });
+      toast.success("Event updated successfully.");
 
       // Call the callback to refresh events
       if (onEventUpdated) {
@@ -373,12 +382,14 @@ const EditEventModal = ({
       onClose();
     } catch (err) {
       console.error("💥 Error updating event:", err);
+      const msg = err?.message || "Something went wrong. Please try again.";
       Swal.fire({
         icon: "error",
         title: "Can’t update event",
-        text: err?.message || "Something went wrong. Please try again.",
+        text: msg,
         confirmButtonColor: "#10b981",
       });
+      toast.error(msg);
     } finally {
       setIsLoading(false);
     }

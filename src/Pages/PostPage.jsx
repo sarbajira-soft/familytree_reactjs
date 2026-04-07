@@ -20,7 +20,6 @@ import { useNavigate } from "react-router-dom";
 import CreatePostModal from "../Components/CreatePostModal";
 import PostViewerModal from "../Components/PostViewerModal";
 import CommentItem from "../Components/CommentItem";
-import { BlockButton } from "../Components/block/BlockButton";
 import ReportContentModal from "../Components/ReportContentModal";
 import { useUser } from "../Contexts/UserContext";
 import PostsShimmer from "./PostsShimmer";
@@ -124,6 +123,50 @@ const PostPage = () => {
     }
   };
 
+  const handlePostCreated = (createdPost) => {
+    if (!createdPost || !createdPost.id) {
+      fetchPosts();
+      return;
+    }
+
+    const shouldShowInCurrentFeed =
+      activeFeed === "family"
+        ? String(createdPost?.privacy || "") === "private" ||
+          String(createdPost?.privacy || "") === "family"
+        : String(createdPost?.privacy || "") === "public";
+
+    if (!shouldShowInCurrentFeed) {
+      return;
+    }
+
+    const mapped = {
+      id: createdPost.id,
+      author: createdPost.user?.name || "Unknown",
+      authorId: createdPost.user?.userId || createdPost.createdBy || null,
+      avatar: createdPost.user?.profile || DEFAULT_AVATAR,
+      time: createdPost.createdAt
+        ? new Date(createdPost.createdAt).toLocaleString()
+        : new Date().toLocaleString(),
+      caption: createdPost.caption,
+      fullImageUrl: createdPost.postImage,
+      postVideo: createdPost.postVideo,
+      likes: createdPost.likeCount ?? 0,
+      comments: createdPost.commentCount ?? 0,
+      liked: createdPost.isLiked ?? false,
+      privacy: createdPost.privacy,
+    };
+
+    if (blockedUserIds.has(Number(mapped.authorId))) {
+      return;
+    }
+
+    setPosts((prev) => {
+      const existing = Array.isArray(prev) ? prev : [];
+      if (existing.some((p) => Number(p?.id) === Number(mapped.id))) return existing;
+      return [mapped, ...existing];
+    });
+  };
+
   const filterCommentsForBlockedUser = (comments, blockedUserId) => {
     if (!Array.isArray(comments)) {
       return [];
@@ -146,37 +189,6 @@ const PostPage = () => {
       nextComments = filterCommentsForBlockedUser(nextComments, blockedUserId);
     });
     return nextComments;
-  };
-
-  const removeBlockedUserContent = (blockedUserId) => {
-    if (!blockedUserId) {
-      return;
-    }
-
-    // BLOCK OVERRIDE: Optimistically hide blocked user's posts/comments immediately.
-    setBlockedUserIds((prev) => new Set(prev).add(Number(blockedUserId)));
-    setPosts((prevPosts) =>
-      prevPosts.filter((post) => Number(post.authorId) !== Number(blockedUserId)),
-    );
-    setPostComments((prevComments) => {
-      const nextComments = {};
-      Object.entries(prevComments).forEach(([postId, comments]) => {
-        nextComments[postId] = filterCommentsForBlockedUser(comments, blockedUserId);
-      });
-      return nextComments;
-    });
-  };
-
-  const handleBlockStatusFromFeed = (targetUserId, status) => {
-    if (status?.isBlockedByMe) {
-      removeBlockedUserContent(targetUserId);
-      return;
-    }
-    setBlockedUserIds((prev) => {
-      const next = new Set(prev);
-      next.delete(Number(targetUserId));
-      return next;
-    });
   };
 
   useEffect(() => {
@@ -1195,19 +1207,6 @@ const PostPage = () => {
                           {postActionMenuPostId === post.id && (
                             <div className="absolute right-0 mt-2 w-40 rounded-xl border border-gray-200 bg-white shadow-lg z-50 overflow-hidden">
                               <div className="py-1">
-                                {String(post.privacy || '').toLowerCase() !== 'public' && (
-                                  <div className="px-2 py-1">
-                                    <BlockButton
-                                      userId={post.authorId}
-                                      isBlockedByMe={blockedUserIds.has(Number(post.authorId))}
-                                      location="membersList"
-                                      userName={post.author}
-                                      onStatusChange={(status) =>
-                                        handleBlockStatusFromFeed(post.authorId, status)
-                                      }
-                                    />
-                                  </div>
-                                )}
                                 <button
                                   type="button"
                                   className="w-full flex items-center rounded-lg px-3 py-2 text-left text-sm text-gray-700 hover:bg-red-50 active:bg-red-100 transition-colors"
@@ -1483,7 +1482,7 @@ const PostPage = () => {
       <CreatePostModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
-        onPostCreated={fetchPosts}
+        onPostCreated={handlePostCreated}
         currentUser={userInfo}
         authToken={token}
         mode="create"

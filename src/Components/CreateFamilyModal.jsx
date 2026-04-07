@@ -14,6 +14,9 @@ const CreateFamilyModal = ({ isOpen, onClose, token, onFamilyCreated, mode = "cr
     const [showSuccess, setShowSuccess] = useState(false);
     const [successData, setSuccessData] = useState(null);
 
+    const MAX_FAMILY_NAME_LENGTH = 100;
+    const MAX_FAMILY_BIO_LENGTH = 250;
+
     const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
     const ALLOWED_IMAGE_TYPES = new Set([
       'image/jpeg',
@@ -102,6 +105,17 @@ const CreateFamilyModal = ({ isOpen, onClose, token, onFamilyCreated, mode = "cr
 
         if (familyNameError) setFamilyNameError('');
 
+        if (nameTrimmed.length > MAX_FAMILY_NAME_LENGTH) {
+          const msg = `Family Name must be ${MAX_FAMILY_NAME_LENGTH} characters or less.`;
+          setFamilyNameError(msg);
+          await Swal.fire({
+            icon: 'warning',
+            title: 'Invalid Family Name',
+            text: msg,
+          });
+          return;
+        }
+
         if (!bioTrimmed) {
           setFamilyBioError('Family Bio cannot be empty.');
           await Swal.fire({
@@ -113,6 +127,17 @@ const CreateFamilyModal = ({ isOpen, onClose, token, onFamilyCreated, mode = "cr
         }
 
         if (familyBioError) setFamilyBioError('');
+
+        if (bioTrimmed.length > MAX_FAMILY_BIO_LENGTH) {
+          const msg = `Family Bio must be ${MAX_FAMILY_BIO_LENGTH} characters or less.`;
+          setFamilyBioError(msg);
+          await Swal.fire({
+            icon: 'warning',
+            title: 'Invalid Family Bio',
+            text: msg,
+          });
+          return;
+        }
 
         const formData = new FormData();
         formData.append('familyName', nameTrimmed);
@@ -298,10 +323,13 @@ const CreateFamilyModal = ({ isOpen, onClose, token, onFamilyCreated, mode = "cr
                 const trimmed = String(next || '').trim();
                 if (!trimmed) {
                   setFamilyNameError('Family Name cannot be empty.');
+                } else if (trimmed.length > MAX_FAMILY_NAME_LENGTH) {
+                  setFamilyNameError(`Family Name must be ${MAX_FAMILY_NAME_LENGTH} characters or less.`);
                 } else if (familyNameError) {
                   setFamilyNameError('');
                 }
               }}
+              maxLength={MAX_FAMILY_NAME_LENGTH}
               required
               className="w-full border rounded-lg px-4 py-2 focus:ring-primary-500 focus:outline-none"
               placeholder="The Singhs"
@@ -321,11 +349,14 @@ const CreateFamilyModal = ({ isOpen, onClose, token, onFamilyCreated, mode = "cr
                 const trimmed = String(next || '').trim();
                 if (!trimmed) {
                   setFamilyBioError('Family Bio cannot be empty.');
+                } else if (trimmed.length > MAX_FAMILY_BIO_LENGTH) {
+                  setFamilyBioError(`Family Bio must be ${MAX_FAMILY_BIO_LENGTH} characters or less.`);
                 } else if (familyBioError) {
                   setFamilyBioError('');
                 }
               }}
               rows={3}
+              maxLength={MAX_FAMILY_BIO_LENGTH}
               required
               className="w-full border rounded-lg px-4 py-2 focus:ring-primary-500 focus:outline-none"
               placeholder="A united and respected family from Chennai."
