@@ -50,11 +50,13 @@ import Swal from "sweetalert2";
 import { FaPlus, FaSave, FaArrowLeft, FaHome, FaMinus } from "react-icons/fa";
 
 import {
+  deleteFamilyMember,
   deletePerson as deletePersonApi,
   fetchFamilyTreeAggregate,
   getMembersNotInTree,
   permanentlyDeleteStructuralDummy as permanentlyDeleteStructuralDummyApi,
   replaceStructuralDummy as replaceStructuralDummyApi,
+  selfRemoveFromFamily,
 } from "../utils/familyTreeApi";
 
 import { useLocation, useNavigate, useParams } from "react-router-dom";
@@ -1836,49 +1838,51 @@ const FamilyTreePage = () => {
         });
       }
     } else {
-      const missingParentTypes = getMissingParentTypes(person);
-      if (missingParentTypes.length > 0) {
+      if (!isExternalLinkedCard) {
+        const missingParentTypes = getMissingParentTypes(person);
+        if (missingParentTypes.length > 0) {
+          items.push({
+            label: "Add Parents",
+            action: () =>
+              setModal({
+                isOpen: true,
+                action: { type: "parents", person, missingParentTypes },
+              }),
+            icon: icons["Add Parents"],
+          });
+        }
+
         items.push({
-          label: "Add Parents",
+          label: "Add Spouse",
           action: () =>
-            setModal({
-              isOpen: true,
-              action: { type: "parents", person, missingParentTypes },
-            }),
-          icon: icons["Add Parents"],
+            setModal({ isOpen: true, action: { type: "spouse", person } }),
+          icon: icons["Add Spouse"],
         });
-      }
 
-      items.push({
-        label: "Add Spouse",
-        action: () =>
-          setModal({ isOpen: true, action: { type: "spouse", person } }),
-        icon: icons["Add Spouse"],
-      });
-
-      items.push({
-        label: "Add Child",
-        action: () =>
-          setModal({ isOpen: true, action: { type: "children", person } }),
-        icon: icons["Add Child"],
-      });
-
-      if (person.parents.size > 0) {
         items.push({
-          label: "Add Sibling",
+          label: "Add Child",
           action: () =>
-            setModal({ isOpen: true, action: { type: "siblings", person } }),
-          icon: icons["Add Sibling"],
+            setModal({ isOpen: true, action: { type: "children", person } }),
+          icon: icons["Add Child"],
         });
-      }
 
-      if (canEditSelectedPersonDetails) {
-        items.push({
-          label: "Edit",
-          action: () =>
-            setModal({ isOpen: true, action: { type: "edit", person } }),
-          icon: icons["Edit"],
-        });
+        if (person.parents.size > 0) {
+          items.push({
+            label: "Add Sibling",
+            action: () =>
+              setModal({ isOpen: true, action: { type: "siblings", person } }),
+            icon: icons["Add Sibling"],
+          });
+        }
+
+        if (canEditSelectedPersonDetails) {
+          items.push({
+            label: "Edit",
+            action: () =>
+              setModal({ isOpen: true, action: { type: "edit", person } }),
+            icon: icons["Edit"],
+          });
+        }
       }
     }
 
@@ -2184,6 +2188,90 @@ const FamilyTreePage = () => {
     openStructuralDummyDialog("delete", person);
   }, [openStructuralDummyDialog]);
 
+  const escapeWarningHtml = (value) =>
+    String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/\"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+
+  const buildRemoveMemberWarning = ({
+    currentPerson,
+    useFamilyRemovalFlow,
+    isExternalLinkedCard,
+    isSelfRemoval,
+  }) => {
+    const displayName = escapeWarningHtml(currentPerson?.name || "This member");
+    const normalizedNodeType = String(currentPerson?.nodeType || "member").toLowerCase();
+    const isAssociatedCard = normalizedNodeType === "associated";
+    const memberTypeLabel = currentPerson?.isAppUser ? "App User" : "Non-App User";
+    const bullets = [];
+    let title = "Remove This Member?";
+
+    if (useFamilyRemovalFlow) {
+      title = isSelfRemoval ? "Leave Family?" : "Remove From Family?";
+      bullets.push(`${displayName} will be removed from this family.`);
+      bullets.push(
+        "The account itself will not be deleted, but this family will stop treating the member as active.",
+      );
+      bullets.push(
+        "A Removed member slot will stay in the tree so parents, children, and spouse lines do not collapse.",
+      );
+      bullets.push(
+        currentPerson?.isAppUser
+          ? "Family-only content from that member becomes hidden from this family after removal."
+          : "This non-app member card will stop acting like an active family member after removal.",
+      );
+
+      if (isSelfRemoval) {
+        bullets.push("You will be taken out of the family and the page will refresh after success.");
+      }
+    } else if (isExternalLinkedCard) {
+      title = "Remove Linked Member?";
+      bullets.push(`${displayName} will be removed only from this family tree.`);
+      bullets.push("The real member will remain safe in their own family.");
+      bullets.push(
+        "If this was the last bridge between the two families, the linked-family connection can also be cleaned up.",
+      );
+      bullets.push(
+        "A placeholder slot may stay behind if the tree needs it to keep the structure stable.",
+      );
+    } else if (isAssociatedCard) {
+      title = "Remove Associated Member?";
+      bullets.push(`${displayName} will be removed only from this family tree.`);
+      bullets.push("The real member will remain safe in the source family.");
+      bullets.push(
+        "If no other association bridge remains, the associated-family connection can also be cleaned up.",
+      );
+      bullets.push(
+        "A placeholder slot may stay behind if the tree needs it to keep the structure stable.",
+      );
+    } else {
+      bullets.push(`${displayName} will be removed from this tree.`);
+      bullets.push(
+        "A Removed member slot may stay behind so the family structure does not break.",
+      );
+    }
+
+    return {
+      title,
+      html: `
+        <div style="text-align:left;line-height:1.5;">
+          <div style="margin-bottom:10px;font-weight:700;color:#1f2937;">
+            ${memberTypeLabel} · ${escapeWarningHtml(normalizedNodeType.replace(/_/g, " "))}
+          </div>
+          <div style="margin-bottom:10px;color:#4b5563;">
+            Please confirm after reviewing what will happen:
+          </div>
+          <ul style="margin:0 0 0 18px;padding:0;color:#111827;">
+            ${bullets.map((item) => `<li style="margin-bottom:8px;">${item}</li>`).join("")}
+          </ul>
+        </div>
+      `,
+    };
+  };
+
   const deletePerson = async (personId) => {
     if (!tree || !familyCodeToUse) return;
 
@@ -2204,18 +2292,46 @@ const FamilyTreePage = () => {
       return;
     }
 
+    const normalizedTreeFamilyCode = String(familyCodeToUse || "")
+      .trim()
+      .toUpperCase();
+    const sourceFamilyCode = String(
+      currentPerson?.sourceFamilyCode ||
+        currentPerson?.primaryFamilyCode ||
+        currentPerson?.familyCode ||
+        "",
+    )
+      .trim()
+      .toUpperCase();
+    const isExternalLinkedCard =
+      Boolean(currentPerson?.isExternalLinked) ||
+      Boolean(currentPerson?.canonicalFamilyCode && currentPerson?.canonicalNodeUid) ||
+      currentPerson?.nodeType === "linked";
+    const targetMemberId = Number(currentPerson?.memberId || currentPerson?.userId || 0);
+    const isSelfRemoval =
+      targetMemberId > 0 &&
+      Number(targetMemberId) === Number(userInfo?.userId || 0);
+    const useFamilyRemovalFlow =
+      !isExternalLinkedCard &&
+      Boolean(sourceFamilyCode) &&
+      sourceFamilyCode === normalizedTreeFamilyCode &&
+      targetMemberId > 0;
+
+    const confirmWarning = buildRemoveMemberWarning({
+      currentPerson,
+      useFamilyRemovalFlow,
+      isExternalLinkedCard,
+      isSelfRemoval,
+    });
+
     const result = await Swal.fire({
       icon: "warning",
-
-      title: "Remove this member?",
-
-      text: "The real member will be removed from family pages, but an empty slot will stay in the tree so the family structure does not break. You can later replace that slot with another member.",
-
+      title: confirmWarning.title,
+      html: confirmWarning.html,
       showCancelButton: true,
-
-      confirmButtonText: "Remove member",
-
+      confirmButtonText: isSelfRemoval ? "Leave family" : "Remove member",
       cancelButtonText: "Cancel",
+      focusCancel: true,
     });
 
     if (!result.isConfirmed) {
@@ -2223,7 +2339,20 @@ const FamilyTreePage = () => {
     }
 
     try {
-      const response = await deletePersonApi(personId, familyCodeToUse);
+      let response;
+      if (useFamilyRemovalFlow) {
+        response = isSelfRemoval
+          ? await selfRemoveFromFamily(familyCodeToUse)
+          : await deleteFamilyMember(targetMemberId, familyCodeToUse);
+      } else {
+        response = await deletePersonApi(personId, familyCodeToUse, currentPerson?.nodeUid);
+      }
+
+      if (useFamilyRemovalFlow && isSelfRemoval) {
+        window.location.reload();
+        return;
+      }
+
       await refreshTreeFromServer(
         Number(personId) === Number(tree?.rootId) ? personId : tree?.rootId,
       );
@@ -2234,7 +2363,9 @@ const FamilyTreePage = () => {
         title: "Member Removed",
         text:
           response?.message ||
-          "The member was removed and an empty slot was left in the tree to protect the structure.",
+          (useFamilyRemovalFlow
+            ? "The member was removed from the family and converted into a removed-member slot in the tree."
+            : "The member card was removed and an empty slot was left in the tree to protect the structure."),
         timer: 2200,
         showConfirmButton: false,
       });
@@ -2243,115 +2374,10 @@ const FamilyTreePage = () => {
       await Swal.fire({
         icon: "error",
         title: "Remove Failed",
-        text: error?.message || "Unable to remove this member from the tree right now.",
+        text: error?.message || "Unable to remove this member right now.",
       });
     }
   };
-
-  const resetTree = async () => {
-    console.log(
-      " New Tree button clicked! hasUnsavedChanges:",
-      hasUnsavedChanges,
-    );
-
-    // CRITICAL: Warn if there are unsaved changes
-
-    if (hasUnsavedChanges) {
-      console.warn(" Blocked: Unsaved changes exist");
-
-      await Swal.fire({
-        icon: "error",
-
-        title: "Unsaved Changes!",
-
-        text: "You have unsaved changes. Please save your current tree before creating a new one.",
-
-        confirmButtonText: "OK",
-      });
-
-      return; // Don't proceed
-    }
-
-    // CRITICAL: Warn about data loss
-
-    const memberCount = tree ? tree.people.size : 0;
-
-    const result = await Swal.fire({
-      icon: "warning",
-
-      title: "Create New Tree",
-
-      html: `<p>This will <strong>replace</strong> your current tree with ${memberCount} members.</p>
-
-
-
-
-
-                   <p><strong style="color: red;">This action cannot be undone!</strong></p>
-
-
-
-
-
-                   <p>Make sure you have saved your current tree first.</p>`,
-
-      showCancelButton: true,
-
-      confirmButtonText: "Yes, create new tree!",
-
-      cancelButtonText: "No, keep current tree!",
-
-      confirmButtonColor: "#d33",
-    });
-
-    if (result.isConfirmed) {
-      // Ensure New Tree starts in normal editable mode (not linked mode)
-      // by clearing any query params like ?mode=linked&source=...
-      try {
-        navigate(
-          { pathname: location.pathname, search: "" },
-          { replace: true },
-        );
-      } catch (_) {
-        // no-op
-      }
-
-      const newTree = new FamilyTree();
-
-      newTree.addPerson({
-        name: userInfo.name,
-
-        gender: userInfo.gender,
-
-        age: userInfo.age,
-
-        img: userInfo.profileUrl,
-
-        dob: userInfo.dob,
-
-        memberId: userInfo.userId,
-      });
-
-      setTree((prev) => {
-        const arranged = arrangeTree(newTree);
-        return arranged || newTree;
-      });
-
-      updateStats(newTree);
-
-      setSelectedPersonId(null);
-
-      setRadialMenu({
-        isActive: false,
-        position: { x: 0, y: 0 },
-        items: [],
-        activePersonId: null,
-      });
-
-      setHasUnsavedChanges(true); // Mark as changed - new tree needs to be saved!
-    }
-  };
-
   const downloadTreeData = async () => {
     // Download the tree as an image (PNG)
 
@@ -3175,13 +3201,6 @@ const FamilyTreePage = () => {
                   </div>
 
                   <div className="sm:hidden fixed bottom-[88px] right-3 z-50 flex flex-col gap-2">
-                    <button
-                      onClick={resetTree}
-                      className="w-12 h-12 bg-green-600 text-white rounded-full shadow-lg flex items-center justify-center active:scale-95 transition-transform"
-                      title="New Tree"
-                    >
-                      <FaPlus className="text-lg" />
-                    </button>
 
                     <button
                       onClick={saveTreeToApi}
@@ -3319,21 +3338,6 @@ const FamilyTreePage = () => {
                         </div>
 
                         <div className="flex items-center gap-1.5 flex-shrink-0">
-                          {/* New Tree */}
-
-                          <button
-                            className="flex items-center gap-1 px-2.5 py-2 bg-white border-2 border-green-600 text-green-600 rounded-lg hover:bg-green-50 text-xs font-semibold active:scale-95 transition-all duration-200 shadow-sm dark:bg-slate-900 dark:hover:bg-slate-800"
-                            onClick={resetTree}
-                          >
-                            <FaPlus className="text-xs" />
-
-                            <span className="whitespace-nowrap">
-                              <span className="hidden md:inline">New Tree</span>
-
-                              <span className="inline md:hidden">New</span>
-                            </span>
-                          </button>
-
                           {/* Save */}
 
                           <button
@@ -4127,6 +4131,11 @@ const FamilyTreePage = () => {
 };
 
 export default FamilyTreePage;
+
+
+
+
+
 
 
 

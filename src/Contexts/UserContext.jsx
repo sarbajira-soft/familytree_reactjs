@@ -11,6 +11,7 @@ import {
 } from '../utils/auth';
 
 import { authFetchResponse } from '../utils/authFetch';
+import { hasFamilyAccessStatus } from '../utils/familyAccess';
 
 const UserContext = createContext();
 
@@ -231,7 +232,7 @@ export const UserProvider = ({ children }) => {
       const pendingFamilyCode = membershipStatus === 'pending'
         ? (membershipFamilyCode || directFamilyCode)
         : '';
-      const resolvedFamilyCode = membershipStatus === 'approved'
+      const resolvedFamilyCode = hasFamilyAccessStatus(membershipStatus)
         ? (directFamilyCode || membershipFamilyCode)
         : (!membershipStatus && directFamilyCode ? directFamilyCode : '');
       const resolvedApproveStatus =

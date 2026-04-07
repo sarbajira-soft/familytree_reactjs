@@ -11,6 +11,7 @@ import GalleryPageShimmer from './GalleryPageShimmer';
 
 import { authFetch } from '../utils/authFetch';
 import { getToken } from '../utils/auth';
+import { hasFamilyAccess } from '../utils/familyAccess';
 
 const GalleryCollage = ({ photos = [], onOpenAlbum }) => {
   // ... (rest of the code remains the same)
@@ -18,6 +19,7 @@ const GalleryCollage = ({ photos = [], onOpenAlbum }) => {
 
 const FamilyGalleryPage = () => {
   const { userInfo, userLoading } = useUser(); // Get user info from context
+  const canAccessFamilyFeed = hasFamilyAccess(userInfo);
   const [token, setToken] = useState(null); // State to store the token
   const navigate = useNavigate();
 
@@ -48,7 +50,7 @@ const FamilyGalleryPage = () => {
   // Function to fetch gallery albums from the API
   const fetchGalleries = async (galleryTitleSearch = '') => {
     // For family feed, check if user has familyCode and is approved
-    if (activeFeed === 'family' && (!userInfo?.familyCode || userInfo?.approveStatus !== 'approved')) {
+    if (activeFeed === 'family' && !canAccessFamilyFeed) {
       setGalleryAlbums([]);
       setLoadingAlbums(false);
       return;
@@ -109,7 +111,7 @@ const FamilyGalleryPage = () => {
   // Fetch galleries whenever activeFeed, userInfo, or token changes
   useEffect(() => {
     fetchGalleries();
-  }, [activeFeed, userInfo?.familyCode, userInfo?.approveStatus, token]);
+  }, [activeFeed, canAccessFamilyFeed, userInfo?.familyCode, userInfo?.approveStatus, token]);
 
   const filteredAlbums = galleryAlbums; // No need to filter here, API should return filtered results
 
@@ -243,8 +245,7 @@ const FamilyGalleryPage = () => {
                     <MdPublic size={16} /> Public
                   </button>
 
-                  {userInfo?.familyCode &&
-                    userInfo?.approveStatus === "approved" && (
+                  {canAccessFamilyFeed && (
                       <button
                         onClick={() => setActiveFeed("family")}
                         className={`flex-1 sm:flex-none flex items-center justify-center 

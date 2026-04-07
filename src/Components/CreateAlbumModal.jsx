@@ -3,6 +3,7 @@ import { FaTimes, FaUpload, FaImage, FaTrashAlt, FaPlus } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 import { throwIfNotOk } from '../utils/apiMessages';
 import { useUser } from '../Contexts/UserContext';
+import { hasFamilyAccessStatus } from '../utils/familyAccess';
 
 const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authToken, mode = 'create', albumData = null }) => {
     const { userInfo } = useUser();
@@ -14,7 +15,7 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
 
     const getDefaultPrivacy = () => {
         const hasFamily = Boolean(currentUser?.familyCode || userInfo?.familyCode);
-        const isApproved = userInfo?.approveStatus === 'approved';
+        const isApproved = hasFamilyAccessStatus(userInfo?.approveStatus);
         return hasFamily && isApproved ? 'family' : 'public';
     };
 
@@ -445,7 +446,7 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
                             Privacy
                         </label>
                         <div className="flex items-center space-x-4">
-                            {userInfo?.approveStatus === 'approved' ? (
+                            {Boolean(getResolvedFamilyCode()) && hasFamilyAccessStatus(userInfo?.approveStatus) ? (
                                 <>
                                     <label className="inline-flex items-center">
                                         <input

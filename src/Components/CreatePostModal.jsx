@@ -18,6 +18,7 @@ import { FFmpeg } from "@ffmpeg/ffmpeg";
 import { fetchFile, toBlobURL } from "@ffmpeg/util";
 import SparkMD5 from "spark-md5";
 import { throwIfNotOk } from "../utils/apiMessages";
+import { hasFamilyAccessStatus } from "../utils/familyAccess";
 
 const CreatePostModal = ({
   isOpen,
@@ -36,7 +37,7 @@ const CreatePostModal = ({
     const hasFamily = Boolean(
       String(currentUser?.familyCode || userInfo?.familyCode || "").trim(),
     );
-    const isApproved = userInfo?.approveStatus === "approved";
+    const isApproved = hasFamilyAccessStatus(userInfo?.approveStatus);
     return hasFamily && isApproved ? "family" : "public";
   };
 
@@ -205,7 +206,7 @@ const CreatePostModal = ({
     const hasFamilyCode = Boolean(
       currentUser?.familyCode || userInfo?.familyCode,
     );
-    const isApproved = userInfo?.approveStatus === "approved";
+    const isApproved = hasFamilyAccessStatus(userInfo?.approveStatus);
     const canUsePrivate = hasFamilyCode && isApproved;
 
     if (!canUsePrivate && privacy === "family") {
@@ -932,7 +933,7 @@ const CreatePostModal = ({
     (currentUser?.familyCode || userInfo?.familyCode) &&
     (currentUser?.familyCode || userInfo?.familyCode).trim() !== "";
 
-  const isApproved = userInfo?.approveStatus === "approved";
+  const isApproved = hasFamilyAccessStatus(userInfo?.approveStatus);
 
   const canUsePrivate = hasFamilyCode && isApproved;
 

@@ -13,6 +13,7 @@ import { FiMoreVertical } from 'react-icons/fi';
 
 import { authFetch } from '../utils/authFetch';
 import { getToken } from '../utils/auth';
+import { hasFamilyAccess } from '../utils/familyAccess';
 import { BlockButton } from '../Components/block/BlockButton';
 
 const EMPTY_VTT_TRACK_SRC = 'data:text/vtt,WEBVTT';
@@ -27,6 +28,7 @@ const PostsAndFeedsPage = () => {
     const [loadingFeed, setLoadingFeed] = useState(true);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const { userInfo } = useUser();
+    const canAccessFamilyFeed = hasFamilyAccess(userInfo);
     const [isPostViewerOpen, setIsPostViewerOpen] = useState(false);
     const [selectedPost, setSelectedPost] = useState(null);
     const [showSearchInput, setShowSearchInput] = useState(false);
@@ -110,7 +112,7 @@ const PostsAndFeedsPage = () => {
     }, [userInfo]);
 
     const fetchPosts = async (captionSearch = '', retryCount = 0) => {
-        if (activeFeed === 'family' && (!userInfo?.familyCode || userInfo?.approveStatus !== 'approved')) {
+        if (activeFeed === 'family' && !canAccessFamilyFeed) {
             setPosts([]);
             setLoadingFeed(false);
             return;
@@ -188,7 +190,7 @@ const PostsAndFeedsPage = () => {
     useEffect(() => {
         setFeedError(null);
         fetchPosts();
-    }, [activeFeed, userInfo?.familyCode, userInfo?.approveStatus]);
+    }, [activeFeed, canAccessFamilyFeed, userInfo?.familyCode, userInfo?.approveStatus]);
 
     const handlePostCreated = () => {
         fetchPosts();
@@ -441,7 +443,7 @@ const PostsAndFeedsPage = () => {
                                 >
                                     <MdPublic size={18} /> Public
                                 </button>
-                                {userInfo?.familyCode && userInfo?.approveStatus === 'approved' && (
+                                {canAccessFamilyFeed && (
                                     <button
                                         onClick={() => setActiveFeed('family')}
                                         className={`flex items-center gap-1.5 py-2 px-3 mr-2 rounded-full text-sm font-semibold transition-all duration-200 ${

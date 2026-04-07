@@ -51,9 +51,13 @@ export async function editPerson(id, person, familyCode) {
   });
 }
 
-export async function deletePerson(id, familyCode) {
+export async function deletePerson(id, familyCode, nodeUid = '') {
   if (!familyCode) throw new Error('familyCode is required');
-  return await authFetch(`${FAMILY_API_BASE}/tree/${familyCode}/person/${id}`, {
+  const normalizedNodeUid = String(nodeUid || '').trim();
+  const url = normalizedNodeUid
+    ? `${FAMILY_API_BASE}/tree/${familyCode}/person/${id}?nodeUid=${encodeURIComponent(normalizedNodeUid)}`
+    : `${FAMILY_API_BASE}/tree/${familyCode}/person/${id}`;
+  return await authFetch(url, {
     method: 'DELETE',
   });
 }

@@ -31,9 +31,11 @@ import CreateFamilyModal from "../Components/CreateFamilyModal";
 import JoinFamilyModal from "../Components/JoinFamilyModal";
 import EventsShimmer from "./EventsShimmer";
 import ReportContentModal from "../Components/ReportContentModal";
+import { hasFamilyAccess, hasFamilyAccessStatus } from "../utils/familyAccess";
 
 const EventsPage = () => {
   const { userInfo, userLoading } = useUser();
+  const canAccessFamilyEvents = hasFamilyAccess(userInfo);
   const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = useState("upcoming");
@@ -136,7 +138,7 @@ const EventsPage = () => {
         return eventData;
       });
     },
-    enabled: !!userInfo?.familyCode && userInfo?.approveStatus === "approved",
+    enabled: canAccessFamilyEvents,
     staleTime: 2 * 60 * 1000,
     cacheTime: 10 * 60 * 1000,
   });
@@ -328,7 +330,7 @@ const EventsPage = () => {
       onCreateFamily={handleCreateFamily}
       onJoinFamily={handleJoinFamily}
     />
-  ) : userInfo?.approveStatus !== "approved" ? (
+  ) : !hasFamilyAccessStatus(userInfo?.approveStatus) ? (
     <PendingApprovalView
       familyCode={pendingFamilyCode || userInfo.familyCode}
       onJoinFamily={handleJoinFamily}

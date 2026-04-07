@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FiClock, FiArrowLeft } from 'react-icons/fi';
 import { useUser } from '../Contexts/UserContext';
@@ -393,19 +393,28 @@ const SuggestionApproving = () => {
   const handleApproveReplace = async () => {
     if (!familyCode || !replaceModal.request || !selectedMemberId) return;
 
+    const selectedReplacement = familyMembers.find(
+      (member) => Number(member?.user?.id || member?.dummyUserId || 0) === Number(selectedMemberId),
+    );
+
+    if (!selectedReplacement) {
+      setAddNewMemberError('Select a valid member to replace.');
+      return;
+    }
+
     setReplaceLoading(true);
     setAddNewMemberError(null);
 
     try {
       await respondToJoinRequest(replaceModal.request.id, 'accept');
 
-      const replaceResponse = await authFetchResponse(
-        `/family/member/${familyCode}/non-app-users/${selectedMemberId}/replace/${replaceModal.request.triggeredBy}`,
-        {
-          method: 'POST',
-          skipThrow: true,
-        }
-      );
+      const replaceUrl = selectedReplacement?.isStructuralDummy
+        ? `/family/tree/${familyCode}/person/${selectedReplacement.personId}/replace/${replaceModal.request.triggeredBy}`
+        : `/family/member/${familyCode}/non-app-users/${selectedReplacement.dummyUserId}/replace/${replaceModal.request.triggeredBy}`;
+      const replaceResponse = await authFetchResponse(replaceUrl, {
+        method: 'POST',
+        skipThrow: true,
+      });
 
       if (!replaceResponse.ok) {
         const replaceError = await replaceResponse.json().catch(() => ({ message: 'Failed to replace tree member' }));
@@ -485,6 +494,9 @@ const SuggestionApproving = () => {
       familyCode: row.familyCode,
       name: row.name || 'Member',
       gender: row.gender || '',
+      isStructuralDummy: Boolean(row?.isStructuralDummy),
+      nodeType: row?.nodeType || null,
+      dummyReason: row?.dummyReason || null,
     }));
 
     setFamilyMembers(mappedMembers);
@@ -505,6 +517,13 @@ const SuggestionApproving = () => {
 
     return (profile.firstName + ' ' + (profile.lastName || '')).toLowerCase().includes(search.toLowerCase());
   });
+
+  const selectedReplacementMember = useMemo(
+    () => familyMembers.find(
+      (member) => Number(member?.user?.id || member?.dummyUserId || 0) === Number(selectedMemberId || 0),
+    ) || null,
+    [familyMembers, selectedMemberId],
+  );
 
   return (
     <>
@@ -594,9 +613,9 @@ const SuggestionApproving = () => {
           <div className="flex flex-col gap-4">
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
               <div>
-                <h2 className="text-xl font-semibold text-gray-900">Replace a non-app member</h2>
+                <h2 className="text-xl font-semibold text-gray-900">Replace a member slot</h2>
                 <p className="text-sm text-gray-500 mt-1">
-                  Choose a non-app member to replace, or add the requester as a new member.
+                  Choose a non-app member or removed slot to replace, or add the requester as a new member.
                   {selectedMemberId && ' Click the selected member again to deselect.'}
                 </p>
               </div>
@@ -622,7 +641,7 @@ const SuggestionApproving = () => {
 
                   {filteredMembers.length === 0 ? (
                     <div className="text-sm text-gray-500 py-10 text-center">
-                      No non-app members found.
+                      No replaceable members or removed slots found.
                     </div>
                   ) : (
                     <div className="max-h-[45vh] overflow-y-auto pr-1">
@@ -663,6 +682,9 @@ const SuggestionApproving = () => {
                                 />
                                 <div className="w-full text-center">
                                   <div className="font-medium text-sm text-gray-900 truncate">{displayName}</div>
+                                  {member?.isStructuralDummy && (
+                                    <div className="text-[11px] font-semibold text-amber-700">Removed Slot</div>
+                                  )}
                                 </div>
                               </div>
                             </button>
@@ -779,7 +801,7 @@ const SuggestionApproving = () => {
             <Modal onClose={() => setShowConfirm(false)}>
               <div className="overflow-y-auto max-h-full">
                 <div className="text-lg font-semibold mb-4">
-                  Are you sure you want to <span className="text-primary-600">approve</span> this request and replace <span className="text-primary-600">{viewMember?.profile.firstName} {viewMember?.profile.lastName}</span> with <span className="text-primary-600">{replaceModal.request?.user?.firstName} {replaceModal.request?.user?.lastName}</span>?<br/>
+                  Are you sure you want to <span className="text-primary-600">approve</span> this request and replace <span className="text-primary-600">{selectedReplacementMember?.name || `${viewMember?.profile.firstName || ''} ${viewMember?.profile.lastName || ''}`.trim()}</span> with <span className="text-primary-600">{replaceModal.request?.user?.firstName} {replaceModal.request?.user?.lastName}</span>?<br/>
                   <span className="text-sm text-gray-500">This action cannot be undone.</span>
                 </div>
                 <button

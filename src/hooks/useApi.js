@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { authFetch } from '../utils/authFetch';
+import { hasFamilyAccessStatus } from '../utils/familyAccess';
 
 // Hook for dashboard summary data
 export const useDashboardSummary = (familyCode, userId, enabled = true) => {
@@ -53,7 +54,7 @@ export const useEvents = (activeTab, familyCode, approveStatus, enabled = true) 
   return useQuery({
     queryKey: ['events', activeTab, familyCode],
     queryFn: () => authFetch(getEndpoint()),
-    enabled: enabled && !!familyCode && approveStatus === 'approved',
+    enabled: enabled && !!familyCode && hasFamilyAccessStatus(approveStatus),
     staleTime: 2 * 60 * 1000, // 2 minutes
   });
 };

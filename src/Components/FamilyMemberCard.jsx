@@ -314,23 +314,40 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
 
     const loadMembersNotInTree = async () => {
       if (!birthFamilyCode) {
-        if (!ignore) setMembersNotInTree([]);
+        if (!ignore) {
+          setMembersNotInTree([]);
+          setNonAppUsers([]);
+        }
         return;
       }
       try {
         setNotInTreeLoading(true);
-        const response = await getMembersNotInTree(birthFamilyCode);
-        const nextMembers = Array.isArray(response?.data)
-          ? response.data.map(normalizeMember)
+        setLoadingNonAppUsers(true);
+        const [membersResponse, nonAppResponse] = await Promise.all([
+          getMembersNotInTree(birthFamilyCode),
+          authFetch('/family/member/' + birthFamilyCode + '/non-app-users', { method: 'GET' }),
+        ]);
+        const nextMembers = Array.isArray(membersResponse?.data)
+          ? membersResponse.data.map(normalizeMember)
+          : [];
+        const nextNonAppUsers = Array.isArray(nonAppResponse?.data)
+          ? nonAppResponse.data
           : [];
         if (!ignore) {
           setMembersNotInTree(nextMembers);
+          setNonAppUsers(nextNonAppUsers);
         }
       } catch (error) {
         logger.error('Failed to load members not in tree', error);
-        if (!ignore) setMembersNotInTree([]);
+        if (!ignore) {
+          setMembersNotInTree([]);
+          setNonAppUsers([]);
+        }
       } finally {
-        if (!ignore) setNotInTreeLoading(false);
+        if (!ignore) {
+          setNotInTreeLoading(false);
+          setLoadingNonAppUsers(false);
+        }
       }
     };
 
@@ -509,14 +526,27 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
     [filteredMembers],
   );
 
+  const birthFamilyMemberUserIds = useMemo(
+    () => new Set(
+      birthFamilyMembers
+        .map((member) => Number(member?.userId || 0))
+        .filter((userId) => userId > 0),
+    ),
+    [birthFamilyMembers],
+  );
+
   const associatedMembersAll = useMemo(
-    () => filteredMembers.filter((member) => member.membershipType === 'associated'),
-    [filteredMembers],
+    () => filteredMembers.filter(
+      (member) => member.membershipType === 'associated' && !birthFamilyMemberUserIds.has(Number(member?.userId || 0)),
+    ),
+    [filteredMembers, birthFamilyMemberUserIds],
   );
 
   const linkedMembersAll = useMemo(
-    () => filteredMembers.filter((member) => member.membershipType === 'linked'),
-    [filteredMembers],
+    () => filteredMembers.filter(
+      (member) => member.membershipType === 'linked' && !birthFamilyMemberUserIds.has(Number(member?.userId || 0)),
+    ),
+    [filteredMembers, birthFamilyMemberUserIds],
   );
 
   const buildFamilyOptions = (members) => {
@@ -637,16 +667,24 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
     );
   }, [membersNotInTree]);
 
-  const replacementCandidates = useMemo(
-    () =>
-      birthFamilyMembers.filter(
-        (member) =>
-          member.user?.isAppUser &&
-          membersNotInTreeUserIds.has(Number(member.userId)) &&
-          !member?.blockStatus?.isBlockedByMe,
-      ),
-    [birthFamilyMembers, membersNotInTreeUserIds],
-  );
+  const replacementCandidates = useMemo(() => {
+    const seenUserIds = new Set();
+    return (membersNotInTree || []).reduce((acc, member) => {
+      const candidateUserId = Number(member?.userId || member?.memberId || member?.user?.id || 0);
+      if (
+        !candidateUserId ||
+        !member?.user?.isAppUser ||
+        member?.blockStatus?.isBlockedByMe ||
+        seenUserIds.has(candidateUserId)
+      ) {
+        return acc;
+      }
+
+      seenUserIds.add(candidateUserId);
+      acc.push(member);
+      return acc;
+    }, []);
+  }, [membersNotInTree]);
 
   const filteredMembersNotInTree = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
@@ -1294,7 +1332,11 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                       </div>
                       <button
                         type="button"
-                        onClick={fetchNonAppUsers}
+                        onClick={() => {
+                          refreshFamilyManagementState().catch((error) => {
+                            logger.error('Failed to refresh replacement section', error);
+                          });
+                        }}
                         className="inline-flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-lg border border-gray-200 text-gray-700 bg-white hover:bg-gray-50"
                       >
                         Refresh

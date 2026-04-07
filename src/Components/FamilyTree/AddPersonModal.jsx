@@ -407,6 +407,66 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
         return rel[`description_${dbLang}`] || rel.description_en || rel.key;
     };
 
+    const buildDirectFamilyMemberOptions = (allMembersData = [], nonTreeMembersData = []) => {
+        const normalizedFamilyCode = String(familyCode || '').trim().toUpperCase();
+        const directMembers = new Map();
+
+        const mergeMember = (member) => {
+            const resolvedUserId = Number(member?.user?.id || member?.memberId || 0);
+            if (!resolvedUserId) {
+                return;
+            }
+
+            const sourceFamilyCode = String(
+                member?.sourceFamilyCode ||
+                member?.user?.userProfile?.familyCode ||
+                member?.familyCode ||
+                normalizedFamilyCode,
+            ).trim().toUpperCase();
+
+            const membershipType = String(
+                member?.membershipType ||
+                (sourceFamilyCode === normalizedFamilyCode ? 'member' : ''),
+            ).trim().toLowerCase();
+
+            if (sourceFamilyCode !== normalizedFamilyCode || membershipType !== 'member') {
+                return;
+            }
+
+            const nextMember = {
+                ...member,
+                sourceFamilyCode: normalizedFamilyCode,
+                membershipType: 'member',
+            };
+
+            const existingMember = directMembers.get(resolvedUserId);
+            if (!existingMember) {
+                directMembers.set(resolvedUserId, nextMember);
+                return;
+            }
+
+            directMembers.set(resolvedUserId, {
+                ...existingMember,
+                ...nextMember,
+                user: {
+                    ...(existingMember?.user || {}),
+                    ...(nextMember?.user || {}),
+                    userProfile: {
+                        ...(existingMember?.user?.userProfile || {}),
+                        ...(nextMember?.user?.userProfile || {}),
+                    },
+                },
+            });
+        };
+
+        [...allMembersData, ...nonTreeMembersData].forEach(mergeMember);
+
+        return Array.from(directMembers.values()).sort((left, right) => {
+            const leftName = String(left?.user?.fullName || '').trim();
+            const rightName = String(right?.user?.fullName || '').trim();
+            return leftName.localeCompare(rightName, undefined, { sensitivity: 'base' });
+        });
+    };
     const titles = {
         parents: 'Add Parents',
         spouse: 'Add Spouse',
@@ -418,27 +478,42 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
     // Add tab state for each form
     const [activeTabs, setActiveTabs] = useState({});
 
-    // Fetch family members when modal opens
+    // Fetch direct birth-family members for Select Existing, while keeping linked/associated members out.
     useEffect(() => {
         if (isOpen && familyCode && token) {
             setLoadingMembers(true);
-            authFetch(`/family/member/${familyCode}`, {
-                method: 'GET',
-                headers: {
-                    accept: '*/*',
-                },
-            })
-                .then(data => {
-                    console.log('Family members API response:', data);
-                    if (data && data.data) {
-                        console.log('Setting family members:', data.data);
-                        setFamilyMembers(data.data);
-                    } else {
-                        console.log('No family members data found');
-                        setFamilyMembers([]);
-                    }
+            Promise.all([
+                authFetch(`/family/member/${familyCode}`, {
+                    method: 'GET',
+                    headers: {
+                        accept: '*/*',
+                    },
+                }),
+                authFetch(`/family/member/${familyCode}/members-not-in-tree`, {
+                    method: 'GET',
+                    headers: {
+                        accept: '*/*',
+                    },
+                }),
+            ])
+                .then(([allMembersResponse, nonTreeResponse]) => {
+                    const allMembersData = Array.isArray(allMembersResponse?.data)
+                        ? allMembersResponse.data
+                        : [];
+                    const nonTreeMembersData = Array.isArray(nonTreeResponse?.data)
+                        ? nonTreeResponse.data
+                        : [];
+
+                    setFamilyMembers(
+                        buildDirectFamilyMemberOptions(allMembersData, nonTreeMembersData),
+                    );
+                })
+                .catch(() => {
+                    setFamilyMembers([]);
                 })
                 .finally(() => setLoadingMembers(false));
+        } else if (!isOpen) {
+            setFamilyMembers([]);
         }
     }, [isOpen, familyCode, token]);
 
@@ -617,25 +692,28 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
     }, [isOpen]);
 
     const handleParentDropdown = (type, value) => {
+        const isManual = value === 'manual';
+        setActiveTabs(prev => ({ ...prev, [type]: isManual ? 'new' : 'existing' }));
         setParentSelections(prev => ({
             ...prev,
             [type]: {
-                selectedMemberId: value === 'manual' ? null : value,
-                showManualEntry: value === 'manual',
+                selectedMemberId: isManual ? null : value,
+                showManualEntry: isManual,
             }
         }));
     };
 
     const handleFormDropdown = (formIndex, value) => {
+        const isManual = value === 'manual';
+        setActiveTabs(prev => ({ ...prev, [formIndex]: isManual ? 'new' : 'existing' }));
         setFormSelections(prev => ({
             ...prev,
             [formIndex]: {
-                selectedMemberId: value === 'manual' ? null : value,
-                showManualEntry: value === 'manual',
+                selectedMemberId: isManual ? null : value,
+                showManualEntry: isManual,
             }
         }));
     };
-
     const handleSubmit = async (e) => {
         e.preventDefault();
         // Fallback: Prevent adding an already-in-tree user
@@ -1160,7 +1238,6 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                         transition: 'all 0.3s ease',
                                         fontWeight: 600
                                     }} 
-                                    disabled={eligible.length === 0}
                                 >
                                     Select Existing
                                 </button>
@@ -1211,6 +1288,23 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                 </div>
                             )}
 
+                            {tab === 'existing' && eligible.length === 0 && !parentSelections[form.type]?.showManualEntry && (
+                                <div className="form-group-upgraded" style={{ marginBottom: 16 }}>
+                                    <div
+                                        style={{
+                                            borderRadius: 12,
+                                            border: `1px solid ${PRIMARY_COLOR}22`,
+                                            background: 'rgba(255, 255, 255, 0.9)',
+                                            padding: '14px 16px',
+                                            color: '#4b5563',
+                                            fontSize: 14,
+                                            lineHeight: 1.5,
+                                        }}
+                                    >
+                                        No direct birth-family members are available in Select Existing right now.
+                                    </div>
+                                </div>
+                            )}
                             {/* Manual entry for parent if needed */}
                             {tab === 'link' && (
                                 <div className="person-form-upgraded" style={{ 
@@ -1990,7 +2084,6 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                   transition: "all 0.3s ease",
                                   fontWeight: 600,
                                 }}
-                                disabled={eligible.length === 0}
                               >
                                 Select Existing
                               </button>
@@ -2083,6 +2176,28 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                 </div>
                               )}
 
+                            {tab === "existing" &&
+                              eligible.length === 0 &&
+                              !formSelections[form.index]?.showManualEntry && (
+                                <div
+                                  className="form-group-upgraded"
+                                  style={{ marginBottom: 16 }}
+                                >
+                                  <div
+                                    style={{
+                                      borderRadius: 12,
+                                      border: `1px solid ${PRIMARY_COLOR}22`,
+                                      background: "rgba(255, 255, 255, 0.9)",
+                                      padding: "14px 16px",
+                                      color: "#4b5563",
+                                      fontSize: 14,
+                                      lineHeight: 1.5,
+                                    }}
+                                  >
+                                    No direct birth-family members are available in Select Existing right now.
+                                  </div>
+                                </div>
+                              )}
                             {/* Manual entry for other types if needed */}
                             {tab === "link" && (
                               <div
@@ -3305,4 +3420,6 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
 };
 
 export default AddPersonModal;
+
+
 
