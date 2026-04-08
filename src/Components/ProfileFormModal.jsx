@@ -886,7 +886,7 @@ const ProfileFormModal = ({
       'mobile',
       'countryCode',
       ...(mode !== 'edit-profile' ? ['role'] : []),
-      'status',
+      ...(mode !== 'edit-profile' ? ['status'] : []),
     ]));
 
     const formDataToSend = new FormData();
@@ -1433,18 +1433,37 @@ const ProfileFormModal = ({
                       <label htmlFor="status" className={labelClassName}>
                         Account Status <span className="text-red-500">*</span>
                       </label>
-                      <select
-                        id="status"
-                        name="status"
-                        value={formData.status || '1'} // FIXED: Ensure never undefined
-                        onChange={handleChange}
-                        className={inputClassName('status')}
-                      >
-                        <option value="0">Unverified</option>
-                        <option value="1">Active</option>
-                        <option value="2">Inactive</option>
-                        <option value="3">Deleted</option>
-                      </select>
+                      {mode === 'edit-profile' ? (
+                        <input
+                          id="status"
+                          name="status"
+                          type="text"
+                          value={
+                            String(formData.status || '1') === '0'
+                              ? 'Unverified'
+                              : String(formData.status || '1') === '2'
+                                ? 'Inactive'
+                                : String(formData.status || '1') === '3'
+                                  ? 'Deleted'
+                                  : 'Active'
+                          }
+                          readOnly
+                          className={`${inputClassName('status')} bg-gray-100 cursor-not-allowed`}
+                        />
+                      ) : (
+                        <select
+                          id="status"
+                          name="status"
+                          value={formData.status || '1'} // FIXED: Ensure never undefined
+                          onChange={handleChange}
+                          className={inputClassName('status')}
+                        >
+                          <option value="0">Unverified</option>
+                          <option value="1">Active</option>
+                          <option value="2">Inactive</option>
+                          <option value="3">Deleted</option>
+                        </select>
+                      )}
                     </div>
                     
                     <div>
@@ -2271,7 +2290,7 @@ const ProfileFormModal = ({
                     className={inputClassName('bio')}
                     placeholder="Tell us about yourself..."
                     rows="3"
-                    maxLength={1000}
+                    maxLength={250}
                   />
                 </div>
                 <div>
@@ -2286,7 +2305,7 @@ const ProfileFormModal = ({
                     className={inputClassName('hobbies')}
                     placeholder="e.g., Reading, Traveling"
                     rows="2"
-                    maxLength={500}
+                    maxLength={50}
                   />
                 </div>
                 <div>
@@ -2301,7 +2320,7 @@ const ProfileFormModal = ({
                     className={inputClassName('favoriteFoods')}
                     placeholder="e.g., Dosa, Biryani"
                     rows="2"
-                    maxLength={500}
+                    maxLength={50}
                   />
                 </div>
                 <div>
@@ -2316,7 +2335,7 @@ const ProfileFormModal = ({
                     className={inputClassName('likes')}
                     placeholder="Things you like"
                     rows="2"
-                    maxLength={500}
+                    maxLength={50}
                   />
                 </div>
                 <div>
@@ -2331,7 +2350,7 @@ const ProfileFormModal = ({
                     className={inputClassName('dislikes')}
                     placeholder="Things you dislike"
                     rows="2"
-                    maxLength={500}
+                    maxLength={50}
                   />
                 </div>
               </div>

@@ -70,6 +70,15 @@ const CreatePostModal = ({
   const [ffmpegLoaded, setFfmpegLoaded] = useState(false);
   const [ffmpegLoading, setFfmpegLoading] = useState(false);
 
+  const ALLOWED_IMAGE_MIME_TYPES = [
+    "image/jpeg",
+    "image/png",
+    "image/jpg",
+    "image/gif",
+  ];
+  const INVALID_IMAGE_TYPE_ERROR =
+    "Only image files (jpeg, png, jpg, gif) are allowed";
+
   const modalRef = useRef(null);
   const privacyDropdownRef = useRef(null);
   const emojiPickerRef = useRef(null);
@@ -333,10 +342,21 @@ const CreatePostModal = ({
   const handleImageChange = (e) => {
     const file = e.target.files[0];
 
-    if (file && file.type.match("image.*")) {
+    if (file) {
+      const normalizedType = String(file?.type || "").toLowerCase();
+      const isValidType = ALLOWED_IMAGE_MIME_TYPES.includes(normalizedType);
+
+      if (!isValidType) {
+        setImageFile(null);
+        setImagePreview(null);
+        setMessage(INVALID_IMAGE_TYPE_ERROR);
+        setShowEmojiPicker(false);
+        return;
+      }
+
       if (file.size > 5 * 1024 * 1024) {
         setMessage("Image size should be less than 5MB");
-
+        setShowEmojiPicker(false);
         return;
       }
 
@@ -362,10 +382,6 @@ const CreatePostModal = ({
         return URL.createObjectURL(file);
       });
       setMessage("");
-    } else {
-      setImageFile(null);
-      setImagePreview(null);
-      setMessage("Please select a valid image file.");
     }
     setShowEmojiPicker(false);
   };

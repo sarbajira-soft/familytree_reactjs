@@ -407,7 +407,7 @@ function renderRadialMenu({ effectiveViewOnly, memberCount, canShowMoreActionsBu
                   />
                 </div>
               )}
-              {person?.nodeUid && (
+              {/* {person?.nodeUid && (
                 <div className="px-2 pb-1.5">
                   <div className="w-full px-2 py-1 text-left text-[11px] text-gray-600 bg-gray-50 rounded-md border border-gray-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700">
                     <div className="text-[10px] font-semibold text-gray-500 dark:text-slate-300 leading-tight">Uid</div>
@@ -422,7 +422,7 @@ function renderRadialMenu({ effectiveViewOnly, memberCount, canShowMoreActionsBu
                     </div>
                   </div>
                 </div>
-              )}
+              )} */}
             </div>
           )}
         </div>
