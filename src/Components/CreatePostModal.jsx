@@ -32,6 +32,7 @@ const CreatePostModal = ({
   const { userInfo } = useUser();
 
   const MAX_CAPTION_LENGTH = 250;
+  const DEFAULT_AVATAR = "/assets/user.png";
 
   const getDefaultPrivacy = () => {
     const hasFamily = Boolean(
@@ -76,6 +77,14 @@ const CreatePostModal = ({
   const fileInputRef = useRef(null);
   const videoInputRef = useRef(null);
   const ffmpegRef = useRef(new FFmpeg());
+
+  const initialEditValuesRef = useRef({
+    content: "",
+    privacy: "public",
+    familyCode: "",
+    postImage: null,
+    postVideo: null,
+  });
 
   const revokeObjectUrl = (url) => {
     if (typeof url === "string" && url.startsWith("blob:")) {
@@ -136,15 +145,30 @@ const CreatePostModal = ({
           ? "family"
           : "public";
 
-      setContent(String(postData.caption || ""));
+      const nextContent = String(postData.caption || "");
+      const nextFamilyCode = String(
+        postData.familyCode || preferredFamilyCode || "",
+      ).trim();
+      const nextPostImage = postData.postImage || null;
+      const nextPostVideo = postData.postVideo || null;
+
+      initialEditValuesRef.current = {
+        content: nextContent.trim(),
+        privacy: nextPrivacy,
+        familyCode: nextFamilyCode,
+        postImage: nextPostImage,
+        postVideo: nextPostVideo,
+      };
+
+      setContent(nextContent);
       setPrivacy(nextPrivacy);
-      setFamilyCode(String(postData.familyCode || preferredFamilyCode || "").trim());
+      setFamilyCode(nextFamilyCode);
       setImageFile(null);
       setImagePreview(null);
       setVideoFile(null);
       setVideoPreview(null);
-      setCurrentPostImageUrl(postData.postImage || null);
-      setCurrentPostVideoUrl(postData.postVideo || null);
+      setCurrentPostImageUrl(nextPostImage);
+      setCurrentPostVideoUrl(nextPostVideo);
       setVideoDurationSec(null);
       setTrimStartSec(0);
       setTrimEndSec(0);
@@ -179,6 +203,25 @@ const CreatePostModal = ({
     userInfo?.familyCode,
     userInfo?.approveStatus,
   ]);
+
+  const isEditMode = mode === "edit" && Boolean(postData?.id);
+  const hasEditChanges = (() => {
+    if (!isEditMode) return true;
+
+    const initial = initialEditValuesRef.current;
+    const nextContent = String(content || "").trim();
+    const nextPrivacy = privacy;
+    const nextFamilyCode = String(familyCode || "").trim();
+
+    const contentChanged = nextContent !== String(initial?.content || "");
+    const privacyChanged = nextPrivacy !== String(initial?.privacy || "public");
+    const familyCodeChanged = nextFamilyCode !== String(initial?.familyCode || "");
+
+    const imageChanged = Boolean(imageFile) || (currentPostImageUrl !== (initial?.postImage || null));
+    const videoChanged = Boolean(videoFile) || (currentPostVideoUrl !== (initial?.postVideo || null));
+
+    return contentChanged || privacyChanged || familyCodeChanged || imageChanged || videoChanged;
+  })();
 
   // When editing a public post and switching privacy to Family, the post itself has no familyCode yet.
   // When editing a public post and switching privacy to Family, the post itself has no familyCode yet.
@@ -895,7 +938,8 @@ const CreatePostModal = ({
       });
       const result = await response.json().catch(() => ({}));
       setShowSuccess(true);
-      onPostCreated(result);
+      const createdPost = result?.data ?? result?.post ?? null;
+      onPostCreated?.(createdPost);
       // Auto-close after 2 seconds
       setTimeout(() => {
         setShowSuccess(false);
@@ -1029,9 +1073,13 @@ const CreatePostModal = ({
 
           <div className="flex items-start sm:items-center gap-3 sm:gap-4 pb-4 border-b border-gray-100">
             <img
-              src={currentUser.profileUrl}
+              src={currentUser?.profileUrl || DEFAULT_AVATAR}
               alt="Your Avatar"
               className="w-12 h-12 sm:w-14 sm:h-14 rounded-full object-cover border-3 border-blue-200 shadow-md flex-shrink-0"
+              onError={(e) => {
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = DEFAULT_AVATAR;
+              }}
             />
 
             <div className="flex-1 min-w-0">
@@ -1396,6 +1444,7 @@ const CreatePostModal = ({
                 type="submit"
                 disabled={
                   isLoading ||
+                  (isEditMode && !hasEditChanges) ||
                   (!content.trim() &&
                     !imageFile &&
                     !currentPostImageUrl &&
