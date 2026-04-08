@@ -10,6 +10,11 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
 
     const MAX_CAPTION_LENGTH = 250;
 
+    const MAX_GALLERY_IMAGES = 10;
+
+    const ALLOWED_IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif'];
+    const INVALID_IMAGE_TYPE_ERROR = 'Only image files (jpeg, png, jpg, gif) are allowed';
+
     const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
     const MAX_IMAGE_ERROR = 'Image is too large. Please select an image less than 5MB.';
 
@@ -137,6 +142,14 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
         const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
         if (!file) return;
 
+        if (!ALLOWED_IMAGE_MIME_TYPES.includes(String(file?.type || '').toLowerCase())) {
+            setCoverPhotoError(INVALID_IMAGE_TYPE_ERROR);
+            setCoverPhotoFile(null);
+            if (coverPhotoInputRef.current) coverPhotoInputRef.current.value = '';
+            e.target.value = null;
+            return;
+        }
+
         if (Number(file?.size || 0) > MAX_IMAGE_BYTES) {
             setCoverPhotoError(MAX_IMAGE_ERROR);
             setCoverPhotoFile(null);
@@ -160,17 +173,43 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
     const handleGalleryPhotosChange = (e) => {
         if (e.target.files) {
             const newFiles = Array.from(e.target.files);
-            const validFiles = newFiles.filter((file) => Number(file?.size || 0) <= MAX_IMAGE_BYTES);
-            const hasOversize = validFiles.length !== newFiles.length;
+            const invalidTypeFiles = newFiles.filter(
+                (file) => !ALLOWED_IMAGE_MIME_TYPES.includes(String(file?.type || '').toLowerCase()),
+            );
+            const validTypeFiles = newFiles.filter(
+                (file) => ALLOWED_IMAGE_MIME_TYPES.includes(String(file?.type || '').toLowerCase()),
+            );
 
-            if (hasOversize) {
+            const oversizeFiles = validTypeFiles.filter((file) => Number(file?.size || 0) > MAX_IMAGE_BYTES);
+            const validFiles = validTypeFiles.filter((file) => Number(file?.size || 0) <= MAX_IMAGE_BYTES);
+
+            if (invalidTypeFiles.length > 0) {
+                setGalleryPhotosError(INVALID_IMAGE_TYPE_ERROR);
+            } else if (oversizeFiles.length > 0) {
                 setGalleryPhotosError(MAX_IMAGE_ERROR);
             } else if (galleryPhotosError) {
                 setGalleryPhotosError('');
             }
 
             if (validFiles.length > 0) {
-                setGalleryPhotoFiles((prevFiles) => [...prevFiles, ...validFiles]);
+                setGalleryPhotoFiles((prevFiles) => {
+                    const prev = prevFiles || [];
+                    const currentCount =
+                        prev.length + (Array.isArray(currentGalleryPhotos) ? currentGalleryPhotos.length : 0);
+                    const remaining = Math.max(0, MAX_GALLERY_IMAGES - currentCount);
+
+                    if (remaining <= 0) {
+                        setGalleryPhotosError(`You can upload a maximum of ${MAX_GALLERY_IMAGES} images.`);
+                        return prev;
+                    }
+
+                    if (validFiles.length > remaining) {
+                        setGalleryPhotosError(`You can upload a maximum of ${MAX_GALLERY_IMAGES} images.`);
+                    }
+
+                    const toAdd = validFiles.slice(0, remaining);
+                    return [...prev, ...toAdd];
+                });
             }
             e.target.value = null;
         }
@@ -182,11 +221,11 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
             if (photoToRemove?.id) {
                 setRemovedImageIds(prev => [...prev, photoToRemove.id]);
             }
-            setCurrentGalleryPhotos(prev => 
+            setCurrentGalleryPhotos(prev =>
                 prev.filter((_, index) => index !== indexToRemove)
             );
         } else {
-            setGalleryPhotoFiles(prev => 
+            setGalleryPhotoFiles(prev =>
                 prev.filter((_, index) => index !== indexToRemove)
             );
         }
@@ -323,10 +362,25 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
         } catch (err) {
             console.error(err);
 
+            const normalizeErrMessage = (value) => {
+                if (!value) return '';
+                if (Array.isArray(value)) return value.map((v) => String(v || '').trim()).filter(Boolean).join(' ');
+                if (typeof value === 'object') {
+                    if (value.message) return normalizeErrMessage(value.message);
+                    return '';
+                }
+                return String(value).trim();
+            };
+
+            const msg =
+                normalizeErrMessage(err?.message) ||
+                normalizeErrMessage(err?.apiMessage) ||
+                'Something went wrong. Please try again.';
+
             Swal.fire({
                 icon: 'error',
                 title: 'Can’t save album',
-                text: err?.message || 'Something went wrong. Please try again.',
+                text: msg,
                 confirmButtonColor: '#d33',
             });
         } finally {
@@ -577,6 +631,10 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
                             Add Photos to Album
                         </label>
 
+                        <div className="mb-2 text-xs text-gray-500">
+                            {(currentGalleryPhotos.length + galleryPhotoFiles.length)}/{MAX_GALLERY_IMAGES} selected
+                        </div>
+
                         {galleryPhotosError ? (
                             <p className="text-red-600 text-xs mb-2">{galleryPhotosError}</p>
                         ) : null}
@@ -588,13 +646,13 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
                             onChange={handleGalleryPhotosChange}
                             accept="image/jpeg,image/png,image/jpg,image/gif"
                             multiple
-                            disabled={isSubmitting}
+                            disabled={isSubmitting || (currentGalleryPhotos.length + galleryPhotoFiles.length) >= MAX_GALLERY_IMAGES}
                             className="hidden"
                         />
                         <button
                             type="button"
                             onClick={() => galleryPhotoInputRef.current.click()}
-                            disabled={isSubmitting}
+                            disabled={isSubmitting || (currentGalleryPhotos.length + galleryPhotoFiles.length) >= MAX_GALLERY_IMAGES}
                             className={`w-full p-3 bg-primary-50 border border-primary-200 rounded-lg transition-colors text-primary-700 flex items-center justify-center ${
                                 isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-primary-100'
                             }`}
@@ -673,9 +731,9 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
                         </button>
                         <button
                             type="submit"
-                            disabled={!title.trim() || isSubmitting}
+                            disabled={!title.trim() || isSubmitting || (galleryPhotoFiles.length + currentGalleryPhotos.length) === 0}
                             className={`px-4 py-2 rounded-lg font-medium text-white transition-all flex items-center gap-1 ${
-                                title.trim() && !isSubmitting
+                                title.trim() && !isSubmitting && (galleryPhotoFiles.length + currentGalleryPhotos.length) > 0
                                     ? 'bg-secondary-500 hover:bg-secondary-600 shadow-md'
                                     : 'bg-gray-300 cursor-not-allowed'
                             }`}

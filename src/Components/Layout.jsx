@@ -137,6 +137,8 @@ const Layout = ({ noScroll = false }) => {
   const location = useLocation();
   const navigate = useNavigate();
 
+  const DEFAULT_AVATAR = "/assets/user.png";
+
   useEffect(() => {
     if (!window.__appModalBackStack) {
       window.__appModalBackStack = [];
@@ -678,6 +680,10 @@ const Layout = ({ noScroll = false }) => {
                       src={userInfo.profileUrl}
                       alt="User Profile"
                       className={`${isMobile ? "w-7 h-7" : "w-8 h-8"} rounded-full object-cover`}
+                      onError={(e) => {
+                        e.currentTarget.onerror = null;
+                        e.currentTarget.src = DEFAULT_AVATAR;
+                      }}
                     />
                   ) : (
                     <div className={`${isMobile ? "w-7 h-7" : "w-8 h-8"} rounded-full bg-gradient-to-r from-primary-500 to-primary-600 flex items-center justify-center text-white`}>

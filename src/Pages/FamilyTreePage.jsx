@@ -3741,7 +3741,7 @@ const FamilyTreePage = () => {
             {structuralDummyDialog.isOpen && (
               <div className="fixed inset-0 z-[1200] flex items-end justify-center bg-slate-950/50 p-3 backdrop-blur-sm sm:items-center sm:p-6">
                 <div className="w-full max-w-2xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.24)]">
-                  <div className="flex items-start justify-between gap-4 bg-gradient-to-r from-sky-600 via-blue-600 to-indigo-600 px-5 py-4 text-white">
+                  <div className="flex items-start justify-between gap-4 bg-primary-600 px-5 py-4 text-white">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-100">
                         Removed Member Slot
@@ -3875,7 +3875,7 @@ const FamilyTreePage = () => {
                                 structuralDummyDialog.submitting ||
                                 !structuralDummyDialogDetails.canDelete
                                   ? "cursor-not-allowed bg-slate-300"
-                                  : "bg-rose-600 hover:bg-rose-700"
+                                  : "bg-secondary-600 "
                               }`}
                             >
                               {structuralDummyDialog.submitting

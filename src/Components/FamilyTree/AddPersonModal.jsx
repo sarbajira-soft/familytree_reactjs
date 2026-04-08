@@ -1283,7 +1283,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                                 {member.user.fullName} {member.user.userProfile && member.user.userProfile.gender ? `(${member.user.userProfile.gender}${member.user.userProfile.dob ? ', ' + member.user.userProfile.dob.split('T')[0] : ''})` : ''} {existingMemberIds.includes(member.user.id) ? '(Already in tree)' : ''}
                                             </option>
                                         ))}
-                                        <option value="manual">Add New Member</option>
+                                        {/* <option value="manual">Add New Member</option> */}
                                     </select>
                                 </div>
                             )}

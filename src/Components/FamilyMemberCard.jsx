@@ -3,12 +3,10 @@ import PropTypes from 'prop-types';
 import { FiTrash2, FiEye, FiLoader, FiShare2, FiSearch } from 'react-icons/fi';
 import { FaBirthdayCake, FaPhone, FaHome, FaMale, FaFemale } from 'react-icons/fa';
 import Swal from 'sweetalert2';
-import { BlockButton } from './block/BlockButton';
 import { BlockedBadge } from './block/BlockedBadge';
 import { logger } from '../utils/logger';
 import { authFetch } from '../utils/authFetch';
 import { fetchFamilyTree, deleteFamilyMember, getMembersNotInTree, replaceDummyUser, replaceStructuralDummy as replaceStructuralDummySlot, selfRemoveFromFamily } from '../utils/familyTreeApi';
-import { getBlockedUsers } from '../services/block.service';
 import {
   buildDefaultFamilyPrivacySettings,
   fetchFamilyPrivacySettings,
@@ -73,8 +71,6 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
       setViewLoadingStates((prev) => ({ ...prev, [key]: false }));
     }
   };
-  const [blockedUsers, setBlockedUsers] = useState([]);
-  const [loadingBlocked, setLoadingBlocked] = useState(false);
   const [privacySettings, setPrivacySettings] = useState(() =>
     buildDefaultFamilyPrivacySettings(''),
   );
@@ -862,18 +858,6 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                   >
                     <FiShare2 size={16} />
                   </button>
-                )}
-                {/* Block button for all app users (not self) */}
-                {member.user?.isAppUser && currentUser?.userId !== member.userId && (
-                  <div className="flex items-center scale-95 origin-right">
-                    <BlockButton
-                      userId={member.userId}
-                      isBlockedByMe={Boolean(member?.blockStatus?.isBlockedByMe)}
-                      location="membersList"
-                      userName={member.name}
-                      onStatusChange={(userId, nextStatus) => handleMemberBlockStatusChange(userId, nextStatus)}
-                    />
-                  </div>
                 )}
                 {allowDelete && member.membershipType === 'member' && currentUser?.userId !== member.userId && (
                   <button

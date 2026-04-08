@@ -25,6 +25,15 @@ const CreateEventModal = ({
   const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
   const EVENT_DATE_MIN = "1900-01-01";
   const EVENT_DATE_MAX = "2100-12-31";
+
+  const ALLOWED_IMAGE_MIME_TYPES = [
+    "image/jpeg",
+    "image/png",
+    "image/jpg",
+    "image/gif",
+  ];
+  const INVALID_IMAGE_TYPE_ERROR =
+    "Only image files (jpeg, png, jpg, gif) are allowed";
   const { userInfo } = useUser();
 
   const [title, setTitle] = useState("");
@@ -140,25 +149,39 @@ const CreateEventModal = ({
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
 
-    const validFiles = files.filter((file) => Number(file?.size || 0) <= MAX_IMAGE_BYTES);
-    const hasOversize = validFiles.length !== files.length;
+    const invalidTypeFiles = files.filter(
+      (file) => !ALLOWED_IMAGE_MIME_TYPES.includes(String(file?.type || "").toLowerCase())
+    );
+    const validTypeFiles = files.filter(
+      (file) => ALLOWED_IMAGE_MIME_TYPES.includes(String(file?.type || "").toLowerCase())
+    );
+
+    if (invalidTypeFiles.length > 0) {
+      setErrors((prev) => ({
+        ...(prev || {}),
+        images: INVALID_IMAGE_TYPE_ERROR,
+      }));
+    }
+
+    const validSizeFiles = validTypeFiles.filter((file) => Number(file?.size || 0) <= MAX_IMAGE_BYTES);
+    const hasOversize = validSizeFiles.length !== validTypeFiles.length;
 
     if (hasOversize) {
       setErrors((prev) => ({
         ...(prev || {}),
         images: "Image is too large. Please select an image less than 5MB.",
       }));
-    } else if (errors.images) {
+    } else if (errors.images && invalidTypeFiles.length === 0) {
       setErrors((prev) => ({ ...(prev || {}), images: undefined }));
     }
 
-    if (!validFiles.length) {
+    if (!validSizeFiles.length) {
       e.target.value = null;
       return;
     }
 
     setImages((prev) => {
-      const merged = [...(prev || []), ...validFiles];
+      const merged = [...(prev || []), ...validSizeFiles];
       const seen = new Set();
       const unique = [];
       for (const f of merged) {
