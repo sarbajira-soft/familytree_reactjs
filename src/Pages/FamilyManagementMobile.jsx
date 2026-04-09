@@ -474,6 +474,7 @@ const FamilyManagementMobile = () => {
                 onManageEvents={handleManageEvents}
                 onManageGifts={handleManageGifts}
                 onEditFamily={handleEditFamily}
+                canEditFamily={isOwnFamilyAdmin}
                 onShareFamilyCode={handleShareFamilyCode}
                 onLeaveFamily={handleLeaveFamily}
                 leavingFamily={leavingFamily}

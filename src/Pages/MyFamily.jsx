@@ -405,6 +405,7 @@ const FamilyHubPage = () => {
                   onManageEvents={handleManageEvent}
                   onManageGifts={handleManageGifts}
                   onEditFamily={handleEditFamily}
+                  canEditFamily={isOwnFamilyAdmin}
                   onShareFamilyCode={handleShareFamilyCode}
                   onLeaveFamily={handleLeaveFamily}
                   leavingFamily={leavingFamily}
