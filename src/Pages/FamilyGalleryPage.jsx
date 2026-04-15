@@ -430,7 +430,7 @@ const FamilyGalleryPage = () => {
                     No albums here yet!
                   </p>
                   <p className="text-lg mb-6">
-                    Looks like the **{activeFeed}** feed is a bit quiet. Why
+                    Looks like the {activeFeed === 'family' ? 'Family' : 'Public'} feed is a bit quiet. Why
                     not be the first to share?
                   </p>
                 </div>
@@ -472,3 +472,5 @@ const FamilyGalleryPage = () => {
 };
 
 export default FamilyGalleryPage;
+
+

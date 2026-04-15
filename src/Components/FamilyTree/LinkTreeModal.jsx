@@ -110,11 +110,19 @@ export default function LinkTreeModal({
     const requestedOptions = Array.isArray(allowedRelationshipTypes)
       ? allowedRelationshipTypes
           .map((value) => String(value || "").trim().toLowerCase())
-          .filter((value, index, arr) => value && arr.indexOf(value) === index)
+          .filter(
+            (value, index, arr) =>
+              value &&
+              ["parent", "child", "sibling"].includes(value) &&
+              arr.indexOf(value) === index,
+          )
       : [];
 
-    const filteredOptions = requestedOptions.filter((value) => baseOptions.includes(value));
-    return filteredOptions.length ? filteredOptions : baseOptions;
+    if (requestedOptions.length) {
+      return requestedOptions;
+    }
+
+    return baseOptions;
   }, [allowedRelationshipTypes, senderHasParents]);
 
   const relationshipFieldLocked = relationshipOptions.length <= 1;
