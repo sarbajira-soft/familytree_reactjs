@@ -5,19 +5,28 @@ import Sidebar from "./Sidebar";
 import BottomNavBar from "./BottomNavBar";
 import { useNotificationSocket } from "../hooks/useNotificationSocket";
 import {
-  FiMenu,
+  FiAlertCircle,
+  FiArrowLeft,
   FiBell,
-  FiChevronDown,
-  FiHome,
   FiCalendar,
-  FiImage,
-  FiGift,
-  FiUsers,
-  FiPackage,
-  FiLink,
+  FiChevronDown,
+  FiChevronRight,
   FiClock,
+  FiEdit2,
+  FiFileText,
+  FiGift,
+  FiHelpCircle,
+  FiHome,
+  FiImage,
+  FiLink,
+  FiLogOut,
+  FiMail,
+  FiMenu,
   FiMoon,
+  FiPackage,
+  FiShield,
   FiSun,
+  FiUsers,
 } from "react-icons/fi";
 import { RiUser3Line } from "react-icons/ri";
 import { RiGitMergeLine } from "react-icons/ri";
@@ -25,6 +34,8 @@ import { useUser } from "../Contexts/UserContext";
 import { useTheme } from "../Contexts/ThemeContext";
 import { MEDUSA_TOKEN_KEY, MEDUSA_CART_ID_KEY } from "../Retail/utils/constants";
 import NotificationPanel from "./NotificationPanel";
+import SupportHelpModal from "./SupportHelpModal";
+import TermsAndConditionsModal from "./TermsAndConditionsModal";
 
 const PullToRefresh = ({ children, onRefresh, disabled }) => {
   const containerRef = useRef(null);
@@ -170,7 +181,11 @@ const Layout = ({ noScroll = false }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [familyMenuOpen, setFamilyMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [profileMenuView, setProfileMenuView] = useState("root");
   const [notificationOpen, setNotificationOpen] = useState(false);
+  const [supportHelpOpen, setSupportHelpOpen] = useState(false);
+  const [supportHelpMode, setSupportHelpMode] = useState("report");
+  const [termsModalOpen, setTermsModalOpen] = useState(false);
 
   const menuButtonRef = useRef(null);
   const sidebarRef = useRef(null);
@@ -183,7 +198,10 @@ const Layout = ({ noScroll = false }) => {
     sidebarOpen: false,
     notificationOpen: false,
     profileOpen: false,
+    profileMenuView: "root",
     familyMenuOpen: false,
+    supportHelpOpen: false,
+    termsModalOpen: false,
   });
 
   useEffect(() => {
@@ -191,9 +209,25 @@ const Layout = ({ noScroll = false }) => {
       sidebarOpen,
       notificationOpen,
       profileOpen,
+      profileMenuView,
       familyMenuOpen,
+      supportHelpOpen,
+      termsModalOpen,
     };
-  }, [sidebarOpen, notificationOpen, profileOpen, familyMenuOpen]);
+  }, [
+    sidebarOpen,
+    notificationOpen,
+    profileOpen,
+    profileMenuView,
+    familyMenuOpen,
+    supportHelpOpen,
+    termsModalOpen,
+  ]);
+
+  const closeProfileMenu = useCallback(() => {
+    setProfileOpen(false);
+    setProfileMenuView("root");
+  }, []);
 
   const handleGlobalBack = useCallback(() => {
     try {
@@ -233,8 +267,22 @@ const Layout = ({ noScroll = false }) => {
       setNotificationOpen(false);
       return true;
     }
+    if (current.supportHelpOpen) {
+      setSupportHelpOpen(false);
+      setSupportHelpMode("report");
+      return true;
+    }
+    if (current.termsModalOpen) {
+      setTermsModalOpen(false);
+      return true;
+    }
+    if (current.profileOpen && current.profileMenuView !== "root") {
+      setProfileMenuView("root");
+      return true;
+    }
     if (current.profileOpen) {
       setProfileOpen(false);
+      setProfileMenuView("root");
       return true;
     }
     if (current.familyMenuOpen) {
@@ -299,6 +347,10 @@ const Layout = ({ noScroll = false }) => {
     .join(' ')
     .trim() || userInfo?.name || userInfo?.email || (userInfo?.mobile ? `${userInfo?.countryCode || ''} ${userInfo.mobile}`.trim() : 'My Account');
   const profileSecondaryInfo = userInfo?.familyCode || userInfo?.email || (userInfo?.mobile ? `${userInfo?.countryCode || ''} ${userInfo.mobile}`.trim() : '');
+  const supportEmail = String(import.meta.env.VITE_SUPPORT_EMAIL || "support@familyss.com").trim();
+  const supportContactHref = useMemo(() => {
+    return `mailto:${supportEmail}?subject=${encodeURIComponent("Support Request - Familyss")}`;
+  }, [supportEmail]);
   const { isConnected, unreadCount, refetchUnreadCount, notifications } =
     useNotificationSocket(userInfo);
 
@@ -335,12 +387,12 @@ const Layout = ({ noScroll = false }) => {
       }
 
       if (profileRef.current && !profileRef.current.contains(e.target)) {
-        setProfileOpen(false);
+        closeProfileMenu();
       }
     };
     document.addEventListener("click", handleClickOutside);
     return () => document.removeEventListener("click", handleClickOutside);
-  }, []);
+  }, [closeProfileMenu]);
 
   const isAdmin = userInfo && userInfo.role === 3;
   const isApproved = userInfo && userInfo.approveStatus === "approved";
@@ -369,8 +421,8 @@ const Layout = ({ noScroll = false }) => {
     if (shouldLockScroll) return true;
     if (isGiftsRoute) return true;
     if (isRestrictedUser) return true;
-    return sidebarOpen || notificationOpen;
-  }, [shouldLockScroll, isGiftsRoute, isRestrictedUser, sidebarOpen, notificationOpen]);
+    return sidebarOpen || notificationOpen || supportHelpOpen || termsModalOpen;
+  }, [shouldLockScroll, isGiftsRoute, isRestrictedUser, sidebarOpen, notificationOpen, supportHelpOpen, termsModalOpen]);
 
   const handlePullRefresh = useCallback(async () => {
     window.location.reload();
@@ -478,10 +530,15 @@ const Layout = ({ noScroll = false }) => {
   const navigateTo = (route) => {
     setFamilyMenuOpen(false);
     setSidebarOpen(false);
+    closeProfileMenu();
     navigate(route);
   };
 
   const handleLogout = () => {
+    closeProfileMenu();
+    setSupportHelpOpen(false);
+    setSupportHelpMode("report");
+    setTermsModalOpen(false);
     logout();
     localStorage.removeItem("userInfo");
     localStorage.removeItem(MEDUSA_TOKEN_KEY);
@@ -489,9 +546,51 @@ const Layout = ({ noScroll = false }) => {
     navigate("/login");
   };
 
+  const handleViewProfile = () => {
+    closeProfileMenu();
+    navigate("/myprofile");
+  };
+
   const handleEditProfile = () => {
-    setProfileOpen(false);
+    closeProfileMenu();
     navigate("/profile/edit");
+  };
+
+  const handleOpenSettingsPanel = () => {
+    setProfileMenuView("settings");
+  };
+
+  const handleOpenSupportPanel = () => {
+    closeProfileMenu();
+    setSupportHelpMode("report");
+    setSupportHelpOpen(true);
+  };
+
+  const handleOpenPrivacy = () => {
+    closeProfileMenu();
+    navigate("/blocked-members");
+  };
+
+  const handleOpenTerms = () => {
+    closeProfileMenu();
+    setTermsModalOpen(true);
+  };
+
+  const handleToggleTheme = () => {
+    toggleTheme();
+    closeProfileMenu();
+  };
+
+  const handleContactSupport = () => {
+    closeProfileMenu();
+    setSupportHelpMode("contact");
+    setSupportHelpOpen(true);
+  };
+
+  const handleOpenSupportReport = () => {
+    closeProfileMenu();
+    setSupportHelpMode("report");
+    setSupportHelpOpen(true);
   };
 
   const decrementUnreadCount = () => {
@@ -671,7 +770,13 @@ const Layout = ({ noScroll = false }) => {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    setProfileOpen(!profileOpen);
+                    const nextProfileOpen = !profileOpen;
+                    setProfileOpen(nextProfileOpen);
+                    setProfileMenuView("root");
+                    if (nextProfileOpen) {
+                      setFamilyMenuOpen(false);
+                      setNotificationOpen(false);
+                    }
                   }}
                   className={`bg-unset flex items-center space-x-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 ${isMobile ? "p-0.5" : "p-1"}`}
                 >
@@ -702,61 +807,177 @@ const Layout = ({ noScroll = false }) => {
 
                 {profileOpen && (
                   <div
-                    className="fixed md:absolute right-4 mt-2 w-48 bg-white rounded-lg shadow-lg py-1 z-50 border border-gray-200 dark:bg-slate-800 dark:border-slate-700"
+                    className="fixed md:absolute right-4 md:right-0 mt-2 w-[17rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-xl z-50 dark:bg-slate-800 dark:border-slate-700"
                     style={{ top: isMobile ? "3.5rem" : "4rem" }}
                   >
-                    <div className="px-4 py-2  text-sm text-gray-800 border-b border-gray-100 dark:text-slate-100 dark:border-slate-700">
-                      <p className="font-semibold">
-                        {profileDisplayName}
-                      </p>
-                      {profileSecondaryInfo && (
-                        <p className="text-gray-500 text-xs dark:text-slate-300">
-                          {userInfo?.familyCode ? `Family Code: ${profileSecondaryInfo}` : profileSecondaryInfo}
-                        </p>
+                    <div className="border-b border-gray-100 px-4 py-3 dark:border-slate-700">
+                      {profileMenuView === "root" ? (
+                        <div className="text-sm text-gray-800 dark:text-slate-100">
+                          <p className="font-semibold">{profileDisplayName}</p>
+                          {profileSecondaryInfo && (
+                            <p className="text-xs text-gray-500 dark:text-slate-300">
+                              {userInfo?.familyCode ? `Family Code: ${profileSecondaryInfo}` : profileSecondaryInfo}
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex items-start gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setProfileMenuView("root")}
+                            className="mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-slate-100"
+                            aria-label="Back to profile menu"
+                          >
+                            <FiArrowLeft size={16} />
+                          </button>
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">
+                              {profileMenuView === "settings" ? "Settings & Privacy" : "Help & Support"}
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-slate-400">
+                              {profileMenuView === "settings"
+                                ? "Manage privacy, appearance, and policies."
+                                : "Contact support or send a guided issue report."}
+                            </p>
+                          </div>
+                        </div>
                       )}
                     </div>
-                    <button
-                      onClick={() => navigate("/myprofile")}
-                      className="block w-full bg-white text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-                    >
-                      My Profile
-                    </button>
-                    <button
-                      onClick={handleEditProfile}
-                      className="block w-full bg-white text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-                    >
-                      Edit Profile
-                    </button>
-                    <button
-                      onClick={() => {
-                        navigate('/blocked-members');
-                        setProfileOpen(false);
-                      }}
-                      className="block w-full bg-white text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-                    >
-                      Privacy
-                    </button>
-                    <button
-                      onClick={() => {
-                        toggleTheme();
-                        setProfileOpen(false);
-                      }}
-                      className="block w-full bg-white text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 flex items-center justify-between"
-                    >
-                      <span>
-                         {theme === "dark" ? "Light" : "Dark"} Mode
-                      </span>
-                      <span className="ml-2 text-primary-600 dark:text-primary-400">
-                        {theme === "dark" ? <FiSun size={16} /> : <FiMoon size={16} />}
-                      </span>
-                    </button>
-                    <div className="border-t border-gray-200 dark:border-slate-700"></div>
-                    <button
-                      onClick={handleLogout}
-                      className="block w-full bg-white text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-                    >
-                      Sign Out
-                    </button>
+
+                    <div className="p-1">
+                      {profileMenuView === "root" ? (
+                        <>
+                          <button
+                            onClick={handleViewProfile}
+                            className="bg-unset flex w-full items-center gap-2 rounded-xl px-2.5 py-1.5 text-left transition hover:bg-gray-100 dark:hover:bg-slate-700"
+                          >
+                            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-200">
+                              <RiUser3Line size={16} />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-[13px] font-medium leading-5 text-gray-800 dark:text-slate-100">My Profile</span>
+                            </span>
+                          </button>
+
+                          <button
+                            onClick={handleEditProfile}
+                            className="bg-unset flex w-full items-center gap-2 rounded-xl px-2.5 py-1.5 text-left transition hover:bg-gray-100 dark:hover:bg-slate-700"
+                          >
+                            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-200">
+                              <FiEdit2 size={15} />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-[13px] font-medium leading-5 text-gray-800 dark:text-slate-100">Edit Profile</span>
+                            </span>
+                          </button>
+
+                          <button
+                            onClick={handleOpenSettingsPanel}
+                            className="bg-unset flex w-full items-center gap-2 rounded-xl px-2.5 py-1.5 text-left transition hover:bg-gray-100 dark:hover:bg-slate-700"
+                          >
+                            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-200">
+                              <FiShield size={15} />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-[13px] font-medium leading-5 text-gray-800 dark:text-slate-100">Settings & Privacy</span>
+                            </span>
+                            <FiChevronRight size={14} className="text-gray-400 dark:text-slate-500" />
+                          </button>
+
+                          <button
+                            onClick={handleOpenSupportPanel}
+                            className="bg-unset flex w-full items-center gap-2 rounded-xl px-2.5 py-1.5 text-left transition hover:bg-gray-100 dark:hover:bg-slate-700"
+                          >
+                            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-200">
+                              <FiHelpCircle size={15} />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-[13px] font-medium leading-5 text-gray-800 dark:text-slate-100">Help & Support</span>
+                            </span>
+                            <FiChevronRight size={14} className="text-gray-400 dark:text-slate-500" />
+                          </button>
+
+                          <div className="my-1 border-t border-gray-200 dark:border-slate-700"></div>
+
+                          <button
+                            onClick={handleLogout}
+                            className="bg-unset flex w-full items-center gap-2 rounded-xl px-2.5 py-1.5 text-left transition hover:bg-red-50 dark:hover:bg-red-500/10"
+                          >
+                            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-300">
+                              <FiLogOut size={15} />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-[13px] font-medium leading-5 text-gray-800 dark:text-slate-100">Sign Out</span>
+                            </span>
+                          </button>
+                        </>
+                      ) : profileMenuView === "settings" ? (
+                        <>
+                          <button
+                            onClick={handleOpenPrivacy}
+                            className="bg-unset flex w-full items-center gap-2 rounded-xl px-2.5 py-1.5 text-left transition hover:bg-gray-100 dark:hover:bg-slate-700"
+                          >
+                            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-200">
+                              <FiShield size={15} />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-[13px] font-medium leading-5 text-gray-800 dark:text-slate-100">Privacy</span>
+                            </span>
+                          </button>
+
+                          <button
+                            onClick={handleOpenTerms}
+                            className="bg-unset flex w-full items-center gap-2 rounded-xl px-2.5 py-1.5 text-left transition hover:bg-gray-100 dark:hover:bg-slate-700"
+                          >
+                            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-200">
+                              <FiFileText size={15} />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-[13px] font-medium leading-5 text-gray-800 dark:text-slate-100">Terms & Conditions</span>
+                            </span>
+                          </button>
+
+                          <button
+                            onClick={handleToggleTheme}
+                            className="bg-unset flex w-full items-center gap-2 rounded-xl px-2.5 py-1.5 text-left transition hover:bg-gray-100 dark:hover:bg-slate-700"
+                          >
+                            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-200">
+                              {theme === "dark" ? <FiSun size={15} /> : <FiMoon size={15} />}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-[13px] font-medium leading-5 text-gray-800 dark:text-slate-100">
+                                {theme === "dark" ? "Light Mode" : "Dark Mode"}
+                              </span>
+                            </span>
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={handleContactSupport}
+                            className="bg-unset flex w-full items-center gap-2 rounded-xl px-2.5 py-1.5 text-left transition hover:bg-gray-100 dark:hover:bg-slate-700"
+                          >
+                            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-200">
+                              <FiMail size={15} />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-[13px] font-medium leading-5 text-gray-800 dark:text-slate-100">Contact Support</span>
+                            </span>
+                          </button>
+
+                          <button
+                            onClick={handleOpenSupportReport}
+                            className="bg-unset flex w-full items-center gap-2 rounded-xl px-2.5 py-1.5 text-left transition hover:bg-red-50 dark:hover:bg-red-500/10"
+                          >
+                            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-300">
+                              <FiAlertCircle size={15} />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-[13px] font-medium leading-5 text-gray-800 dark:text-slate-100">Report a Problem</span>
+                            </span>
+                          </button></>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -829,6 +1050,23 @@ const Layout = ({ noScroll = false }) => {
         )}
       </main>
 
+      <SupportHelpModal
+        isOpen={supportHelpOpen}
+        onClose={() => {
+          setSupportHelpOpen(false);
+          setSupportHelpMode("report");
+        }}
+        supportEmail={supportEmail}
+        userInfo={userInfo}
+        currentPath={location.pathname}
+        mode={supportHelpMode}
+      />
+
+      <TermsAndConditionsModal
+        isOpen={termsModalOpen}
+        onClose={() => setTermsModalOpen(false)}
+      />
+
       {/* Notification Panel */}
       <NotificationPanel
         open={notificationOpen}
@@ -844,3 +1082,7 @@ const Layout = ({ noScroll = false }) => {
 };
 
 export default Layout;
+
+
+
+
