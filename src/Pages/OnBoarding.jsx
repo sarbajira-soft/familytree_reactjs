@@ -315,7 +315,10 @@ const buildContactSectionErrors = (data) => {
     errors.contactNumber = "Please enter a valid contact number";
   }
 
-  if (isBlank(data.address)) errors.address = "Address is required";
+  if (isBlank(data.addressLine1)) errors.addressLine1 = "Address Line 1 is required";
+  if (isBlank(data.district)) errors.district = "District is required";
+  if (isBlank(data.state)) errors.state = "State is required";
+  if (isBlank(data.pincode)) errors.pincode = "Pincode is required";
   return errors;
 };
 
@@ -344,7 +347,7 @@ const SECTION_FIELD_MAP = {
     "gothramOther",
     "kuladevata",
   ]),
-  contact: new Set(["contactNumber", "address"]),
+  contact: new Set(["contactNumber", "addressLine1", "district", "state", "pincode"]),
 };
 
 const getSectionForErrors = (errors) => {
@@ -420,7 +423,7 @@ const areAllMandatoryFieldsFilled = (data) => {
   if (data.religionId === "other" && isBlank(data.religionOther)) return false;
   if (data.gothram === "other" && isBlank(data.gothramOther)) return false;
 
-  if (isBlank(data.contactNumber) || isBlank(data.address)) return false;
+  if (isBlank(data.contactNumber) || isBlank(data.addressLine1) || isBlank(data.district) || isBlank(data.state) || isBlank(data.pincode)) return false;
   return true;
 };
 
@@ -588,7 +591,11 @@ const fetchAndApplyUserDetails = async ({
         likes: userProfile.likes || "",
         dislikes: userProfile.dislikes || "",
         favoriteFoods: userProfile.favoriteFoods || "",
-        address: userProfile.address || "",
+        addressLine1: userProfile.addressLine1 || "",
+        addressLine2: userProfile.addressLine2 || "",
+        district: userProfile.district || "",
+        state: userProfile.state || "",
+        pincode: userProfile.pincode || "",
         contactNumber,
         contactCountryCode: userCountryCode || prev.contactCountryCode || "+91",
         bio: userProfile.bio || "",
@@ -619,6 +626,8 @@ const shouldSkipOnSave = (key, data) => {
   if (key === "contactCountryCode") return true;
   if (key === "childrenNames" || key === "profile") return true;
   if (key.startsWith("childName")) return true;
+  // Skip individual address fields - they will be combined into 'address'
+  if (["addressLine1", "addressLine2", "district", "state", "pincode"].includes(key)) return true;
 
   const value = data[key];
   if (value === undefined || value === null) return true;
@@ -791,6 +800,21 @@ const applyContactFields = (payload, data) => {
   }
 };
 
+const applyAddressFields = (payload, data) => {
+  // Combine address fields into a single address string
+  const addressParts = [
+    data.addressLine1,
+    data.addressLine2,
+    data.district,
+    data.state,
+    data.pincode,
+  ].map((part) => String(part || "").trim()).filter(Boolean);
+
+  if (addressParts.length > 0) {
+    payload.set("address", addressParts.join(", "));
+  }
+};
+
 const finalizeProfilePayload = (payload, data) => {
   payload.set(
     "childrenCount",
@@ -802,6 +826,12 @@ const finalizeProfilePayload = (payload, data) => {
   payload.delete("childrenCount");
   payload.delete("profileUrl");
   payload.delete("contactCountryCode");
+  // Remove individual address fields - combined 'address' is already set by applyAddressFields
+  payload.delete("addressLine1");
+  payload.delete("addressLine2");
+  payload.delete("district");
+  payload.delete("state");
+  payload.delete("pincode");
 };
 
 const buildProfileUpdateFormData = (data) => {
@@ -813,6 +843,7 @@ const buildProfileUpdateFormData = (data) => {
   applyChildrenNames(payload, data);
   applyProfileFile(payload, data);
   applyContactFields(payload, data);
+  applyAddressFields(payload, data);
   finalizeProfilePayload(payload, data);
   return payload;
 };
@@ -2123,6 +2154,7 @@ const ContactSection = ({
           id="hobbies"
           type="text"
           name="hobbies"
+          maxLength={50}
           value={formData.hobbies}
           onChange={handleChange}
           placeholder="Playing football"
@@ -2144,6 +2176,7 @@ const ContactSection = ({
           id="likes"
           type="text"
           name="likes"
+          maxLength={50}
           value={formData.likes}
           onChange={handleChange}
           placeholder="Watching movies in theatre"
@@ -2167,6 +2200,7 @@ const ContactSection = ({
           name="dislikes"
           value={formData.dislikes}
           onChange={handleChange}
+          maxLength={50}
           placeholder="Loud music"
           className="w-full px-4 py-2.5 border border-gray-300 rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
         />
@@ -2189,37 +2223,114 @@ const ContactSection = ({
           value={formData.favoriteFoods}
           onChange={handleChange}
           placeholder="Biryani"
+          maxLength={50}
           className="w-full px-4 py-2.5 border border-gray-300 rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
         />
       </div>
 
-      {/* Enter address */}
+      {/* Address Fields */}
 
       <div className="md:col-span-2">
-        <label
-          htmlFor="address"
-          className="block text-sm font-medium text-gray-700 mb-1"
-        >
-          Enter address <span className="text-red-500">*</span>
+        <label className="block text-sm font-medium text-gray-700 mb-3">
+          Address <span className="text-red-500">*</span>
         </label>
 
-        <input
-          id="address"
-          ref={fieldRefs.address}
-          type="text"
-          name="address"
-          value={formData.address}
-          onChange={handleChange}
-          placeholder="204, North Anna Salai, Chennai"
-          className={`w-full px-4 py-2.5 border rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 ${errors.address
-              ? "border-red-500 focus:ring-red-300"
-              : "border-gray-300 focus:ring-[var(--color-primary)]"
-            }`}
-        />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Address Line 1 */}
+          <div className="md:col-span-2">
+            <input
+              id="addressLine1"
+              ref={fieldRefs.addressLine1}
+              type="text"
+              name="addressLine1"
+              value={formData.addressLine1}
+              onChange={handleChange}
+              placeholder="Address Line 1 (House/Street)"
+              className={`w-full px-4 py-2.5 border rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 ${errors.addressLine1
+                  ? "border-red-500 focus:ring-red-300"
+                  : "border-gray-300 focus:ring-[var(--color-primary)]"
+                }`}
+            />
+            {errors.addressLine1 && (
+              <p className="text-red-500 text-xs mt-1">{errors.addressLine1}</p>
+            )}
+          </div>
 
-        {errors.address && (
-          <p className="text-red-500 text-xs mt-1">{errors.address}</p>
-        )}
+          {/* Address Line 2 */}
+          <div className="md:col-span-2">
+            <input
+              id="addressLine2"
+              ref={fieldRefs.addressLine2}
+              type="text"
+              name="addressLine2"
+              value={formData.addressLine2}
+              onChange={handleChange}
+              placeholder="Address Line 2 (Area/Landmark) - Optional"
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+            />
+          </div>
+
+          {/* District */}
+          <div>
+            <input
+              id="district"
+              ref={fieldRefs.district}
+              type="text"
+              name="district"
+              value={formData.district}
+              onChange={handleChange}
+              placeholder="District"
+              className={`w-full px-4 py-2.5 border rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 ${errors.district
+                  ? "border-red-500 focus:ring-red-300"
+                  : "border-gray-300 focus:ring-[var(--color-primary)]"
+                }`}
+            />
+            {errors.district && (
+              <p className="text-red-500 text-xs mt-1">{errors.district}</p>
+            )}
+          </div>
+
+          {/* State */}
+          <div>
+            <input
+              id="state"
+              ref={fieldRefs.state}
+              type="text"
+              name="state"
+              value={formData.state}
+              onChange={handleChange}
+              placeholder="State"
+              className={`w-full px-4 py-2.5 border rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 ${errors.state
+                  ? "border-red-500 focus:ring-red-300"
+                  : "border-gray-300 focus:ring-[var(--color-primary)]"
+                }`}
+            />
+            {errors.state && (
+              <p className="text-red-500 text-xs mt-1">{errors.state}</p>
+            )}
+          </div>
+
+          {/* Pincode */}
+          <div className="md:col-span-2">
+            <input
+              id="pincode"
+              ref={fieldRefs.pincode}
+              type="text"
+              name="pincode"
+              value={formData.pincode}
+              onChange={handleChange}
+              placeholder="Pincode"
+              maxLength={10}
+              className={`w-full px-4 py-2.5 border rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 ${errors.pincode
+                  ? "border-red-500 focus:ring-red-300"
+                  : "border-gray-300 focus:ring-[var(--color-primary)]"
+                }`}
+            />
+            {errors.pincode && (
+              <p className="text-red-500 text-xs mt-1">{errors.pincode}</p>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -2266,6 +2377,7 @@ const BioSection = ({ formData, handleChange }) => (
           onChange={handleChange}
           placeholder="Share a short story from your life — a moment, a lesson, or a memory you'd like future generations to remember."
           rows="6"
+          maxLength={250}
           className="w-full px-4 py-2.5 border border-gray-300 rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] resize-none"
         />
       </div>
@@ -2506,7 +2618,11 @@ const OnBoarding = () => {
 
     contactNumber: useRef(null),
 
-    address: useRef(null),
+    addressLine1: useRef(null),
+    addressLine2: useRef(null),
+    district: useRef(null),
+    state: useRef(null),
+    pincode: useRef(null),
   };
 
   const [errors, setErrors] = useState({});
@@ -2566,7 +2682,11 @@ const OnBoarding = () => {
 
     favoriteFoods: "",
 
-    address: "",
+    addressLine1: "",
+    addressLine2: "",
+    district: "",
+    state: "",
+    pincode: "",
 
     contactNumber: "",
     contactCountryCode: "+91",
