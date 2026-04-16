@@ -109,9 +109,10 @@ const FamilyMemberModal = ({ isOpen, onClose, onSave, mode, initialNodeData, sel
     };
 
     return (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md relative animate-fade-in-up overflow-hidden">
-                 <div className="max-h-[90vh] overflow-y-auto p-6 custom-scrollbar animate-fade-in-up">
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-start sm:items-center justify-center z-50 px-2 sm:px-4 pt-8 pb-24 sm:pt-4 sm:pb-6">
+            <div className="bg-white rounded-2xl sm:rounded-lg shadow-xl w-full max-w-md relative animate-fade-in-up overflow-hidden"
+                 style={{ maxHeight: "calc(100vh - 140px)" }}>
+                 <div className="h-full overflow-y-auto p-4 sm:p-6 custom-scrollbar animate-fade-in-up">
                     <h2 className="text-2xl font-bold text-gray-800 mb-4 text-center">{getModalTitle()}</h2>
                     <form onSubmit={handleSubmit} className="space-y-4">
 

@@ -118,11 +118,12 @@ const ViewFamilyMemberModal = ({ isOpen, onClose, member, isLoading = false }) =
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm modal-backdrop"
+      className="fixed inset-0 z-50 flex items-start sm:items-center justify-center px-2 sm:px-4 pt-8 pb-24 sm:pt-4 sm:pb-6 bg-black/60 backdrop-blur-sm modal-backdrop"
       onClick={handleClose}
     >
       <div 
-        className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl mx-auto max-h-[95vh] overflow-hidden relative transform transition-all duration-300 ease-out modal-content-animate flex flex-col"
+        className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-4xl mx-auto overflow-hidden relative transform transition-all duration-300 ease-out modal-content-animate flex flex-col"
+        style={{ maxHeight: "calc(100vh - 140px)" }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Loading Overlay */}

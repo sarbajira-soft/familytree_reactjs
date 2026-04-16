@@ -626,7 +626,7 @@ const FamilyManagementMobile = () => {
                               <button
                                 type="button"
                                 onClick={() => {
-                                  const rawBaseUrl = import.meta.env.VITE_BASE_URL || window.location.origin;
+                                  const rawBaseUrl = import.meta.env.VITE_BASE_URL;
                                   const baseUrl = /^https?:\/\//i.test(rawBaseUrl)
                                     ? rawBaseUrl
                                     : `https://${rawBaseUrl}`;
