@@ -224,20 +224,12 @@ const FamilyHubPage = () => {
     const confirm = await Swal.fire({
       icon: 'warning',
       title: 'Leave Family?',
-      text: 'Type LEAVE to confirm removing yourself from this family tree.',
-      input: 'text',
-      inputPlaceholder: 'Type LEAVE',
+      text: 'Are you sure you want to leave this family?',
       showCancelButton: true,
       confirmButtonText: 'Leave family',
       cancelButtonText: 'Cancel',
       confirmButtonColor: '#dc2626',
-      preConfirm: (value) => {
-        if (String(value || '').trim().toUpperCase() !== 'LEAVE') {
-          Swal.showValidationMessage('Type LEAVE exactly to continue.');
-          return false;
-        }
-        return true;
-      },
+      focusCancel: true,
     });
 
     if (!confirm.isConfirmed) return;

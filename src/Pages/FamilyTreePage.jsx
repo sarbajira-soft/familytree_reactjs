@@ -2188,89 +2188,6 @@ const FamilyTreePage = () => {
     openStructuralDummyDialog("delete", person);
   }, [openStructuralDummyDialog]);
 
-  const escapeWarningHtml = (value) =>
-    String(value ?? "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/\"/g, "&quot;")
-      .replace(/'/g, "&#39;");
-
-  const buildRemoveMemberWarning = ({
-    currentPerson,
-    useFamilyRemovalFlow,
-    isExternalLinkedCard,
-    isSelfRemoval,
-  }) => {
-    const displayName = escapeWarningHtml(currentPerson?.name || "This member");
-    const normalizedNodeType = String(currentPerson?.nodeType || "member").toLowerCase();
-    const isAssociatedCard = normalizedNodeType === "associated";
-    const memberTypeLabel = currentPerson?.isAppUser ? "App User" : "Non-App User";
-    const bullets = [];
-    let title = "Remove This Member?";
-
-    if (useFamilyRemovalFlow) {
-      title = isSelfRemoval ? "Leave Family?" : "Remove From Family?";
-      bullets.push(`${displayName} will be removed from this family.`);
-      bullets.push(
-        "The account itself will not be deleted, but this family will stop treating the member as active.",
-      );
-      bullets.push(
-        "A Removed member slot will stay in the tree so parents, children, and spouse lines do not collapse.",
-      );
-      bullets.push(
-        currentPerson?.isAppUser
-          ? "Family-only content from that member becomes hidden from this family after removal."
-          : "This non-app member card will stop acting like an active family member after removal.",
-      );
-
-      if (isSelfRemoval) {
-        bullets.push("You will be taken out of the family and the page will refresh after success.");
-      }
-    } else if (isExternalLinkedCard) {
-      title = "Remove Linked Member?";
-      bullets.push(`${displayName} will be removed only from this family tree.`);
-      bullets.push("The real member will remain safe in their own family.");
-      bullets.push(
-        "If this was the last bridge between the two families, the linked-family connection can also be cleaned up.",
-      );
-      bullets.push(
-        "A placeholder slot may stay behind if the tree needs it to keep the structure stable.",
-      );
-    } else if (isAssociatedCard) {
-      title = "Remove Associated Member?";
-      bullets.push(`${displayName} will be removed only from this family tree.`);
-      bullets.push("The real member will remain safe in the source family.");
-      bullets.push(
-        "If no other association bridge remains, the associated-family connection can also be cleaned up.",
-      );
-      bullets.push(
-        "A placeholder slot may stay behind if the tree needs it to keep the structure stable.",
-      );
-    } else {
-      bullets.push(`${displayName} will be removed from this tree.`);
-      bullets.push(
-        "A Removed member slot may stay behind so the family structure does not break.",
-      );
-    }
-
-    return {
-      title,
-      html: `
-        <div style="text-align:left;line-height:1.5;">
-          <div style="margin-bottom:10px;font-weight:700;color:#1f2937;">
-            ${memberTypeLabel} · ${escapeWarningHtml(normalizedNodeType.replace(/_/g, " "))}
-          </div>
-          <div style="margin-bottom:10px;color:#4b5563;">
-            Please confirm after reviewing what will happen:
-          </div>
-          <ul style="margin:0 0 0 18px;padding:0;color:#111827;">
-            ${bullets.map((item) => `<li style="margin-bottom:8px;">${item}</li>`).join("")}
-          </ul>
-        </div>
-      `,
-    };
-  };
 
   const deletePerson = async (personId) => {
     if (!tree || !familyCodeToUse) return;
@@ -2317,66 +2234,69 @@ const FamilyTreePage = () => {
       sourceFamilyCode === normalizedTreeFamilyCode &&
       targetMemberId > 0;
 
-    const confirmWarning = buildRemoveMemberWarning({
-      currentPerson,
-      useFamilyRemovalFlow,
-      isExternalLinkedCard,
-      isSelfRemoval,
-    });
-
     const result = await Swal.fire({
       icon: "warning",
-      title: confirmWarning.title,
-      html: confirmWarning.html,
+      title: isSelfRemoval ? "Leave Family?" : "Remove Member?",
+      text: isSelfRemoval
+        ? "Are you sure you want to leave this family?"
+        : "Are you sure you want to remove this member from the family?",
       showCancelButton: true,
       confirmButtonText: isSelfRemoval ? "Leave family" : "Remove member",
       cancelButtonText: "Cancel",
+      confirmButtonColor: "#dc2626",
       focusCancel: true,
+      showLoaderOnConfirm: true,
+      allowOutsideClick: () => !Swal.isLoading(),
+      allowEscapeKey: () => !Swal.isLoading(),
+      preConfirm: async () => {
+        try {
+          let response;
+          if (useFamilyRemovalFlow) {
+            response = isSelfRemoval
+              ? await selfRemoveFromFamily(familyCodeToUse)
+              : await deleteFamilyMember(targetMemberId, familyCodeToUse);
+          } else {
+            response = await deletePersonApi(personId, familyCodeToUse, currentPerson?.nodeUid);
+          }
+
+          return response;
+        } catch (error) {
+          console.error("Error deleting person:", error);
+          Swal.showValidationMessage(
+            error?.message || "Unable to remove this member right now.",
+          );
+          return false;
+        }
+      },
     });
 
     if (!result.isConfirmed) {
       return;
     }
 
-    try {
-      let response;
-      if (useFamilyRemovalFlow) {
-        response = isSelfRemoval
-          ? await selfRemoveFromFamily(familyCodeToUse)
-          : await deleteFamilyMember(targetMemberId, familyCodeToUse);
-      } else {
-        response = await deletePersonApi(personId, familyCodeToUse, currentPerson?.nodeUid);
-      }
+    const response = result.value;
 
-      if (useFamilyRemovalFlow && isSelfRemoval) {
-        window.location.reload();
-        return;
-      }
-
-      await refreshTreeFromServer(
-        Number(personId) === Number(tree?.rootId) ? personId : tree?.rootId,
-      );
-      setSelectedPersonId(personId);
-
-      await Swal.fire({
-        icon: "success",
-        title: "Member Removed",
-        text:
-          response?.message ||
-          (useFamilyRemovalFlow
-            ? "The member was removed from the family and converted into a removed-member slot in the tree."
-            : "The member card was removed and an empty slot was left in the tree to protect the structure."),
-        timer: 2200,
-        showConfirmButton: false,
-      });
-    } catch (error) {
-      console.error("Error deleting person:", error);
-      await Swal.fire({
-        icon: "error",
-        title: "Remove Failed",
-        text: error?.message || "Unable to remove this member right now.",
-      });
+    if (useFamilyRemovalFlow && isSelfRemoval) {
+      window.location.reload();
+      return;
     }
+
+    await refreshTreeFromServer(
+      Number(personId) === Number(tree?.rootId) ? personId : tree?.rootId,
+    );
+    setSelectedPersonId(personId);
+
+    await Swal.fire({
+      icon: "success",
+      title: "Member Removed",
+      text:
+        response?.message ||
+        (useFamilyRemovalFlow
+          ? "The member was removed from the family and converted into a removed-member slot in the tree."
+          : "The member card was removed and an empty slot was left in the tree to protect the structure."),
+      timer: 2200,
+      showConfirmButton: false,
+    });
   };
   const downloadTreeData = async () => {
     // Download the tree as an image (PNG)

@@ -104,9 +104,10 @@ export default function LinkTreeModal({
   const receiverHasParents = receiverParents.length > 0;
   const parentAllowed = !senderHasParents;
   const siblingAllowed = senderHasParents && receiverHasParents;
+  const isFirstGenerationSender = Number.isFinite(Number(senderPerson?.generation)) && Number(senderPerson?.generation) <= 1;
 
   const relationshipOptions = React.useMemo(() => {
-    const baseOptions = senderHasParents ? ["sibling", "child"] : ["parent", "child"];
+    const baseOptions = isFirstGenerationSender ? ["sibling"] : senderHasParents ? ["sibling", "child"] : ["parent", "child"];
     const requestedOptions = Array.isArray(allowedRelationshipTypes)
       ? allowedRelationshipTypes
           .map((value) => String(value || "").trim().toLowerCase())
@@ -123,7 +124,7 @@ export default function LinkTreeModal({
     }
 
     return baseOptions;
-  }, [allowedRelationshipTypes, senderHasParents]);
+  }, [allowedRelationshipTypes, isFirstGenerationSender, senderHasParents]);
 
   const relationshipFieldLocked = relationshipOptions.length <= 1;
   const siblingModeActive =
@@ -1161,6 +1162,9 @@ export default function LinkTreeModal({
     </div>
   );
 }
+
+
+
 
 
 

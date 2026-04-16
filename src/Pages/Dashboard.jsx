@@ -218,8 +218,7 @@ const MiniEventCalendar = ({ events = [] }) => {
               const dateKey = getLocalDateKey(event.eventDate || event.date);
               const timeKey = event.eventTime || event.time || "time";
               const eventKey = `${event.id || title || "event"}_${dateKey}_${timeKey}_${index}`;
-              const dateDisplay = `${event.eventDate || event.date || ""}$$${event.eventTime ? " • " + event.eventTime : ""
-                }`;
+              const dateDisplay = `${event.eventDate || event.date || ""}${event.eventTime ? " • " + event.eventTime : ""}`;
               const location = event.location;
               const description = event.eventDescription || event.description;
 
@@ -250,7 +249,7 @@ const MiniEventCalendar = ({ events = [] }) => {
                     {dateDisplay.trim() && (
                       <p className="flex items-center gap-1 text-[11px] text-gray-600">
                         <FiCalendar size={11} />
-                        <span className="truncate">{dateDisplay.replace("$", "")}</span>
+                        <span className="truncate">{dateDisplay}</span>
                       </p>
                     )}
                     {location && (
@@ -974,3 +973,4 @@ Dashboard.propTypes = {
 };
 
 export default Dashboard;
+

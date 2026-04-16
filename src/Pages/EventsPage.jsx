@@ -237,6 +237,35 @@ const EventsPage = () => {
     setIsCreateFamilyModalOpen(false);
   };
 
+  const formatEventDate = (rawDate) => {
+    const cleaned = String(rawDate || '').replace(/\$/g, '').trim();
+    if (!cleaned) return '';
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(cleaned)) {
+      const [year, month, day] = cleaned.split('-').map(Number);
+      const parsed = new Date(Date.UTC(year, month - 1, day));
+      if (!Number.isNaN(parsed.getTime())) {
+        return new Intl.DateTimeFormat('en-US', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+          timeZone: 'UTC',
+        }).format(parsed);
+      }
+    }
+
+    const parsed = new Date(cleaned);
+    if (!Number.isNaN(parsed.getTime())) {
+      return new Intl.DateTimeFormat('en-US', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      }).format(parsed);
+    }
+
+    return cleaned;
+  };
+
   const displayedEvents = allEvents;
 
   const getEventTypeStyle = (eventType) => {
@@ -597,7 +626,7 @@ const EventsPage = () => {
                               <div>
                                 <p className="text-xs text-gray-500 dark:text-slate-400">Date & Time</p>
                                 <p className="text-sm font-semibold">
-                                  {event.date} {event.time && `• ${event.time}`}
+                                  {formatEventDate(event.date)} {event.time && `• ${event.time}`}
                                 </p>
                               </div>
                             </div>
@@ -773,3 +802,4 @@ const EventsPage = () => {
 };
 
 export default EventsPage;
+

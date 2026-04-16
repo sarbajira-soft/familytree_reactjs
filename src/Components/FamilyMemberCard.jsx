@@ -492,6 +492,22 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
     event?.stopPropagation?.();
     if (!memberId || !birthFamilyCode) return;
     const isSelf = Number(memberUserId) === Number(currentUser?.userId || currentUser?.id);
+
+    const confirmResult = await Swal.fire({
+      icon: 'warning',
+      title: isSelf ? 'Leave Family?' : 'Remove Member?',
+      text: isSelf
+        ? 'Are you sure you want to leave this family?'
+        : 'Are you sure you want to remove this member from the family?',
+      showCancelButton: true,
+      confirmButtonText: isSelf ? 'Leave family' : 'Remove member',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#dc2626',
+      focusCancel: true,
+    });
+
+    if (!confirmResult.isConfirmed) return;
+
     try {
       if (isSelf) {
         await selfRemoveFromFamily(birthFamilyCode);
@@ -1887,6 +1903,8 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
 };
 
 export default FamilyMemberCard;
+
+
 
 
 

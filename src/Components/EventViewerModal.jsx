@@ -20,6 +20,35 @@ const EventViewerModal = ({
 }) => {
   const [activeIndex, setActiveIndex] = useState(0);
 
+  const formatEventDate = (rawDate) => {
+    const cleaned = String(rawDate || '').replace(/\$/g, '').trim();
+    if (!cleaned) return '';
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(cleaned)) {
+      const [year, month, day] = cleaned.split('-').map(Number);
+      const parsed = new Date(Date.UTC(year, month - 1, day));
+      if (!Number.isNaN(parsed.getTime())) {
+        return new Intl.DateTimeFormat('en-US', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+          timeZone: 'UTC',
+        }).format(parsed);
+      }
+    }
+
+    const parsed = new Date(cleaned);
+    if (!Number.isNaN(parsed.getTime())) {
+      return new Intl.DateTimeFormat('en-US', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      }).format(parsed);
+    }
+
+    return cleaned;
+  };
+
   useEffect(() => {
     if (!isOpen) return;
     if (typeof onClose !== "function") return;
@@ -262,7 +291,7 @@ const EventViewerModal = ({
                       {event.title}
                     </div>
                     <div className="text-xs text-gray-500">
-                      {event.date} • {event.time}
+                      {formatEventDate(event.date)} • {event.time}
                     </div>
                     {event.location && (
                       <div className="text-xs text-gray-500 mt-1">
@@ -293,7 +322,7 @@ const EventViewerModal = ({
                     <div className="bg-white p-3 rounded-xl border border-gray-100">
                       <div className="text-xs text-gray-500">Date</div>
                       <div className="font-medium text-gray-800">
-                        {event.date}
+                        {formatEventDate(event.date)}
                       </div>
                     </div>
                     <div className="bg-white p-3 rounded-xl border border-gray-100">
@@ -436,3 +465,6 @@ const EventViewerModal = ({
 };
 
 export default EventViewerModal;
+
+
+

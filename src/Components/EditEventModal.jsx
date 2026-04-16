@@ -24,6 +24,8 @@ const EditEventModal = ({
   apiBaseUrl = import.meta.env.VITE_API_BASE_URL,
 }) => {
   const MAX_EVENT_TITLE_LENGTH = 50;
+  const MAX_EVENT_LOCATION_LENGTH = 250;
+  const MAX_EVENT_IMAGE_COUNT = 10;
   const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
   const EVENT_DATE_MIN = "1900-01-01";
   const EVENT_DATE_MAX = "2200-12-31";
@@ -71,6 +73,9 @@ const EditEventModal = ({
 
   const getImageKey = (file) => `${file?.name || ""}-${file?.size || 0}-${file?.lastModified || 0}`;
 
+  const getMaxImageCountError = () =>
+    `You can upload a maximum of ${MAX_EVENT_IMAGE_COUNT} images.`;
+
   useEffect(() => {
     setImagePreviews((prev) => {
       prev.forEach((url) => {
@@ -103,6 +108,7 @@ const EditEventModal = ({
     const normalizedTitle = String(title || "").trim();
     const normalizedDate = String(date || "").trim();
     const normalizedTime = String(time || "").trim();
+    const normalizedLocation = String(location || "").trim();
 
     if (!normalizedTitle) {
       nextErrors.title = "Event title is required.";
@@ -122,6 +128,14 @@ const EditEventModal = ({
       nextErrors.time = "Event time is required.";
     } else if (!/^\d{2}:\d{2}(:\d{2})?$/.test(normalizedTime)) {
       nextErrors.time = "Event time is invalid. Please choose a valid time.";
+    }
+
+    if (normalizedLocation.length > MAX_EVENT_LOCATION_LENGTH) {
+      nextErrors.location = `Location must be ${MAX_EVENT_LOCATION_LENGTH} characters or less.`;
+    }
+
+    if (existingImages.length + images.length > MAX_EVENT_IMAGE_COUNT) {
+      nextErrors.images = getMaxImageCountError();
     }
 
     setErrors(nextErrors);
@@ -206,6 +220,7 @@ const EditEventModal = ({
         .map((m) => {
           if (m === "eventTitle should not be empty") return "Event title is required.";
           if (m === "Event title must be at most 50 characters") return "Event title must be 50 characters or less.";
+          if (m === "Location must be 250 characters or less") return "Location must be 250 characters or less.";
           if (m === "eventDate should not be empty") return "Event date is required.";
           if (m === "eventDate must be a valid ISO 8601 date string") return "Event date is invalid. Please choose a valid date.";
           return m;
@@ -235,6 +250,9 @@ const EditEventModal = ({
     }
     if (status === 413 || lower.includes("file too large") || lower.includes("payload too large")) {
       return "Image is too large. Please upload images up to 5MB.";
+    }
+    if (lower.includes("too many files") || lower.includes("limit_file_count")) {
+      return getMaxImageCountError();
     }
     if (lower.includes("only image") || lower.includes("image files") || lower.includes("mimetype")) {
       return "Only image files (jpeg, jpg, png, gif, webp) are allowed.";
@@ -290,6 +308,15 @@ const EditEventModal = ({
           unique.push(f);
         }
       }
+      const allowedNewImageCount = Math.max(0, MAX_EVENT_IMAGE_COUNT - existingImages.length);
+      if (unique.length > allowedNewImageCount) {
+        setErrors((prevErrors) => ({
+          ...(prevErrors || {}),
+          images: getMaxImageCountError(),
+        }));
+        return unique.slice(0, allowedNewImageCount);
+      }
+      setErrors((prevErrors) => ({ ...(prevErrors || {}), images: undefined }));
       return unique;
     });
 
@@ -531,11 +558,22 @@ const EditEventModal = ({
               </label>
               <input
                 type="text"
+                maxLength={MAX_EVENT_LOCATION_LENGTH}
                 value={location}
-                onChange={(e) => setLocation(e.target.value)}
+                onChange={(e) => {
+                  setLocation(e.target.value.slice(0, MAX_EVENT_LOCATION_LENGTH));
+                  if (errors.location) setErrors((prev) => ({ ...prev, location: undefined }));
+                }}
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
                 placeholder="Enter event location..."
               />
+              {errors.location ? <p className="text-red-600 text-xs">{errors.location}</p> : null}
+              <div className="text-[11px] text-gray-500 flex items-center justify-between">
+                <span>Max {MAX_EVENT_LOCATION_LENGTH} characters.</span>
+                <span className={location.length > MAX_EVENT_LOCATION_LENGTH ? "text-red-600" : ""}>
+                  {location.length}/{MAX_EVENT_LOCATION_LENGTH}
+                </span>
+              </div>
             </div>
 
             {/* Description */}
@@ -652,7 +690,7 @@ const EditEventModal = ({
                     Add New Images
                   </p>
                   <p className="text-gray-500 text-sm text-center">
-                    Click to select multiple images
+                    Click to select up to {MAX_EVENT_IMAGE_COUNT} images
                   </p>
                 </div>
               )}

@@ -340,6 +340,49 @@ const FamilyManagementMobile = () => {
       });
   };
 
+  const handleInviteNow = async () => {
+    const familyCode = String(userInfo?.familyCode || familyData?.familyCode || '').trim();
+    if (!familyCode) {
+      await Swal.fire({
+        icon: 'warning',
+        title: 'Family Code Missing',
+        text: 'Please refresh and try inviting again.',
+      });
+      return;
+    }
+
+    const rawBaseUrl = import.meta.env.VITE_BASE_URL || window.location.origin;
+    const baseUrl = /^https?:\/\//i.test(rawBaseUrl)
+      ? rawBaseUrl
+      : `https://${rawBaseUrl}`;
+    const inviteLink = `${baseUrl.replace(/\/$/, '')}/edit-profile?familyCode=${encodeURIComponent(familyCode)}`;
+
+    try {
+      if (navigator?.share) {
+        await navigator.share({
+          title: 'Join our family tree',
+          text: 'Join our family tree using this invite link.',
+          url: inviteLink,
+        });
+        return;
+      }
+
+      await navigator.clipboard.writeText(inviteLink);
+      await Swal.fire({
+        icon: 'success',
+        title: 'Invite Link Copied',
+        text: 'The family invite link has been copied. You can share it with your relatives now.',
+      });
+    } catch (error) {
+      if (error?.name === 'AbortError') return;
+      await Swal.fire({
+        icon: 'error',
+        title: 'Invite Failed',
+        text: 'Unable to start the invite flow right now. Please try again.',
+      });
+    }
+  };
+
   const handleLeaveFamily = async () => {
     const familyCode = userInfo?.familyCode || familyData?.familyCode;
     const accessToken = token || getToken();
@@ -374,20 +417,12 @@ const FamilyManagementMobile = () => {
     const confirm = await Swal.fire({
       icon: 'warning',
       title: 'Leave Family?',
-      text: 'Type LEAVE to confirm removing yourself from this family tree.',
-      input: 'text',
-      inputPlaceholder: 'Type LEAVE',
+      text: 'Are you sure you want to leave this family?',
       showCancelButton: true,
       confirmButtonText: 'Leave family',
       cancelButtonText: 'Cancel',
       confirmButtonColor: '#dc2626',
-      preConfirm: (value) => {
-        if (String(value || '').trim().toUpperCase() !== 'LEAVE') {
-          Swal.showValidationMessage('Type LEAVE exactly to continue.');
-          return false;
-        }
-        return true;
-      },
+      focusCancel: true,
     });
 
     if (!confirm.isConfirmed) return;
@@ -648,7 +683,7 @@ const FamilyManagementMobile = () => {
                               </button>
                               <button
                                 type="button"
-                                onClick={() => navigate("/pending-request")}
+                                onClick={handleInviteNow}
                                 className="w-full px-6 py-3 text-sm font-bold text-white bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-700 rounded-2xl hover:scale-105 active:scale-95 transition-all duration-300 shadow-[0_8px_20px_rgba(99,102,241,0.3)] hover:shadow-[0_12px_25px_rgba(99,102,241,0.4)]"
                               >
                                 Invite Now
@@ -768,4 +803,5 @@ const FamilyManagementMobile = () => {
 };
 
 export default FamilyManagementMobile;
+
 
