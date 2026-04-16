@@ -3121,7 +3121,7 @@ const FamilyTreePage = () => {
               {canEdit && (
                 <>
                   <div
-                    className="sm:hidden fixed left-0 right-0 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 shadow-sm z-50 px-3 py-2"
+                    className="sm:hidden fixed left-0 right-0 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 shadow-sm z-40 px-3 py-2"
                     style={{
                       // Position this header just below the global app header
                       // while also respecting any safe-area inset at the top
