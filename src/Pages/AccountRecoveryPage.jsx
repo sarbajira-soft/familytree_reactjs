@@ -268,7 +268,7 @@ const AccountRecoveryPage = () => {
       <div className="w-full max-w-lg bg-white border border-gray-200 rounded-2xl shadow-sm p-6 sm:p-8">
         <h1 className="text-2xl font-bold text-gray-900">Account Recovery</h1>
         <p className="text-sm text-gray-600 mt-2">
-          Recover a deleted account within the 30-day window.
+          Recover a deleted account within the 60-day window.
         </p>
 
         {recoverable === false ? (

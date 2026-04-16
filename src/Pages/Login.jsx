@@ -206,7 +206,7 @@ const Login = () => {
 
   return (
     <div
-      className="w-full bg-gray-50 flex items-center justify-center px-4 relative overflow-y-auto"
+      className="w-full bg-gray-50 dark:bg-slate-950 flex items-center justify-center px-4 relative overflow-y-auto"
       style={{ minHeight: '100dvh', paddingTop: 'env(safe-area-inset-top, 0px)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
     >
       <div className="w-full max-w-md px-4 sm:px-6 lg:px-8">
@@ -217,8 +217,8 @@ const Login = () => {
 
         {/* Title */}
         <div className="text-center mb-9">
-          <h2 className="text-2xl font-bold text-gray-800">Welcome back!!!</h2>
-          <p className="text-sm text-gray-500 mt-1">
+          <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Welcome back!!!</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             Please enter your login details
           </p>
         </div>
@@ -244,7 +244,7 @@ const Login = () => {
           <div>
             <label
               htmlFor="username"
-              className="block text-sm font-medium text-gray-700 mb-1"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
             >
               Email or Phone
             </label>
@@ -254,7 +254,7 @@ const Login = () => {
               type="text"
               value={formData.username}
               onChange={(e) => handleChange("username", e.target.value)}
-              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 ${
+              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 dark:bg-slate-900 dark:text-white dark:border-slate-700 dark:placeholder-gray-400 ${
                 errors.username
                   ? "border-red-500 focus:ring-red-300"
                   : "border-gray-300 focus:ring-[var(--color-primary)]"
@@ -270,7 +270,7 @@ const Login = () => {
           <div className="relative">
             <label
               htmlFor="password"
-              className="block text-sm font-medium text-gray-700 mb-1"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
             >
               Password
             </label>
@@ -280,7 +280,7 @@ const Login = () => {
               type={showPassword ? "text" : "password"}
               value={formData.password}
               onChange={(e) => handleChange("password", e.target.value)}
-              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 ${
+              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 dark:bg-slate-900 dark:text-white dark:border-slate-700 dark:placeholder-gray-400 ${
                 errors.password
                   ? "border-red-500 focus:ring-red-300"
                   : "border-gray-300 focus:ring-[var(--color-primary)]"
@@ -348,7 +348,7 @@ const Login = () => {
                 onChange={(e) => setStayLoggedIn(e.target.checked)}
                 className="rounded border-gray-300 text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
               />
-              <span>Stay logged in</span>
+              <span className="dark:text-gray-300">Stay logged in</span>
             </label>
             <a
               href="/forgot-password"

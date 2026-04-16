@@ -2,6 +2,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 
 import { UserPlus, Users, Edit, Trash2, Plus, User, UserMinus, Link2, Info } from 'lucide-react';
+import { useTheme } from '../../Contexts/ThemeContext';
 
 
 
@@ -50,6 +51,8 @@ const RadialMenu = ({
     onClose = () => {},
 
 } = {}) => {
+    const { theme } = useTheme();
+    const isDark = theme === 'dark';
 
     if (!isActive) return null;
 
@@ -182,9 +185,9 @@ const RadialMenu = ({
 
                     zIndex: 1000,
 
-                    background: 'rgba(255,255,255,0.97)',
+                    background: isDark ? 'rgba(15,23,42,0.97)' : 'rgba(255,255,255,0.97)',
 
-                    border: '1px solid #e5e7eb',
+                    border: isDark ? '1px solid #334155' : '1px solid #e5e7eb',
 
                     borderRadius: isMobile ? 22 : 14,
 
@@ -236,8 +239,8 @@ const RadialMenu = ({
                             left: '50%',
                             width: 12,
                             height: 12,
-                            background: '#dbeafe',
-                            border: '1px solid #93c5fd',
+                            background: isDark ? '#1e293b' : '#dbeafe',
+                            border: isDark ? '1px solid #334155' : '1px solid #93c5fd',
                             transform: 'translateX(-50%) rotate(45deg)',
                             boxShadow: '0 6px 14px rgba(15,23,42,0.12)',
                             bottom: placedAbove ? -6 : 'auto',
@@ -260,7 +263,7 @@ const RadialMenu = ({
 
                         minWidth: isMobile ? 120 : itemWidth,
 
-                        background: '#f8fafc',
+                        background: isDark ? '#1e293b' : '#f8fafc',
 
                         borderRadius: 12,
 
@@ -272,9 +275,9 @@ const RadialMenu = ({
 
                         justifyContent: 'center',
 
-                        boxShadow: '0 1px 3px rgba(15,23,42,0.08)',
+                        boxShadow: isDark ? '0 1px 3px rgba(0,0,0,0.3)' : '0 1px 3px rgba(15,23,42,0.08)',
 
-                        border: '1px solid #e6edf3',
+                        border: isDark ? '1px solid #334155' : '1px solid #e6edf3',
 
                         cursor: isDisabled ? 'not-allowed' : 'pointer',
 
@@ -333,11 +336,11 @@ const RadialMenu = ({
 
                                 if (isDisabled) return;
 
-                                e.currentTarget.style.background = '#e0f2fe';
+                                e.currentTarget.style.background = isDark ? '#334155' : '#e0f2fe';
 
-                                e.currentTarget.style.boxShadow = '0 2px 8px rgba(15,23,42,0.14)';
+                                e.currentTarget.style.boxShadow = isDark ? '0 2px 8px rgba(0,0,0,0.4)' : '0 2px 8px rgba(15,23,42,0.14)';
 
-                                e.currentTarget.style.border = '1.5px solid #2563eb';
+                                e.currentTarget.style.border = isDark ? '1.5px solid #60a5fa' : '1.5px solid #2563eb';
 
                             }}
 
@@ -345,17 +348,17 @@ const RadialMenu = ({
 
                                 if (isDisabled) return;
 
-                                e.currentTarget.style.background = '#f8fafc';
+                                e.currentTarget.style.background = isDark ? '#1e293b' : '#f8fafc';
 
-                                e.currentTarget.style.boxShadow = '0 1px 3px rgba(15,23,42,0.08)';
+                                e.currentTarget.style.boxShadow = isDark ? '0 1px 3px rgba(0,0,0,0.3)' : '0 1px 3px rgba(15,23,42,0.08)';
 
-                                e.currentTarget.style.border = '1px solid #e6edf3';
+                                e.currentTarget.style.border = isDark ? '1px solid #334155' : '1px solid #e6edf3';
 
                             }}
 
                         >
 
-                            <Icon size={isMobile ? 22 : 18} color={isDisabled ? "#6b7280" : "#2563eb"} style={{ marginBottom: isMobile ? 4 : 2 }} />
+                            <Icon size={isMobile ? 22 : 18} color={isDisabled ? (isDark ? "#64748b" : "#6b7280") : (isDark ? "#60a5fa" : "#2563eb")} style={{ marginBottom: isMobile ? 4 : 2 }} />
 
                             <span style={{
 
@@ -363,7 +366,7 @@ const RadialMenu = ({
 
                                 fontWeight: 700,
 
-                                color: '#222',
+                                color: isDark ? '#e2e8f0' : '#222',
 
                                 textAlign: 'center',
 

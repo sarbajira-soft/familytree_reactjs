@@ -301,6 +301,8 @@ const FamilyGalleryPage = () => {
         rounded-full border border-gray-300 
         text-sm focus:outline-none 
         focus:ring-2 focus:ring-primary-400
+        dark:bg-slate-800
+        dark:text-white
       "
               />
             </div>

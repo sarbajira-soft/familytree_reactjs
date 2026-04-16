@@ -104,6 +104,7 @@ const EventsPage = () => {
           time: item.eventTime,
           location: item.location,
           createdBy: item.createdBy ?? item.userId ?? item.created_by,
+          // author: item.createdByName ?? item.creatorName ?? item.userName ?? item.author ?? "Unknown",
           eventType: item.eventType || "custom",
           eventImages:
             item.eventImages && item.eventImages.length > 0

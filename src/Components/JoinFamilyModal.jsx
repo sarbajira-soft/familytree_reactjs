@@ -12,6 +12,7 @@ const JoinFamilyModal = ({ isOpen, onClose, token, onFamilyJoined }) => {
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [suggestedFamilies, setSuggestedFamilies] = useState([]);
   const [activeTab, setActiveTab] = useState('suggested');
+  const [error, setError] = useState('');
 
   const extractDigits = (val) => String(val || '').replace(/\D+/g, '');
   const formatFamilyCode = (digits) => {
@@ -40,6 +41,7 @@ const JoinFamilyModal = ({ isOpen, onClose, token, onFamilyJoined }) => {
     setFamilyCodeDigits('');
     setSuggestedFamilies([]);
     setActiveTab('suggested');
+    setError('');
 
     const loadSuggestedFamilies = async () => {
       if (!accessToken || !currentUserId) return;
@@ -109,14 +111,11 @@ const JoinFamilyModal = ({ isOpen, onClose, token, onFamilyJoined }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
 
     const digits = extractDigits(familyCodeDigits);
     if (digits.length !== 6) {
-      Swal.fire({
-        icon: 'error',
-        title: 'Family Code Required',
-        text: 'Please enter a valid 6-digit family code to join.',
-      });
+      setError('Please enter a valid 6-digit family code to join.');
       return;
     }
 
@@ -136,11 +135,8 @@ const JoinFamilyModal = ({ isOpen, onClose, token, onFamilyJoined }) => {
       }
       onClose();
     } catch (err) {
-      Swal.fire({ 
-        icon: 'error', 
-        title: 'Failed to send join request', 
-        text: err?.message || 'Please try again.' 
-      });
+      const message = err?.message || 'Failed to send join request. Please try again.';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -290,21 +286,30 @@ const JoinFamilyModal = ({ isOpen, onClose, token, onFamilyJoined }) => {
                     <input
                       type="text"
                       value={familyCodeDigits}
-                      onChange={(e) => setFamilyCodeDigits(extractDigits(e.target.value).slice(0, 6))}
+                      onChange={(e) => {
+                        setFamilyCodeDigits(extractDigits(e.target.value).slice(0, 6));
+                        if (error) setError('');
+                      }}
                       onPaste={(e) => {
                         const text = e.clipboardData?.getData('text') || '';
                         const digits = extractDigits(text).slice(0, 6);
                         if (digits) {
                           e.preventDefault();
                           setFamilyCodeDigits(digits);
+                          if (error) setError('');
                         }
                       }}
                       required
-                      className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      className={`w-full border dark:bg-black dark:text-white rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary-500 focus:border-transparent ${
+                        error ? 'border-red-500 focus:ring-red-500' : 'border-gray-300'
+                      }`}
                       placeholder="Enter family code"
                       inputMode="numeric"
                       autoComplete="off"
                     />
+                    {error && (
+                      <p className="text-red-500 text-xs mt-2">{error}</p>
+                    )}
 
                     <div className="text-xs text-gray-600 mt-2">
                       Full code: <span className="font-semibold">{formattedFamilyCode || 'FAM______'}</span>
