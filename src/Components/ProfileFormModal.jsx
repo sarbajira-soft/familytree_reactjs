@@ -4,6 +4,7 @@ import Swal from 'sweetalert2';
 import { FiArrowLeft } from 'react-icons/fi';
 import { toast } from 'react-toastify';
 import { useUser } from '../Contexts/UserContext';
+import { useTheme } from '../Contexts/ThemeContext';
 
 import { clearAuthData, getToken } from '../utils/auth';
 import { authFetchResponse } from '../utils/authFetch';
@@ -46,6 +47,8 @@ const ProfileFormModal = ({
   const mobileRef = useRef(null);
   const profileFileInputRef = useRef(null);
   const { userInfo, userLoading } = useUser();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
 
   useEffect(() => {
     if (!isOpen) return;
@@ -1200,12 +1203,12 @@ const ProfileFormModal = ({
   const lockEmailAndMobile = mode === 'edit-profile' || mode === 'edit-member';
   const showFieldPrivacyControls = mode === 'edit-profile';
 
-  const inputClassName = (fieldName) => `w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-1 text-sm font-inter text-gray-800 placeholder-gray-400 ${
-    errors[fieldName] ? 'border-red-500 focus:ring-red-300' : 'border-gray-300 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)]'
+  const inputClassName = (fieldName) => `w-full px-4 py-2.5 border rounded-lg focus:outline-none focus:ring-1 text-sm font-inter text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 dark:bg-slate-900 dark:border-slate-700 ${
+    errors[fieldName] ? 'border-red-500 focus:ring-red-300' : 'border-gray-300 dark:border-slate-700 focus:ring-[var(--color-primary)] focus:border-[var(--color-primary)]'
   }`;
 
-  const sectionClassName = "bg-white p-6 rounded-lg space-y-4 border border-gray-200";
-  const labelClassName = "block text-sm font-medium text-gray-700 mb-1";
+  const sectionClassName = "bg-white dark:bg-slate-900 p-6 rounded-lg space-y-4 border border-gray-200 dark:border-slate-700";
+  const labelClassName = "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1";
 
   const selectedRelFromApiUI = dropdownData.religions.find(
     (r) => String(r.id) === String(formData.religionId)
@@ -1219,15 +1222,15 @@ const ProfileFormModal = ({
 
   const containerClassName = isPageVariant
     ? "w-full max-w-5xl mx-auto"
-    : "bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto";
+    : "bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto";
 
   const headerClassName = isPageVariant
     ? "flex justify-between items-center mb-4 sm:mb-6"
-    : "flex justify-between items-center p-5 border-b border-gray-200 sticky top-0 bg-white z-10";
+    : "flex justify-between items-center p-5 border-b border-gray-200 dark:border-slate-700 sticky top-0 bg-white dark:bg-slate-900 z-10";
 
   const titleClassName = isPageVariant
-    ? "text-xl sm:text-2xl font-bold text-gray-800"
-    : "text-2xl font-bold text-gray-800";
+    ? "text-xl sm:text-2xl font-bold text-gray-800 dark:text-white"
+    : "text-2xl font-bold text-gray-800 dark:text-white";
 
   const contentWrapperClassName = isPageVariant
     ? ""
@@ -1254,7 +1257,7 @@ const ProfileFormModal = ({
           {!isPageVariant && (
             <button
               onClick={onClose}
-              className="bg-unset p-2 rounded-full hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700"
+              className="bg-unset p-2 rounded-full hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
               aria-label="Close modal"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1290,7 +1293,7 @@ const ProfileFormModal = ({
 
             {/* Profile Image Section */}
             <div className={sectionClassName}>
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Profile Picture</h3>
+              <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Profile Picture</h3>
               <div className="flex flex-col sm:flex-row items-center gap-6">
                 <button
                   type="button"
@@ -1298,7 +1301,7 @@ const ProfileFormModal = ({
                   className="relative group focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-opacity-50 rounded-lg"
                   title="Change profile photo"
                 >
-                  <div className="w-32 h-32 rounded-lg border-2 border-gray-200 overflow-hidden shadow-sm flex items-center justify-center bg-gray-100">
+                  <div className="w-32 h-32 rounded-lg border-2 border-gray-200 dark:border-slate-700 overflow-hidden shadow-sm flex items-center justify-center bg-gray-100 dark:bg-slate-800">
                     {formData.profileImageUrl || formData.profileUrl ? (
                       <img
                         src={formData.profileImageUrl || formData.profileUrl}
@@ -1307,7 +1310,7 @@ const ProfileFormModal = ({
                         onError={(e) => { e.target.onerror = null; e.target.src = 'https://placehold.co/128x128/cccccc/ffffff?text=No+Image'; }}
                       />
                     ) : (
-                      <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-12 h-12 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                       </svg>
                     )}
@@ -1342,7 +1345,7 @@ const ProfileFormModal = ({
 
             {/* Account Information Section */}
             <div className={sectionClassName}>
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Account Information</h3>
+              <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Account Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="email" className={labelClassName}>
@@ -1355,14 +1358,14 @@ const ProfileFormModal = ({
                     value={formData.email || ''} // FIXED: Ensure never undefined
                     onChange={handleChange}
                     disabled={lockEmailAndMobile}
-                    className={`${inputClassName('email')} ${lockEmailAndMobile ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                    className={`${inputClassName('email')} ${lockEmailAndMobile ? 'bg-gray-100 dark:bg-slate-800 cursor-not-allowed' : ''}`}
                     placeholder="your@email.com"
                     maxLength={255}
                   />
                   {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
                   {showFieldPrivacyControls && (
                     <div className="mt-3">
-                      <label htmlFor="emailPrivacy" className="block text-xs font-medium text-gray-600 mb-1">
+                      <label htmlFor="emailPrivacy" className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                         Email Visibility
                       </label>
                       <select
@@ -1386,7 +1389,7 @@ const ProfileFormModal = ({
                   </label>
                   <PhoneInput
                     specialLabel={""}
-                    inputClass={errors.mobile ? 'border border-red-500 focus:border-red-500' : 'border border-gray-300'}
+                    inputClass={errors.mobile ? 'border border-red-500 focus:border-red-500' : 'border border-gray-300 dark:border-slate-700 dark:bg-slate-900 dark:text-white'}
                     country={'in'}
                     value={getFullMobile(formData.countryCode || '+91', formData.mobile || '')}
                     onChange={(value, data) => handleMobileChange(value, data, 'mobile')}
@@ -1404,15 +1407,20 @@ const ProfileFormModal = ({
                       height: '42px',
                       fontSize: '14px',
                       paddingLeft: '48px',
-                      border: `1px solid ${errors.mobile ? '#ef4444' : '#d1d5db'}`,
+                      border: `1px solid ${errors.mobile ? '#ef4444' : isDark ? '#334155' : '#d1d5db'}`,
                       borderRadius: '8px',
-                      backgroundColor: lockEmailAndMobile ? '#f3f4f6' : 'white',
+                      backgroundColor: lockEmailAndMobile
+                        ? (isDark ? '#1e293b' : '#f3f4f6')
+                        : (isDark ? '#0f172a' : 'white'),
+                      color: isDark ? '#ffffff' : '#1f2937',
                     }}
                     buttonStyle={{
-                      border: `1px solid ${errors.mobile ? '#ef4444' : '#d1d5db'}`,
+                      border: `1px solid ${errors.mobile ? '#ef4444' : isDark ? '#334155' : '#d1d5db'}`,
                       borderRight: 'none',
                       borderRadius: '8px 0 0 8px',
-                      backgroundColor: lockEmailAndMobile ? '#f3f4f6' : 'white',
+                      backgroundColor: lockEmailAndMobile
+                        ? (isDark ? '#1e293b' : '#f3f4f6')
+                        : (isDark ? '#0f172a' : 'white'),
                     }}
                   />
                   {errors.mobile && <p className="text-red-500 text-xs mt-1">{errors.mobile}</p>}
@@ -1456,7 +1464,7 @@ const ProfileFormModal = ({
                                   : 'Active'
                           }
                           readOnly
-                          className={`${inputClassName('status')} bg-gray-100 cursor-not-allowed`}
+                          className={`${inputClassName('status')} bg-gray-100 dark:bg-slate-800 cursor-not-allowed`}
                         />
                       ) : (
                         <select
@@ -1491,7 +1499,7 @@ const ProfileFormModal = ({
                                 : 'Member'
                           }
                           readOnly
-                          className={`${inputClassName('role')} bg-gray-100 cursor-not-allowed`}
+                          className={`${inputClassName('role')} bg-gray-100 dark:bg-slate-800 cursor-not-allowed`}
                         />
                       ) : (
                         <select
@@ -1681,7 +1689,7 @@ const ProfileFormModal = ({
 
             {/* Personal Information Section */}
             <div className={sectionClassName}>
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Personal Information</h3>
+              <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Personal Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="firstName" className={labelClassName}>
@@ -1762,7 +1770,7 @@ const ProfileFormModal = ({
                               });
                             }
                           }}
-                          className="text-gray-400 hover:text-gray-600 transition-colors duration-200 p-1 rounded-full hover:bg-gray-100"
+                          className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors duration-200 p-1 rounded-full hover:bg-gray-100 dark:hover:bg-slate-800"
                         >
                           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1796,7 +1804,7 @@ const ProfileFormModal = ({
                     type="text"
                     value={formData.age || ''} // FIXED: Ensure never undefined
                     readOnly
-                    className={`${inputClassName('age')} bg-gray-100 cursor-not-allowed`}
+                    className={`${inputClassName('age')} bg-gray-100 dark:bg-slate-800 cursor-not-allowed`}
                   />
                 </div>
                 {showFieldPrivacyControls && (
@@ -1821,7 +1829,7 @@ const ProfileFormModal = ({
 
             {/* Contact Information Section */}
             <div className={sectionClassName}>
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Contact Information</h3>
+              <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Contact Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
                   <label htmlFor="addressLine1" className={labelClassName}>
@@ -1936,7 +1944,7 @@ const ProfileFormModal = ({
 
             {/* Family Information Section */}
             <div className={sectionClassName}>
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Family Information</h3>
+              <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Family Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="maritalStatus" className={labelClassName}>

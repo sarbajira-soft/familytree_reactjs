@@ -260,10 +260,10 @@ const CreateFamilyModal = ({ isOpen, onClose, token, onFamilyCreated, mode = "cr
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 font-inter">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg relative max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-lg relative max-h-[90vh] overflow-hidden flex flex-col">
         {showSuccess && (
-          <div className="absolute inset-0 bg-white/95 backdrop-blur-sm flex flex-col items-center justify-center z-50 p-4 sm:p-6 text-center animate-fadeIn">
-            <div className="bg-white rounded-3xl p-6 sm:p-10 shadow-2xl max-w-sm w-full border-4 border-green-500 transform animate-scaleIn">
+          <div className="absolute inset-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm flex flex-col items-center justify-center z-50 p-4 sm:p-6 text-center animate-fadeIn">
+            <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 sm:p-10 shadow-2xl max-w-sm w-full border-4 border-green-500 transform animate-scaleIn">
               <div className="w-20 h-20 sm:w-24 sm:h-24 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center mb-5 sm:mb-6 mx-auto shadow-lg animate-bounce">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -281,11 +281,11 @@ const CreateFamilyModal = ({ isOpen, onClose, token, onFamilyCreated, mode = "cr
                 </svg>
               </div>
 
-              <h3 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-3">
+              <h3 className="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-white mb-3">
                 Success!
               </h3>
 
-              <p className="text-gray-600 mb-6 text-base sm:text-lg">
+              <p className="text-gray-600 dark:text-gray-300 mb-6 text-base sm:text-lg">
                 {mode === 'edit' ? 'Family updated successfully!' : 'Family created successfully!'}
               </p>
 
@@ -313,7 +313,7 @@ const CreateFamilyModal = ({ isOpen, onClose, token, onFamilyCreated, mode = "cr
 
         <form onSubmit={handleSubmit} className="space-y-4 flex flex-col p-6 overflow-y-auto">
           <div>
-            <label className="block mb-1 font-medium text-gray-700">Family Name</label>
+            <label className="block mb-1 font-medium text-gray-700 dark:text-gray-300">Family Name</label>
             <input
               type="text"
               value={familyName}
@@ -331,7 +331,7 @@ const CreateFamilyModal = ({ isOpen, onClose, token, onFamilyCreated, mode = "cr
               }}
               maxLength={MAX_FAMILY_NAME_LENGTH}
               required
-              className="w-full border rounded-lg px-4 py-2 focus:ring-primary-500 focus:outline-none"
+              className="w-full border border-gray-300 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder-gray-400 rounded-lg px-4 py-2 focus:ring-primary-500 focus:outline-none"
               placeholder="The Singhs"
             />
             {familyNameError ? (
@@ -340,7 +340,7 @@ const CreateFamilyModal = ({ isOpen, onClose, token, onFamilyCreated, mode = "cr
           </div>
 
           <div>
-            <label className="block mb-1 font-medium text-gray-700">Family Bio</label>
+            <label className="block mb-1 font-medium text-gray-700 dark:text-gray-300">Family Bio</label>
             <textarea
               value={familyBio}
               onChange={(e) => {
@@ -358,7 +358,7 @@ const CreateFamilyModal = ({ isOpen, onClose, token, onFamilyCreated, mode = "cr
               rows={3}
               maxLength={MAX_FAMILY_BIO_LENGTH}
               required
-              className="w-full border rounded-lg px-4 py-2 focus:ring-primary-500 focus:outline-none"
+              className="w-full border border-gray-300 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:placeholder-gray-400 rounded-lg px-4 py-2 focus:ring-primary-500 focus:outline-none"
               placeholder="A united and respected family from Chennai."
             />
             {familyBioError ? (
@@ -367,27 +367,27 @@ const CreateFamilyModal = ({ isOpen, onClose, token, onFamilyCreated, mode = "cr
           </div>
 
           <div>
-            <label className="block mb-1 font-medium text-gray-700">Family Code</label>
+            <label className="block mb-1 font-medium text-gray-700 dark:text-gray-300">Family Code</label>
             <input
                 type="text"
                 value={familyCode}
                 readOnly
-                className="w-full border rounded-lg px-4 py-2 bg-gray-100 text-gray-700 focus:outline-none cursor-not-allowed"
+                className="w-full border border-gray-300 dark:border-slate-700 rounded-lg px-4 py-2 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 focus:outline-none cursor-not-allowed"
                 placeholder="FAM001122"
                 />
 
           </div>
 
           <div>
-            <label className="block mb-1 font-medium text-gray-700">Family Photo (optional)</label>
+            <label className="block mb-1 font-medium text-gray-700 dark:text-gray-300">Family Photo (optional)</label>
             <div
-              className="w-full h-32 border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center cursor-pointer"
+              className="w-full h-32 border-2 border-dashed border-gray-300 dark:border-slate-600 rounded-xl flex items-center justify-center cursor-pointer dark:hover:bg-slate-800/50 transition-colors"
               onClick={() => document.getElementById('family-image-input').click()}
             >
               {preview ? (
                 <img src={preview} alt="Preview" className="max-h-full max-w-full object-contain rounded-xl" />
               ) : (
-                <div className="text-center text-gray-500">
+                <div className="text-center text-gray-500 dark:text-gray-400">
                   <FiImage size={30} className="mx-auto mb-2" />
                   <p>Click to upload photo</p>
                 </div>

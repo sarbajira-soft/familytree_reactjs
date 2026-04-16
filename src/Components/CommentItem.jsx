@@ -259,7 +259,7 @@ const CommentItem = ({
                 value={replyText}
                 onChange={(e) => setReplyText(e.target.value)}
                 placeholder="Write a reply..."
-                className="flex-1 w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-400 text-sm resize-none"
+                className="flex-1 w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-400  text-sm resize-none dark:text-white dark:bg-slate-800"
                 rows="2"
                 disabled={isLoading}
               />

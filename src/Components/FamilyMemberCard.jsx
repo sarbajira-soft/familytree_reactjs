@@ -837,7 +837,7 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      const inviteLink = `${window.location.origin}/edit-profile?familyCode=${encodeURIComponent(familyCode)}&memberId=${member.memberId}`;
+                      const inviteLink = `${ import.meta.env.VITE_BASE_URL}/edit-profile?familyCode=${encodeURIComponent(familyCode)}&memberId=${member.memberId}`;
                       const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(`Join our family tree! Click here to complete your profile: ${inviteLink}`)}`;
                       window.open(whatsappUrl, '_blank');
                     }}

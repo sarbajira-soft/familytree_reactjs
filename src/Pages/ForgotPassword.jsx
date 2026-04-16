@@ -45,7 +45,7 @@ const ForgotPassword = () => {
   };
 
   return (
-    <div className="min-h-screen w-full bg-gray-50 flex items-center justify-center px-4">
+    <div className="min-h-screen w-full bg-gray-50 dark:bg-slate-950 flex items-center justify-center px-4">
       <div className="w-full max-w-md px-4 sm:px-6 lg:px-8">
         {/* Logo */}
         <div className="flex justify-center mb-1">
@@ -54,8 +54,8 @@ const ForgotPassword = () => {
 
         {/* Title */}
         <div className="text-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-800">Forgot Password</h2>
-          <p className="text-sm text-gray-500 mt-1">
+          <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Forgot Password</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             Enter your email to receive an OTP
           </p>
         </div>
@@ -74,7 +74,7 @@ const ForgotPassword = () => {
         {/* Email Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Email Address
             </label>
             <input
@@ -82,7 +82,7 @@ const ForgotPassword = () => {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+              className="w-full px-4 py-3 border border-gray-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] dark:bg-slate-900 dark:text-white dark:placeholder-gray-400"
               placeholder="example@email.com"
             />
           </div>

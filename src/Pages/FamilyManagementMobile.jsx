@@ -47,6 +47,25 @@ const FamilyManagementMobile = () => {
   const [inviteCopySuccess, setInviteCopySuccess] = useState(false);
   const [leavingFamily, setLeavingFamily] = useState(false);
 
+  // Handle mobile back button for CreateFamilyModal
+  useEffect(() => {
+    if (!isCreateFamilyModalOpen) return;
+    if (!window.__appModalBackStack) window.__appModalBackStack = [];
+
+    const handler = () => {
+      setIsCreateFamilyModalOpen(false);
+    };
+
+    window.__appModalBackStack.push(handler);
+
+    return () => {
+      const stack = window.__appModalBackStack;
+      if (!Array.isArray(stack)) return;
+      const idx = stack.lastIndexOf(handler);
+      if (idx >= 0) stack.splice(idx, 1);
+    };
+  }, [isCreateFamilyModalOpen]);
+
   const currentFamilyCode = normalizeFamilyCode(familyData?.familyCode || userInfo?.familyCode);
   const isFamilyCreator = Number(familyData?.createdBy || 0) === Number(userInfo?.userId || 0);
   const isOwnFamilyAdmin = Boolean(

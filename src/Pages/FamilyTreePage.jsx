@@ -3739,8 +3739,9 @@ const FamilyTreePage = () => {
             />
 
             {structuralDummyDialog.isOpen && (
-              <div className="fixed inset-0 z-[1200] flex items-end justify-center bg-slate-950/50 p-3 backdrop-blur-sm sm:items-center sm:p-6">
-                <div className="w-full max-w-2xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.24)]">
+              <div className="fixed inset-0 z-[1200] flex items-start sm:items-center justify-center bg-slate-950/50 px-2 sm:px-4 pt-8 pb-24 sm:pt-4 sm:pb-6 backdrop-blur-sm">
+                <div className="w-full max-w-2xl overflow-hidden rounded-2xl sm:rounded-3xl border border-slate-200 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.24)]"
+                     style={{ maxHeight: "calc(100vh - 140px)" }}>
                   <div className="flex items-start justify-between gap-4 bg-primary-600 px-5 py-4 text-white">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-100">
@@ -3768,7 +3769,7 @@ const FamilyTreePage = () => {
                     </button>
                   </div>
 
-                  <div className="space-y-5 p-5 sm:p-6">
+                  <div className="space-y-5 p-5 sm:p-6 overflow-y-auto" style={{ maxHeight: "calc(100vh - 240px)" }}>
                     <div className="grid gap-3 sm:grid-cols-3">
                       <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -3967,7 +3968,7 @@ const FamilyTreePage = () => {
                             </div>
                           )}
 
-                        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                        <div className="flex flex-col-reverse pb-5 gap-3 sm:flex-row sm:justify-end">
                           <button
                             type="button"
                             onClick={closeStructuralDummyDialog}

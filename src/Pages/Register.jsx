@@ -219,7 +219,7 @@ const Register = () => {
 
   return (
     <div
-      className="w-full bg-gray-50 flex items-center justify-center px-4 overflow-y-auto"
+      className="w-full bg-gray-50 dark:bg-slate-950 flex items-center justify-center px-4 overflow-y-auto"
       style={{ minHeight: '100dvh', paddingTop: 'env(safe-area-inset-top, 0px)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
     >
       <div className="w-full max-w-md px-4 sm:px-6 lg:px-8">
@@ -230,10 +230,10 @@ const Register = () => {
 
         {/* Title */}
         <div className="text-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-800">
+          <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
             Create your account
           </h2>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             Please enter your details to sign up
           </p>
         </div>
@@ -263,7 +263,7 @@ const Register = () => {
             <div>
               <label
                 htmlFor="firstName"
-                className="block text-sm font-bold text-gray-700 mb-1"
+                className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1"
               >
                 First name <span className="text-red-500">*</span>
               </label>
@@ -275,10 +275,10 @@ const Register = () => {
                 onChange={(e) =>
                   handleChange("firstName", sanitizeNameInput(e.target.value))
                 }
-                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 ${
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 dark:bg-slate-900 dark:text-white dark:border-slate-700 dark:placeholder-gray-400 ${
                   errors.firstName
                     ? "border-red-500 focus:ring-red-300"
-                    : "border-gray-300 focus:ring-[#1976d2]"
+                    : "border-gray-300 dark:border-slate-700 focus:ring-[#1976d2]"
                 }`}
                 placeholder="Enter first name"
                 maxLength={NAME_MAX_LENGTH}
@@ -292,7 +292,7 @@ const Register = () => {
             <div>
               <label
                 htmlFor="lastName"
-                className="block text-sm font-bold text-gray-700 mb-1"
+                className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1"
               >
                 Last name <span className="text-red-500">*</span>
               </label>
@@ -303,10 +303,10 @@ const Register = () => {
                 onChange={(e) =>
                   handleChange("lastName", sanitizeNameInput(e.target.value))
                 }
-                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 ${
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 dark:bg-slate-900 dark:text-white dark:border-slate-700 dark:placeholder-gray-400 ${
                   errors.lastName
                     ? "border-red-500 focus:ring-red-300"
-                    : "border-gray-300 focus:ring-[#1976d2]"
+                    : "border-gray-300 dark:border-slate-700 focus:ring-[#1976d2]"
                 }`}
                 placeholder="Enter last name"
                 maxLength={NAME_MAX_LENGTH}
@@ -323,7 +323,7 @@ const Register = () => {
           <div>
             <label
               htmlFor="email"
-              className="block text-sm font-bold text-gray-700 mb-1"
+              className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1"
             >
               Email <span className="text-red-500">*</span>
             </label>
@@ -332,10 +332,10 @@ const Register = () => {
               type="email"
               value={formData.email}
               onChange={(e) => handleChange("email", e.target.value)}
-              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 ${
+              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 dark:bg-slate-900 dark:text-white dark:border-slate-700 dark:placeholder-gray-400 ${
                 errors.email
                   ? "border-red-500 focus:ring-red-300"
-                  : "border-gray-300 focus:ring-[#1976d2]"
+                  : "border-gray-300 dark:border-slate-700 focus:ring-[#1976d2]"
               }`}
               placeholder="Enter email"
             />
@@ -348,7 +348,7 @@ const Register = () => {
           <div>
             <label
               htmlFor="mobile"
-              className="block text-sm font-bold text-gray-700 mb-1"
+              className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1"
             >
               Mobile number <span className="text-red-500">*</span>
             </label>
@@ -356,9 +356,9 @@ const Register = () => {
               {/* Country Code - Small Box */}
               <div className="w-20 mr-2">
                 <div
-                  className={`w-full h-12 px-2 flex items-center justify-center border rounded-lg ${
-                    errors.mobile ? "border-red-500" : "border-gray-300"
-                  } bg-gray-50 font-medium`}
+                  className={`w-full h-12 px-2 flex items-center justify-center border rounded-lg dark:bg-slate-900 dark:text-white dark:border-slate-700 ${
+                    errors.mobile ? "border-red-500" : "border-gray-300 dark:border-slate-700"
+                  } bg-gray-50 dark:bg-slate-900 font-medium`}
                 >
                   +91
                 </div>
@@ -371,10 +371,10 @@ const Register = () => {
                   type="tel"
                   value={formData.mobile}
                   onChange={(e) => handleMobileChange(e.target.value)}
-                  className={`w-full h-12 px-4 border rounded-lg focus:outline-none focus:ring-2 ${
+                  className={`w-full h-12 px-4 border rounded-lg focus:outline-none focus:ring-2 dark:bg-slate-900 dark:text-white dark:border-slate-700 dark:placeholder-gray-400 ${
                     errors.mobile
                       ? "border-red-500 focus:ring-red-300"
-                      : "border-gray-300 focus:ring-[#1976d2]"
+                      : "border-gray-300 dark:border-slate-700 focus:ring-[#1976d2]"
                   }`}
                   placeholder="Enter 10-digit mobile number"
                   maxLength={10}
@@ -391,7 +391,7 @@ const Register = () => {
           <div className="relative">
             <label
               htmlFor="password"
-              className="block text-sm font-bold text-gray-800 mb-1"
+              className="block text-sm font-bold text-gray-800 dark:text-gray-300 mb-1"
             >
               Password <span className="text-red-500">*</span>
             </label>
@@ -400,17 +400,17 @@ const Register = () => {
               type={showPassword ? "text" : "password"}
               value={formData.password}
               onChange={(e) => handleChange("password", e.target.value)}
-              className={`w-full px-4 py-3 pr-10 border rounded-lg focus:outline-none focus:ring-2 ${
+              className={`w-full px-4 py-3 pr-10 border rounded-lg focus:outline-none focus:ring-2 dark:bg-slate-900 dark:text-white dark:border-slate-700 dark:placeholder-gray-400 ${
                 errors.password
                   ? "border-red-500 focus:ring-red-300"
-                  : "border-gray-300 focus:ring-[#1976d2]"
+                  : "border-gray-300 dark:border-slate-700 focus:ring-[#1976d2]"
               }`}
               placeholder="Enter password"
               autoComplete="new-password"
             />
             <span
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute top-9 right-3 cursor-pointer text-gray-600 hover:text-gray-800"
+              className="absolute top-9 right-3 cursor-pointer text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
             >
               {showPassword ? (
                 <svg
@@ -524,10 +524,10 @@ const Register = () => {
               onDrop={(e) => {
                 e.preventDefault();
               }}
-              className={`w-full px-4 py-3 pr-10 border rounded-lg focus:outline-none focus:ring-2 ${
+               className={`w-full px-4 py-3 pr-10 border rounded-lg focus:outline-none focus:ring-2 dark:bg-slate-900 dark:text-white dark:border-slate-700 dark:placeholder-gray-400 ${
                 errors.confirmPassword
                   ? "border-red-500 focus:ring-red-300"
-                  : "border-gray-300 focus:ring-[#1976d2]"
+                 : "border-gray-300 dark:border-slate-700 focus:ring-[#1976d2]"
               }`}
               placeholder="Confirm password"
               autoComplete="new-password"
