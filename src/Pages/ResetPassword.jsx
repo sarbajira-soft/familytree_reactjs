@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import AuthLogo from '../Components/AuthLogo';
+import { markOtpSent, readOtpSecondsLeft } from '../utils/otpCooldown';
 
 const ResetPassword = () => {
   const navigate = useNavigate();
@@ -53,26 +54,20 @@ const ResetPassword = () => {
   }, []);
 
   useEffect(() => {
-    const otpSent = parseInt(localStorage.getItem('otp_sent_time'), 10);
-    if (otpSent) {
-      const checkTimeLeft = () => {
-        const now = Date.now();
-        const diff = 15 * 60 * 1000 - (now - otpSent); // 15 mins
-        if (diff > 0) {
-          setTimeLeft(Math.ceil(diff / 1000));
-          setCanResend(false);
-        } else {
-          setTimeLeft(0);
-          setCanResend(true);
-        }
-      };
+    const checkTimeLeft = () => {
+      const secondsLeft = readOtpSecondsLeft();
+      if (secondsLeft > 0) {
+        setTimeLeft(secondsLeft);
+        setCanResend(false);
+      } else {
+        setTimeLeft(0);
+        setCanResend(true);
+      }
+    };
 
-      checkTimeLeft();
-      const interval = setInterval(checkTimeLeft, 1000);
-      return () => clearInterval(interval);
-    } else {
-      setCanResend(true);
-    }
+    checkTimeLeft();
+    const interval = setInterval(checkTimeLeft, 1000);
+    return () => clearInterval(interval);
   }, []);
 
   if (!email) return null;
@@ -152,7 +147,7 @@ const ResetPassword = () => {
         return;
       }
 
-      localStorage.setItem('otp_sent_time', Date.now().toString());
+      markOtpSent();
       setCanResend(false);
       setError('OTP has been resent to your email');
     } catch (err) {
@@ -298,7 +293,7 @@ const ResetPassword = () => {
               </button>
             ) : (
               <span className="text-gray-400">
-                You can resend OTP in {Math.floor(timeLeft / 60)}m {timeLeft % 60}s
+                You can resend OTP in {timeLeft}s
               </span>
             )}
           </p>

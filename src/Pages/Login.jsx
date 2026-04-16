@@ -5,6 +5,7 @@ import { setAuthData, isAuthenticated } from '../utils/auth';
 import { useUser } from '../Contexts/UserContext';
 import { MEDUSA_TOKEN_KEY } from '../Retail/utils/constants';
 import * as retailAuthService from '../Retail/services/authService';
+import { markOtpSent } from '../utils/otpCooldown';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -147,7 +148,7 @@ const Login = () => {
           }
 
           try {
-            localStorage.setItem('otp_sent_time', Date.now().toString());
+            markOtpSent();
           } catch (_) {
             // ignore
           }
@@ -413,3 +414,4 @@ const Login = () => {
 };
 
 export default Login;
+

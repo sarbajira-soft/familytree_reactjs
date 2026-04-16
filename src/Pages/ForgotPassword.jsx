@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import AuthLogo from '../Components/AuthLogo';
+import { markOtpSent } from '../utils/otpCooldown';
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState('');
@@ -33,7 +34,7 @@ const ForgotPassword = () => {
       if (!response.ok) {
         setError(data.message || 'Something went wrong. Please try again.');
       } else {
-        localStorage.setItem('otp_sent_time', Date.now().toString());
+        markOtpSent();
         navigate('/reset-password', { state: { email } });
       }
     } catch (err) {
@@ -110,3 +111,4 @@ const ForgotPassword = () => {
 };
 
 export default ForgotPassword;
+
