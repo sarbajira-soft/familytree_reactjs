@@ -23,9 +23,9 @@ const RetailToast = () => {
   const isError = (toast?.variant || 'error') === 'error';
 
   return (
-    <div className="fixed right-4 top-16 z-[9999]">
+    <div className="fixed left-4 right-4 sm:left-auto sm:right-4 top-16 z-[9999] flex justify-center sm:justify-end">
       <div
-        className={`min-w-[220px] rounded-xl px-5 py-3 text-sm font-semibold shadow-xl border ${
+        className={`w-full sm:w-auto sm:min-w-[220px] max-w-md rounded-xl px-4 sm:px-5 py-3 text-sm font-semibold shadow-xl border ${
           isError
             ? 'bg-red-600 text-white border-red-700'
             : 'bg-gray-900 text-white border-gray-800'

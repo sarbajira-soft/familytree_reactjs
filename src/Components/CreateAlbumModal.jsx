@@ -52,6 +52,26 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
     const getResolvedFamilyCode = () =>
         String(familyCode || currentUser?.familyCode || userInfo?.familyCode || '').trim();
 
+    // Handle back button to close modal instead of navigating
+    useEffect(() => {
+        if (!isOpen) return;
+        if (typeof onClose !== 'function') return;
+        if (!window.__appModalBackStack) window.__appModalBackStack = [];
+
+        const handler = () => {
+            onClose();
+        };
+
+        window.__appModalBackStack.push(handler);
+
+        return () => {
+            const stack = window.__appModalBackStack;
+            if (!Array.isArray(stack)) return;
+            const idx = stack.lastIndexOf(handler);
+            if (idx >= 0) stack.splice(idx, 1);
+        };
+    }, [isOpen, onClose]);
+
     // Effect to initialize form fields when modal opens or mode/albumData changes
 
     useEffect(() => {
@@ -452,7 +472,7 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
                 </div>
 
                 {/* Main Content */}
-                <form onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto flex-grow">
+                <form onSubmit={handleSubmit} className="p-5 pb-20 sm:pb-5 space-y-4 overflow-y-auto flex-grow">
                     {/* Album Title */}
                     <div>
                         <label htmlFor="albumTitle" className="block text-sm font-medium text-gray-700 mb-2">
