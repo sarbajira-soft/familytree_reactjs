@@ -53,6 +53,26 @@ const CreateEventModal = ({
   const getImageKey = (file) =>
     [file?.name, file?.size, file?.lastModified, file?.type].join(":");
 
+  // Handle back button to close modal instead of navigating
+  useEffect(() => {
+    if (!isOpen) return;
+    if (typeof onClose !== 'function') return;
+    if (!window.__appModalBackStack) window.__appModalBackStack = [];
+
+    const handler = () => {
+      onClose();
+    };
+
+    window.__appModalBackStack.push(handler);
+
+    return () => {
+      const stack = window.__appModalBackStack;
+      if (!Array.isArray(stack)) return;
+      const idx = stack.lastIndexOf(handler);
+      if (idx >= 0) stack.splice(idx, 1);
+    };
+  }, [isOpen, onClose]);
+
   useEffect(() => {
     if (!isOpen) return;
     const preferredCode = getPreferredFamilyCode();
@@ -466,6 +486,7 @@ const CreateEventModal = ({
               </label>
               <input
                 type="text"
+                maxLength={100}
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 required

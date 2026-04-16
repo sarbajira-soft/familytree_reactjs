@@ -84,7 +84,14 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       {/* BLOCK OVERRIDE: Global toast container for block/unblock success and error feedback. */}
-      <ToastContainer position="top-right" autoClose={2500} newestOnTop />
+      <ToastContainer
+        position="top-center"
+        autoClose={2500}
+        newestOnTop
+        className="w-full px-4 sm:px-0 sm:w-auto"
+        toastClassName="rounded-xl shadow-xl font-medium text-sm"
+        bodyClassName="px-4 py-3"
+      />
       <ThemeProvider>
         <UserProvider>
           <Router>

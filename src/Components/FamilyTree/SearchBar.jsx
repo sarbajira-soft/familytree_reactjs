@@ -162,6 +162,8 @@ const SearchBar = ({
         }
         setCurrentResultIndex(index);
         setShowResults(false);
+        // Close mobile search modal
+        setIsSearchOpen(false);
     };
 
     // Handle keyboard navigation
@@ -171,6 +173,8 @@ const SearchBar = ({
             if (searchResults.length > 0 && currentResultIndex >= 0) {
                 focusOnResult(currentResultIndex);
                 setShowResults(false);
+                // Close mobile search modal
+                setIsSearchOpen(false);
             }
         } else if (e.key === 'ArrowDown') {
             e.preventDefault();

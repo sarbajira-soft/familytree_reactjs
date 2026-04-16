@@ -8,9 +8,9 @@ import { authFetch, authFetchResponse } from '../utils/authFetch';
 import { getToken } from '../utils/auth';
 
 const Modal = ({ children, onClose }) => (
-  <div className="fixed inset-0 bg-black bg-opacity-40 z-50 p-4 overflow-y-auto">
-    <div className="min-h-full flex items-start justify-center">
-      <div className="bg-white rounded-2xl p-8 max-w-3xl w-full shadow-2xl relative max-h-[calc(100vh-2rem)] overflow-y-auto flex flex-col">
+  <div className="fixed inset-0 bg-black bg-opacity-40 z-50 p-4 pt-12 pb-20 overflow-y-auto">
+    <div className="min-h-full flex items-center justify-center">
+      <div className="bg-white rounded-2xl p-4 sm:p-8 max-w-3xl w-full shadow-2xl relative max-h-[calc(100vh-8rem)] overflow-y-auto flex flex-col">
         <button className="absolute top-2 right-2 text-gray-400 text-2xl z-10" onClick={onClose}>&times;</button>
         {children}
       </div>
@@ -539,7 +539,7 @@ const SuggestionApproving = () => {
 
         <div className="flex items-center  mb-6">
           <FiClock className="text-primary-600 text-3xl mr-3" />
-          <h1 className="text-3xl font-bold text-gray-800">Pending Requests</h1>
+          <h1 className="text-2xl font-bold text-gray-800">Pending Requests</h1>
         </div>
         <p className="hidden md:block text-gray-500 mb-6">Review and manage pending join requests for your family.</p>
         {loading ? (
@@ -549,59 +549,63 @@ const SuggestionApproving = () => {
         ) : (
           <div className="space-y-4">
             {requests.map((req) => (
-              <div key={req.id} className="flex items-center bg-white rounded-lg shadow p-4">
-                <img
-                  src={normalizeImageUrl(req.user?.profile)}
-                  alt={req.user?.firstName || 'User'}
-                  className="w-12 h-12 rounded-full object-cover border mr-4"
-                  onError={(e) => {
-                    e.currentTarget.src = DEFAULT_AVATAR;
-                  }}
-                />
-                <div className="flex-1">
-                  <div className="font-semibold text-lg">
-                    {req.user?.firstName} {req.user?.lastName}
-                  </div>
-                  <div className="text-sm text-gray-500">{req.message}</div>
-                  <div className="text-xs text-gray-400 mt-1">
-                    {new Date(req.createdAt).toLocaleString()}
+              <div key={req.id} className="flex flex-col sm:flex-row sm:items-center bg-white rounded-lg shadow p-4 gap-4">
+                <div className="flex items-center flex-1 min-w-0">
+                  <img
+                    src={normalizeImageUrl(req.user?.profile)}
+                    alt={req.user?.firstName || 'User'}
+                    className="w-12 h-12 rounded-full object-cover border mr-4 flex-shrink-0"
+                    onError={(e) => {
+                      e.currentTarget.src = DEFAULT_AVATAR;
+                    }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-lg truncate">
+                      {req.user?.firstName} {req.user?.lastName}
+                    </div>
+                    <div className="text-sm text-gray-500 truncate">{req.message}</div>
+                    <div className="text-xs text-gray-400 mt-1">
+                      {new Date(req.createdAt).toLocaleString()}
+                    </div>
                   </div>
                 </div>
-                <button
-                  className="ml-auto bg-blue-500 text-white px-4 py-2 rounded mr-2"
-                  onClick={async () => {
-                    const userId = req?.triggeredBy;
-                    if (!userId) {
-                      window.alert('User id not found for this request.');
-                      return;
-                    }
-                    navigate(`/user/${userId}`);
-                  }}
-                >
-                  View Profile
-                </button>
-                <button
-                  className="bg-red-500 text-white px-4 py-2 rounded mr-2"
-                  onClick={() => {
-                    setRequestToReject(req);
-                    setShowRejectConfirm(true);
-                  }}
-                >
-                  Reject
-                </button>
-                <button
-                  className="bg-green-500 text-white px-4 py-2 rounded"
-                  disabled={Number(req?.triggeredBy) === Number(effectiveUserId) || actionRequestId === req.id}
-                  onClick={() => {
-                    if (Number(req?.triggeredBy) === Number(effectiveUserId)) {
-                      window.alert('This join request is from your own account. You cannot replace your own account holder profile.');
-                      return;
-                    }
-                    openReplaceModal(req);
-                  }}
-                >
-                  Accept & Replace
-                </button>
+                <div className="flex flex-col sm:flex-row gap-2 sm:flex-shrink-0 w-full sm:w-auto">
+                  <button
+                    className="w-full sm:w-auto bg-blue-500 text-white px-3 py-2 rounded text-sm whitespace-nowrap"
+                    onClick={async () => {
+                      const userId = req?.triggeredBy;
+                      if (!userId) {
+                        window.alert('User id not found for this request.');
+                        return;
+                      }
+                      navigate(`/user/${userId}`);
+                    }}
+                  >
+                    View Profile
+                  </button>
+                  <button
+                    className="w-full sm:w-auto bg-red-500 text-white px-3 py-2 rounded text-sm whitespace-nowrap"
+                    onClick={() => {
+                      setRequestToReject(req);
+                      setShowRejectConfirm(true);
+                    }}
+                  >
+                    Reject
+                  </button>
+                  <button
+                    className="w-full sm:w-auto bg-green-500 text-white px-3 py-2 rounded text-sm whitespace-nowrap"
+                    disabled={Number(req?.triggeredBy) === Number(effectiveUserId) || actionRequestId === req.id}
+                    onClick={() => {
+                      if (Number(req?.triggeredBy) === Number(effectiveUserId)) {
+                        window.alert('This join request is from your own account. You cannot replace your own account holder profile.');
+                        return;
+                      }
+                      openReplaceModal(req);
+                    }}
+                  >
+                    Accept & Replace
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -644,7 +648,7 @@ const SuggestionApproving = () => {
                       No replaceable members or removed slots found.
                     </div>
                   ) : (
-                    <div className="max-h-[45vh] overflow-y-auto pr-1">
+                    <div className="max-h-[35vh] sm:max-h-[40vh] overflow-y-auto pr-1">
                       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                         {filteredMembers.map((member) => {
                           const user = member.user || {};

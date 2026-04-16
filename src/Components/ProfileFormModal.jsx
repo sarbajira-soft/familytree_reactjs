@@ -624,16 +624,23 @@ const ProfileFormModal = ({
       ]);
 
       if (!allowedImageTypes.has(String(file.type || '').toLowerCase())) {
-        Swal.fire({
-          icon: 'warning',
-          title: 'Invalid file',
-          text: 'Only image files (jpeg, jpg, png, gif) are allowed.',
-          confirmButtonColor: '#3f982c',
-        });
+        setErrors((prev) => ({ ...prev, profile: 'Only image files (jpeg, jpg, png, gif) are allowed.' }));
         e.target.value = '';
         return;
       }
 
+      const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB in bytes
+      if (file.size > MAX_FILE_SIZE) {
+        setErrors((prev) => ({ ...prev, profile: 'Image size must be less than 5MB.' }));
+        e.target.value = '';
+        return;
+      }
+
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors.profile;
+        return newErrors;
+      });
       setFormData((prevData) => ({
         ...prevData,
         profileImageFile: file,
@@ -1328,6 +1335,7 @@ const ProfileFormModal = ({
                       hover:file:bg-[var(--color-primary)] file:cursor-pointer"
                   />
                   <p className="mt-1 text-xs text-gray-500">JPG, PNG or GIF (Max. 5MB)</p>
+                  {errors.profile && <p className="text-red-500 text-xs mt-1">{errors.profile}</p>}
                 </div>
               </div>
             </div>
