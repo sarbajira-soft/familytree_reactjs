@@ -14,6 +14,7 @@ import Swal from 'sweetalert2';
 
 import { authFetch, authFetchResponse } from '../utils/authFetch';
 import { getToken } from '../utils/auth';
+import { shareFamilyInvite } from '../utils/familyInviteShare';
 
 const normalizeFamilyCode = (value) => String(value || '').trim().toUpperCase();
 
@@ -176,17 +177,19 @@ const FamilyHubPage = () => {
   const handleEditFamily = () => {
     setIsEditModalOpen(true);
   };
-  
-  const handleShareFamilyCode = () => {
-    if (familyData?.familyCode) {
-      navigator.clipboard.writeText(familyData.familyCode)
-        .then(() => {
-          setShowCopyMessage(true);
-          setTimeout(() => setShowCopyMessage(false), 2000);
-        })
-        .catch(() => {
-          Swal.fire({ icon: 'error', title: 'Copy failed', text: 'Unable to copy to clipboard. Please try manually.' });
-        });
+  const handleShareFamilyCode = async () => {
+    const familyCode = userInfo?.familyCode || familyData?.familyCode;
+    if (!familyCode) return;
+
+    try {
+      const result = await shareFamilyInvite(familyCode);
+      if (result?.method === 'copy') {
+        setShowCopyMessage(true);
+        setTimeout(() => setShowCopyMessage(false), 2000);
+      }
+    } catch (error) {
+      if (error?.name === 'AbortError') return;
+      Swal.fire({ icon: 'error', title: 'Share failed', text: error?.message || 'Unable to share the family invite right now.' });
     }
   };
 

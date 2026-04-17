@@ -20,6 +20,7 @@ import { getTreeCardDimensions } from "../../utils/treeCardDimensions";
 import { BlockButton } from "../block/BlockButton";
 import { BlockedBadge } from "../block/BlockedBadge";
 import { logger } from "../../utils/logger";
+import { shareFamilyInvite } from "../../utils/familyInviteShare";
 
 // Helper function to get inverse/opposite relationship code
 
@@ -206,24 +207,25 @@ async function saveCustomLabel({ currentUserId, currentFamilyId, displayRelation
     return false;
   }
 }
-
-// Extracted helper: share profile invite link
-async function shareInviteLink(memberId, currentFamilyCode) {
-  if (!memberId || !currentFamilyCode) {
-    await Swal.fire({ icon: "warning", title: "Cannot share link", text: "Family or member information is missing for this person." });
+// Extracted helper: share family sign-up invite
+async function shareInviteLink(currentFamilyCode) {
+  if (!currentFamilyCode) {
+    await Swal.fire({ icon: "warning", title: "Cannot share invite", text: "Family code is missing for this person." });
     return;
   }
-  const inviteUrl = `${globalThis.location.origin}/edit-profile?familyCode=${currentFamilyCode}&memberId=${memberId}`;
   try {
-    if (navigator.share) {
-      await navigator.share({ title: "Family Tree Invitation", text: "Update your family tree profile using this secure link.", url: inviteUrl });
-    } else {
-      await navigator.clipboard.writeText(inviteUrl);
-      await Swal.fire({ icon: "success", title: "Invite Link Copied", text: "The profile invite link has been copied to your clipboard. You can share it via WhatsApp or any app." });
+    const result = await shareFamilyInvite(currentFamilyCode);
+    if (result?.method === "copy") {
+      await Swal.fire({
+        icon: "success",
+        title: "Invite Copied",
+        text: "The sign-up invite and family code have been copied to your clipboard.",
+      });
     }
   } catch (err) {
-    logger.error("BLOCK OVERRIDE: Error sharing invite link from tree node", err);
-    await Swal.fire({ icon: "error", title: "Share Failed", text: "Unable to share the invite link. Please try again." });
+    if (err?.name === "AbortError") return;
+    logger.error("Error sharing family invite from tree node", err);
+    await Swal.fire({ icon: "error", title: "Share Failed", text: err?.message || "Unable to share the family invite. Please try again." });
   }
 }
 
@@ -431,7 +433,7 @@ function renderRadialMenu({ effectiveViewOnly, memberCount, canShowMoreActionsBu
         <button
           onClick={handleShareClick}
           className="w-4 h-4 md:w-5 md:h-5 bg-white/90 hover:bg-white text-sky-600 hover:text-sky-700 rounded-full flex items-center justify-center shadow-md border border-cyan-300 dark:bg-slate-900/90 dark:hover:bg-slate-900 dark:text-sky-300 dark:hover:text-sky-200 dark:border-slate-700"
-          title="Share profile link"
+          title="Share sign-up invite"
         >
           <FiShare2 size={12} />
         </button>
@@ -621,7 +623,7 @@ function computePersonFlags(person, userInfo, viewOnly, onClick, isRoot) {
   const effectiveViewOnly = viewOnly || typeof onClick !== "function";
   const isAdmin = !!(userInfo && (userInfo.role === 2 || userInfo.role === 3));
   const personUserId = person?.userId || person?.memberId || null;
-  const canShare = !!personUserId;
+  const canShare = !!personUserId && !person?.isAppUser;
   const canShowAdminMenu = isAdmin && !!personUserId;
   const isSelf = !!(
     personUserId &&
@@ -747,7 +749,7 @@ const Person = ({
     if (!e.target.closest(".radial-menu-button")) onClick(person.id);
   };
   const handleRadialMenuClick = (e) => { e.stopPropagation(); onClick(person.id); };
-  const handleShareClick = (e) => { e.stopPropagation(); shareInviteLink(person.memberId, currentFamilyCode); };
+  const handleShareClick = (e) => { e.stopPropagation(); shareInviteLink(currentFamilyCode); };
   const handleMenuToggle = (e) => { e.stopPropagation(); setIsMenuOpen((prev) => !prev); };
 
   const { linkedTargetFamilyCode, associatedTargetFamilyCode, showLinkedTreeIcon, showAssociatedTreeIcon } = useMemo(
