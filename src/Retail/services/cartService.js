@@ -1,11 +1,8 @@
 import axios from 'axios';
-import { MEDUSA_BASE_URL, MEDUSA_PUBLISHABLE_KEY, buildBaseHeaders, buildJsonHeaders } from '../utils/constants';
+import { RETAIL_PROXY_BASE_URL, buildBaseHeaders, buildJsonHeaders } from '../utils/constants';
 
 const client = axios.create({
-  baseURL: MEDUSA_BASE_URL,
-  headers: {
-    'x-publishable-api-key': MEDUSA_PUBLISHABLE_KEY,
-  },
+  baseURL: RETAIL_PROXY_BASE_URL,
 });
 
 export async function createCart(token) {

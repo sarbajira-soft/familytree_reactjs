@@ -20,7 +20,7 @@ import {
   calculateCartTotals,
   isInsufficientInventoryError,
 } from '../utils/helpers';
-import { MEDUSA_BASE_URL, MEDUSA_PUBLISHABLE_KEY } from '../utils/constants';
+import { RETAIL_PROXY_BASE_URL, buildJsonHeaders } from '../utils/constants';
 import * as cartService from '../services/cartService';
 
 const emptyAddress = {
@@ -110,14 +110,10 @@ async function checkShiprocketServiceability(postalCode, token) {
   }
 
   const res = await axios.post(
-    `${MEDUSA_BASE_URL}/store/shiprocket/serviceability`,
+    `${RETAIL_PROXY_BASE_URL}/store/shiprocket/serviceability`,
     { postal_code: postalCode.trim() },
     {
-      headers: {
-        'x-publishable-api-key': MEDUSA_PUBLISHABLE_KEY,
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
+      headers: buildJsonHeaders(token),
     },
   );
 

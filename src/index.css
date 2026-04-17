@@ -1092,6 +1092,13 @@ h6 { font-size: 0.9rem; }
   color: #6b7280;
 }
 
+/* SweetAlert2 - Custom input field to prevent overflow */
+.swal2-input-custom {
+  width: 80% !important;
+  box-sizing: border-box !important;
+  margin: 5px auto !important;
+}
+
 .ft-swal-chip {
   margin: 6px auto 0;
   padding: 6px 16px;
