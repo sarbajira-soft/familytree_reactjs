@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
+import { loadRetailConfig } from './Retail/utils/constants'
 import './index.css'
 
 if (typeof window !== 'undefined') {
@@ -24,6 +25,12 @@ if (typeof window !== 'undefined') {
   window.prompt = () => null
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(
-    <App />
-)
+async function bootstrap() {
+  await loadRetailConfig()
+
+  ReactDOM.createRoot(document.getElementById('root')).render(
+      <App />
+  )
+}
+
+bootstrap()

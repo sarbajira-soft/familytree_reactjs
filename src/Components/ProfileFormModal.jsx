@@ -1113,6 +1113,9 @@ const ProfileFormModal = ({
       cancelButtonColor: '#3085d6',
       confirmButtonText: 'Request deletion',
       cancelButtonText: 'Cancel',
+      customClass: {
+        input: 'swal2-input-custom',
+      },
       preConfirm: (value) => {
         const normalized = String(value || '').trim().toUpperCase();
         if (normalized !== 'DELETE') {

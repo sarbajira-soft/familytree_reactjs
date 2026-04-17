@@ -15,6 +15,8 @@ import { LanguageProvider } from "./Contexts/LanguageContext";
 import { FamilyTreeProvider } from "./Contexts/FamilyTreeContext";
 import { GiftEventProvider } from "./Contexts/GiftEventContext";
 import { ThemeProvider } from "./Contexts/ThemeContext";
+import { NetworkProvider, useNetwork } from "./Contexts/NetworkContext";
+import OfflineUI from "./Components/OfflineUI";
 
 import PrivateRoute from "./Routes/PrivateRoute";
 import GuestRoute from "./Routes/GuestRoute";
@@ -60,13 +62,30 @@ const BlockedMembersPage = lazy(() => import("./Pages/BlockedMembersPage"));
 
 // ---------------- Loading Fallback ----------------
 const LoadingFallback = () => (
-  <div className="flex items-center justify-center min-h-screen bg-gray-50">
+  <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-slate-900">
     <div className="text-center">
       <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mb-4"></div>
-      <p className="text-gray-600 text-lg">Loading...</p>
+      <p className="text-gray-600 dark:text-gray-300 text-lg">Loading...</p>
     </div>
   </div>
 );
+
+// Network-aware app content component
+const AppContent = () => {
+  const { isOffline, isReady } = useNetwork();
+
+  // Show loading fallback while network status initializes
+  if (!isReady) {
+    return <LoadingFallback />;
+  }
+
+  // Show offline UI when there's no internet connection
+  if (isOffline) {
+    return <OfflineUI />;
+  }
+
+  return null; // Return null to render the normal app routes
+};
 
 // ---------------- Admin Route ----------------
 const AdminRoute = ({ children }) => {
@@ -93,10 +112,12 @@ function App() {
         bodyClassName="px-4 py-3"
       />
       <ThemeProvider>
-        <UserProvider>
-          <Router>
-            <Suspense fallback={<LoadingFallback />}>
-              <Routes>
+        <NetworkProvider>
+          <UserProvider>
+            <Router>
+              <AppContent />
+              <Suspense fallback={<LoadingFallback />}>
+                <Routes>
               {/* ---------------- Guest-only Routes ---------------- */}
               <Route
                 path="/"
@@ -276,9 +297,10 @@ function App() {
               {/* ---------------- Catch-all Redirect ---------------- */}
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
               </Routes>
-            </Suspense>
-          </Router>
-        </UserProvider>
+              </Suspense>
+            </Router>
+          </UserProvider>
+        </NetworkProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

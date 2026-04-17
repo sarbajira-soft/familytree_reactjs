@@ -193,14 +193,18 @@ const ResetPassword = () => {
               OTP
             </label>
             <input
-              id="otp"
-              type="text"
-              value={otp}
-              onChange={(e) => setOtp(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-              placeholder="Enter 6-digit OTP"
-              maxLength="6"
-            />
+  id="otp"
+  type="text"
+  inputMode="numeric"
+  pattern="[0-9]*"
+  value={otp}
+  onChange={(e) => {
+    const val = e.target.value.replace(/\D/g, ''); // allow only digits
+    if (val.length <= 6) setOtp(val);
+  }}
+  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+  placeholder="Enter 6-digit OTP"
+/>
           </div>
 
          <div className="relative">
