@@ -60,7 +60,7 @@ const ViewFamilyMemberModal = ({ isOpen, onClose, member, isLoading = false }) =
       fullName: `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || 'N/A',
       email: member?.email || profile.email || 'N/A',
       countryCode: member?.countryCode || '',
-      mobile: member?.mobile || profile.contactNumber || 'N/A',
+      mobile: profile?.fieldVisibility?.phone === false ? 'N/A' : (profile.contactNumber || 'N/A'),
       profileImage: profile.profile || member?.profileUrl || 'https://placehold.co/96x96/e2e8f0/64748b?text=👤',
       gender: profile.gender || 'N/A',
       dob: profile.dob || null,
@@ -351,3 +351,5 @@ const formatDate = (date) => {
 };
 
 export default ViewFamilyMemberModal;
+
+

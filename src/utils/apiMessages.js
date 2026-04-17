@@ -1,3 +1,11 @@
+export const UI_MESSAGES = {
+  MEMBER_ADDED_SUCCESS: 'Member added successfully!',
+  MEMBER_ADDED_SUCCESS_DESC: 'The requester has been added as a new member.',
+  MEMBER_REPLACED_SUCCESS: 'Member replaced successfully!',
+  MEMBER_REPLACED_SUCCESS_DESC: 'The selected member has been replaced with the new joiner.',
+  INVALID_OTP: 'Invalid OTP. Please try again.',
+};
+
 export async function readResponseBody(response) {
   if (!response) return { json: null, text: "" };
   const contentType = response.headers?.get?.("content-type") || "";

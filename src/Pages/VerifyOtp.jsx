@@ -8,6 +8,13 @@ import {
   markOtpSent,
   readOtpSecondsLeft,
 } from '../utils/otpCooldown';
+import {
+  OTP_LENGTH,
+  extractDigitsFromClipboardEvent,
+  isValidOtp,
+  sanitizeOtpInput,
+} from '../utils/inputSanitizers';
+import { UI_MESSAGES } from '../utils/apiMessages';
 
 const VerifyOtp = () => {
   const navigate = useNavigate();
@@ -23,8 +30,7 @@ const VerifyOtp = () => {
 
   const [canResend, setCanResend] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
-  
-  // Check for email in location state or redirect
+
   useEffect(() => {
     const stateEmail = location.state?.email;
     const stateMobile = location.state?.mobile;
@@ -38,7 +44,6 @@ const VerifyOtp = () => {
     navigate('/register', { replace: true });
   }, [location.state, navigate]);
 
-  // Handle OTP resend cooldown
   useEffect(() => {
     if (!localStorage.getItem(OTP_SENT_STORAGE_KEY)) {
       markOtpSent();
@@ -69,8 +74,8 @@ const VerifyOtp = () => {
     e.preventDefault();
     setError('');
 
-    if (!otp) {
-      setError('Please enter the OTP');
+    if (!isValidOtp(otp)) {
+      setError(`Please enter a valid ${OTP_LENGTH}-digit OTP`);
       return;
     }
 
@@ -80,12 +85,17 @@ const VerifyOtp = () => {
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/user/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userName, otp }),
+        body: JSON.stringify({ userName, otp: sanitizeOtpInput(otp) }),
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        setError(errorData.message || 'OTP verification failed');
+        const errorData = await response.json().catch(() => ({}));
+        const apiMessage = String(errorData?.message || '').trim();
+        if (apiMessage.toLowerCase().includes('invalid otp')) {
+          setError(UI_MESSAGES.INVALID_OTP);
+        } else {
+          setError(apiMessage || 'OTP verification failed');
+        }
         return;
       }
 
@@ -98,13 +108,8 @@ const VerifyOtp = () => {
         mobile: mobile || '',
       };
 
-      // IMPORTANT: use setAuthData so we refresh session expiry and userInfo
-      // (otherwise an old sessionExpiry can instantly clear the new token)
       const stayLoggedIn = localStorage.getItem('stayLoggedIn') === 'true';
       setAuthData(data.accessToken, minimalUser, stayLoggedIn);
-
-      // Ensure the UserContext is populated before navigating to a PrivateRoute
-      // (otherwise PrivateRoute sees token but userInfo=null and redirects to /login)
       await refetchUser();
 
       if (familyCode) {
@@ -130,12 +135,11 @@ const VerifyOtp = () => {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({}));
         setError(errorData.message || 'Failed to resend OTP');
         return;
       }
 
-      // Reset resend timer
       markOtpSent();
       setCanResend(false);
 
@@ -149,12 +153,10 @@ const VerifyOtp = () => {
   return (
     <div className="min-h-screen w-full bg-gray-50 flex items-center justify-center px-4">
       <div className="w-full max-w-md px-4 sm:px-6 lg:px-8">
-        {/* Logo */}
         <div className="flex justify-center mb-1">
           <AuthLogo className="w-28 h-28" />
         </div>
 
-        {/* Title */}
         <div className="text-center mb-6">
           <h2 className="text-2xl font-bold text-gray-800">Verify Your Account</h2>
           <p className="text-sm text-gray-500 mt-1">
@@ -164,7 +166,7 @@ const VerifyOtp = () => {
 
         {error && (
           <div className={`mb-4 p-3 text-sm rounded border ${
-            error.includes('resent') 
+            error.includes('resent')
               ? 'text-green-700 bg-green-100 border-green-300'
               : 'text-red-700 bg-red-100 border-red-300'
           }`}>
@@ -172,7 +174,6 @@ const VerifyOtp = () => {
           </div>
         )}
 
-        {/* OTP Form */}
         <form onSubmit={handleVerifyOtp} className="space-y-4">
           <div>
             <label htmlFor="otp" className="block text-sm font-medium text-gray-700 mb-1">
@@ -202,7 +203,6 @@ const VerifyOtp = () => {
           </button>
         </form>
 
-        {/* Resend OTP */}
         <div className="text-center mt-4 text-sm">
           <p className="text-gray-500">
             Didn't receive the code?{' '}

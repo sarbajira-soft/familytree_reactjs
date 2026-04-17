@@ -8,6 +8,8 @@ import { useTheme } from '../Contexts/ThemeContext';
 
 import { clearAuthData, getToken } from '../utils/auth';
 import { authFetchResponse } from '../utils/authFetch';
+import { UI_MESSAGES } from '../utils/apiMessages';
+import { OTP_LENGTH, extractDigitsFromClipboardEvent, isValidOtp, sanitizeOtpInput, sanitizePincodeInput } from '../utils/inputSanitizers';
 
 const INDIAN_RELIGIONS = [
   'Hindu',
@@ -95,7 +97,7 @@ const ProfileFormModal = ({
     city: '',
     state: '',
     pincode: '',
-    country: 'India',
+    country: '',
     emailPrivacy: 'FAMILY',
     addressPrivacy: 'FAMILY',
     phonePrivacy: 'FAMILY',
@@ -279,7 +281,7 @@ const ProfileFormModal = ({
             dobPrivacy: safeString(sourceDataRaw.dobPrivacy || sourceDataRaw.privacySettings?.dobPrivacy || sourceDataRaw.raw?.userProfile?.dobPrivacy || sourceDataRaw.raw?.userProfile?.privacySettings?.dobPrivacy || 'FAMILY') || 'FAMILY',
             state,
             pincode,
-            country: country || 'India',
+            country: country || '',
             maritalStatus: sourceDataRaw.maritalStatus || '',
             spouseName: sourceDataRaw.spouseName || '',
             fatherName: sourceDataRaw.fatherName || '',
@@ -486,6 +488,10 @@ const ProfileFormModal = ({
       newErrors.mobile = 'Invalid mobile number';
     }
 
+    if (String(formData.pincode || '').trim() && !/^\d{6}$/.test(String(formData.pincode || '').trim())) {
+      newErrors.pincode = 'Pincode must be exactly 6 digits';
+    }
+
     if (mode === 'add' && !formData.password.trim()) {
       newErrors.password = 'Password is required';
     }
@@ -572,9 +578,11 @@ const ProfileFormModal = ({
       'region',
     ]);
 
+    const normalizedValue = name === 'pincode' ? sanitizePincodeInput(value) : (value || '');
+
     const sanitizedValue = restrictedNameFields.has(name)
       ? String(value || '').replace(/[^A-Za-z ]/g, '')
-      : (value || '');
+      : normalizedValue;
 
     setFormData((prevData) => ({
       ...prevData,
@@ -789,7 +797,7 @@ const ProfileFormModal = ({
     setPasswordChangeError('');
     setPasswordChangeSuccess('');
 
-    const otp = String(otpValue || '').trim();
+    const otp = sanitizeOtpInput(otpValue);
     const newPassword = String(newPasswordValue || '');
     const confirmPassword = String(confirmPasswordValue || '');
 
@@ -800,6 +808,11 @@ const ProfileFormModal = ({
 
     if (!otp || !newPassword || !confirmPassword) {
       setPasswordChangeError('All fields are required.');
+      return;
+    }
+
+    if (!isValidOtp(otp)) {
+      setPasswordChangeError(`Please enter a valid ${OTP_LENGTH}-digit OTP.`);
       return;
     }
 
@@ -830,7 +843,11 @@ const ProfileFormModal = ({
 
       if (!resetRes.ok) {
         const errorData = await resetRes.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Failed to reset password. Please try again.');
+        const apiMessage = String(errorData?.message || '').trim();
+        if (apiMessage.toLowerCase().includes('invalid otp')) {
+          throw new Error(UI_MESSAGES.INVALID_OTP);
+        }
+        throw new Error(apiMessage || 'Failed to reset password. Please try again.');
       }
 
       setPasswordChangeSuccess('Your password has been updated successfully.');
@@ -1590,10 +1607,21 @@ const ProfileFormModal = ({
                           name="passwordOtp"
                           type="text"
                           value={otpValue}
-                          onChange={(e) => setOtpValue(e.target.value)}
+                          onChange={(e) => setOtpValue(sanitizeOtpInput(e.target.value))}
+                          onPaste={(e) => {
+                            const digits = extractDigitsFromClipboardEvent(e);
+                            if (!digits) {
+                              e.preventDefault();
+                              return;
+                            }
+                            e.preventDefault();
+                            setOtpValue(sanitizeOtpInput(digits));
+                          }}
                           className={inputClassName('passwordOtp')}
                           placeholder="123456"
-                          maxLength={12}
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          maxLength={OTP_LENGTH}
                         />
                         <button
                           type="button"
@@ -1906,7 +1934,9 @@ const ProfileFormModal = ({
                     onChange={handleChange}
                     className={inputClassName('pincode')}
                     placeholder="e.g., 600001"
-                    maxLength={10}
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={6}
                   />
                 </div>
                 <div>
@@ -2432,5 +2462,15 @@ const ProfileFormModal = ({
 };
 
 export default ProfileFormModal;
+
+
+
+
+
+
+
+
+
+
 
 

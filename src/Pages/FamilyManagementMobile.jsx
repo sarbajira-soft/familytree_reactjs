@@ -12,6 +12,7 @@ import Swal from "sweetalert2";
 
 import { authFetchResponse } from "../utils/authFetch";
 import { getToken } from "../utils/auth";
+import { copyFamilyInvite, shareFamilyInvite } from "../utils/familyInviteShare";
 
 const normalizeFamilyCode = (value) => String(value || "").trim().toUpperCase();
 
@@ -345,18 +346,25 @@ const FamilyManagementMobile = () => {
     globalThis.location.reload();
   };
 
-  const handleShareFamilyCode = () => {
-    if (!familyData?.familyCode) return;
+  const handleShareFamilyCode = async () => {
+    const familyCode = String(userInfo?.familyCode || familyData?.familyCode || "").trim();
+    if (!familyCode) return;
 
-    navigator.clipboard
-      .writeText(familyData.familyCode)
-      .then(() => {
-        setShowCopyMessage(true);
-        setTimeout(() => setShowCopyMessage(false), 2000);
-      })
-      .catch(() => {
-        // Ignore clipboard errors silently
+    try {
+      await copyFamilyInvite(familyCode);
+      setShowCopyMessage(true);
+      setInviteCopySuccess(true);
+      setTimeout(() => {
+        setShowCopyMessage(false);
+        setInviteCopySuccess(false);
+      }, 2000);
+    } catch (error) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Copy Failed',
+        text: error?.message || 'Unable to copy the family invite right now.',
       });
+    }
   };
 
   const handleInviteNow = async () => {
@@ -370,38 +378,25 @@ const FamilyManagementMobile = () => {
       return;
     }
 
-    const rawBaseUrl = import.meta.env.VITE_BASE_URL || window.location.origin;
-    const baseUrl = /^https?:\/\//i.test(rawBaseUrl)
-      ? rawBaseUrl
-      : `https://${rawBaseUrl}`;
-    const inviteLink = `${baseUrl.replace(/\/$/, '')}/edit-profile?familyCode=${encodeURIComponent(familyCode)}`;
-
     try {
-      if (navigator?.share) {
-        await navigator.share({
-          title: 'Join our family tree',
-          text: 'Join our family tree using this invite link.',
-          url: inviteLink,
-        });
-        return;
+      const result = await shareFamilyInvite(familyCode);
+      if (result?.method === 'copy') {
+        setShowCopyMessage(true);
+        setInviteCopySuccess(true);
+        setTimeout(() => {
+          setShowCopyMessage(false);
+          setInviteCopySuccess(false);
+        }, 2000);
       }
-
-      await navigator.clipboard.writeText(inviteLink);
-      await Swal.fire({
-        icon: 'success',
-        title: 'Invite Link Copied',
-        text: 'The family invite link has been copied. You can share it with your relatives now.',
-      });
     } catch (error) {
       if (error?.name === 'AbortError') return;
       await Swal.fire({
         icon: 'error',
         title: 'Invite Failed',
-        text: 'Unable to start the invite flow right now. Please try again.',
+        text: error?.message || 'Unable to start the invite flow right now. Please try again.',
       });
     }
   };
-
   const handleLeaveFamily = async () => {
     const familyCode = userInfo?.familyCode || familyData?.familyCode;
     const accessToken = token || getToken();
@@ -536,7 +531,7 @@ const FamilyManagementMobile = () => {
               />
               {showCopyMessage && (
                 <div className="mt-2 text-xs text-green-600 dark:text-green-400">
-                  Family code copied to clipboard
+                  Invite copied to clipboard
                 </div>
               )}
 
@@ -670,51 +665,34 @@ const FamilyManagementMobile = () => {
                             Share The Love
                           </h3>
                           <p className="mt-1 text-sm font-medium text-indigo-800/80 dark:text-indigo-200/80">
-                            Send a link or share your family code so relatives can join easily.
+                            Share the sign-up invite so relatives can join with your family code.
                           </p>
                         </div>
 
-                        <div className="w-full relative mt-2">
-                          {userInfo?.familyCode && (
-                            <div className="flex flex-col gap-3">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const rawBaseUrl = import.meta.env.VITE_BASE_URL;
-                                  const baseUrl = /^https?:\/\//i.test(rawBaseUrl)
-                                    ? rawBaseUrl
-                                    : `https://${rawBaseUrl}`;
-                                  const link = `${baseUrl.replace(/\/$/, "")}/edit-profile?familyCode=${userInfo.familyCode}`;
-                                  navigator.clipboard
-                                    .writeText(link)
-                                    .then(() => {
-                                      setInviteCopySuccess(true);
-                                      setTimeout(() => setInviteCopySuccess(false), 2000);
-                                    })
-                                    .catch(() => {
-                                      setInviteCopySuccess(false);
-                                    });
-                                }}
-                                className="relative w-full flex items-center justify-center gap-2 px-6 py-3 text-sm font-bold text-indigo-700 dark:text-indigo-300 bg-white dark:bg-slate-800 rounded-2xl hover:bg-indigo-50 dark:hover:bg-slate-700 hover:scale-105 active:scale-95 transition-all duration-300 shadow-sm hover:shadow-md border border-indigo-100/50 dark:border-indigo-800/50"
-                              >
-                                <span>Copy Link</span>
-                                <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={handleInviteNow}
-                                className="w-full px-6 py-3 text-sm font-bold text-white bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-700 rounded-2xl hover:scale-105 active:scale-95 transition-all duration-300 shadow-[0_8px_20px_rgba(99,102,241,0.3)] hover:shadow-[0_12px_25px_rgba(99,102,241,0.4)]"
-                              >
-                                Invite Now
-                              </button>
-                            </div>
-                          )}
-                          {inviteCopySuccess && (
-                            <div className="absolute -bottom-10 left-0 right-0 text-center text-[11px] font-bold tracking-wide text-emerald-700 dark:text-emerald-300 bg-emerald-100/90 dark:bg-emerald-900/50 py-2 px-4 rounded-full backdrop-blur-sm shadow-sm animate-bounce">
-                              Invite link copied! 🎉
-                            </div>
-                          )}
-                        </div>
+                        {userInfo?.familyCode && (
+                          <div className="flex flex-col gap-3">
+                            <button
+                              type="button"
+                              onClick={handleShareFamilyCode}
+                              className="relative w-full flex items-center justify-center gap-2 px-6 py-3 text-sm font-bold text-indigo-700 dark:text-indigo-300 bg-white dark:bg-slate-800 rounded-2xl hover:bg-indigo-50 dark:hover:bg-slate-700 hover:scale-105 active:scale-95 transition-all duration-300 shadow-sm hover:shadow-md border border-indigo-100/50 dark:border-indigo-800/50"
+                            >
+                              <span>Copy Invite</span>
+                              <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleInviteNow}
+                              className="w-full px-6 py-3 text-sm font-bold text-white bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-700 rounded-2xl hover:scale-105 active:scale-95 transition-all duration-300 shadow-[0_8px_20px_rgba(99,102,241,0.3)] hover:shadow-[0_12px_25px_rgba(99,102,241,0.4)]"
+                            >
+                              Share Invite
+                            </button>
+                          </div>
+                        )}
+                        {inviteCopySuccess && (
+                          <div className="absolute -bottom-10 left-0 right-0 text-center text-[11px] font-bold tracking-wide text-emerald-700 dark:text-emerald-300 bg-emerald-100/90 dark:bg-emerald-900/50 py-2 px-4 rounded-full backdrop-blur-sm shadow-sm animate-bounce">
+                            Invite copied! 🎉
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
