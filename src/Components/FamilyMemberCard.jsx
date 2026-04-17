@@ -252,7 +252,7 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
       age: calculateAge(profile?.dob),
       dob: profile?.dob || null,
       gender: profile?.gender || '',
-      contact: profile?.contactNumber || user?.mobile || '',
+      contact: profile?.fieldVisibility?.phone === false ? '' : (profile?.contactNumber || ''),
       address: profile?.address || '',
       role: raw?.familyRole || roleMapping[user?.role] || 'Member',
       sourceFamilyCode: primaryCode,
@@ -1896,6 +1896,7 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
 };
 
 export default FamilyMemberCard;
+
 
 
 

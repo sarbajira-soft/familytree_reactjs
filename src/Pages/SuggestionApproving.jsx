@@ -6,6 +6,7 @@ import RelationshipCalculator from '../utils/relationshipCalculator';
 
 import { authFetch, authFetchResponse } from '../utils/authFetch';
 import { getToken } from '../utils/auth';
+import { UI_MESSAGES } from '../utils/apiMessages';
 
 const Modal = ({ children, onClose }) => (
   <div className="fixed inset-0 bg-black bg-opacity-40 z-50 p-4 pt-12 pb-20 overflow-y-auto">
@@ -62,6 +63,7 @@ const SuggestionApproving = () => {
   const [viewMember, setViewMember] = useState(null); // for member details in replace modal
   const [showConfirm, setShowConfirm] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [successAction, setSuccessAction] = useState('replace');
   const [showRejectConfirm, setShowRejectConfirm] = useState(false);
   const [requestToReject, setRequestToReject] = useState(null);
   const [familyTreePeople, setFamilyTreePeople] = useState(null);
@@ -427,6 +429,7 @@ const SuggestionApproving = () => {
       setReplaceModal({ open: false, request: null });
       setSelectedMemberId(null);
       setViewMember(null);
+      setSuccessAction('replace');
       setShowSuccess(true);
       setTimeout(() => {
         setShowSuccess(false);
@@ -449,6 +452,7 @@ const SuggestionApproving = () => {
       await refetchUser?.();
       setReplaceModal({ open: false, request: null });
       setSelectedMemberId(null);
+      setSuccessAction('add');
       setShowSuccess(true);
       setTimeout(() => {
         setShowSuccess(false);
@@ -833,8 +837,8 @@ const SuggestionApproving = () => {
         <Modal onClose={() => setShowSuccess(false)}>
           <div className="text-center py-8">
             <div className="text-3xl mb-4 text-green-600">✔️</div>
-            <div className="text-xl font-bold mb-2">Member replaced successfully!</div>
-            <div className="text-gray-500">The selected member has been replaced with the new joiner.</div>
+            <div className="text-xl font-bold mb-2">{successAction === 'add' ? UI_MESSAGES.MEMBER_ADDED_SUCCESS : UI_MESSAGES.MEMBER_REPLACED_SUCCESS}</div>
+            <div className="text-gray-500">{successAction === 'add' ? UI_MESSAGES.MEMBER_ADDED_SUCCESS_DESC : UI_MESSAGES.MEMBER_REPLACED_SUCCESS_DESC}</div>
           </div>
         </Modal>
       )}
@@ -884,4 +888,9 @@ const SuggestionApproving = () => {
 };
 
 export default SuggestionApproving;
+
+
+
+
+
 

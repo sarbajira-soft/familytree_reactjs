@@ -24,6 +24,7 @@ import PropTypes from "prop-types";
 
 import { authFetchResponse } from "../utils/authFetch";
 import { getToken } from "../utils/auth";
+import { isValidPincode, sanitizePincodeInput } from "../utils/inputSanitizers";
 
 const SECTIONS = [
   {
@@ -319,6 +320,7 @@ const buildContactSectionErrors = (data) => {
   if (isBlank(data.district)) errors.district = "District is required";
   if (isBlank(data.state)) errors.state = "State is required";
   if (isBlank(data.pincode)) errors.pincode = "Pincode is required";
+  else if (!isValidPincode(data.pincode)) errors.pincode = "Pincode must be exactly 6 digits";
   return errors;
 };
 
@@ -2320,7 +2322,9 @@ const ContactSection = ({
               value={formData.pincode}
               onChange={handleChange}
               placeholder="Pincode"
-              maxLength={10}
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={6}
               className={`w-full px-4 py-2.5 border rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 ${errors.pincode
                   ? "border-red-500 focus:ring-red-300"
                   : "border-gray-300 focus:ring-[var(--color-primary)]"
@@ -2747,6 +2751,8 @@ const OnBoarding = () => {
       } else {
         processedValue = value;
       }
+    } else if (name === "pincode") {
+      processedValue = sanitizePincodeInput(value);
     } else if (type === "number" || name === "childrenCount") {
       processedValue = value === "" ? 0 : Number.parseInt(value, 10);
     }
@@ -3035,3 +3041,5 @@ const OnBoarding = () => {
 };
 
 export default OnBoarding;
+
+

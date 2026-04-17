@@ -812,10 +812,10 @@ const Layout = ({ noScroll = false }) => {
                   >
                     <div className="border-b border-gray-100 px-4 py-3 dark:border-slate-700">
                       {profileMenuView === "root" ? (
-                        <div className="text-sm text-gray-800 dark:text-slate-100">
-                          <p className="font-semibold">{profileDisplayName}</p>
+                        <div className="min-w-0 text-sm text-gray-800 dark:text-slate-100">
+                          <p className="font-semibold truncate overflow-hidden text-ellipsis whitespace-nowrap" title={profileDisplayName}>{profileDisplayName}</p>
                           {profileSecondaryInfo && (
-                            <p className="text-xs text-gray-500 dark:text-slate-300">
+                            <p className="text-xs text-gray-500 dark:text-slate-300 truncate overflow-hidden text-ellipsis whitespace-nowrap" title={userInfo?.familyCode ? `Family Code: ${profileSecondaryInfo}` : profileSecondaryInfo}>
                               {userInfo?.familyCode ? `Family Code: ${profileSecondaryInfo}` : profileSecondaryInfo}
                             </p>
                           )}
@@ -1082,6 +1082,7 @@ const Layout = ({ noScroll = false }) => {
 };
 
 export default Layout;
+
 
 
 

@@ -745,7 +745,7 @@ const FamilyTreePage = () => {
 
             age: userInfo.age,
 
-            img: userInfo.profileUrl,
+            img: userInfo.profileUrl || userInfo.profile || userInfo.userProfile?.profile || "",
 
             dob: userInfo.dob,
 
@@ -2682,10 +2682,12 @@ const FamilyTreePage = () => {
           if (person.img instanceof File) {
             formData.append(`person_${index}_img`, person.img);
           } else if (typeof person.img === "string") {
-            const imgValue = person.img.includes("/")
-              ? person.img.split("/").pop()
-              : person.img;
-            formData.append(`person_${index}_img`, imgValue);
+            const rawImg = person.img.trim();
+            const isAbsoluteOrData = /^(https?:)?\/\//i.test(rawImg) || rawImg.startsWith("data:");
+            // Do not derive/upload keys from absolute URLs. Omitting img preserves existing backend image.
+            if (!isAbsoluteOrData) {
+              formData.append(`person_${index}_img`, rawImg);
+            }
           }
         }
 
@@ -4052,6 +4054,9 @@ const FamilyTreePage = () => {
 };
 
 export default FamilyTreePage;
+
+
+
 
 
 
