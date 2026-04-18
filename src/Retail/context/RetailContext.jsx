@@ -30,6 +30,7 @@ const initialState = {
   loading: false,
   error: null,
   toast: null,
+  paymentRecovery: null,
 };
 
 function reducer(state, action) {
@@ -42,6 +43,10 @@ function reducer(state, action) {
       return { ...state, toast: action.payload };
     case 'CLEAR_TOAST':
       return { ...state, toast: null };
+    case 'SET_PAYMENT_RECOVERY':
+      return { ...state, paymentRecovery: action.payload };
+    case 'CLEAR_PAYMENT_RECOVERY':
+      return { ...state, paymentRecovery: null };
     case 'SET_TOKEN':
       return { ...state, token: action.payload };
     case 'SET_USER':
@@ -83,6 +88,17 @@ export const RetailProvider = ({ children }) => {
 
   const clearToast = useCallback(() => {
     dispatch({ type: 'CLEAR_TOAST' });
+  }, []);
+
+  const setPaymentRecovery = useCallback((payload) => {
+    dispatch({
+      type: 'SET_PAYMENT_RECOVERY',
+      payload: payload || null,
+    });
+  }, []);
+
+  const clearPaymentRecovery = useCallback(() => {
+    dispatch({ type: 'CLEAR_PAYMENT_RECOVERY' });
   }, []);
 
   const setToken = useCallback((token) => {
@@ -145,6 +161,85 @@ export const RetailProvider = ({ children }) => {
         try {
           const cart = await cartService.getCart(storedCartId, storedToken || null);
           setCartPersistent(cart);
+
+          try {
+            const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+            const recoverCartPayment = async () => {
+              let latestRecovery = null;
+
+              setPaymentRecovery({
+                active: true,
+                cartId: cart.id,
+                status: 'processing',
+                message: 'Payment received. We are finalizing your order securely.',
+              });
+
+              for (let attempt = 0; attempt < 45; attempt += 1) {
+                // eslint-disable-next-line no-await-in-loop
+                latestRecovery = await cartService.getRazorpayRecovery({
+                  cartId: cart.id,
+                  token: storedToken || null,
+                });
+
+                const nextStatus = latestRecovery?.status || 'processing';
+                const nextMessage =
+                  latestRecovery?.message ||
+                  (nextStatus === 'pending_capture'
+                    ? 'Payment is authorized and waiting for capture confirmation.'
+                    : 'Payment received. We are finalizing your order securely.');
+
+                setPaymentRecovery({
+                  active: !['completed', 'failed', 'expired', 'abandoned', 'not_started'].includes(
+                    nextStatus,
+                  ),
+                  cartId: cart.id,
+                  status: nextStatus,
+                  message: nextMessage,
+                });
+
+                if (
+                  nextStatus === 'completed' ||
+                  nextStatus === 'failed' ||
+                  nextStatus === 'expired' ||
+                  nextStatus === 'abandoned' ||
+                  nextStatus === 'not_started'
+                ) {
+                  return latestRecovery;
+                }
+
+                // eslint-disable-next-line no-await-in-loop
+                await sleep(2000);
+              }
+
+              return latestRecovery;
+            };
+
+            const recovery = await recoverCartPayment();
+
+            if (recovery?.status === 'completed' && recovery?.order) {
+              const recoveredCart = await cartService.createCart(storedToken || null);
+              let nextCart = recoveredCart;
+
+              if (storedToken) {
+                try {
+                  nextCart = await cartService.transferCart(recoveredCart.id, storedToken);
+                } catch {
+                  nextCart = recoveredCart;
+                }
+              }
+
+              setCartPersistent(nextCart);
+              clearPaymentRecovery();
+              showToast('Your previous payment was confirmed and the order has been placed.', 'success');
+              return;
+            }
+
+            clearPaymentRecovery();
+          } catch {
+            clearPaymentRecovery();
+            // Ignore recovery polling failures during bootstrap.
+          }
+
           return;
         } catch (err) {
           localStorage.removeItem(MEDUSA_CART_ID_KEY);
@@ -158,7 +253,7 @@ export const RetailProvider = ({ children }) => {
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
-  }, [setCartPersistent, setToken]);
+  }, [clearPaymentRecovery, setCartPersistent, setPaymentRecovery, setToken, showToast]);
 
   useEffect(() => {
     bootstrap();
@@ -609,6 +704,113 @@ export const RetailProvider = ({ children }) => {
     }
   }, [state.token]);
 
+  useEffect(() => {
+    const recovery = state.paymentRecovery;
+
+    if (!recovery?.active || recovery?.source !== 'checkout' || !recovery?.cartId) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    const pollRecovery = async () => {
+      for (let attempt = 0; attempt < 45; attempt += 1) {
+        let latestRecovery = null;
+
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          latestRecovery = await cartService.getRazorpayRecovery({
+            cartId: recovery.cartId,
+            token: state.token || null,
+          });
+        } catch (err) {
+          if (cancelled) {
+            return;
+          }
+
+          const message = getErrorMessage(err) || 'Failed to verify payment status.';
+          dispatch({ type: 'SET_ERROR', payload: message });
+          showToast(message);
+          clearPaymentRecovery();
+          return;
+        }
+
+        if (cancelled) {
+          return;
+        }
+
+        const nextStatus = latestRecovery?.status || 'processing';
+        const nextMessage =
+          latestRecovery?.message ||
+          (nextStatus === 'pending_capture'
+            ? 'Payment is authorized and waiting for capture confirmation.'
+            : 'Payment received. We are finalizing your order securely.');
+
+        if (nextStatus === 'completed' && latestRecovery?.order) {
+          let recoveredCart = await cartService.createCart(state.token || null);
+
+          if (state.token) {
+            try {
+              recoveredCart = await cartService.transferCart(recoveredCart.id, state.token);
+            } catch {
+              // Keep anonymous fresh cart fallback.
+            }
+          }
+
+          setCartPersistent(recoveredCart);
+
+          if (state.token) {
+            await fetchOrders();
+          }
+
+          clearPaymentRecovery();
+          showToast('Payment successful! Your order has been placed.', 'success');
+          return;
+        }
+
+        if (
+          nextStatus === 'failed' ||
+          nextStatus === 'expired' ||
+          nextStatus === 'abandoned'
+        ) {
+          dispatch({ type: 'SET_ERROR', payload: nextMessage });
+          showToast(nextMessage);
+          clearPaymentRecovery();
+          return;
+        }
+
+        setPaymentRecovery({
+          active: true,
+          source: 'checkout',
+          cartId: recovery.cartId,
+          status: nextStatus,
+          message: nextMessage,
+        });
+
+        // eslint-disable-next-line no-await-in-loop
+        await sleep(2000);
+      }
+    };
+
+    pollRecovery();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    clearPaymentRecovery,
+    fetchOrders,
+    setCartPersistent,
+    setPaymentRecovery,
+    showToast,
+    state.paymentRecovery?.active,
+    state.paymentRecovery?.cartId,
+    state.paymentRecovery?.source,
+    state.token,
+  ]);
+
   const fetchOrdersPage = useCallback(
     async ({ limit = 50, offset = 0, append = false } = {}) => {
       if (!state.token) {
@@ -743,7 +945,7 @@ export const RetailProvider = ({ children }) => {
   );
 
   const completeCheckout = useCallback(
-    async (shippingAddress, billingAddress, shippingMethodId, shippingMeta) => {
+    async (shippingAddress, billingAddress, shippingSelections) => {
       dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'SET_ERROR', payload: null });
 
@@ -768,10 +970,9 @@ export const RetailProvider = ({ children }) => {
 
         // 3. Attach the selected shipping method directly. The backend
         // clears any previous shipping methods before adding a new one.
-        const cartWithShipping = await cartService.addShippingMethod({
+        const cartWithShipping = await cartService.addShippingMethods({
           cartId: updatedWithBilling.id,
-          optionId: shippingMethodId,
-          data: shippingMeta || {},
+          options: shippingSelections,
           token: state.token || null,
         });
 
@@ -814,7 +1015,7 @@ export const RetailProvider = ({ children }) => {
   );
 
   const startOnlinePayment = useCallback(
-    async (shippingAddress, billingAddress, shippingMethodId, shippingMeta) => {
+    async (shippingAddress, billingAddress, shippingSelections) => {
       dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'SET_ERROR', payload: null });
 
@@ -837,41 +1038,24 @@ export const RetailProvider = ({ children }) => {
 
         // Attach the selected shipping method directly. The backend clears any
         // previous shipping methods before adding a new one.
-        const cartWithShipping = await cartService.addShippingMethod({
+        const cartWithShipping = await cartService.addShippingMethods({
           cartId: updatedWithBilling.id,
-          optionId: shippingMethodId,
-          data: shippingMeta || {},
+          options: shippingSelections,
           token: state.token || null,
         });
 
         setCartPersistent(cartWithShipping);
 
-        const paymentCollection = await cartService.createPaymentCollection(
-          cartWithShipping.id,
-          state.token || null,
-        );
-
-        const collectionWithSessions = await cartService.initPaymentSession({
-          paymentCollectionId: paymentCollection.id,
-          providerId: 'pp_razorpay_razorpay',
+        const sessionResult = await cartService.createOrReuseRazorpaySession({
+          cartId: cartWithShipping.id,
           token: state.token || null,
         });
 
-        const collection =
-          collectionWithSessions.payment_collection || collectionWithSessions;
-
-        const sessionsArray = Array.isArray(collection.payment_sessions)
-          ? collection.payment_sessions
-          : Array.isArray(collection.paymentSessions)
-          ? collection.paymentSessions
-          : [];
-
-        const primarySession = sessionsArray[0] || null;
-
         return {
           cartId: cartWithShipping.id,
-          paymentCollectionId: collection.id,
-          razorpaySession: primarySession?.data || {},
+          paymentCollectionId: sessionResult.paymentCollectionId || null,
+          paymentAttempt: sessionResult.attempt || null,
+          razorpaySession: sessionResult.razorpaySession || {},
         };
       } catch (err) {
         if (isInsufficientInventoryError(err)) {
@@ -906,6 +1090,8 @@ export const RetailProvider = ({ children }) => {
       toast: state.toast,
       showToast,
       clearToast,
+      setPaymentRecovery,
+      clearPaymentRecovery,
       login,
       logout,
       refreshCustomerProfile,
@@ -935,6 +1121,8 @@ export const RetailProvider = ({ children }) => {
       state.toast,
       showToast,
       clearToast,
+      setPaymentRecovery,
+      clearPaymentRecovery,
       login,
       logout,
       fetchProducts,
