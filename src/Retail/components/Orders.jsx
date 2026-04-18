@@ -40,15 +40,12 @@ const Orders = () => {
     return true;
   });
 
-  if (!user) {
+  if (loading && orders.length === 0) {
     return (
-      <section className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-12 text-center text-xs text-gray-600">
-        <FiPackage className="mb-3 text-4xl text-gray-300" />
-        <p className="font-semibold text-gray-800">Sign in to view your orders</p>
-        <p className="mt-1 max-w-xs text-xs text-gray-500">
-          Once you complete purchases while signed in, your order history will appear here.
-        </p>
-      </section>
+      <div className="flex flex-col items-center justify-center rounded-2xl border border-gray-100 bg-white px-4 py-10 text-center text-xs text-gray-600">
+        <FiLoader className="mb-3 animate-spin text-2xl text-blue-500" />
+        <p>Loading your orders...</p>
+      </div>
     );
   }
 
@@ -84,13 +81,6 @@ const Orders = () => {
         <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
           <FiAlertCircle className="text-sm" />
           <span className="flex-1 truncate">{error}</span>
-        </div>
-      )}
-
-      {loading && orders.length === 0 && (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-gray-100 bg-white px-4 py-10 text-center text-xs text-gray-600">
-          <FiLoader className="mb-3 animate-spin text-2xl text-blue-500" />
-          <p>Loading your orders...</p>
         </div>
       )}
 
