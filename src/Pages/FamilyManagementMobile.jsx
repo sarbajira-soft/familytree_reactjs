@@ -15,10 +15,18 @@ import { getToken } from "../utils/auth";
 import { copyFamilyInvite, shareFamilyInvite } from "../utils/familyInviteShare";
 
 const normalizeFamilyCode = (value) => String(value || "").trim().toUpperCase();
+const isInactiveMembershipMessage = (message) => {
+  const normalized = String(message || "").trim().toLowerCase();
+  return (
+    normalized.includes('not an active member of this family') ||
+    normalized.includes('family member already removed')
+  );
+};
+
 
 const FamilyManagementMobile = () => {
   const navigate = useNavigate();
-  const { userInfo } = useUser();
+  const { userInfo, refetchUser } = useUser();
 
   const hasFamily = !!userInfo?.familyCode;
   const pendingFamilyCode = userInfo?.pendingFamilyCode || '';
@@ -111,6 +119,7 @@ const FamilyManagementMobile = () => {
         });
         if (!res.ok) {
           setFamilyData(null);
+          await refetchUser?.({ silent: true, throttleMs: 0 });
           return;
         }
         const json = await res.json();
@@ -359,6 +368,20 @@ const FamilyManagementMobile = () => {
         setInviteCopySuccess(false);
       }, 2000);
     } catch (error) {
+      if (isInactiveMembershipMessage(error?.message)) {
+        try {
+          await refetchUser?.({ silent: true, throttleMs: 0 });
+        } catch (_) {
+          // Ignore refresh errors and still show the backend message.
+        }
+      }
+      if (isInactiveMembershipMessage(error?.message)) {
+        try {
+          await refetchUser?.({ silent: true, throttleMs: 0 });
+        } catch (_) {
+          // Ignore refresh errors and still show the backend message.
+        }
+      }
       await Swal.fire({
         icon: 'error',
         title: 'Copy Failed',
@@ -471,6 +494,13 @@ const FamilyManagementMobile = () => {
 
       window.location.reload();
     } catch (error) {
+      if (isInactiveMembershipMessage(error?.message)) {
+        try {
+          await refetchUser?.({ silent: true, throttleMs: 0 });
+        } catch (_) {
+          // Ignore refresh errors and still show the backend message.
+        }
+      }
       await Swal.fire({
         icon: 'error',
         title: 'Unable to Leave Family',
@@ -800,5 +830,6 @@ const FamilyManagementMobile = () => {
 };
 
 export default FamilyManagementMobile;
+
 
 

@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import PropTypes from "prop-types";
 import React, { useEffect, useMemo, useState } from "react";
 import {
@@ -308,6 +308,7 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
   const { userInfo } = useUser();
   const { setSelectedGiftEvent } = useGiftEvent();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const token = getToken();
   const [isGalleryModalOpen, setIsGalleryModalOpen] = useState(false);
   const [selectedAlbum, setSelectedAlbum] = useState(null);
@@ -389,6 +390,12 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
     const formattedAlbum = formatAlbumForModal(album);
     setSelectedAlbum(formattedAlbum);
     setIsGalleryModalOpen(true);
+  };
+
+  const onGalleryCreated = async () => {
+    await queryClient.invalidateQueries({
+      queryKey: ["dashboardGallery", userInfo?.userId],
+    });
   };
 
   const handleProductSuggestionClick = (product) => {
@@ -937,6 +944,10 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
       <CreateAlbumModal
         isOpen={isCreateAlbumModalOpen}
         onClose={() => setIsCreateAlbumModalOpen(false)}
+        onCreateAlbum={onGalleryCreated}
+        currentUser={userInfo}
+        authToken={token}
+        mode="create"
       />
       <CreatePostModal
         isOpen={isCreatePostModalOpen}
@@ -973,4 +984,6 @@ Dashboard.propTypes = {
 };
 
 export default Dashboard;
+
+
 

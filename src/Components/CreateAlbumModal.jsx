@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { FaTimes, FaUpload, FaImage, FaTrashAlt, FaPlus } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 import { throwIfNotOk } from '../utils/apiMessages';
+import { getToken } from '../utils/auth';
 import { useUser } from '../Contexts/UserContext';
 import { hasFamilyAccessStatus } from '../utils/familyAccess';
 
@@ -260,7 +261,9 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
             return;
         }
 
-        if (!authToken) {
+        const accessToken = authToken || getToken();
+
+        if (!accessToken) {
             Swal.fire({
                 icon: 'error',
                 title: 'Not authenticated',
@@ -358,7 +361,7 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
             const response = await fetch(url, {
                 method: method,
                 headers: {
-                    'Authorization': `Bearer ${authToken}`,
+                    'Authorization': `Bearer ${accessToken}`,
                 },
                 body: formData,
             });
@@ -787,3 +790,4 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
 };
 
 export default CreateAlbumModal;
+

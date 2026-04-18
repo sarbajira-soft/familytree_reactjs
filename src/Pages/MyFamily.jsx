@@ -18,10 +18,18 @@ import { shareFamilyInvite } from '../utils/familyInviteShare';
 
 const normalizeFamilyCode = (value) => String(value || '').trim().toUpperCase();
 
+const isInactiveMembershipMessage = (message) => {
+  const normalized = String(message || '').trim().toLowerCase();
+  return (
+    normalized.includes('not an active member of this family') ||
+    normalized.includes('family member already removed')
+  );
+};
+
 const FamilyHubPage = () => {
   const navigate = useNavigate();
   const [token, setToken] = useState(null);
-  const { userInfo, userLoading } = useUser();
+  const { userInfo, userLoading, refetchUser } = useUser();
   const [familyData, setFamilyData] = useState(null);
   const [isCreateFamilyModalOpen, setIsCreateFamilyModalOpen] = useState(false);
   const [isJoinFamilyModalOpen, setIsJoinFamilyModalOpen] = useState(false);
@@ -62,7 +70,9 @@ const FamilyHubPage = () => {
           headers: { accept: 'application/json' },
         });
 
-        if (!response.ok) throw new Error('Failed to fetch family data');
+        if (!response.ok) {
+          throw new Error('Failed to fetch family data');
+        }
         const data = await response.json();
 
         if (!ignore) {
@@ -78,6 +88,11 @@ const FamilyHubPage = () => {
           setError('Failed to load family data.');
           setFamilyData(null);
         }
+        try {
+          await refetchUser?.({ silent: true, throttleMs: 0 });
+        } catch (_) {
+          // Ignore refresh errors here and let the existing UI fallback handle it.
+        }
       }
     };
 
@@ -86,7 +101,7 @@ const FamilyHubPage = () => {
     return () => {
       ignore = true;
     };
-  }, [userInfo?.familyCode, userInfo?.approveStatus, userLoading]);
+  }, [refetchUser, userInfo?.familyCode, userInfo?.approveStatus, userLoading]);
 
   const handleCreateFamily = async () => {
     setLoadingSuggestions(true);
@@ -267,6 +282,13 @@ const FamilyHubPage = () => {
 
       window.location.reload();
     } catch (error) {
+      if (isInactiveMembershipMessage(error?.message)) {
+        try {
+          await refetchUser?.({ silent: true, throttleMs: 0 });
+        } catch (_) {
+          // Ignore refresh errors and still show the backend message.
+        }
+      }
       await Swal.fire({
         icon: 'error',
         title: 'Unable to Leave Family',
@@ -500,4 +522,5 @@ const FamilyHubPage = () => {
 };
 
 export default FamilyHubPage;
+
 

@@ -169,7 +169,7 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
 
     try {
       setIsSavingPrivacySettings(true);
-      await Swal.fire({
+      Swal.fire({
         title: 'Saving... ',
         allowOutsideClick: false,
         allowEscapeKey: false,
@@ -183,6 +183,7 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
         userId,
         settings: privacySettings,
       });
+      Swal.close();
       setPrivacySettings(saved);
       setPrivacySavedAt(saved?.updatedAt || '');
 
@@ -192,7 +193,7 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
         }),
       );
 
-      await Swal.fire({
+      Swal.fire({
         icon: 'success',
         title: 'Privacy Saved',
         text: 'Your content privacy settings have been updated.',
@@ -201,7 +202,8 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
       });
     } catch (error) {
       logger.error('Failed to save content privacy settings', error);
-      await Swal.fire({
+      Swal.close();
+      Swal.fire({
         icon: 'error',
         title: 'Save Failed',
         text: error?.message || 'Unable to update your content privacy settings.',
@@ -466,7 +468,7 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
       await refreshFamilyManagementState();
     } catch (error) {
       logger.error('Failed to replace dummy user', error);
-      await Swal.fire({ icon: 'error', title: 'Replace Failed', text: error?.message || 'Unable to replace this dummy user right now.' });
+      Swal.fire({ icon: 'error', title: 'Replace Failed', text: error?.message || 'Unable to replace this dummy user right now.' });
     } finally {
       setReplacingDummyIds((prev) => {
         const next = new Set(prev);
@@ -482,7 +484,7 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
     try {
       const result = await shareFamilyInvite(birthFamilyCode);
       if (result?.method === 'copy') {
-        await Swal.fire({
+        Swal.fire({
           icon: 'success',
           title: 'Invite Copied',
           text: 'The sign-up invite and family code have been copied.',
@@ -491,7 +493,7 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
     } catch (error) {
       if (error?.name === 'AbortError') return;
       logger.error('Failed to share invite', error);
-      await Swal.fire({
+      Swal.fire({
         icon: 'error',
         title: 'Share Failed',
         text: error?.message || 'Unable to share the family invite right now.',
@@ -530,7 +532,7 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
       await refreshFamilyManagementState();
     } catch (error) {
       logger.error('Failed to delete family member', error);
-      await Swal.fire({ icon: 'error', title: 'Action Failed', text: error?.message || 'Unable to update this family member right now.' });
+      Swal.fire({ icon: 'error', title: 'Action Failed', text: error?.message || 'Unable to update this family member right now.' });
     }
   };
   const filteredMembers = useMemo(() => {
@@ -1896,6 +1898,8 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
 };
 
 export default FamilyMemberCard;
+
+
 
 
 
