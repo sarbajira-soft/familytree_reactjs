@@ -21,6 +21,7 @@ import OfflineUI from "./Components/OfflineUI";
 import PrivateRoute from "./Routes/PrivateRoute";
 import GuestRoute from "./Routes/GuestRoute";
 import Layout from "./Components/Layout";
+import AuthLayout from "./Layouts/AuthLayout";
 
 // ✅ Lazy load all pages for code splitting
 const Login = lazy(() => import("./Pages/Login"));
@@ -118,63 +119,24 @@ function App() {
               <AppContent />
               <Suspense fallback={<LoadingFallback />}>
                 <Routes>
-              {/* ---------------- Guest-only Routes ---------------- */}
+              {/* ---------------- Guest-only Auth Routes (Persistent Layout) ---------------- */}
               <Route
-                path="/"
                 element={
                   <GuestRoute>
-                    <Login />
+                    <AuthLayout />
                   </GuestRoute>
                 }
-              />
-              <Route
-                path="/login"
-                element={
-                  <GuestRoute>
-                    <Login />
-                  </GuestRoute>
-                }
-              />
-              <Route
-                path="/register"
-                element={
-                  <GuestRoute>
-                    <Register />
-                  </GuestRoute>
-                }
-              />
-              <Route
-                path="/forgot-password"
-                element={
-                  <GuestRoute>
-                    <ForgotPassword />
-                  </GuestRoute>
-                }
-              />
-              <Route
-                path="/reset-password"
-                element={
-                  <GuestRoute>
-                    <ResetPassword />
-                  </GuestRoute>
-                }
-              />
-              <Route
-                path="/verify-otp"
-                element={
-                  <GuestRoute>
-                    <VerifyOtp />
-                  </GuestRoute>
-                }
-              />
-              <Route
-                path="/account-recovery"
-                element={
-                  <GuestRoute>
-                    <AccountRecoveryPage />
-                  </GuestRoute>
-                }
-              />
+              >
+                <Route path="/" element={<Login />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/verify-otp" element={<VerifyOtp />} />
+                <Route path="/account-recovery" element={<AccountRecoveryPage />} />
+              </Route>
+
+              {/* ---------------- Guest-only Routes without Auth Layout ---------------- */}
               <Route
                 path="/edit-profile"
                 element={

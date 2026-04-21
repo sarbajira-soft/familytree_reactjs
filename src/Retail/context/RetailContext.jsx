@@ -23,6 +23,8 @@ const initialState = {
   token: null,
   cart: null,
   cartId: null,
+  regions: [],
+  selectedRegionId: null,
   products: [],
   productCategories: [],
   selectedCategoryId: 'all',
@@ -55,6 +57,10 @@ function reducer(state, action) {
       return { ...state, cart: action.payload, cartId: action.payload ? action.payload.id : null };
     case 'SET_CART_ID':
       return { ...state, cartId: action.payload };
+    case 'SET_REGIONS':
+      return { ...state, regions: action.payload };
+    case 'SET_SELECTED_REGION_ID':
+      return { ...state, selectedRegionId: action.payload };
     case 'SET_PRODUCTS':
       return { ...state, products: action.payload };
     case 'SET_PRODUCT_CATEGORIES':
@@ -110,6 +116,18 @@ export const RetailProvider = ({ children }) => {
     dispatch({ type: 'SET_TOKEN', payload: token || null });
   }, []);
 
+  const setSelectedRegionPersistent = useCallback((regionId) => {
+    const normalizedRegionId = regionId || null;
+
+    if (normalizedRegionId) {
+      localStorage.setItem(MEDUSA_REGION_ID_KEY, normalizedRegionId);
+    } else {
+      localStorage.removeItem(MEDUSA_REGION_ID_KEY);
+    }
+
+    dispatch({ type: 'SET_SELECTED_REGION_ID', payload: normalizedRegionId });
+  }, []);
+
   const setCartPersistent = useCallback((cart) => {
     if (cart && cart.id) {
       localStorage.setItem(MEDUSA_CART_ID_KEY, cart.id);
@@ -117,6 +135,7 @@ export const RetailProvider = ({ children }) => {
       const regionId = cart?.region_id || cart?.region?.id || null;
       if (regionId) {
         localStorage.setItem(MEDUSA_REGION_ID_KEY, regionId);
+        dispatch({ type: 'SET_SELECTED_REGION_ID', payload: regionId });
       }
       dispatch({ type: 'SET_CART', payload: cart });
     } else {
@@ -132,6 +151,7 @@ export const RetailProvider = ({ children }) => {
     try {
       let storedToken = localStorage.getItem(MEDUSA_TOKEN_KEY);
       const storedCartId = localStorage.getItem(MEDUSA_CART_ID_KEY);
+      const storedRegionId = localStorage.getItem(MEDUSA_REGION_ID_KEY);
 
       if (!storedToken) {
         const appAccessToken = localStorage.getItem('access_token');
@@ -155,6 +175,23 @@ export const RetailProvider = ({ children }) => {
         } catch (err) {
           setToken(null);
         }
+      }
+
+      let resolvedRegionId = storedRegionId || null;
+      try {
+        const regions = await productService.fetchRegions(storedToken || null);
+        const normalizedRegions = Array.isArray(regions) ? regions : [];
+        dispatch({ type: 'SET_REGIONS', payload: normalizedRegions });
+
+        if (!resolvedRegionId && normalizedRegions.length > 0) {
+          resolvedRegionId = normalizedRegions[0]?.id || null;
+        }
+
+        if (resolvedRegionId) {
+          setSelectedRegionPersistent(resolvedRegionId);
+        }
+      } catch {
+        dispatch({ type: 'SET_REGIONS', payload: [] });
       }
 
       if (storedCartId) {
@@ -217,7 +254,10 @@ export const RetailProvider = ({ children }) => {
             const recovery = await recoverCartPayment();
 
             if (recovery?.status === 'completed' && recovery?.order) {
-              const recoveredCart = await cartService.createCart(storedToken || null);
+              const recoveredCart = await cartService.createCart(
+                storedToken || null,
+                cart?.region_id || cart?.region?.id || resolvedRegionId || null,
+              );
               let nextCart = recoveredCart;
 
               if (storedToken) {
@@ -246,14 +286,21 @@ export const RetailProvider = ({ children }) => {
         }
       }
 
-      const newCart = await cartService.createCart(storedToken || null);
+      const newCart = await cartService.createCart(storedToken || null, resolvedRegionId);
       setCartPersistent(newCart);
     } catch (err) {
       dispatch({ type: 'SET_ERROR', payload: getErrorMessage(err) });
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
-  }, [clearPaymentRecovery, setCartPersistent, setPaymentRecovery, setToken, showToast]);
+  }, [
+    clearPaymentRecovery,
+    setCartPersistent,
+    setPaymentRecovery,
+    setSelectedRegionPersistent,
+    setToken,
+    showToast,
+  ]);
 
   useEffect(() => {
     bootstrap();
@@ -286,7 +333,7 @@ export const RetailProvider = ({ children }) => {
           }
         }
 
-        const createdCart = await cartService.createCart(token);
+        const createdCart = await cartService.createCart(token, state.selectedRegionId || null);
         try {
           const transferredCart = await cartService.transferCart(createdCart.id, token);
           setCartPersistent(transferredCart);
@@ -301,7 +348,7 @@ export const RetailProvider = ({ children }) => {
         dispatch({ type: 'SET_LOADING', payload: false });
       }
     },
-    [setToken, setCartPersistent, state.cartId],
+    [setToken, setCartPersistent, state.cartId, state.selectedRegionId],
   );
 
   const logout = useCallback(() => {
@@ -428,7 +475,10 @@ export const RetailProvider = ({ children }) => {
       }
     }
 
-    const createdCart = await cartService.createCart(storedToken || null);
+    const createdCart = await cartService.createCart(
+      storedToken || null,
+      state.selectedRegionId || localStorage.getItem(MEDUSA_REGION_ID_KEY) || null,
+    );
     let nextCart = createdCart;
     if (storedToken) {
       try {
@@ -439,13 +489,16 @@ export const RetailProvider = ({ children }) => {
     }
     setCartPersistent(nextCart);
     return nextCart;
-  }, [setCartPersistent, state.cart, state.cartId, state.token]);
+  }, [setCartPersistent, state.cart, state.cartId, state.selectedRegionId, state.token]);
 
   const createFreshCart = useCallback(async () => {
-    const newCart = await cartService.createCart(state.token || null);
+    const newCart = await cartService.createCart(
+      state.token || null,
+      state.selectedRegionId || null,
+    );
     setCartPersistent(newCart);
     return newCart;
-  }, [setCartPersistent, state.token]);
+  }, [setCartPersistent, state.selectedRegionId, state.token]);
 
   const fetchProducts = useCallback(async ({ categoryId: categoryIdOverride } = {}) => {
     dispatch({ type: 'SET_LOADING', payload: true });
@@ -455,6 +508,7 @@ export const RetailProvider = ({ children }) => {
       const regionId =
         state.cart?.region_id ||
         state.cart?.region?.id ||
+        state.selectedRegionId ||
         localStorage.getItem(MEDUSA_REGION_ID_KEY) ||
         null;
       const rawCategoryId = categoryIdOverride ?? state.selectedCategoryId;
@@ -470,7 +524,7 @@ export const RetailProvider = ({ children }) => {
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });
     }
-  }, [state.token, state.cart, state.selectedCategoryId]);
+  }, [state.token, state.cart, state.selectedCategoryId, state.selectedRegionId]);
 
   const fetchProductCategories = useCallback(async () => {
     dispatch({ type: 'SET_ERROR', payload: null });
@@ -485,6 +539,69 @@ export const RetailProvider = ({ children }) => {
       return [];
     }
   }, [state.token]);
+
+  const fetchRegions = useCallback(async () => {
+    dispatch({ type: 'SET_ERROR', payload: null });
+
+    try {
+      const regions = await productService.fetchRegions(state.token || null);
+      const normalizedRegions = Array.isArray(regions) ? regions : [];
+      dispatch({ type: 'SET_REGIONS', payload: normalizedRegions });
+
+      if (!state.selectedRegionId && normalizedRegions.length > 0) {
+        setSelectedRegionPersistent(normalizedRegions[0]?.id || null);
+      }
+
+      return normalizedRegions;
+    } catch (err) {
+      dispatch({ type: 'SET_ERROR', payload: getErrorMessage(err) });
+      dispatch({ type: 'SET_REGIONS', payload: [] });
+      return [];
+    }
+  }, [setSelectedRegionPersistent, state.selectedRegionId, state.token]);
+
+  const changeRegion = useCallback(
+    async (regionId) => {
+      if (!regionId || regionId === state.selectedRegionId) {
+        return state.selectedRegionId;
+      }
+
+      dispatch({ type: 'SET_LOADING', payload: true });
+      dispatch({ type: 'SET_ERROR', payload: null });
+
+      try {
+        setSelectedRegionPersistent(regionId);
+        const nextCart = await cartService.createCart(state.token || null, regionId);
+        let persistedCart = nextCart;
+
+        if (state.token) {
+          try {
+            persistedCart = await cartService.transferCart(nextCart.id, state.token);
+          } catch {
+            persistedCart = nextCart;
+          }
+        }
+
+        setCartPersistent(persistedCart);
+        await fetchProducts({ categoryId: state.selectedCategoryId });
+        return regionId;
+      } catch (err) {
+        const message = getErrorMessage(err);
+        dispatch({ type: 'SET_ERROR', payload: message });
+        throw new Error(message);
+      } finally {
+        dispatch({ type: 'SET_LOADING', payload: false });
+      }
+    },
+    [
+      fetchProducts,
+      setCartPersistent,
+      setSelectedRegionPersistent,
+      state.selectedCategoryId,
+      state.selectedRegionId,
+      state.token,
+    ],
+  );
 
   const setSelectedCategoryId = useCallback((categoryId) => {
     dispatch({ type: 'SET_SELECTED_CATEGORY_ID', payload: categoryId || 'all' });
@@ -535,7 +652,10 @@ export const RetailProvider = ({ children }) => {
           if (status !== 404) throw err;
 
           localStorage.removeItem(MEDUSA_CART_ID_KEY);
-          const createdCart = await cartService.createCart(storedToken);
+          const createdCart = await cartService.createCart(
+            storedToken,
+            state.selectedRegionId || localStorage.getItem(MEDUSA_REGION_ID_KEY) || null,
+          );
           let newCart = createdCart;
           try {
             newCart = await cartService.transferCart(createdCart.id, storedToken);
@@ -749,7 +869,10 @@ export const RetailProvider = ({ children }) => {
             : 'Payment received. We are finalizing your order securely.');
 
         if (nextStatus === 'completed' && latestRecovery?.order) {
-          let recoveredCart = await cartService.createCart(state.token || null);
+          let recoveredCart = await cartService.createCart(
+            state.token || null,
+            state.selectedRegionId || localStorage.getItem(MEDUSA_REGION_ID_KEY) || null,
+          );
 
           if (state.token) {
             try {
@@ -855,7 +978,7 @@ export const RetailProvider = ({ children }) => {
   );
 
   const createReturn = useCallback(
-    async ({ orderId, items, returnShipping }) => {
+    async ({ orderId, items, note }) => {
       if (!orderId) return null;
 
       if (!state.token) {
@@ -869,7 +992,7 @@ export const RetailProvider = ({ children }) => {
         const createdReturn = await orderService.createReturn({
           orderId,
           items,
-          returnShipping,
+          note,
           token: state.token,
         });
         await fetchOrders();
@@ -887,7 +1010,95 @@ export const RetailProvider = ({ children }) => {
         dispatch({ type: 'SET_LOADING', payload: false });
       }
     },
+    [state.token, fetchOrders, showToast],
+  );
+
+  const createRefundRequest = useCallback(
+    async ({ orderId, items, note }) => {
+      if (!orderId) return null;
+
+      if (!state.token) {
+        throw new Error('Not authenticated');
+      }
+
+      dispatch({ type: 'SET_LOADING', payload: true });
+      dispatch({ type: 'SET_ERROR', payload: null });
+
+      try {
+        const request = await orderService.createRefundRequest({
+          orderId,
+          items,
+          note,
+          token: state.token,
+        });
+        await fetchOrders();
+        return request;
+      } catch (err) {
+        const message = getErrorMessage(err);
+        dispatch({ type: 'SET_ERROR', payload: message });
+        throw new Error(message);
+      } finally {
+        dispatch({ type: 'SET_LOADING', payload: false });
+      }
+    },
     [state.token, fetchOrders],
+  );
+
+  const cancelOrder = useCallback(
+    async (orderId) => {
+      if (!orderId) return null;
+
+      if (!state.token) {
+        throw new Error('Not authenticated');
+      }
+
+      dispatch({ type: 'SET_LOADING', payload: true });
+      dispatch({ type: 'SET_ERROR', payload: null });
+
+      try {
+        const cancelledOrder = await orderService.cancelOrder(orderId, state.token);
+        await fetchOrders();
+        return cancelledOrder;
+      } catch (err) {
+        const message = getErrorMessage(err);
+        dispatch({ type: 'SET_ERROR', payload: message });
+        throw new Error(message);
+      } finally {
+        dispatch({ type: 'SET_LOADING', payload: false });
+      }
+    },
+    [state.token, fetchOrders],
+  );
+
+  const fetchOrderTracking = useCallback(
+    async (orderId) => {
+      if (!orderId) return null;
+      return await orderService.fetchOrderTracking(orderId, state.token || null);
+    },
+    [state.token],
+  );
+
+  const fetchOrderTimeline = useCallback(
+    async (orderId) => {
+      if (!orderId) return null;
+      return await orderService.fetchOrderTimeline(orderId, state.token || null);
+    },
+    [state.token],
+  );
+
+  const fetchOrderInvoice = useCallback(
+    async (orderId) => {
+      if (!orderId) return '';
+      return await orderService.fetchOrderInvoice(orderId, state.token || null);
+    },
+    [state.token],
+  );
+
+  const fetchReturnReasons = useCallback(
+    async () => {
+      return await orderService.fetchReturnReasons(state.token || null);
+    },
+    [state.token],
   );
 
   const getShippingOptionsForCart = useCallback(
@@ -1101,6 +1312,8 @@ export const RetailProvider = ({ children }) => {
       deleteCustomerAddress,
       fetchProducts,
       fetchProductCategories,
+      fetchRegions,
+      changeRegion,
       addToCart,
       removeFromCart,
       updateCartQuantity,
@@ -1108,6 +1321,12 @@ export const RetailProvider = ({ children }) => {
       fetchOrdersPage,
       retrieveOrder,
       createReturn,
+      createRefundRequest,
+      cancelOrder,
+      fetchOrderTracking,
+      fetchOrderTimeline,
+      fetchOrderInvoice,
+      fetchReturnReasons,
       refreshCart,
       createFreshCart,
       completeCheckout,
@@ -1127,12 +1346,21 @@ export const RetailProvider = ({ children }) => {
       logout,
       fetchProducts,
       fetchProductCategories,
+      fetchRegions,
+      changeRegion,
       addToCart,
       removeFromCart,
       updateCartQuantity,
       fetchOrders,
       fetchOrdersPage,
       retrieveOrder,
+      createReturn,
+      createRefundRequest,
+      cancelOrder,
+      fetchOrderTracking,
+      fetchOrderTimeline,
+      fetchOrderInvoice,
+      fetchReturnReasons,
       refreshCart,
       createFreshCart,
       completeCheckout,

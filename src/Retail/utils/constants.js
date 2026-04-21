@@ -2,8 +2,12 @@ const {
   VITE_API_BASE_URL,
 } = import.meta.env;
 
-export const RETAIL_PROXY_BASE_URL = VITE_API_BASE_URL
-  ? `${String(VITE_API_BASE_URL).replace(/\/$/, '')}/retail`
+export const API_BASE_URL = VITE_API_BASE_URL
+  ? String(VITE_API_BASE_URL).replace(/\/$/, '')
+  : '';
+
+export const RETAIL_PROXY_BASE_URL = API_BASE_URL
+  ? `${API_BASE_URL}/retail`
   : '/retail';
 
 export const MEDUSA_TOKEN_KEY = 'medusa_retail_token';

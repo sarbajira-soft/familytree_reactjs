@@ -45,20 +45,19 @@ const ForgotPassword = () => {
   };
 
   return (
-    <div className="min-h-screen w-full bg-gray-50 dark:bg-slate-950 flex items-center justify-center px-4">
-      <div className="w-full max-w-md px-4 sm:px-6 lg:px-8">
-        {/* Logo */}
-        <div className="flex justify-center mb-1">
-          <AuthLogo className="w-28 h-28" />
-        </div>
+    <>
+      {/* Logo */}
+      <div className="flex justify-center mb-1">
+        <AuthLogo className="w-28 h-28" />
+      </div>
 
-        {/* Title */}
-        <div className="text-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Forgot Password</h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Enter your email to receive an OTP
-          </p>
-        </div>
+      {/* Title */}
+      <div className="text-center mb-6">
+        <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Forgot Password</h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+          Enter your email to receive an OTP
+        </p>
+      </div>
 
         {error && (
           <div className="mb-4 p-3 text-sm rounded border text-red-700 bg-red-100 border-red-300">
@@ -105,8 +104,7 @@ const ForgotPassword = () => {
             &larr; Back to Login
           </Link>
         </div>
-      </div>
-    </div>
+    </>
   );
 };
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
 import AuthLogo from '../Components/AuthLogo';
 import { markOtpSent, readOtpSecondsLeft } from '../utils/otpCooldown';
 import {
@@ -172,18 +172,17 @@ const ResetPassword = () => {
   };
 
   return (
-    <div className="min-h-screen w-full bg-gray-50 flex items-center justify-center px-4">
-      <div className="w-full max-w-md px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-center mb-1">
-          <AuthLogo className="w-28 h-28" />
-        </div>
+    <>
+      <div className="flex justify-center mb-1">
+        <AuthLogo className="w-28 h-28" />
+      </div>
 
-        <div className="text-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-800">Reset Password</h2>
-          <p className="text-sm text-gray-500 mt-1">
-            Enter the OTP and your new password
-          </p>
-        </div>
+      <div className="text-center mb-6">
+        <h2 className="text-2xl font-bold text-gray-800">Reset Password</h2>
+        <p className="text-sm text-gray-500 mt-1">
+          Enter the OTP and your new password
+        </p>
+      </div>
 
         {success && (
           <div className="mb-4 p-3 text-sm rounded border text-green-700 bg-green-100 border-green-300">
@@ -316,16 +315,15 @@ const ResetPassword = () => {
 
         <div className="text-center mt-4 text-sm">
           <p>
-            <a
-              href="/"
+            <Link
+              to="/"
               className="text-[var(--color-primary)] hover:underline focus:outline-none"
             >
               &larr; Back to Login
-            </a>
+            </Link>
           </p>
         </div>
-      </div>
-    </div>
+    </>
   );
 };
 

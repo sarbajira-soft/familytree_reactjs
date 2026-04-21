@@ -25,6 +25,10 @@ const Header = ({
     cart,
     cartCount,
     user,
+    regions,
+    selectedRegionId,
+    changeRegion,
+    loading,
     logout,
     productCategories,
     selectedCategoryId,
@@ -57,6 +61,31 @@ const Header = ({
   };
 
   const miniCartItems = cart?.items?.slice(0, 3) || [];
+
+  const handleRegionChange = async (event) => {
+    const nextRegionId = event.target.value || null;
+
+    if (!nextRegionId || nextRegionId === selectedRegionId) {
+      return;
+    }
+
+    if (cartCount > 0) {
+      const confirmed = window.confirm(
+        'Changing the region will start a fresh cart because pricing and availability can change. Continue?',
+      );
+
+      if (!confirmed) {
+        event.target.value = selectedRegionId || '';
+        return;
+      }
+    }
+
+    try {
+      await changeRegion(nextRegionId);
+    } catch {
+      event.target.value = selectedRegionId || '';
+    }
+  };
 
   const renderMiniCart = () => {
     if (!showMiniCart || miniCartItems.length === 0) return null;
@@ -156,6 +185,21 @@ const Header = ({
                   </option>
                 ))}
               </select>
+
+              {(regions || []).length > 0 && (
+                <select
+                  value={selectedRegionId || ''}
+                  onChange={handleRegionChange}
+                  disabled={loading}
+                  className="h-[30px] min-w-[130px] rounded-full border border-gray-200 bg-white px-3 text-xs text-gray-700 shadow-sm focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                >
+                  {(regions || []).map((region) => (
+                    <option key={region.id} value={region.id}>
+                      {region.name || region.currency_code?.toUpperCase() || 'Region'}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           )}
         </div>

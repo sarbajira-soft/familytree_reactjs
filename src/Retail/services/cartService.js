@@ -5,10 +5,10 @@ const client = axios.create({
   baseURL: RETAIL_PROXY_BASE_URL,
 });
 
-export async function createCart(token) {
+export async function createCart(token, regionId = null) {
   const res = await client.post(
     '/store/carts',
-    {},
+    regionId ? { region_id: regionId } : {},
     { 
       headers: buildJsonHeaders(token)
      },
@@ -289,6 +289,14 @@ export async function addShippingMethods({ cartId, options = [], token }) {
 
   const payload = res.data;
   return payload.cart || payload;
+}
+
+export async function getShippingCoverage({ cartId, token }) {
+  const res = await client.get(`/store/carts/${cartId}/shipping-coverage`, {
+    headers: buildBaseHeaders(token),
+  });
+
+  return res.data || null;
 }
 
 export async function createPaymentCollection(cartId, token) {

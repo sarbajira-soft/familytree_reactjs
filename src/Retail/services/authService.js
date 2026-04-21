@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { RETAIL_PROXY_BASE_URL, buildJsonHeaders } from '../utils/constants';
+import { API_BASE_URL, RETAIL_PROXY_BASE_URL, buildJsonHeaders } from '../utils/constants';
 
 const client = axios.create({
   baseURL: RETAIL_PROXY_BASE_URL,
@@ -34,21 +34,49 @@ export async function completeCustomerProfile(token, profile) {
 }
 
 export async function loginCustomer({ email, password }) {
-  const res = await client.post(
-    '/auth/customer/emailpass',
-    { email, password },
-    { headers: buildJsonHeaders() },
-  );
+  try {
+    const res = await client.post(
+      '/auth/customer/emailpass',
+      { email, password },
+      { headers: buildJsonHeaders() },
+    );
 
-  const token = extractToken(res.data) || res.data?.token;
+    const token = extractToken(res.data) || res.data?.token;
 
-  if (!token) {
-    throw new Error('Login succeeded but no token was returned.');
+    if (!token) {
+      throw new Error('Login succeeded but no token was returned.');
+    }
+
+    const { customer } = await getCustomerProfile(token);
+
+    return { token, customer };
+  } catch (error) {
+    if (!API_BASE_URL) {
+      throw error;
+    }
+
+    const appLoginResponse = await axios.post(
+      `${API_BASE_URL}/user/login`,
+      {
+        username: email,
+        password,
+      },
+      {
+        headers: buildJsonHeaders(),
+      },
+    );
+
+    const appAccessToken =
+      appLoginResponse?.data?.accessToken ||
+      appLoginResponse?.data?.access_token ||
+      null;
+
+    if (!appAccessToken) {
+      throw error;
+    }
+
+    return await loginCustomerViaAppSso(appAccessToken);
   }
-
-  const { customer } = await getCustomerProfile(token);
-
-  return { token, customer };
 }
 
 export async function loginCustomerViaAppSso(appAccessToken) {

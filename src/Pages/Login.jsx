@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import AuthLogo from '../Components/AuthLogo';
 import { setAuthData, isAuthenticated } from '../utils/auth';
 import { useUser } from '../Contexts/UserContext';
@@ -205,23 +205,19 @@ const Login = () => {
   };
 
   return (
-    <div
-      className="w-full bg-gray-50 dark:bg-slate-950 flex items-center justify-center px-4 relative overflow-y-auto"
-      style={{ minHeight: '100dvh', paddingTop: 'env(safe-area-inset-top, 0px)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
-    >
-      <div className="w-full max-w-md px-4 sm:px-6 lg:px-8">
-        {/* Logo */}
-        <div className="flex justify-center mb-1">
-          <AuthLogo className="w-28 h-28" />
-        </div>
+    <>
+      {/* Logo */}
+      <div className="flex justify-center mb-1">
+        <AuthLogo className="w-28 h-28" />
+      </div>
 
-        {/* Title */}
-        <div className="text-center mb-9">
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Welcome back!!!</h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Please enter your login details
-          </p>
-        </div>
+      {/* Title */}
+      <div className="text-center mb-9">
+        <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Welcome back!!!</h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+          Please enter your login details
+        </p>
+      </div>
 
         {/* API Error */}
         {apiError && (
@@ -350,17 +346,17 @@ const Login = () => {
               />
               <span className="dark:text-gray-300">Stay logged in</span>
             </label>
-            <a
-              href="/forgot-password"
+            <Link
+              to="/forgot-password"
               className="text-[#1976d2] hover:underline"
             >
               Forgot password?
-            </a>
+            </Link>
           </div>
           <div className="text-right -mt-2">
-            <a href="/account-recovery" className="text-sm text-[#1976d2] hover:underline">
+            <Link to="/account-recovery" className="text-sm text-[#1976d2] hover:underline">
               Recover deleted account
-            </a>
+            </Link>
           </div>
 
           {/* Submit Button with Loader */}
@@ -404,12 +400,11 @@ const Login = () => {
         {/* Sign Up */}
         <p className="text-center text-sm text-gray-500 mt-6 pb-8">
           Don't have an account?{" "}
-          <a href="/register" className="text-[#1976d2] hover:underline">
+          <Link to="/register" className="text-[#1976d2] hover:underline">
             Sign up
-          </a>
+          </Link>
         </p>
-      </div>
-    </div>
+    </>
   );
 };
 

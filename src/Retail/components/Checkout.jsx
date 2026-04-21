@@ -289,6 +289,7 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
   const [billingErrors, setBillingErrors] = useState({});
   const [shippingTouched, setShippingTouched] = useState({});
   const [billingTouched, setBillingTouched] = useState({});
+  const [shippingCoverage, setShippingCoverage] = useState(null);
 
   const displayTotals = completedOrder ? calculateCartTotals(completedOrder) : totals;
   const [giftAddressLoading, setGiftAddressLoading] = useState(false);
@@ -435,6 +436,7 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
       setPaymentMethod('');
       setShippingOptions([]);
       setSelectedShippingId('');
+      setShippingCoverage(null);
       setError(null);
       setSuccess(null);
 
@@ -464,10 +466,32 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
     const loadShippingOptions = async () => {
       setShippingLoading(true);
       setError(null);
+      setShippingCoverage(null);
       try {
-          const fetched = await getShippingOptionsForCart(mode);
+        const fetched = await getShippingOptionsForCart(mode);
         if (cancelled) return;
         setShippingOptions(fetched);
+
+        if (cart?.id) {
+          const coverage = await cartService.getShippingCoverage({
+            cartId: cart.id,
+            token: token || null,
+          });
+
+          if (cancelled) return;
+
+          setShippingCoverage(coverage);
+
+          if (coverage && coverage.ready === false) {
+            setSelectedShippingId('');
+            setError(
+              coverage.message ||
+                'Some items in your cart do not yet have compatible shipping coverage.',
+            );
+            return;
+          }
+        }
+
         if (fetched && fetched.length > 0) {
           setSelectedShippingId(fetched[0].id);
         } else {
@@ -488,7 +512,7 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
     return () => {
       cancelled = true;
     };
-  }, [addressesUpdated, paymentMethod, getShippingOptionsForCart]);
+  }, [addressesUpdated, cart?.id, getShippingOptionsForCart, paymentMethod, token]);
 
   useEffect(() => {
     if (!completedOrder) return;
@@ -496,6 +520,7 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
     setPaymentMethod('');
     setShippingOptions([]);
     setSelectedShippingId('');
+    setShippingCoverage(null);
   }, [completedOrder]);
 
   const handleChange = (setter) => (e) => {
@@ -665,6 +690,28 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
     if (!selectedShippingId) {
       setError('Please select a shipping method.');
       return;
+    }
+
+    if (cart?.id) {
+      try {
+        const coverage = await cartService.getShippingCoverage({
+          cartId: cart.id,
+          token: token || null,
+        });
+
+        setShippingCoverage(coverage);
+
+        if (coverage && coverage.ready === false) {
+          setError(
+            coverage.message ||
+              'Some items in your cart do not yet have compatible shipping coverage.',
+          );
+          return;
+        }
+      } catch (err) {
+        setError(getErrorMessage(err) || 'Failed to validate shipping coverage');
+        return;
+      }
     }
 
     // Now proceed with checkout
@@ -1532,6 +1579,11 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
                   <FiLoader className="animate-spin" />
                   <span>Loading shipping options...</span>
                 </div>
+              ) : shippingCoverage && shippingCoverage.ready === false ? (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
+                  {shippingCoverage.message ||
+                    'Some items in your cart still need compatible shipping coverage before checkout can continue.'}
+                </div>
               ) : shippingOptions.length === 0 ? (
                 <p className="text-[11px] text-gray-500">
                   No shipping options are available for this address.
@@ -1592,7 +1644,7 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
           {addressesUpdated && (
             <button
               type="submit"
-              disabled={disabled || !selectedShippingId}
+              disabled={disabled || !selectedShippingId || shippingCoverage?.ready === false}
               className="mt-1 inline-flex w-full items-center justify-center rounded-full bg-orange-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-orange-600 disabled:opacity-50"
             >
               {submitting || waitingForPayment ? (
