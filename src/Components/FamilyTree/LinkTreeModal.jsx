@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import Swal from "sweetalert2";
 import { getToken } from "../../utils/auth";
 import { authFetch, authFetchResponse } from "../../utils/authFetch";
+import { useTheme } from "../../Contexts/ThemeContext";
 
 const DEFAULT_PRIMARY = "#1976D2";
 
@@ -30,6 +31,8 @@ export default function LinkTreeModal({
   existingCanonicalKeys = [],
   allowedRelationshipTypes = null,
 }) {
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
   const senderNodeUid = String(senderPerson?.nodeUid || "").trim();
 
   useEffect(() => {
@@ -669,6 +672,7 @@ export default function LinkTreeModal({
 
   return (
     <div
+      className="link-tree-modal"
       style={{
         position: "fixed",
         inset: 0,
@@ -685,12 +689,13 @@ export default function LinkTreeModal({
       aria-label="Link Family Tree"
     >
       <div
+        className="link-tree-modal-panel"
         style={{
           width: "100%",
           maxWidth: 680,
           maxHeight: "calc(100vh - 24px)",
           height: "auto",
-          background: "rgba(255,255,255,0.98)",
+          background: isDark ? "rgba(15, 23, 42, 0.6)" : "rgba(255, 255, 255, 0.9)",
           borderRadius: 18,
           boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
           overflow: "hidden",
@@ -719,7 +724,7 @@ export default function LinkTreeModal({
             onClick={onClose}
             style={{
               border: "none",
-              background: "rgba(255,255,255,0.2)",
+              background: isDark ? "rgba(15, 23, 42, 0.6)" : "rgba(255, 255, 255, 0.2)",
               color: "#fff",
               borderRadius: 10,
               padding: "6px 10px",
@@ -779,7 +784,7 @@ export default function LinkTreeModal({
             </div>
 
             {phoneLookup.result && (
-              <div style={{ marginTop: 10, fontSize: 13, fontWeight: 700, color: "#111" }}>
+              <div style={{ marginTop: 10, fontSize: 13, fontWeight: 700, color: isDark ? "#f1f5f9" : "#333" }}>
                 {phoneLookup.result.exists ? (
                   <>
                     <div style={{ marginBottom: 6 }}>
@@ -841,10 +846,10 @@ export default function LinkTreeModal({
                     borderRadius: 12,
                     border: `2px solid ${primaryColor}22`,
                     padding: "12px 14px",
-                    background: "#fff",
+                    background: isDark ? "rgba(15, 23, 42, 0.6)" : "#fff",
                   }}
                 >
-                  <div style={{ fontWeight: 900, color: "#111", marginRight: 10 }}>FAM</div>
+                  <div style={{ fontWeight: 900, color: isDark ? "#f1f5f9" : "#333", marginRight: 10 }}>FAM</div>
                   <input
                     value={receiverFamilyCodeDigits}
                     onChange={(e) => setReceiverFamilyCodeDigits(extractDigits(e.target.value).slice(0, 6))}
@@ -876,7 +881,7 @@ export default function LinkTreeModal({
                     borderRadius: 12,
                     padding: "12px 14px",
                     border: `2px solid ${primaryColor}33`,
-                    background: "#fff",
+                    background: isDark ? "rgba(15, 23, 42, 0.6)" : "#fff",
                     cursor: peopleLoading || !canSearchReceiverFamily ? "not-allowed" : "pointer",
                     fontWeight: 900,
                     color: primaryColor,
@@ -947,7 +952,7 @@ export default function LinkTreeModal({
                   borderRadius: 12,
                   border: `2px solid ${primaryColor}22`,
                   padding: "12px 14px",
-                  background: "rgba(255,255,255,0.9)",
+                  background: isDark ? "rgba(15, 23, 42, 0.6)" : "rgba(255, 255, 255, 0.9)",
                   fontWeight: 700,
                 }}
               >
@@ -990,7 +995,7 @@ export default function LinkTreeModal({
                 padding: "12px 14px",
                 outline: "none",
                 fontWeight: 600,
-                background: people?.length ? "#fff" : "rgba(0,0,0,0.03)",
+                background: people?.length ? (isDark ? "rgba(15, 23, 42, 0.6)" : "#fff") : (isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.03)"),
               }}
             />
             {(Boolean(people?.length) || hasSearched) && (
@@ -1001,7 +1006,7 @@ export default function LinkTreeModal({
                   borderRadius: 12,
                   maxHeight: 220,
                   overflow: "auto",
-                  background: "#fff",
+                  background: isDark ? "rgba(15, 23, 42, 0.6)" : "#fff",
                 }}
               >
                 {!people?.length ? (
@@ -1059,7 +1064,7 @@ export default function LinkTreeModal({
                               }}
                             />
                           )}
-                          <div style={{ fontWeight: 800, color: "#222", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          <div style={{ fontWeight: 800, color: isDark ? "#f1f5f9" : "#333", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                             {p?.name || "Unnamed"}
                           </div>
                         </div>
@@ -1130,7 +1135,7 @@ export default function LinkTreeModal({
                 borderRadius: 12,
                 padding: "12px 14px",
                 border: "2px solid rgba(0,0,0,0.15)",
-                background: "#fff",
+                background: isDark ? "rgba(15, 23, 42, 0.6)" : "#fff",
                 cursor: "pointer",
                 fontWeight: 900,
               }}

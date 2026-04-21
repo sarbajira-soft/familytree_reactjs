@@ -810,7 +810,7 @@ const ProfilePage = () => {
                         </h1>
                         {user.familyCode && (
                           <div className="flex items-center justify-center md:justify-start gap-2 mt-1">
-                            <span className="inline-flex items-center rounded-full bg-gray-50 px-3 py-1 text-[11px] font-medium text-gray-600 ring-1 ring-gray-200">
+                            <span className="inline-flex items-center rounded-full bg-white/10 backdrop-blur-md px-3 py-1 text-[11px] font-semibold text-white ring-1 ring-white/20">
                               Family Code: {user.familyCode}
                             </span>
                           </div>
@@ -850,10 +850,10 @@ const ProfilePage = () => {
 
                       <div className="mt-3 md:mt-0 flex flex-col items-center md:items-end gap-3 w-full">
                         <div className="flex w-full flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-3">
-                          <label className="inline-flex items-center justify-between gap-2 rounded-full bg-gray-50 px-3 py-1.5 text-[11px] text-gray-700 sm:bg-transparent sm:px-0">
-                            <span className="flex items-center gap-1.5">
-                              <FiSettings size={16} className="text-gray-500" />
-                              <span className="font-medium">Private account</span>
+                          <label className="inline-flex items-center justify-between gap-3 rounded-full bg-white/10 backdrop-blur-md px-4 py-1.5 text-[11px] text-white sm:bg-white/10 sm:px-4 shadow-sm border border-white/10">
+                            <span className="flex items-center gap-2">
+                              <FiSettings size={14} className="text-white/80" />
+                              <span className="font-bold tracking-tight">Private account</span>
                             </span>
                             <button
                               type="button"
@@ -865,15 +865,15 @@ const ProfilePage = () => {
                                 !token ||
                                 typeof localIsPrivate !== 'boolean'
                               }
-                              className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-opacity-75 ${localIsPrivate ? 'bg-primary-600' : 'bg-gray-300'
+                              className={`relative inline-flex h-5 w-10 items-center rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white/50 ${localIsPrivate ? 'bg-orange-500 shadow-inner' : 'bg-white/20'
                                 } ${privacyMutation.isPending || !token
                                   ? 'opacity-60 cursor-not-allowed'
-                                  : 'cursor-pointer'
+                                  : 'cursor-pointer hover:scale-105'
                                 }`}
                               aria-pressed={Boolean(localIsPrivate)}
                             >
                               <span
-                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${localIsPrivate
+                                className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-md transition-transform duration-300 ${localIsPrivate
                                     ? 'translate-x-5'
                                     : 'translate-x-1'
                                   }`}

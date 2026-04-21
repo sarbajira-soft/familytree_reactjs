@@ -335,9 +335,9 @@ function computeRelationshipText(displayRelationshipCode, getLabel, isViewingBir
 // Extracted helper: get gender-based background gradient
 function getGenderBackground(gender, dark) {
   if (dark) {
-    if (gender === "male") return "linear-gradient(135deg, rgb(2 6 23) 0%, rgba(14, 165, 233, 0.14) 100%)";
-    if (gender === "female") return "linear-gradient(135deg, rgb(2 6 23) 0%, rgba(244, 114, 182, 0.14) 100%)";
-    return "linear-gradient(135deg, rgb(2 6 23) 0%, rgb(15 23 42) 100%)";
+    if (gender === "male") return "linear-gradient(135deg, rgb(15 23 42) 0%, rgba(14, 165, 233, 0.18) 100%)";
+    if (gender === "female") return "linear-gradient(135deg, rgb(15 23 42) 0%, rgba(244, 114, 182, 0.18) 100%)";
+    return "linear-gradient(135deg, rgb(15 23 42) 0%, rgb(30 41 59) 100%)";
   }
   if (gender === "male") return "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)";
   if (gender === "female") return "linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)";
@@ -545,8 +545,8 @@ function computeCardBackground(isDark, isRoot, isNew, gender) {
     if (isNew) return "linear-gradient(135deg, #f0f9ff 0%, #dbeafe 50%, #e0f2fe 100%)";
     return getGenderBackground(gender, false);
   }
-  if (isRoot) return "linear-gradient(135deg, rgb(2 6 23) 0%, rgb(15 23 42) 45%, rgb(30 41 59) 100%)";
-  if (isNew) return "linear-gradient(135deg, rgb(2 6 23) 0%, rgba(14, 165, 233, 0.12) 55%, rgb(15 23 42) 100%)";
+  if (isRoot) return "linear-gradient(135deg, rgb(15 23 42) 0%, rgb(30 41 59) 45%, rgb(51 65 85) 100%)";
+  if (isNew) return "linear-gradient(135deg, rgb(15 23 42) 0%, rgba(14, 165, 233, 0.16) 55%, rgb(30 41 59) 100%)";
   return getGenderBackground(gender, true);
 }
 

@@ -63,11 +63,11 @@ const AssociationRequestItem = ({ request, onAccept, onReject, loading = false }
   const getStatusDisplay = () => {
     switch (status) {
       case 'accepted':
-        return { text: 'Accepted', color: 'text-green-600', bgColor: 'bg-green-100' };
+        return { text: 'Accepted', color: 'text-green-600', bgColor: 'bg-green-100 dark:bg-green-900/40' };
       case 'rejected':
         return { text: 'Rejected', color: 'text-red-600', bgColor: 'bg-red-100' };
       case 'expired':
-        return { text: 'Expired', color: 'text-gray-600', bgColor: 'bg-gray-100' };
+        return { text: 'Expired', color: 'text-gray-600 dark:text-slate-300', bgColor: 'bg-gray-100 dark:bg-slate-700' };
       default:
         return null;
     }
@@ -77,13 +77,13 @@ const AssociationRequestItem = ({ request, onAccept, onReject, loading = false }
 
   return (
     <div className={`p-4 transition-colors duration-150 border-l-4 ${
-      status === 'accepted' ? 'border-green-400 bg-gradient-to-r from-green-50 to-white' :
-      status === 'rejected' ? 'border-red-400 bg-gradient-to-r from-red-50 to-white' :
-      status === 'expired' ? 'border-gray-400 bg-gradient-to-r from-gray-50 to-white opacity-75' :
-      'border-green-400 bg-gradient-to-r from-green-50 to-white hover:bg-green-50'
+      status === 'accepted' ? 'border-green-400 dark:border-green-500 bg-gradient-to-r from-green-50 to-white dark:from-green-900/20 dark:to-slate-800' :
+      status === 'rejected' ? 'border-red-400 dark:border-red-500 bg-gradient-to-r from-red-50 to-white dark:from-red-900/20 dark:to-slate-800' :
+      status === 'expired' ? 'border-gray-400 dark:border-slate-500 bg-gradient-to-r from-gray-50 to-white dark:from-slate-800 dark:to-slate-900 opacity-75' :
+      'border-green-400 dark:border-green-500 bg-gradient-to-r from-green-50 to-white dark:from-green-900/20 dark:to-slate-800 hover:bg-green-50 dark:hover:bg-slate-700/50'
     }`}>
       <div className="flex items-start">
-        <div className="flex-shrink-0 bg-green-100 rounded-full p-2 shadow-sm">
+        <div className="flex-shrink-0 bg-green-100 dark:bg-green-900/40 rounded-full p-2 shadow-sm">
           {isFamilyJoinRequest ? (
             <Users className="h-5 w-5 text-green-600" />
           ) : (
@@ -93,7 +93,7 @@ const AssociationRequestItem = ({ request, onAccept, onReject, loading = false }
         
         <div className="ml-3 flex-1 min-w-0">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-gray-900 truncate">
+            <p className="text-sm font-medium text-gray-900 dark:text-slate-100 truncate">
               {request.message || message || (
                 isFamilyJoinRequest 
                   ? `${senderName} wants to join ${targetFamilyCode}`
@@ -107,7 +107,7 @@ const AssociationRequestItem = ({ request, onAccept, onReject, loading = false }
                 </span>
               )}
               <span 
-                className="text-xs text-gray-500 whitespace-nowrap" 
+                className="text-xs text-gray-500 dark:text-slate-400 whitespace-nowrap" 
                 title={fullDateTime}
               >
                 {timeAgo}
@@ -116,7 +116,7 @@ const AssociationRequestItem = ({ request, onAccept, onReject, loading = false }
           </div>
           
           {!isFamilyJoinRequest && senderFamilyCode && (
-            <p className="text-xs text-green-600 mt-1 font-medium">
+            <p className="text-xs text-green-600 dark:text-green-400 mt-1 font-medium">
               Connect {senderFamilyCode} ↔ {targetFamilyCode}
             </p>
           )}
@@ -153,8 +153,8 @@ const AssociationRequestItem = ({ request, onAccept, onReject, loading = false }
                 disabled={isLoading}
                 className={`inline-flex items-center px-4 py-2 border text-xs font-semibold rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all duration-200 ${
                   isLoading && !isRejecting
-                    ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
-                    : 'border-red-300 text-red-700 bg-white hover:bg-red-50 focus:ring-red-500 hover:shadow-md transform hover:scale-105'
+                    ? 'border-gray-200 dark:border-slate-700 text-gray-400 dark:text-slate-500 bg-gray-50 dark:bg-slate-800 cursor-not-allowed'
+                    : 'border-red-300 dark:border-red-500/50 text-red-700 dark:text-red-400 bg-white dark:bg-slate-900 hover:bg-red-50 dark:hover:bg-red-900/20 focus:ring-red-500 hover:shadow-md transform hover:scale-105'
                 }`}
               >
                 {isRejecting ? (

@@ -61,7 +61,7 @@ const ViewFamilyMemberModal = ({ isOpen, onClose, member, isLoading = false }) =
       email: member?.email || profile.email || 'N/A',
       countryCode: member?.countryCode || '',
       mobile: profile?.fieldVisibility?.phone === false ? 'N/A' : (profile.contactNumber || 'N/A'),
-      profileImage: profile.profile || member?.profileUrl || 'https://placehold.co/96x96/e2e8f0/64748b?text=👤',
+      profileImage: profile.profile || member?.profileUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(member?.name || 'User')}&background=e2e8f0&color=475569&bold=true&size=96`,
       gender: profile.gender || 'N/A',
       dob: profile.dob || null,
       maritalStatus: profile.maritalStatus || 'N/A',
@@ -154,7 +154,7 @@ const ViewFamilyMemberModal = ({ isOpen, onClose, member, isLoading = false }) =
                 alt={normalized.fullName}
                 className="w-20 h-20 rounded-full object-cover border-3 border-white/30 shadow-lg transition-smooth"
                 onError={(e) => {
-                  e.target.src = 'https://placehold.co/80x80/e2e8f0/64748b?text=👤';
+                  e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(member?.name || 'User')}&background=e2e8f0&color=475569&bold=true`;
                 }}
               />
               <div className="absolute -bottom-1 -right-1 p-1.5 bg-white rounded-full shadow-md">

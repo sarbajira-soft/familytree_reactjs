@@ -2975,7 +2975,7 @@ const FamilyTreePage = () => {
       <>
         {showFullScreenLoading ? (
           <div
-            className="w-full min-h-[calc(100vh-3.5rem)] flex items-center justify-center bg-white/90 dark:bg-slate-950/90 backdrop-blur-sm p-4"
+            className="w-full min-h-[calc(100vh-3.5rem)] flex items-center justify-center bg-white dark:bg-slate-900/90 dark:bg-slate-950/90 backdrop-blur-sm p-4"
             style={{
               paddingTop:
                 "calc(3.5rem + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)))",
@@ -3023,7 +3023,7 @@ const FamilyTreePage = () => {
           </div>
         ) : !tree ? (
           <div
-            className="w-full min-h-[calc(100vh-3.5rem)] flex items-center justify-center bg-white/90 dark:bg-slate-950/90 backdrop-blur-sm p-4"
+            className="w-full min-h-[calc(100vh-3.5rem)] flex items-center justify-center bg-white dark:bg-slate-900/90 dark:bg-slate-950/90 backdrop-blur-sm p-4"
             style={{
               paddingTop:
                 "calc(3.5rem + var(--safe-area-inset-top, env(safe-area-inset-top, 0px)))",
@@ -3459,7 +3459,7 @@ const FamilyTreePage = () => {
 
               {needsPlacementBanner && (
                 <>
-                  <div className="sm:hidden fixed top-14 left-0 right-0 z-40 bg-amber-50 border-b border-amber-200 px-3 py-2 dark:bg-amber-900/20 dark:border-amber-800">
+                  <div className="sm:hidden fixed top-14 left-0 right-0 z-40 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800/50 px-3 py-2 dark:bg-amber-900/20 dark:border-amber-800">
                     <div className="text-xs font-semibold text-amber-900 dark:text-amber-100">
                       You have joined this family, but the admin hasn’t placed
                       you in the tree yet.
@@ -3471,7 +3471,7 @@ const FamilyTreePage = () => {
                     </div>
                   </div>
 
-                  <div className="hidden sm:block w-full bg-amber-50 border-b border-amber-200 dark:bg-amber-900/20 dark:border-amber-800">
+                  <div className="hidden sm:block w-full bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:bg-amber-900/20 dark:border-amber-800">
                     <div className="w-full max-w-none 2xl:max-w-7xl mx-auto px-4 sm:px-6 py-3">
                       <div className="text-sm font-semibold text-amber-900 dark:text-amber-100">
                         You have joined this family, but the admin hasn’t placed
@@ -3624,7 +3624,7 @@ const FamilyTreePage = () => {
               {(isLinkedMode || (code && code !== userInfo.familyCode)) && (
                 <div className="sm:hidden fixed top-16 left-4 z-40 flex gap-2">
                   <button
-                    className="w-10 h-10 bg-white border-2 border-gray-300 text-gray-700 rounded-full hover:bg-gray-50 active:scale-95 transition-all duration-200 shadow-lg flex items-center justify-center"
+                    className="w-10 h-10 bg-white dark:bg-slate-900 border-2 border-gray-300 text-gray-700 rounded-full hover:bg-gray-50 active:scale-95 transition-all duration-200 shadow-lg flex items-center justify-center"
                     onClick={() => navigate(-1)}
                     title="Back"
                   >
@@ -3662,7 +3662,7 @@ const FamilyTreePage = () => {
 
             {structuralDummyDialog.isOpen && (
               <div className="fixed inset-0 z-[1200] flex items-start sm:items-center justify-center bg-slate-950/50 px-2 sm:px-4 pt-8 pb-24 sm:pt-4 sm:pb-6 backdrop-blur-sm">
-                <div className="w-full max-w-2xl overflow-hidden rounded-2xl sm:rounded-3xl border border-slate-200 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.24)]"
+                <div className="w-full max-w-2xl overflow-hidden rounded-2xl sm:rounded-3xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-[0_24px_60px_rgba(15,23,42,0.24)]"
                      style={{ maxHeight: "calc(100vh - 140px)" }}>
                   <div className="flex items-start justify-between gap-4 bg-primary-600 px-5 py-4 text-white">
                     <div>
@@ -3685,7 +3685,7 @@ const FamilyTreePage = () => {
                     <button
                       type="button"
                       onClick={closeStructuralDummyDialog}
-                      className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-sm font-semibold text-white transition hover:bg-white/20"
+                      className="rounded-full border border-white/20 bg-white dark:bg-slate-900/10 px-3 py-1 text-sm font-semibold text-white transition hover:bg-white dark:bg-slate-900/20"
                     >
                       Close
                     </button>
@@ -3693,31 +3693,31 @@ const FamilyTreePage = () => {
 
                   <div className="space-y-5 p-5 sm:p-6 overflow-y-auto" style={{ maxHeight: "calc(100vh - 240px)" }}>
                     <div className="grid gap-3 sm:grid-cols-3">
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                           Slot
                         </p>
-                        <p className="mt-1 text-base font-semibold text-slate-900">
+                        <p className="mt-1 text-base font-semibold text-slate-900 dark:text-slate-100">
                           {structuralDummyDialogDetails.person?.name || "Removed member"}
                         </p>
                       </div>
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                           Linked Children
                         </p>
-                        <p className="mt-1 text-base font-semibold text-slate-900">
+                        <p className="mt-1 text-base font-semibold text-slate-900 dark:text-slate-100">
                           {structuralDummyDialogDetails.childCount}
                         </p>
                       </div>
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                           Slot Status
                         </p>
                         <p
                           className={`mt-1 text-base font-semibold ${
                             structuralDummyDialogDetails.canDelete
-                              ? "text-emerald-700"
-                              : "text-amber-700"
+                              ? "text-emerald-700 dark:text-emerald-400"
+                              : "text-amber-700 dark:text-amber-400"
                           }`}
                         >
                           {structuralDummyDialogDetails.canDelete
@@ -3733,38 +3733,38 @@ const FamilyTreePage = () => {
                         <div
                           className={`rounded-2xl border px-4 py-4 ${
                             structuralDummyDialogDetails.canDelete
-                              ? "border-emerald-200 bg-emerald-50"
-                              : "border-amber-200 bg-amber-50"
+                              ? "border-emerald-200 dark:border-emerald-800/50 bg-emerald-50 dark:bg-emerald-900/20"
+                              : "border-amber-200 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-900/20"
                           }`}
                         >
-                          <p className="text-sm font-semibold text-slate-900">
+                          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                             {structuralDummyDialog.mode === "info"
                               ? "This slot is protected for a reason"
                               : structuralDummyDialogDetails.canDelete
                                 ? "This slot can be deleted safely"
                                 : "This slot cannot be deleted yet"}
                           </p>
-                          <p className="mt-2 text-sm leading-6 text-slate-700">
+                          <p className="mt-2 text-sm leading-6 text-slate-700 dark:text-slate-300">
                             {structuralDummyDialogDetails.protectionMessage}
                           </p>
                         </div>
 
                         {structuralDummyDialogDetails.childNames.length > 0 && (
-                          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                            <p className="text-sm font-semibold text-slate-900">
+                          <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-4">
+                            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                               Children linked to this slot
                             </p>
                             <div className="mt-3 flex flex-wrap gap-2">
                               {structuralDummyDialogDetails.childNames.map((childName) => (
                                 <span
                                   key={childName}
-                                  className="inline-flex items-center rounded-full border border-sky-200 bg-white px-3 py-1 text-sm font-medium text-sky-700"
+                                  className="inline-flex items-center rounded-full border border-sky-200 dark:border-sky-800/50 bg-white dark:bg-slate-900 px-3 py-1 text-sm font-medium text-sky-700 dark:text-sky-400"
                                 >
                                   {childName}
                                 </span>
                               ))}
                               {structuralDummyDialogDetails.hasMoreChildren && (
-                                <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-medium text-slate-600">
+                                <span className="inline-flex items-center rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1 text-sm font-medium text-slate-600 dark:text-slate-400">
                                   +{structuralDummyDialogDetails.childCount - structuralDummyDialogDetails.childNames.length} more
                                 </span>
                               )}
@@ -3782,7 +3782,7 @@ const FamilyTreePage = () => {
                           <button
                             type="button"
                             onClick={closeStructuralDummyDialog}
-                            className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                            className="rounded-2xl border border-slate-200 dark:border-slate-700 px-5 py-3 text-sm font-semibold text-slate-700 dark:text-slate-300 transition hover:bg-slate-50 dark:bg-slate-800"
                           >
                             Close
                           </button>
@@ -3814,18 +3814,18 @@ const FamilyTreePage = () => {
 
                     {structuralDummyDialog.mode === "replace" && (
                       <>
-                        <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-4">
-                          <p className="text-sm font-semibold text-slate-900">
+                        <div className="rounded-2xl border border-sky-200 dark:border-sky-800/50 bg-sky-50 dark:bg-sky-900/20 px-4 py-4">
+                          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
                             Choose a replacement member
                           </p>
-                          <p className="mt-2 text-sm leading-6 text-slate-700">
+                          <p className="mt-2 text-sm leading-6 text-slate-700 dark:text-slate-300">
                             Only approved family members who are not already placed in this tree can fill this removed-member slot.
                           </p>
                         </div>
 
                         {structuralDummyDialog.loadingCandidates ? (
-                          <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-600">
-                            <div className="h-5 w-5 animate-spin rounded-full border-2 border-sky-200 border-t-sky-600" />
+                          <div className="flex items-center gap-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-5 text-sm text-slate-600 dark:text-slate-400">
+                            <div className="h-5 w-5 animate-spin rounded-full border-2 border-sky-200 dark:border-sky-800/50 border-t-sky-600" />
                             Loading approved members...
                           </div>
                         ) : structuralDummyDialog.candidates.length > 0 ? (
@@ -3839,8 +3839,8 @@ const FamilyTreePage = () => {
                                   key={candidate.userId}
                                   className={`flex cursor-pointer items-start gap-3 rounded-2xl border px-4 py-4 transition ${
                                     isSelected
-                                      ? "border-sky-300 bg-sky-50 shadow-sm"
-                                      : "border-slate-200 bg-white hover:border-sky-200 hover:bg-slate-50"
+                                      ? "border-sky-300 bg-sky-50 dark:bg-sky-900/20 shadow-sm"
+                                      : "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-sky-200 dark:border-sky-800/50 hover:bg-slate-50 dark:bg-slate-800"
                                   }`}
                                 >
                                   <input
@@ -3858,17 +3858,17 @@ const FamilyTreePage = () => {
                                   />
                                   <div className="min-w-0 flex-1">
                                     <div className="flex flex-wrap items-center gap-2">
-                                      <span className="text-base font-semibold text-slate-900">
+                                      <span className="text-base font-semibold text-slate-900 dark:text-slate-100">
                                         {candidate.name}
                                       </span>
-                                      <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-500">
+                                      <span className="rounded-full bg-white dark:bg-slate-900 px-2.5 py-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
                                         #{candidate.userId}
                                       </span>
-                                      <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                                      <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
                                         {candidate.familyRole}
                                       </span>
                                     </div>
-                                    <p className="mt-2 text-sm text-slate-500">
+                                    <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
                                       {candidate.contact || "No contact number available"}
                                     </p>
                                   </div>
@@ -3877,7 +3877,7 @@ const FamilyTreePage = () => {
                             })}
                           </div>
                         ) : (
-                          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-600">
+                          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 dark:bg-slate-800 px-4 py-5 text-sm text-slate-600 dark:text-slate-400">
                             {structuralDummyDialog.error ||
                               "No approved members outside the tree are available right now."}
                           </div>
@@ -3894,7 +3894,7 @@ const FamilyTreePage = () => {
                           <button
                             type="button"
                             onClick={closeStructuralDummyDialog}
-                            className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                            className="rounded-2xl border border-slate-200 dark:border-slate-700 px-5 py-3 text-sm font-semibold text-slate-700 dark:text-slate-300 transition hover:bg-slate-50 dark:bg-slate-800"
                           >
                             Cancel
                           </button>
@@ -3908,8 +3908,8 @@ const FamilyTreePage = () => {
                             disabled={structuralDummyDialog.loadingCandidates}
                             className={`rounded-2xl border px-5 py-3 text-sm font-semibold transition ${
                               structuralDummyDialog.loadingCandidates
-                                ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
-                                : "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100"
+                                ? "cursor-not-allowed border-slate-200 dark:border-slate-700 bg-slate-100 text-slate-400"
+                                : "border-sky-200 dark:border-sky-800/50 bg-sky-50 dark:bg-sky-900/20 text-sky-700 dark:text-sky-400 hover:bg-sky-100"
                             }`}
                           >
                             Refresh List

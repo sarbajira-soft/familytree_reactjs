@@ -1,8 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
+import { digitsOnly, extractDigitsFromClipboardEvent } from '../utils/inputSanitizers';
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+const RECOVERY_TOKEN_LENGTH = 8;
+
+const sanitizeRecoveryTokenInput = (value) => digitsOnly(value).slice(0, RECOVERY_TOKEN_LENGTH);
 
 const readRecoveryHint = () => {
   try {
@@ -72,8 +76,10 @@ const AccountRecoveryPage = () => {
   };
 
   const validateToken = (value) => {
-    const normalized = String(value || '').trim();
-    if (normalized.length < 4) return 'Token must be at least 4 characters.';
+    const normalized = sanitizeRecoveryTokenInput(value);
+    if (normalized.length !== RECOVERY_TOKEN_LENGTH) {
+      return `Recovery token must be ${RECOVERY_TOKEN_LENGTH} digits.`;
+    }
     return '';
   };
 
@@ -225,7 +231,7 @@ const AccountRecoveryPage = () => {
       return;
     }
 
-    const normalizedToken = String(token || '').trim();
+    const normalizedToken = sanitizeRecoveryTokenInput(token);
     const tokenError = validateToken(normalizedToken);
     if (tokenError) {
       await Swal.fire({ icon: 'warning', title: 'Invalid Token', text: tokenError });
@@ -319,9 +325,17 @@ const AccountRecoveryPage = () => {
           <label className="block text-sm font-medium text-gray-700">Recovery Token</label>
           <input
             type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            autoComplete="one-time-code"
+            maxLength={RECOVERY_TOKEN_LENGTH}
             value={token}
-            onChange={(e) => setToken(e.target.value)}
-            placeholder="Enter recovery token"
+            onChange={(e) => setToken(sanitizeRecoveryTokenInput(e.target.value))}
+            onPaste={(e) => {
+              e.preventDefault();
+              setToken(sanitizeRecoveryTokenInput(extractDigitsFromClipboardEvent(e)));
+            }}
+            placeholder={`Enter ${RECOVERY_TOKEN_LENGTH}-digit recovery token`}
             className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
             disabled={confirming}
           />

@@ -87,10 +87,10 @@ const FamilyMemberCard = ({ member, onWhatsAppClick }) => {
         <div className="flex-shrink-0">
           <div className="relative w-16 h-16 md:w-20 md:h-20 rounded-full overflow-hidden border-2 border-gray-100 shadow-xs">
             <img
-              src={member.profilePic || "https://placehold.co/80x80/f5f5f5/e0e0e0?text=👤"}
+              src={member.profilePic || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name || 'User')}&background=e2e8f0&color=475569&bold=true`}
               alt={member.name}
               className="w-full h-full object-cover"
-              onError={(e) => e.target.src = "https://placehold.co/80x80/f5f5f5/e0e0e0?text=👤"}
+              onError={(e) => e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name || 'User')}&background=e2e8f0&color=475569&bold=true`}
             />
           </div>
         </div>

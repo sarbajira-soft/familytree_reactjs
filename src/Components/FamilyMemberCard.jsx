@@ -751,21 +751,21 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
           handleViewMember(member.userId, { stopPropagation: () => { } });
         }
       }}
-      className={`group relative flex flex-col sm:flex-row items-stretch bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md hover:border-primary-300 transition-all duration-200 overflow-hidden ${currentUserIsFamilyAdmin && !disabled ? 'cursor-pointer' : 'cursor-default'
+      className={`group relative flex flex-col sm:flex-row items-stretch bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm hover:shadow-md hover:border-primary-300 dark:hover:border-sky-500/40 transition-all duration-200 overflow-hidden ${currentUserIsFamilyAdmin && !disabled ? 'cursor-pointer' : 'cursor-default'
         } ${deletedMemberIds.has(member.memberId) || disabled ? 'opacity-60 grayscale' : ''}`}
     >
       {/* Left Accent Bar */}
-      <div className={`w-1.5 flex-shrink-0 ${member.gender === 'male' ? 'bg-sky-400' : member.gender === 'female' ? 'bg-pink-400' : 'bg-gray-300'}`}></div>
+      <div className={`w-1.5 flex-shrink-0 ${member.gender === 'male' ? 'bg-sky-400' : member.gender === 'female' ? 'bg-pink-400' : 'bg-gray-300 dark:bg-slate-600'}`}></div>
 
       <div className="flex-1 p-3 sm:p-4 flex flex-col sm:flex-row items-center gap-4 min-w-0">
         {/* Profile Avatar */}
         <div className="flex-shrink-0 relative">
           <img
-            src={member.profilePic || 'https://placehold.co/80x80/f8fafc/94a3b8?text=👤'}
+            src={member.profilePic || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name || 'User')}&background=e2e8f0&color=475569&bold=true`}
             alt={member.name}
-            className="w-16 h-16 sm:w-12 sm:h-12 rounded-full object-cover border border-gray-200 shadow-sm"
+            className="w-16 h-16 sm:w-12 sm:h-12 rounded-full object-cover border border-gray-200 dark:border-slate-700 shadow-sm"
             onError={(e) => {
-              e.target.src = 'https://placehold.co/80x80/f8fafc/94a3b8?text=👤';
+              e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name || 'User')}&background=e2e8f0&color=475569&bold=true`;
             }}
           />
         </div>
@@ -776,48 +776,48 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
           {/* Identity Info (Col 4) */}
           <div className="sm:col-span-4 flex flex-col items-center sm:items-start text-center sm:text-left min-w-0 pr-2">
             <div className="flex items-center gap-2 max-w-full">
-              <h3 className="text-base font-bold text-gray-900 truncate">{member.name}</h3>
+              <h3 className="text-base font-bold text-gray-900 dark:text-slate-100 truncate">{member.name}</h3>
               {currentUserIsFamilyAdmin && member?.blockStatus?.isBlockedByMe && (
                 <BlockedBadge />
               )}
             </div>
             <div className="flex flex-wrap items-center justify-center sm:justify-start gap-1.5 mt-1">
-              <span className={`inline-flex items-center text-[10px] sm:text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${relationColors[member.role] || 'bg-gray-100 text-gray-700'}`}>
+              <span className={`inline-flex items-center text-[10px] sm:text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${relationColors[member.role] || 'bg-gray-100 text-gray-700 dark:bg-slate-800 dark:text-slate-300'}`}>
                 {member.role}
               </span>
               {/* Show Associated or Linked badge based on membershipType */}
               {member.membershipType === 'associated' && (
-                <span className="inline-block text-[10px] sm:text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-sky-100 text-sky-600 border border-sky-200">
+                <span className="inline-block text-[10px] sm:text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-sky-100 dark:bg-sky-500/20 text-sky-600 dark:text-sky-200 border border-sky-200 dark:border-sky-500/30">
                   Associated
                 </span>
               )}
               {member.membershipType === 'linked' && (
-                <span className="inline-block text-[10px] sm:text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                <span className="inline-block text-[10px] sm:text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 border border-slate-200 dark:border-slate-600">
                   Linked
                 </span>
               )}
               {disabled && (
-                <span className="inline-block text-[10px] sm:text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 border border-emerald-200">
+                <span className="inline-block text-[10px] sm:text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-200 border border-emerald-200 dark:border-emerald-500/30">
                   Already in Tree
                 </span>
               )}
               {member.user?.isAppUser ? (
-                <span className="inline-block text-[10px] sm:text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-green-100 text-green-700 border border-green-200">
+                <span className="inline-block text-[10px] sm:text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-green-100 dark:bg-green-500/20 text-green-700 dark:text-green-200 border border-green-200 dark:border-green-500/30">
                   App User
                 </span>
               ) : (
-                <span className="inline-block text-[10px] sm:text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-gray-100 text-gray-500 border border-gray-200">
+                <span className="inline-block text-[10px] sm:text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-300 border border-gray-200 dark:border-slate-700">
                   Non-App
                 </span>
               )}
               {/* Show NOT IN TREE badge for members not yet added to tree - only in Birth Family Directory */}
               {showNotInTreeBadge && member.membershipType === 'member' && membersNotInTreeUserIds.has(Number(member.userId)) && (
-                <span className="inline-block text-[10px] sm:text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-200">
+                <span className="inline-block text-[10px] sm:text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-500/20 text-amber-700 dark:text-amber-200 border border-amber-200 dark:border-amber-500/30">
                   Not in Tree
                 </span>
               )}
               {showFamilyCode && member.sourceFamilyCode && (
-                <span className="inline-block text-[10px] sm:text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-100">
+                <span className="inline-block text-[10px] sm:text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-50 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-200 border border-indigo-100 dark:border-indigo-500/30">
                   Code: {member.sourceFamilyCode}
                 </span>
               )}
@@ -825,9 +825,9 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
           </div>
 
           {/* Demographics (Col 3) */}
-          <div className="sm:col-span-3 flex flex-row sm:flex-col justify-center sm:justify-center items-center sm:items-start gap-3 sm:gap-1.5 text-sm text-gray-600 border-t sm:border-t-0 border-gray-100 pt-3 sm:pt-0">
+          <div className="sm:col-span-3 flex flex-row sm:flex-col justify-center sm:justify-center items-center sm:items-start gap-3 sm:gap-1.5 text-sm text-gray-600 dark:text-slate-300 border-t sm:border-t-0 border-gray-100 dark:border-slate-700 pt-3 sm:pt-0">
             <div className="flex items-center gap-2 truncate" title="Age / DOB">
-              <FaBirthdayCake className="text-gray-400 flex-shrink-0" size={14} />
+              <FaBirthdayCake className="text-gray-400 dark:text-slate-500 flex-shrink-0" size={14} />
               <span className="font-medium truncate">{member.age || calculateAge(member.dob)} yrs</span>
             </div>
             <div className="flex items-center gap-2 truncate" title="Gender">
@@ -837,34 +837,34 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
           </div>
 
           {/* Contact info (Col 3) */}
-          <div className="sm:col-span-3 flex flex-col justify-center items-center sm:items-start gap-1.5 text-sm text-gray-500 min-w-0">
+          <div className="sm:col-span-3 flex flex-col justify-center items-center sm:items-start gap-1.5 text-sm text-gray-500 dark:text-slate-400 min-w-0">
             {member.contact ? (
               <div className="flex items-center gap-2 w-full justify-center sm:justify-start">
-                <FaPhone className="text-gray-400 flex-shrink-0" size={13} />
+                <FaPhone className="text-gray-400 dark:text-slate-500 flex-shrink-0" size={13} />
                 <span className="truncate" title={member.contact}>{member.contact}</span>
               </div>
             ) : (
-              <div className="hidden sm:block text-gray-300 text-xs italic">-</div>
+              <div className="hidden sm:block text-gray-300 dark:text-slate-600 text-xs italic">-</div>
             )}
             {member.address ? (
               <div className="flex items-center gap-2 w-full justify-center sm:justify-start mt-1 sm:mt-0">
-                <FaHome className="text-gray-400 flex-shrink-0" size={13} />
+                <FaHome className="text-gray-400 dark:text-slate-500 flex-shrink-0" size={13} />
                 <span className="truncate" title={member.address}>{member.address}</span>
               </div>
             ) : (
-              <div className="hidden sm:block text-gray-300 text-xs italic">-</div>
+              <div className="hidden sm:block text-gray-300 dark:text-slate-600 text-xs italic">-</div>
             )}
           </div>
 
           {/* Actions (Col 2) */}
-          <div className="sm:col-span-2 flex items-center justify-center sm:justify-end gap-2 sm:pl-4 border-t sm:border-t-0 sm:border-l border-gray-100 pt-4 sm:pt-0 pb-1 sm:pb-0 h-full">
+          <div className="sm:col-span-2 flex items-center justify-center sm:justify-end gap-2 sm:pl-4 border-t sm:border-t-0 sm:border-l border-gray-100 dark:border-slate-700 pt-4 sm:pt-0 pb-1 sm:pb-0 h-full">
             {currentUserIsFamilyAdmin && !disabled && (
               <>
                 {allowManageActions && member.membershipType === 'member' && !member.user?.isAppUser && (
                   <button
                     onClick={(e) => handleShareInvite(member, e)}
                     disabled={deletedMemberIds.has(member.memberId)}
-                    className="p-1.5 rounded-lg bg-gray-50 text-gray-500 hover:bg-blue-50 hover:text-blue-600 hover:shadow-sm border border-transparent hover:border-blue-100 transition-all tooltip"
+                    className="p-1.5 rounded-lg bg-gray-50 dark:bg-slate-800 text-gray-500 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-700 hover:text-blue-600 dark:hover:text-blue-200 hover:shadow-sm border border-transparent hover:border-blue-100 dark:hover:border-slate-600 transition-all tooltip"
                     title="Share sign-up invite"
                   >
                     <FiShare2 size={16} />
@@ -877,7 +877,7 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                       handleDeleteMember(member.memberId, familyCode, member.userId, e);
                     }}
                     disabled={deletedMemberIds.has(member.memberId)}
-                    className="p-1.5 rounded-lg bg-gray-50 text-gray-500 hover:bg-red-50 hover:text-red-600 hover:shadow-sm border border-transparent hover:border-red-100 transition-all tooltip"
+                    className="p-1.5 rounded-lg bg-gray-50 dark:bg-slate-800 text-gray-500 dark:text-slate-300 hover:bg-red-50 dark:hover:bg-slate-700 hover:text-red-600 dark:hover:text-red-300 hover:shadow-sm border border-transparent hover:border-red-100 dark:hover:border-slate-600 transition-all tooltip"
                     title={memberIdsInTree.has(Number(member.userId)) && member.sourceFamilyCode === birthFamilyCode && member.user?.isAppUser ? 'Move to Members Not in Tree' : 'Delete'}
                   >
                     <FiTrash2 size={16} />
@@ -888,7 +888,7 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                   disabled={deletedMemberIds.has(member.memberId) || viewLoadingStates[member.userId]}
                   className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all border font-semibold text-sm ${viewLoadingStates[member.userId]
                       ? 'bg-primary-50 text-primary-400 border-primary-100 cursor-not-allowed'
-                      : 'bg-white text-primary-600 border-primary-200 hover:bg-primary-50 hover:border-primary-300 hover:shadow-sm'
+                      : 'bg-white dark:bg-slate-900 text-primary-600 border-primary-200 hover:bg-primary-50 hover:border-primary-300 hover:shadow-sm'
                     } tooltip`}
                   title="View Profile"
                 >
@@ -912,7 +912,7 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
   );
 
   const PrivacyControls = () => (
-    <section className="w-full rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+    <section className="w-full rounded-2xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
       <div className="bg-gradient-to-r from-primary-600 to-primary-700 px-6 py-5">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
@@ -926,7 +926,7 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
             onClick={handleSavePrivacySettings}
             disabled={isSavingPrivacySettings}
             className={
-              'flex items-center gap-2 px-5 py-2.5 bg-white text-primary-700 font-semibold rounded-lg transition-all shadow-lg ' +
+              'flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-slate-900 text-primary-700 font-semibold rounded-lg transition-all shadow-lg ' +
               (isSavingPrivacySettings ? 'opacity-70 cursor-not-allowed' : 'hover:bg-primary-50')
             }
           >
@@ -945,29 +945,29 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
           const selectedCodes = Array.isArray(setting.familyCodes) ? setting.familyCodes : [];
 
           return (
-            <div key={entry.key} className="rounded-xl border border-gray-200 bg-white shadow-sm hover:shadow-md transition-shadow">
-              <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50 rounded-t-xl">
+            <div key={entry.key} className="rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-shadow">
+              <div className="px-5 py-4 border-b border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/50 dark:bg-slate-800/70 rounded-t-xl">
                 <div className="flex items-center gap-3">
                   <span className="text-2xl">{entry.icon}</span>
                   <div>
-                    <h3 className="font-bold text-gray-900">{entry.label}</h3>
-                    <p className="text-xs text-gray-500">{entry.desc}</p>
+                    <h3 className="font-bold text-gray-900 dark:text-slate-100">{entry.label}</h3>
+                    <p className="text-xs text-gray-500 dark:text-slate-400">{entry.desc}</p>
                   </div>
                 </div>
               </div>
 
               <div className="p-5 space-y-4">
                 <div>
-                  <p className="text-xs font-semibold tracking-wide uppercase text-gray-500 mb-2">Visibility</p>
-                  <div className="grid grid-cols-2 gap-2 rounded-xl bg-gray-100 p-1">
+                  <p className="text-xs font-semibold tracking-wide uppercase text-gray-500 dark:text-slate-400 mb-2">Visibility</p>
+                  <div className="grid grid-cols-2 gap-2 rounded-xl bg-gray-100 dark:bg-slate-800 p-1">
                     <button
                       type="button"
                       onClick={() => updatePrivacySetting(entry.key, { visibility: 'all-members', familyCodes: [] })}
                       className={
                         'rounded-lg px-3 py-2 text-sm font-semibold transition-all ' +
                         (setting.visibility === 'all-members'
-                          ? 'bg-white text-primary-600 shadow-sm'
-                          : 'text-gray-600 hover:text-gray-900')
+                          ? 'bg-white dark:bg-slate-900 text-primary-600 dark:text-sky-300 shadow-sm'
+                          : 'text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-100')
                       }
                     >
                       All Members
@@ -978,8 +978,8 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                       className={
                         'rounded-lg px-3 py-2 text-sm font-semibold transition-all ' +
                         (setting.visibility === 'specific-family'
-                          ? 'bg-white text-primary-600 shadow-sm'
-                          : 'text-gray-600 hover:text-gray-900')
+                          ? 'bg-white dark:bg-slate-900 text-primary-600 dark:text-sky-300 shadow-sm'
+                          : 'text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-100')
                       }
                     >
                       Specific Families
@@ -988,15 +988,15 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                 </div>
 
                 {setting.visibility === 'all-members' ? (
-                  <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-4">
-                    <p className="text-sm font-semibold text-gray-900">All connected families can view this family content</p>
-                    <p className="mt-1 text-xs text-gray-500">
+                  <div className="rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/70 px-4 py-4">
+                    <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">All connected families can view this family content</p>
+                    <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">
                       This includes your birth family plus linked and associated families that already have access to your family network.
                     </p>
                   </div>
                 ) : (
                   <div>
-                    <p className="text-xs font-semibold tracking-wide uppercase text-gray-500 mb-2">Select Families</p>
+                    <p className="text-xs font-semibold tracking-wide uppercase text-gray-500 dark:text-slate-400 mb-2">Select Families</p>
                     <div className="space-y-2">
                       {privacyFamilyOptions.map((family) => {
                         const isSelected = selectedCodes.includes(family.familyCode);
@@ -1008,21 +1008,21 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                             className={
                               'w-full text-left rounded-xl border px-4 py-3 transition-all ' +
                               (isSelected
-                                ? 'border-primary-300 bg-primary-50 shadow-sm'
-                                : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50')
+                                ? 'border-primary-300 dark:border-sky-400/40 bg-primary-50 dark:bg-slate-800 shadow-sm'
+                                : 'border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:border-gray-300 dark:hover:border-slate-500 hover:bg-gray-50 dark:hover:bg-slate-800')
                             }
                           >
                             <div className="flex items-center justify-between gap-3">
                               <div>
-                                <p className="text-sm font-semibold text-gray-900">{family.familyName}</p>
-                                <p className="text-xs text-gray-500">{family.group} · {family.familyCode}</p>
+                                <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">{family.familyName}</p>
+                                <p className="text-xs text-gray-500 dark:text-slate-400">{family.group} · {family.familyCode}</p>
                               </div>
                               <span
                                 className={
                                   'inline-flex h-5 w-5 items-center justify-center rounded-full border text-xs font-bold ' +
                                   (isSelected
                                     ? 'border-primary-600 bg-primary-600 text-white'
-                                    : 'border-gray-300 text-transparent')
+                                    : 'border-gray-300 dark:border-slate-600 text-transparent')
                                 }
                               >
                                 ✓
@@ -1032,7 +1032,7 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                         );
                       })}
                     </div>
-                    <p className="mt-2 text-xs text-gray-500">
+                    <p className="mt-2 text-xs text-gray-500 dark:text-slate-400">
                       {selectedCodes.length > 0
                         ? selectedCodes.length + ' family code' + (selectedCodes.length > 1 ? 's are' : ' is') + ' selected.'
                         : 'No family selected yet. Until you select a family, only you will be able to view this family content.'}
@@ -1046,8 +1046,8 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
       </div>
 
       {privacySavedAt && (
-        <div className="px-6 py-3 bg-gray-50 border-t border-gray-200">
-          <p className="text-xs text-gray-500 text-center">
+        <div className="px-6 py-3 bg-gray-50 dark:bg-slate-900 border-t border-gray-200 dark:border-slate-700">
+          <p className="text-xs text-gray-500 dark:text-slate-400 text-center">
             Last saved: {new Date(privacySavedAt).toLocaleString()}
           </p>
         </div>
@@ -1058,7 +1058,7 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
     { id: 'birth', label: 'Birth Family', count: activeBirthMembers.length, color: 'text-slate-700 bg-slate-100', emptyMessage: 'No birth family members found.' },
     { id: 'associated', label: 'Associated', count: associatedFamiliesOptions.length, color: 'text-sky-700 bg-sky-100', emptyMessage: 'No associated families linked.' },
     { id: 'linked', label: 'Linked', count: linkedFamiliesOptions.length, color: 'text-emerald-700 bg-emerald-100', emptyMessage: 'No linked families discovered yet.' },
-    { id: 'pending', label: 'Members Not in Tree', count: filteredMembersNotInTree.length, color: 'text-amber-700 bg-amber-100', emptyMessage: 'All birth family members are already placed in the family tree.' },
+    { id: 'pending', label: 'Members Not in Tree', count: filteredMembersNotInTree.length, color: 'text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/40', emptyMessage: 'All birth family members are already placed in the family tree.' },
     { id: 'privacy', label: 'Privacy', count: null, color: null, emptyMessage: null },
   ];
 
@@ -1082,17 +1082,17 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
         <button
           onClick={() => setFamilyFilterPage(prev => Math.max(prev - 1, 1))}
           disabled={familyFilterPage === 1}
-          className="px-2 py-1 rounded-md border border-gray-200 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="px-2 py-1 rounded-md border border-gray-200 dark:border-slate-700 text-xs font-semibold text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           Prev
         </button>
-        <span className="text-xs text-gray-500 font-medium">
+        <span className="text-xs text-gray-500 dark:text-slate-400 font-medium">
           {familyFilterPage} / {totalPages}
         </span>
         <button
           onClick={() => setFamilyFilterPage(prev => Math.min(prev + 1, totalPages))}
           disabled={familyFilterPage === totalPages}
-          className="px-2 py-1 rounded-md border border-gray-200 text-xs font-semibold text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="px-2 py-1 rounded-md border border-gray-200 dark:border-slate-700 text-xs font-semibold text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           Next
         </button>
@@ -1118,15 +1118,15 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
     }
 
     return (
-      <div className="flex flex-col sm:flex-row items-center justify-between mt-8 pt-6 border-t border-gray-100 gap-4">
-        <p className="text-sm text-gray-500 font-medium">
-          Showing <span className="font-bold text-gray-900">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-bold text-gray-900">{Math.min(currentPage * itemsPerPage, totalItems)}</span> of <span className="font-bold text-gray-900">{totalItems}</span> members
+      <div className="flex flex-col sm:flex-row items-center justify-between mt-8 pt-6 border-t border-gray-100 dark:border-slate-800 gap-4">
+        <p className="text-sm text-gray-500 dark:text-slate-400 font-medium">
+          Showing <span className="font-bold text-gray-900 dark:text-slate-100">{(currentPage - 1) * itemsPerPage + 1}</span> to <span className="font-bold text-gray-900 dark:text-slate-100">{Math.min(currentPage * itemsPerPage, totalItems)}</span> of <span className="font-bold text-gray-900 dark:text-slate-100">{totalItems}</span> members
         </p>
         <div className="flex items-center gap-1 sm:gap-2">
           <button
             onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
             disabled={currentPage === 1}
-            className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg border border-gray-200 text-xs sm:text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg border border-gray-200 dark:border-slate-700 text-xs sm:text-sm font-semibold text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             Prev
           </button>
@@ -1134,14 +1134,14 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
           <div className="flex items-center gap-1">
             {pages.map((p, i) => (
               p === '...' ? (
-                <span key={`ellipsis-${i}`} className="px-2 text-gray-400">...</span>
+                <span key={`ellipsis-${i}`} className="px-2 text-gray-400 dark:text-slate-500">...</span>
               ) : (
                 <button
                   key={`page-${p}`}
                   onClick={() => setCurrentPage(p)}
                   className={`w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-md text-sm font-semibold transition-colors ${currentPage === p
                       ? 'bg-primary-600 text-white shadow-sm'
-                      : 'text-gray-600 hover:bg-gray-100'
+                      : 'text-gray-600 dark:text-slate-400 hover:bg-gray-100'
                     }`}
                 >
                   {p}
@@ -1153,7 +1153,7 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
           <button
             onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
             disabled={currentPage === totalPages}
-            className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg border border-gray-200 text-xs sm:text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg border border-gray-200 dark:border-slate-700 text-xs sm:text-sm font-semibold text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             Next
           </button>
@@ -1178,12 +1178,12 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                       onClick={() => setActiveTab(tab.id)}
                       className={`flex-shrink-0 whitespace-nowrap flex items-center gap-2 px-3 py-2 sm:px-4 sm:py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all duration-200 ${activeTab === tab.id
                           ? 'bg-primary-600 text-white shadow-md shadow-primary-600/20'
-                          : 'bg-white text-gray-600 hover:bg-primary-50 hover:text-gray-900 border border-gray-200 shadow-sm'
+                          : 'bg-white dark:bg-slate-900 text-gray-600 dark:text-slate-400 hover:bg-primary-50 hover:text-gray-900 dark:text-slate-100 border border-gray-200 dark:border-slate-700 shadow-sm'
                         }`}
                     >
                       {tab.label}
                       {tab.count !== null && (
-                        <span className={`px-2 py-0.5 rounded-md text-[10px] tracking-wide font-bold ${activeTab === tab.id ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-500'
+                        <span className={`px-2 py-0.5 rounded-md text-[10px] tracking-wide font-bold ${activeTab === tab.id ? 'bg-white/20 dark:bg-slate-900/20 text-white' : 'bg-gray-100 text-gray-500 dark:text-slate-400'
                           }`}>
                           {tab.count}
                         </span>
@@ -1196,7 +1196,7 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                 <div className="sm:hidden flex-1 relative" ref={tabDropdownRef}>
                   <button
                     onClick={() => setIsTabDropdownOpen(!isTabDropdownOpen)}
-                    className="w-full flex items-center justify-between gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm font-semibold text-gray-700 shadow-sm"
+                    className="w-full flex items-center justify-between gap-2 px-4 py-2.5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-sm font-semibold text-gray-700 dark:text-slate-300 shadow-sm"
                   >
                     <span className="flex items-center gap-2">
                       {TABS.find(tab => tab.id === activeTab)?.label}
@@ -1207,7 +1207,7 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                       )}
                     </span>
                     <svg 
-                      className={`w-4 h-4 text-gray-500 transition-transform ${isTabDropdownOpen ? 'rotate-180' : ''}`}
+                      className={`w-4 h-4 text-gray-500 dark:text-slate-400 transition-transform ${isTabDropdownOpen ? 'rotate-180' : ''}`}
                       fill="none" 
                       stroke="currentColor" 
                       viewBox="0 0 24 24"
@@ -1217,7 +1217,7 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                   </button>
                   
                   {isTabDropdownOpen && (
-                    <div className="absolute z-50 mt-1 left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg py-1">
+                    <div className="absolute z-50 mt-1 left-0 right-0 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg shadow-lg py-1">
                       {TABS.map((tab) => (
                         <button
                           key={tab.id}
@@ -1228,13 +1228,13 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                           className={`w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium transition-colors ${
                             activeTab === tab.id 
                               ? 'bg-primary-50 text-primary-700' 
-                              : 'text-gray-700 hover:bg-gray-50'
+                              : 'text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:bg-slate-800'
                           }`}
                         >
                           <span>{tab.label}</span>
                           {tab.count !== null && (
                             <span className={`px-2 py-0.5 rounded-md text-[10px] tracking-wide font-bold ${
-                              activeTab === tab.id ? 'bg-primary-200 text-primary-800' : 'bg-gray-100 text-gray-600'
+                              activeTab === tab.id ? 'bg-primary-200 text-primary-800' : 'bg-gray-100 text-gray-600 dark:text-slate-400'
                             }`}>
                               {tab.count}
                             </span>
@@ -1247,11 +1247,11 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
 
                 {/* Search (name-only) */}
                 <div className="flex-shrink-0">
-                  <div className="relative group shadow-sm rounded-lg bg-white transition-shadow hover:shadow-md focus-within:shadow-md focus-within:ring-2 focus-within:ring-primary-100 border border-gray-200 w-44 sm:w-52 md:w-60 h-10">
+                  <div className="relative group shadow-sm rounded-lg bg-white dark:bg-slate-900 transition-shadow hover:shadow-md focus-within:shadow-md focus-within:ring-2 focus-within:ring-primary-100 border border-gray-200 dark:border-slate-700 w-44 sm:w-52 md:w-60 h-10">
                     <div className="absolute inset-y-0 left-0 w-12 flex items-center justify-center pointer-events-none">
                       <FiSearch
                         size={16}
-                        className="text-gray-400 group-focus-within:text-primary-500 transition-colors"
+                        className="text-gray-400 dark:text-slate-500 group-focus-within:text-primary-500 transition-colors"
                       />
                     </div>
                     <input
@@ -1273,23 +1273,23 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
       <div className="w-full pb-20 max-w-7xl mx-auto">
         {loading ? (
           <div className="flex justify-center items-center py-20">
-            <div className="animate-spin rounded-full h-10 w-10 border-4 border-gray-200 border-t-primary-600" />
+            <div className="animate-spin rounded-full h-10 w-10 border-4 border-gray-200 dark:border-slate-700 border-t-primary-600" />
           </div>
         ) : (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
             {!filteredMembers.length && !notInTreeLoading && activeTab !== 'privacy' && activeTab !== 'birth' && activeTab !== 'linked' && activeTab !== 'pending' && activeTab !== 'blocked' && activeTab !== 'associated' && (
-              <div className="flex flex-col items-center justify-center py-16 bg-white rounded-xl border border-gray-200 shadow-sm text-gray-400">
-                <p className="text-lg font-semibold text-gray-600">No members found</p>
-                <p className="text-sm text-gray-400 mt-1">Try adjusting your filters or search terms.</p>
+              <div className="flex flex-col items-center justify-center py-16 bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm text-gray-400 dark:text-slate-500">
+                <p className="text-lg font-semibold text-gray-600 dark:text-slate-400">No members found</p>
+                <p className="text-sm text-gray-400 dark:text-slate-500 mt-1">Try adjusting your filters or search terms.</p>
               </div>
             )}
 
             {activeTab === 'birth' && (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 p-6">
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900 mb-1">Birth Family Directory</h2>
-                    <p className="text-sm text-gray-500">Manage members of your primary birth family.</p>
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100 mb-1">Birth Family Directory</h2>
+                    <p className="text-sm text-gray-500 dark:text-slate-400">Manage members of your primary birth family.</p>
                   </div>
                 </div>
                 {activeBirthMembers.length > 0 ? (
@@ -1310,18 +1310,18 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                     <PaginationControls totalItems={activeBirthMembers.length} />
                   </>
                 ) : (
-                  <div className="flex flex-col items-center justify-center py-12 bg-gray-50 rounded-xl border border-gray-100">
-                    <p className="text-gray-500 text-sm font-medium">No birth family members found.</p>
-                    <p className="text-gray-400 text-xs mt-1">Family members will appear here once added.</p>
+                  <div className="flex flex-col items-center justify-center py-12 bg-gray-50 dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-800">
+                    <p className="text-gray-500 dark:text-slate-400 text-sm font-medium">No birth family members found.</p>
+                    <p className="text-gray-400 dark:text-slate-500 text-xs mt-1">Family members will appear here once added.</p>
                   </div>
                 )}
 
                 {currentUserIsFamilyAdmin && (
-                  <div className="mt-8 pt-6 border-t border-gray-100">
+                  <div className="mt-8 pt-6 border-t border-gray-100 dark:border-slate-800">
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                       <div>
-                        <h3 className="text-lg font-bold text-gray-900">Non-App Users And Removed Slots</h3>
-                        <p className="text-sm text-gray-500">
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-slate-100">Non-App Users And Removed Slots</h3>
+                        <p className="text-sm text-gray-500 dark:text-slate-400">
                           Replace non-app users and removed-member slots with active app members not already placed in the tree.
                         </p>
                       </div>
@@ -1332,16 +1332,16 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                             logger.error('Failed to refresh replacement section', error);
                           });
                         }}
-                        className="inline-flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-lg border border-gray-200 text-gray-700 bg-white hover:bg-gray-50"
+                        className="inline-flex items-center justify-center px-3 py-2 text-sm font-semibold rounded-lg border border-gray-200 dark:border-slate-700 text-gray-700 dark:text-slate-300 bg-white dark:bg-slate-900 hover:bg-gray-50 dark:bg-slate-800"
                       >
                         Refresh
                       </button>
                     </div>
 
                     {loadingNonAppUsers ? (
-                      <div className="py-8 text-sm text-gray-500">Loading non-app users...</div>
+                      <div className="py-8 text-sm text-gray-500 dark:text-slate-400">Loading non-app users...</div>
                     ) : nonAppUsers.length === 0 ? (
-                      <div className="py-8 text-sm text-gray-500 bg-gray-50 rounded-lg border border-gray-100 px-4">
+                      <div className="py-8 text-sm text-gray-500 dark:text-slate-400 bg-gray-50 dark:bg-slate-800 rounded-lg border border-gray-100 dark:border-slate-800 px-4">
                         No non-app users or removed-member slots found in this family tree.
                       </div>
                     ) : (
@@ -1352,24 +1352,24 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                           const selectedReplacement = Number(replacementSelections?.[replacementKey] || 0);
                           const isReplacing = replacingDummyIds.has(replacementKey);
                           return (
-                            <div key={`dummy-${replacementKey}`} className="rounded-lg border border-gray-200 p-4 bg-gray-50/40">
+                            <div key={`dummy-${replacementKey}`} className="rounded-lg border border-gray-200 dark:border-slate-700 p-4 bg-gray-50/40 dark:bg-slate-800/40">
                               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
                                 <div>
                                   <div className="flex flex-wrap items-center gap-2">
-                                    <p className="text-sm font-semibold text-gray-900">
+                                    <p className="text-sm font-semibold text-gray-900 dark:text-slate-100">
                                       {dummy?.name || 'Familyss User'}
                                     </p>
                                     {dummy?.isStructuralDummy && (
-                                      <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+                                      <span className="inline-flex items-center rounded-full bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:text-amber-300">
                                         Removed Slot
                                       </span>
                                     )}
                                   </div>
-                                  <p className="text-xs text-gray-500">
+                                  <p className="text-xs text-gray-500 dark:text-slate-400">
                                     Dummy ID: {dummyUserId} | Node: {dummy?.nodeUid || '-'} | Generation: {dummy?.generation ?? '-'}
                                   </p>
                                   {dummy?.isStructuralDummy && (
-                                    <p className="mt-1 text-xs text-amber-700">
+                                    <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
                                       This slot came from a removed family member and can be filled directly from here.
                                     </p>
                                   )}
@@ -1384,7 +1384,7 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                                         [replacementKey]: nextValue || '',
                                       }));
                                     }}
-                                    className="min-w-[220px] rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700"
+                                    className="min-w-[220px] rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-gray-700 dark:text-slate-300"
                                   >
                                     <option value="">Select replacement member</option>
                                     {replacementCandidates.map((candidate) => (
@@ -1410,7 +1410,7 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                     )}
 
                     {!loadingNonAppUsers && nonAppUsers.length > 0 && replacementCandidates.length === 0 && (
-                      <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                      <p className="mt-3 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 rounded-lg px-3 py-2">
                         No eligible replacement members available. Add or approve an app user who is not already in the tree.
                       </p>
                     )}
@@ -1422,28 +1422,28 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
             {activeTab === 'associated' && (
               <div className="space-y-4">
                 {/* Section 1: Associated Members IN MY TREE (Highlighted) */}
-                <div className="bg-white rounded-xl shadow-sm border-2 border-sky-200 overflow-hidden">
+                <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border-2 border-sky-200 dark:border-sky-500/20 overflow-hidden">
                   <button
                     onClick={() => setAssociatedAccordionOpen(prev => ({ ...prev, inTree: !prev.inTree }))}
-                    className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-sky-50 to-white hover:from-sky-100 transition-colors"
+                    className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-sky-50 to-white dark:from-slate-800 dark:to-slate-900 hover:from-sky-100 dark:hover:from-slate-700 transition-colors"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-sky-500 flex items-center justify-center text-white">
+                      <div className="w-10 h-10 rounded-full bg-sky-500 dark:bg-sky-400/20 flex items-center justify-center text-white dark:text-sky-200">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
                         </svg>
                       </div>
                       <div className="text-left">
-                        <h2 className="text-lg font-bold text-gray-900">Associated in My Tree</h2>
-                        <p className="text-sm text-gray-500">Associated members already placed in your family tree</p>
+                        <h2 className="text-lg font-bold text-gray-900 dark:text-slate-100">Associated in My Tree</h2>
+                        <p className="text-sm text-gray-500 dark:text-slate-400">Associated members already placed in your family tree</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="px-3 py-1 bg-sky-100 text-sky-700 rounded-full text-sm font-bold">
+                      <span className="px-3 py-1 bg-sky-100 dark:bg-sky-500/20 text-sky-700 dark:text-sky-200 rounded-full text-sm font-bold">
                         {associatedMembersAll.filter(m => memberIdsInTree.has(Number(m.userId))).length}
                       </span>
                       <svg 
-                        className={`w-5 h-5 text-gray-400 transition-transform ${associatedAccordionOpen.inTree ? 'rotate-180' : ''}`} 
+                        className={`w-5 h-5 text-gray-400 dark:text-slate-400 transition-transform ${associatedAccordionOpen.inTree ? 'rotate-180' : ''}`} 
                         fill="none" 
                         stroke="currentColor" 
                         viewBox="0 0 24 24"
@@ -1454,13 +1454,13 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                   </button>
                   
                   {associatedAccordionOpen.inTree && (
-                    <div className="p-4 border-t border-gray-100">
+                    <div className="p-4 border-t border-gray-100 dark:border-slate-700">
                       {(() => {
                         const associatedInTree = associatedMembersAll.filter(m => memberIdsInTree.has(Number(m.userId)));
                         return associatedInTree.length > 0 ? (
                           <>
                             <div className="mb-4">
-                              <div className="flex flex-wrap gap-1 bg-gray-100/50 p-1 rounded-lg">
+                              <div className="flex flex-wrap gap-1 bg-gray-100/50 dark:bg-slate-800/70 p-1 rounded-lg">
                                 {associatedFamiliesOptions.map((family) => {
                                   const familyMemberCount = associatedInTree.filter(
                                     m => normalizeFamilyCode(m.sourceFamilyCode) === family.familyCode
@@ -1472,12 +1472,12 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                                       key={`associated-tree-tab-${family.familyCode}`}
                                       onClick={() => setSelectedAssociatedFamilyCode(family.familyCode)}
                                       className={`px-4 py-2 text-sm font-semibold transition-all rounded-md ${selectedAssociatedFamilyCode === family.familyCode
-                                          ? 'bg-white text-sky-600 shadow-sm'
-                                          : 'text-gray-500 hover:text-gray-700'
+                                          ? 'bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-300 shadow-sm'
+                                          : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-100'
                                         }`}
                                     >
                                       {family.familyName || family.familyCode}
-                                      <span className="ml-1.5 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">
+                                      <span className="ml-1.5 text-xs bg-gray-200 dark:bg-slate-700 text-gray-600 dark:text-slate-200 px-1.5 py-0.5 rounded-full">
                                         {familyMemberCount}
                                       </span>
                                     </button>
@@ -1485,7 +1485,7 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                                 })}
                               </div>
                             </div>
-                            <div className="bg-sky-50/50 rounded-lg p-4">
+                            <div className="bg-sky-50/50 dark:bg-slate-800/70 rounded-lg p-4">
                               {selectedAssociatedFamilyCode ? (
                                 (() => {
                                   const filtered = associatedInTree.filter(
@@ -1493,10 +1493,10 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                                   );
                                   return filtered.length > 0 ? (
                                     <div className="flex flex-col gap-2">
-                                      <h3 className="text-sm font-bold text-sky-800 mb-3 flex items-center gap-2">
-                                        <span className="w-2 h-2 bg-sky-500 rounded-full"></span>
+                                      <h3 className="text-sm font-bold text-sky-800 dark:text-sky-200 mb-3 flex items-center gap-2">
+                                        <span className="w-2 h-2 bg-sky-500 dark:bg-sky-300 rounded-full"></span>
                                         {associatedFamilyNameMap[selectedAssociatedFamilyCode] || selectedAssociatedFamilyCode}
-                                        <span className="text-xs font-normal text-gray-500 bg-white px-2 py-0.5 rounded border">
+                                        <span className="text-xs font-normal text-gray-500 dark:text-slate-300 bg-white dark:bg-slate-900 px-2 py-0.5 rounded border border-gray-200 dark:border-slate-700">
                                           {selectedAssociatedFamilyCode}
                                         </span>
                                       </h3>
@@ -1512,21 +1512,21 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                                     </div>
                                   ) : (
                                     <div className="flex flex-col items-center justify-center py-8">
-                                      <p className="text-gray-500 text-sm font-medium">No associated members from this family in your tree</p>
+                                      <p className="text-gray-500 dark:text-slate-400 text-sm font-medium">No associated members from this family in your tree</p>
                                     </div>
                                   );
                                 })()
                               ) : (
                                 <div className="flex flex-col items-center justify-center py-8">
-                                  <p className="text-gray-500 text-sm font-medium">Select a family to view members</p>
+                                  <p className="text-gray-500 dark:text-slate-400 text-sm font-medium">Select a family to view members</p>
                                 </div>
                               )}
                             </div>
                           </>
                         ) : (
-                          <div className="flex flex-col items-center justify-center py-8 bg-gray-50 rounded-lg">
-                            <p className="text-gray-500 text-sm font-medium">No associated members in your tree yet</p>
-                            <p className="text-gray-400 text-xs mt-1">Associated members will appear here when placed in your tree</p>
+                          <div className="flex flex-col items-center justify-center py-8 bg-gray-50 dark:bg-slate-800 rounded-lg">
+                            <p className="text-gray-500 dark:text-slate-400 text-sm font-medium">No associated members in your tree yet</p>
+                            <p className="text-gray-400 dark:text-slate-500 text-xs mt-1">Associated members will appear here when placed in your tree</p>
                           </div>
                         );
                       })()}
@@ -1535,30 +1535,30 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                 </div>
 
                 {/* Section 2: ALL Associated Family Members */}
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden">
                   <button
                     onClick={() => setAssociatedAccordionOpen(prev => ({ ...prev, allAssociated: !prev.allAssociated }))}
-                    className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
+                    className="w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-800/70 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white">
+                      <div className="w-10 h-10 rounded-full bg-blue-500 dark:bg-blue-400/20 flex items-center justify-center text-white dark:text-blue-200">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                         </svg>
                       </div>
                       <div className="text-left">
-                        <h2 className="text-lg font-bold text-gray-900">All Associated Members</h2>
-                        <p className="text-sm text-gray-500">Complete list of all members from associated families</p>
+                        <h2 className="text-lg font-bold text-gray-900 dark:text-slate-100">All Associated Members</h2>
+                        <p className="text-sm text-gray-500 dark:text-slate-400">Complete list of all members from associated families</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-bold">
+                      <span className="px-3 py-1 bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-200 rounded-full text-sm font-bold">
                         {selectedAssociatedFamilyCode 
                           ? selectedAssociatedFamilyMembersAll.filter(m => m.name?.toLowerCase().includes(searchTerm.toLowerCase())).length
                           : associatedMembersAll.length}
                       </span>
                       <svg 
-                        className={`w-5 h-5 text-gray-400 transition-transform ${associatedAccordionOpen.allAssociated ? 'rotate-180' : ''}`} 
+                        className={`w-5 h-5 text-gray-400 dark:text-slate-400 transition-transform ${associatedAccordionOpen.allAssociated ? 'rotate-180' : ''}`} 
                         fill="none" 
                         stroke="currentColor" 
                         viewBox="0 0 24 24"
@@ -1569,12 +1569,12 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                   </button>
                   
                   {associatedAccordionOpen.allAssociated && (
-                    <div className="p-4 border-t border-gray-100">
+                    <div className="p-4 border-t border-gray-100 dark:border-slate-700">
                       {associatedFamiliesOptions.length > 0 ? (
                         <>
                           {/* Tab-style Family Filter */}
                           <div className="mb-4">
-                            <div className="flex flex-wrap gap-1 bg-gray-100/50 p-1 rounded-lg">
+                            <div className="flex flex-wrap gap-1 bg-gray-100/50 dark:bg-slate-800/70 p-1 rounded-lg">
                               {associatedFamiliesOptions.map((family) => {
                                 const familyMemberCount = selectedAssociatedFamilyMembersAll.filter(
                                   m => normalizeFamilyCode(m.sourceFamilyCode) === family.familyCode &&
@@ -1586,12 +1586,12 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                                     key={`associated-tab-${family.familyCode}`}
                                     onClick={() => setSelectedAssociatedFamilyCode(family.familyCode)}
                                     className={`px-4 py-2 text-sm font-semibold transition-all rounded-md ${selectedAssociatedFamilyCode === family.familyCode
-                                        ? 'bg-white text-blue-600 shadow-sm'
-                                        : 'text-gray-500 hover:text-gray-700'
+                                        ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-300 shadow-sm'
+                                        : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-100'
                                       }`}
                                   >
                                     {family.familyName || 'Family'}
-                                    <span className="ml-1.5 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">
+                                    <span className="ml-1.5 text-xs bg-gray-200 dark:bg-slate-700 text-gray-600 dark:text-slate-200 px-1.5 py-0.5 rounded-full">
                                       {familyMemberCount}
                                     </span>
                                   </button>
@@ -1603,8 +1603,8 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                           {selectedAssociatedFamilyCode ? (
                             loadingAssociatedFamily ? (
                               <div className="flex justify-center items-center py-8">
-                                <div className="animate-spin rounded-full h-8 w-8 border-4 border-gray-200 border-t-blue-500" />
-                                <span className="ml-3 text-sm text-gray-500">Loading...</span>
+                                <div className="animate-spin rounded-full h-8 w-8 border-4 border-gray-200 dark:border-slate-700 border-t-blue-500" />
+                                <span className="ml-3 text-sm text-gray-500 dark:text-slate-400">Loading...</span>
                               </div>
                             ) : (
                               (() => {
@@ -1614,8 +1614,8 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                                 
                                 return filteredMembers.length > 0 ? (
                                   <div className="flex flex-col gap-3">
-                                    <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 mb-2">
-                                      <p className="text-sm text-blue-700">
+                                    <div className="bg-blue-50 dark:bg-slate-800 border border-blue-100 dark:border-slate-700 rounded-lg p-3 mb-2">
+                                      <p className="text-sm text-blue-700 dark:text-blue-200">
                                         <span className="font-semibold">{filteredMembers.length}</span> member{filteredMembers.length > 1 ? 's' : ''}
                                         {' from '}{associatedFamilyNameMap[selectedAssociatedFamilyCode] || selectedAssociatedFamilyCode}
                                       </p>
@@ -1630,21 +1630,21 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                                     <PaginationControls totalItems={filteredMembers.length} />
                                   </div>
                                 ) : (
-                                  <div className="flex flex-col items-center justify-center py-8 bg-gray-50 rounded-lg">
-                                    <p className="text-gray-500 text-sm font-medium">No members from this family</p>
+                                  <div className="flex flex-col items-center justify-center py-8 bg-gray-50 dark:bg-slate-800 rounded-lg">
+                                    <p className="text-gray-500 dark:text-slate-400 text-sm font-medium">No members from this family</p>
                                   </div>
                                 );
                               })()
                             )
                           ) : (
-                            <div className="flex flex-col items-center justify-center py-8 bg-gray-50 rounded-lg">
-                              <p className="text-gray-500 text-sm font-medium">Select a family to view members</p>
+                            <div className="flex flex-col items-center justify-center py-8 bg-gray-50 dark:bg-slate-800 rounded-lg">
+                              <p className="text-gray-500 dark:text-slate-400 text-sm font-medium">Select a family to view members</p>
                             </div>
                           )}
                         </>
                       ) : (
-                        <div className="flex flex-col items-center justify-center py-8 bg-gray-50 rounded-lg">
-                          <p className="text-gray-500 text-sm font-medium">No associated families discovered yet</p>
+                        <div className="flex flex-col items-center justify-center py-8 bg-gray-50 dark:bg-slate-800 rounded-lg">
+                          <p className="text-gray-500 dark:text-slate-400 text-sm font-medium">No associated families discovered yet</p>
                         </div>
                       )}
                     </div>
@@ -1657,28 +1657,28 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
             {activeTab === 'linked' && (
               <div className="space-y-4">
                 {/* Section 1: Linked Members IN MY TREE (Highlighted) */}
-                <div className="bg-white rounded-xl shadow-sm border-2 border-emerald-200 overflow-hidden">
+                <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border-2 border-emerald-200 dark:border-emerald-500/20 overflow-hidden">
                   <button
                     onClick={() => setLinkedAccordionOpen(prev => ({ ...prev, inTree: !prev.inTree }))}
-                    className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-emerald-50 to-white hover:from-emerald-100 transition-colors"
+                    className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-emerald-50 to-white dark:from-slate-800 dark:to-slate-900 hover:from-emerald-100 dark:hover:from-slate-700 transition-colors"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center text-white">
+                      <div className="w-10 h-10 rounded-full bg-emerald-500 dark:bg-emerald-400/20 flex items-center justify-center text-white dark:text-emerald-200">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
                         </svg>
                       </div>
                       <div className="text-left">
-                        <h2 className="text-lg font-bold text-gray-900">Linked in My Tree</h2>
-                        <p className="text-sm text-gray-500">Members from linked families already placed in your family tree</p>
+                        <h2 className="text-lg font-bold text-gray-900 dark:text-slate-100">Linked in My Tree</h2>
+                        <p className="text-sm text-gray-500 dark:text-slate-400">Members from linked families already placed in your family tree</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-sm font-bold">
+                      <span className="px-3 py-1 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-200 rounded-full text-sm font-bold">
                         {Object.values(treeLinkedFamilyMap).flat().length}
                       </span>
                       <svg 
-                        className={`w-5 h-5 text-gray-400 transition-transform ${linkedAccordionOpen.inTree ? 'rotate-180' : ''}`} 
+                        className={`w-5 h-5 text-gray-400 dark:text-slate-400 transition-transform ${linkedAccordionOpen.inTree ? 'rotate-180' : ''}`} 
                         fill="none" 
                         stroke="currentColor" 
                         viewBox="0 0 24 24"
@@ -1689,25 +1689,25 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                   </button>
                   
                   {linkedAccordionOpen.inTree && (
-                    <div className="p-4 border-t border-gray-100">
+                    <div className="p-4 border-t border-gray-100 dark:border-slate-700">
                       {Object.keys(treeLinkedFamilyMap).length > 0 ? (
                         <>
                           {/* Horizontal Tab-style Family Selector */}
                           <div className="mb-4">
-                            <div className="flex flex-wrap gap-1 bg-gray-100/50 p-1 rounded-lg">
+                            <div className="flex flex-wrap gap-1 bg-gray-100/50 dark:bg-slate-800/70 p-1 rounded-lg">
                               {Object.entries(treeLinkedFamilyMap).map(([familyCode, members]) => (
                                 <button
                                   type="button"
                                   key={`tree-tab-${familyCode}`}
                                   onClick={() => setSelectedLinkedFamilyCode(familyCode)}
                                   className={`px-4 py-2 text-sm font-semibold transition-all rounded-md ${selectedLinkedFamilyCode === familyCode
-                                      ? 'bg-white text-emerald-600 shadow-sm'
-                                      : 'text-gray-500 hover:text-gray-700'
+                                      ? 'bg-white dark:bg-slate-900 text-emerald-600 dark:text-emerald-300 shadow-sm'
+                                      : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-100'
                                     }`}
                                 >
                                   {linkedFamilyNameMap[familyCode] || familyCode}
-                                  <span className="ml-1.5 text-xs text-gray-400">({familyCode})</span>
-                                  <span className="ml-1.5 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">
+                                  <span className="ml-1.5 text-xs text-gray-400 dark:text-slate-400">({familyCode})</span>
+                                  <span className="ml-1.5 text-xs bg-gray-200 dark:bg-slate-700 text-gray-600 dark:text-slate-200 px-1.5 py-0.5 rounded-full">
                                     {members.length}
                                   </span>
                                 </button>
@@ -1717,11 +1717,11 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
 
                           {/* Selected Family Members */}
                           {selectedLinkedFamilyCode && treeLinkedFamilyMap[selectedLinkedFamilyCode] ? (
-                            <div className="bg-emerald-50/50 rounded-lg p-4">
-                              <h3 className="text-sm font-bold text-emerald-800 mb-3 flex items-center gap-2">
-                                <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
+                            <div className="bg-emerald-50/50 dark:bg-slate-800/70 rounded-lg p-4">
+                              <h3 className="text-sm font-bold text-emerald-800 dark:text-emerald-200 mb-3 flex items-center gap-2">
+                                <span className="w-2 h-2 bg-emerald-500 dark:bg-emerald-300 rounded-full"></span>
                                 {linkedFamilyNameMap[selectedLinkedFamilyCode] || selectedLinkedFamilyCode}
-                                <span className="text-xs font-normal text-gray-500 bg-white px-2 py-0.5 rounded border">
+                                <span className="text-xs font-normal text-gray-500 dark:text-slate-300 bg-white dark:bg-slate-900 px-2 py-0.5 rounded border border-gray-200 dark:border-slate-700">
                                   {selectedLinkedFamilyCode}
                                 </span>
                               </h3>
@@ -1737,15 +1737,15 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                               </div>
                             </div>
                           ) : (
-                            <div className="flex flex-col items-center justify-center py-8 bg-gray-50 rounded-lg">
-                              <p className="text-gray-500 text-sm font-medium">Select a family to view members</p>
+                            <div className="flex flex-col items-center justify-center py-8 bg-gray-50 dark:bg-slate-800 rounded-lg">
+                              <p className="text-gray-500 dark:text-slate-400 text-sm font-medium">Select a family to view members</p>
                             </div>
                           )}
                         </>
                       ) : (
-                        <div className="flex flex-col items-center justify-center py-8 bg-gray-50 rounded-lg">
-                          <p className="text-gray-500 text-sm font-medium">No linked members in your tree yet</p>
-                          <p className="text-gray-400 text-xs mt-1">Add members from linked families to your tree to see them here</p>
+                        <div className="flex flex-col items-center justify-center py-8 bg-gray-50 dark:bg-slate-800 rounded-lg">
+                          <p className="text-gray-500 dark:text-slate-400 text-sm font-medium">No linked members in your tree yet</p>
+                          <p className="text-gray-400 dark:text-slate-500 text-xs mt-1">Add members from linked families to your tree to see them here</p>
                         </div>
                       )}
                     </div>
@@ -1753,30 +1753,30 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                 </div>
 
                 {/* Section 2: ALL Linked Family Members */}
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 overflow-hidden">
                   <button
                     onClick={() => setLinkedAccordionOpen(prev => ({ ...prev, allLinked: !prev.allLinked }))}
-                    className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 transition-colors"
+                    className="w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-800/70 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white">
+                      <div className="w-10 h-10 rounded-full bg-blue-500 dark:bg-blue-400/20 flex items-center justify-center text-white dark:text-blue-200">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                         </svg>
                       </div>
                       <div className="text-left">
-                        <h2 className="text-lg font-bold text-gray-900">All Family Members</h2>
-                        <p className="text-sm text-gray-500">Complete list of all members from linked families</p>
+                        <h2 className="text-lg font-bold text-gray-900 dark:text-slate-100">All Family Members</h2>
+                        <p className="text-sm text-gray-500 dark:text-slate-400">Complete list of all members from linked families</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-bold">
+                      <span className="px-3 py-1 bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-200 rounded-full text-sm font-bold">
                         {selectedLinkedFamilyCode 
                           ? selectedLinkedFamilyMembersAll.filter(m => m.sourceFamilyCode === selectedLinkedFamilyCode).length
                           : 'Select a family'}
                       </span>
                       <svg 
-                        className={`w-5 h-5 text-gray-400 transition-transform ${linkedAccordionOpen.allLinked ? 'rotate-180' : ''}`} 
+                        className={`w-5 h-5 text-gray-400 dark:text-slate-400 transition-transform ${linkedAccordionOpen.allLinked ? 'rotate-180' : ''}`} 
                         fill="none" 
                         stroke="currentColor" 
                         viewBox="0 0 24 24"
@@ -1787,12 +1787,12 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                   </button>
                   
                   {linkedAccordionOpen.allLinked && (
-                    <div className="p-4 border-t border-gray-100">
+                    <div className="p-4 border-t border-gray-100 dark:border-slate-700">
                       {linkedFamiliesOptions.length > 0 ? (
                         <>
                           {/* Tab-style Family Filter */}
                           <div className="mb-4">
-                            <div className="flex flex-wrap gap-1 bg-gray-100/50 p-1 rounded-lg">
+                            <div className="flex flex-wrap gap-1 bg-gray-100/50 dark:bg-slate-800/70 p-1 rounded-lg">
                               {linkedFamiliesOptions.map((family) => {
                                 const familyMemberCount = selectedLinkedFamilyMembersAll.filter(
                                   m => m.sourceFamilyCode === family.familyCode
@@ -1803,12 +1803,12 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                                     key={`linked-tab-${family.familyCode}`}
                                     onClick={() => setSelectedLinkedFamilyCode(family.familyCode)}
                                     className={`px-4 py-2 text-sm font-semibold transition-all rounded-md ${selectedLinkedFamilyCode === family.familyCode
-                                        ? 'bg-white text-blue-600 shadow-sm'
-                                        : 'text-gray-500 hover:text-gray-700'
+                                        ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-300 shadow-sm'
+                                        : 'text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-100'
                                       }`}
                                   >
                                     {family.familyName || 'Family'}
-                                    <span className="ml-1.5 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">
+                                    <span className="ml-1.5 text-xs bg-gray-200 dark:bg-slate-700 text-gray-600 dark:text-slate-200 px-1.5 py-0.5 rounded-full">
                                       {familyMemberCount}
                                     </span>
                                   </button>
@@ -1824,8 +1824,8 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                               
                               return filteredMembers.length > 0 ? (
                                 <div className="flex flex-col gap-3">
-                                  <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 mb-2">
-                                    <p className="text-sm text-blue-700">
+                                  <div className="bg-blue-50 dark:bg-slate-800 border border-blue-100 dark:border-slate-700 rounded-lg p-3 mb-2">
+                                    <p className="text-sm text-blue-700 dark:text-blue-200">
                                       <span className="font-semibold">{filteredMembers.length}</span> member{filteredMembers.length > 1 ? 's' : ''}
                                       {' from '}{linkedFamilyNameMap[selectedLinkedFamilyCode] || selectedLinkedFamilyCode}
                                     </p>
@@ -1840,20 +1840,20 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                                   <PaginationControls totalItems={filteredMembers.length} />
                                 </div>
                               ) : (
-                                <div className="flex flex-col items-center justify-center py-8 bg-gray-50 rounded-lg">
-                                  <p className="text-gray-500 text-sm font-medium">No members from this family</p>
+                                <div className="flex flex-col items-center justify-center py-8 bg-gray-50 dark:bg-slate-800 rounded-lg">
+                                  <p className="text-gray-500 dark:text-slate-400 text-sm font-medium">No members from this family</p>
                                 </div>
                               );
                             })()
                           ) : (
-                            <div className="flex flex-col items-center justify-center py-8 bg-gray-50 rounded-lg">
-                              <p className="text-gray-500 text-sm font-medium">Select a family to view members</p>
+                            <div className="flex flex-col items-center justify-center py-8 bg-gray-50 dark:bg-slate-800 rounded-lg">
+                              <p className="text-gray-500 dark:text-slate-400 text-sm font-medium">Select a family to view members</p>
                             </div>
                           )}
                         </>
                       ) : (
-                        <div className="flex flex-col items-center justify-center py-8 bg-gray-50 rounded-lg">
-                          <p className="text-gray-500 text-sm font-medium">No linked families discovered yet</p>
+                        <div className="flex flex-col items-center justify-center py-8 bg-gray-50 dark:bg-slate-800 rounded-lg">
+                          <p className="text-gray-500 dark:text-slate-400 text-sm font-medium">No linked families discovered yet</p>
                         </div>
                       )}
                     </div>
@@ -1864,9 +1864,9 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
             )}
 
             {activeTab === 'pending' && (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-1">Members Not in Tree</h2>
-                <p className="text-sm text-gray-500 mb-6">These birth family members are not yet placed in the family tree (Under Admin's Family Code).</p>
+              <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 p-6">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-slate-100 mb-1">Members Not in Tree</h2>
+                <p className="text-sm text-gray-500 dark:text-slate-400 mb-6">These birth family members are not yet placed in the family tree (Under Admin's Family Code).</p>
                 {filteredMembersNotInTree.length > 0 ? (
                   <>
                     <div className="flex flex-col gap-3">
@@ -1877,9 +1877,9 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                     <PaginationControls totalItems={filteredMembersNotInTree.length} />
                   </>
                 ) : (
-                  <div className="flex flex-col items-center justify-center py-12 bg-gray-50 rounded-xl border border-gray-100">
-                    <p className="text-gray-500 text-sm font-medium">All birth family members are already placed in the family tree.</p>
-                    <p className="text-gray-400 text-xs mt-1">New members who haven't been added to the tree will appear here.</p>
+                  <div className="flex flex-col items-center justify-center py-12 bg-gray-50 dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700">
+                    <p className="text-gray-500 dark:text-slate-400 text-sm font-medium">All birth family members are already placed in the family tree.</p>
+                    <p className="text-gray-400 dark:text-slate-500 text-xs mt-1">New members who haven't been added to the tree will appear here.</p>
                   </div>
                 )}
               </div>

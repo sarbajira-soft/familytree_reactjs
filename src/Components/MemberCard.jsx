@@ -9,10 +9,10 @@ const MemberCard = React.forwardRef(({ member, onNodeClick }, ref) => (
     >
         <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-white shadow-md mb-2 flex-shrink-0">
             <img
-                src={member.photo || 'https://placehold.co/100x100/CCCCCC/FFFFFF?text=User'}
+                src={member.photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(member.name || 'User')}&background=e2e8f0&color=475569&bold=true&size=100`}
                 alt={member.name}
                 className="w-full h-full object-cover"
-                onError={(e) => { e.target.onerror = null; e.target.src="https://placehold.co/100x100/CCCCCC/FFFFFF?text=User"; }}
+                onError={(e) => { e.target.onerror = null; e.target.src=`https://ui-avatars.com/api/?name=${encodeURIComponent(member.name || 'User')}&background=e2e8f0&color=475569&bold=true&size=100`; }}
             />
         </div>
         <div className={`px-4 py-1 rounded-md text-white font-semibold text-sm whitespace-nowrap ${member.color || 'bg-gray-500'} shadow-md`}>

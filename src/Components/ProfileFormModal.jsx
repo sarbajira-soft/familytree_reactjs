@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import PhoneInput from 'react-phone-input-2';
 import Swal from 'sweetalert2';
-import { FiArrowLeft } from 'react-icons/fi';
+import { FiArrowLeft, FiCalendar } from 'react-icons/fi';
 import { toast } from 'react-toastify';
 import { useUser } from '../Contexts/UserContext';
 import { useTheme } from '../Contexts/ThemeContext';
@@ -1785,8 +1785,12 @@ const ProfileFormModal = ({
                       onChange={handleChange}
                       min="1900-01-01"
                       max="2100-12-31"
+                      style={{ colorScheme: isDark ? 'dark' : 'light' }}
                       className={`${inputClassName('dob')} pr-10`}
                     />
+                    <div className="pointer-events-none absolute inset-y-0 right-10 flex items-center text-gray-400 dark:text-slate-300">
+                      <FiCalendar size={14} />
+                    </div>
                     {formData.dob && (
                       <div className="absolute inset-y-0 right-8 flex items-center pr-2">
                         <button
@@ -2009,10 +2013,14 @@ const ProfileFormModal = ({
                         id="marriageDate"
                         name="marriageDate"
                         type="date"
-                        value={formData.marriageDate || ''} // FIXED: Ensure never undefined
-                        onChange={handleChange}
-                        className={inputClassName('marriageDate')}
-                      />
+                      value={formData.marriageDate || ''} // FIXED: Ensure never undefined
+                      onChange={handleChange}
+                      style={{ colorScheme: isDark ? 'dark' : 'light' }}
+                      className={inputClassName('marriageDate')}
+                    />
+                    <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-400 dark:text-slate-300">
+                      <FiCalendar size={14} />
+                    </div>
                       {errors.marriageDate && <p className="text-red-500 text-xs mt-1">{errors.marriageDate}</p>}
                     </div>
                     <div>

@@ -512,19 +512,25 @@ const EditEventModal = ({
                   </div>
                   Date
                 </label>
-                <input
-                  type="date"
-                  value={date}
-                  onKeyDown={(e) => e.preventDefault()}
-                  onChange={(e) => {
-                    setDate(e.target.value);
-                    if (errors.date) setErrors((prev) => ({ ...prev, date: undefined }));
-                  }}
-                  required
-                  min={EVENT_DATE_MIN}
-                  max={EVENT_DATE_MAX}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
-                />
+                <div className="relative">
+                  <input
+                    type="date"
+                    value={date}
+                    onKeyDown={(e) => e.preventDefault()}
+                    onChange={(e) => {
+                      setDate(e.target.value);
+                      if (errors.date) setErrors((prev) => ({ ...prev, date: undefined }));
+                    }}
+                    required
+                    min={EVENT_DATE_MIN}
+                    max={EVENT_DATE_MAX}
+                    style={{ colorScheme: isDark ? "dark" : "light" }}
+                    className="w-full px-4 py-3 pr-10 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-gray-50 dark:bg-slate-900 dark:focus:bg-slate-900 text-gray-900 dark:text-slate-100"
+                  />
+                  <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-400 dark:text-slate-300">
+                    <FiCalendar size={16} />
+                  </div>
+                </div>
                 {errors.date ? <p className="text-red-600 text-xs">{errors.date}</p> : null}
               </div>
               <div className="space-y-2">
@@ -534,16 +540,22 @@ const EditEventModal = ({
                   </div>
                   Time
                 </label>
-                <input
-                  type="time"
-                  value={time}
-                  onChange={(e) => {
-                    setTime(e.target.value);
-                    if (errors.time) setErrors((prev) => ({ ...prev, time: undefined }));
-                  }}
-                  required
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white"
-                />
+                <div className="relative">
+                  <input
+                    type="time"
+                    value={time}
+                    onChange={(e) => {
+                      setTime(e.target.value);
+                      if (errors.time) setErrors((prev) => ({ ...prev, time: undefined }));
+                    }}
+                    required
+                    style={{ colorScheme: isDark ? "dark" : "light" }}
+                    className="w-full px-4 py-3 pr-10 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-gray-50 dark:bg-slate-900 dark:focus:bg-slate-900 text-gray-900 dark:text-slate-100"
+                  />
+                  <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-400 dark:text-slate-300">
+                    <FiClock size={16} />
+                  </div>
+                </div>
                 {errors.time ? <p className="text-red-600 text-xs">{errors.time}</p> : null}
               </div>
             </div>

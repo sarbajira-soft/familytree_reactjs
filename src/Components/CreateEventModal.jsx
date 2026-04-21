@@ -12,6 +12,7 @@ import {
 } from "react-icons/fi";
 import Swal from "sweetalert2";
 import { useUser } from "../Contexts/UserContext";
+import { useTheme } from "../Contexts/ThemeContext";
 import { getToken } from "../utils/auth";
 import { authFetchResponse } from "../utils/authFetch";
 
@@ -37,6 +38,8 @@ const CreateEventModal = ({
   const INVALID_IMAGE_TYPE_ERROR =
     "Only image files (jpeg, png, jpg, gif) are allowed";
   const { userInfo } = useUser();
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
 
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
@@ -381,20 +384,20 @@ const CreateEventModal = ({
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start sm:items-center justify-center px-2 sm:px-4 pt-8 pb-24 sm:pt-4 sm:pb-6 z-50 font-inter">
       <div
-        className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-md sm:max-w-2xl relative flex flex-col overflow-hidden"
+        className="bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-md sm:max-w-2xl relative flex flex-col overflow-hidden border border-transparent dark:border-slate-700"
         style={{ maxHeight: "calc(100vh - 140px)" }}
       >
         {/* NEW: Success Popup */}
         {showSuccess && (
-          <div className="absolute inset-0 bg-white/90 flex flex-col items-center justify-center z-10 p-6 text-center">
-            <div className="border-4 border-green-500 rounded-2xl p-8 bg-white shadow-lg max-w-md w-full">
+          <div className="absolute inset-0 bg-white/90 dark:bg-slate-950/90 flex flex-col items-center justify-center z-10 p-6 text-center">
+            <div className="border-4 border-green-500 rounded-2xl p-8 bg-white dark:bg-slate-900 shadow-lg max-w-md w-full">
               <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-6 mx-auto">
                 <FiCheckCircle size={40} className="text-green-600" />
               </div>
-              <h3 className="text-2xl font-bold text-gray-800 mb-3">
+              <h3 className="text-2xl font-bold text-gray-800 dark:text-slate-100 mb-3">
                 Success!
               </h3>
-              <p className="text-gray-600 mb-6 text-lg">
+              <p className="text-gray-600 dark:text-slate-300 mb-6 text-lg">
                 Event created successfully.
               </p>
               <button
@@ -436,9 +439,9 @@ const CreateEventModal = ({
           <form onSubmit={handleSubmit} className="space-y-5 sm:space-y-6">
             {/* Event Title */}
             <div className="space-y-2">
-              <label className="flex items-center gap-2 text-gray-700 font-semibold text-xs sm:text-sm">
-                <div className="w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center">
-                  <FiFileText size={11} className="text-primary-600" />
+              <label className="flex items-center gap-2 text-gray-700 dark:text-slate-200 font-semibold text-xs sm:text-sm">
+                <div className="w-6 h-6 bg-primary-100 dark:bg-primary-500/15 rounded-full flex items-center justify-center">
+                  <FiFileText size={11} className="text-primary-600 dark:text-primary-300" />
                 </div>
                 Event Title
               </label>
@@ -451,7 +454,7 @@ const CreateEventModal = ({
                 }}
                 required
                 maxLength={MAX_EVENT_TITLE_LENGTH}
-                className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white text-sm"
+                className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-gray-50 dark:bg-slate-800/90 focus:bg-white dark:focus:bg-slate-800 text-sm text-gray-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-400"
                 placeholder="Enter event title..."
               />
               {errors.title ? <p className="text-red-600 text-xs">{errors.title}</p> : null}
@@ -466,9 +469,9 @@ const CreateEventModal = ({
             {/* Date and Time */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="flex items-center gap-2 text-gray-700 font-semibold text-xs sm:text-sm">
-                  <div className="w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center">
-                    <FiCalendar size={11} className="text-primary-600" />
+                <label className="flex items-center gap-2 text-gray-700 dark:text-slate-200 font-semibold text-xs sm:text-sm">
+                  <div className="w-6 h-6 bg-primary-100 dark:bg-primary-500/15 rounded-full flex items-center justify-center">
+                    <FiCalendar size={11} className="text-primary-600 dark:text-primary-300" />
                   </div>
                   Date
                 </label>
@@ -483,14 +486,15 @@ const CreateEventModal = ({
                   required
                   min={EVENT_DATE_MIN}
                   max={EVENT_DATE_MAX}
-                  className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white text-sm"
+                  style={{ colorScheme: isDark ? "dark" : "light" }}
+                  className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-gray-50 dark:bg-slate-800/90 focus:bg-white dark:focus:bg-slate-800 text-sm text-gray-900 dark:text-slate-100"
                 />
                 {errors.date ? <p className="text-red-600 text-xs">{errors.date}</p> : null}
               </div>
               <div className="space-y-2">
-                <label className="flex items-center gap-2 text-gray-700 font-semibold text-xs sm:text-sm">
-                  <div className="w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center">
-                    <FiClock size={11} className="text-primary-600" />
+                <label className="flex items-center gap-2 text-gray-700 dark:text-slate-200 font-semibold text-xs sm:text-sm">
+                  <div className="w-6 h-6 bg-primary-100 dark:bg-primary-500/15 rounded-full flex items-center justify-center">
+                    <FiClock size={11} className="text-primary-600 dark:text-primary-300" />
                   </div>
                   Time
                 </label>
@@ -502,7 +506,8 @@ const CreateEventModal = ({
                     if (errors.time) setErrors((prev) => ({ ...prev, time: undefined }));
                   }}
                   required
-                  className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white text-sm"
+                  style={{ colorScheme: isDark ? "dark" : "light" }}
+                  className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-gray-50 dark:bg-slate-800/90 focus:bg-white dark:focus:bg-slate-800 text-sm text-gray-900 dark:text-slate-100"
                 />
                 {errors.time ? <p className="text-red-600 text-xs">{errors.time}</p> : null}
               </div>
@@ -510,9 +515,9 @@ const CreateEventModal = ({
 
             {/* Location */}
             <div className="space-y-2">
-              <label className="flex items-center gap-2 text-gray-700 font-semibold text-xs sm:text-sm">
-                <div className="w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center">
-                  <FiMapPin size={11} className="text-primary-600" />
+              <label className="flex items-center gap-2 text-gray-700 dark:text-slate-200 font-semibold text-xs sm:text-sm">
+                <div className="w-6 h-6 bg-primary-100 dark:bg-primary-500/15 rounded-full flex items-center justify-center">
+                  <FiMapPin size={11} className="text-primary-600 dark:text-primary-300" />
                 </div>
                 Location
               </label>
@@ -527,7 +532,7 @@ const CreateEventModal = ({
                   }
                 }}
                 required
-                className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white text-sm"
+                className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-gray-50 dark:bg-slate-800/90 focus:bg-white dark:focus:bg-slate-800 text-sm text-gray-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-400"
                 placeholder="Enter event location..."
               />
               {errors.location ? <p className="text-red-600 text-xs">{errors.location}</p> : null}
@@ -541,9 +546,9 @@ const CreateEventModal = ({
 
             {/* Description */}
             <div className="space-y-2">
-              <label className="flex items-center gap-2 text-gray-700 font-semibold text-xs sm:text-sm">
-                <div className="w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center">
-                  <FiFileText size={11} className="text-primary-600" />
+              <label className="flex items-center gap-2 text-gray-700 dark:text-slate-200 font-semibold text-xs sm:text-sm">
+                <div className="w-6 h-6 bg-primary-100 dark:bg-primary-500/15 rounded-full flex items-center justify-center">
+                  <FiFileText size={11} className="text-primary-600 dark:text-primary-300" />
                 </div>
                 Description
               </label>
@@ -557,7 +562,7 @@ const CreateEventModal = ({
                 }}
                 maxLength={MAX_EVENT_DESCRIPTION_LENGTH}
                 rows="4"
-                className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-gray-50 focus:bg-white resize-none text-sm"
+                className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-gray-50 dark:bg-slate-800/90 focus:bg-white dark:focus:bg-slate-800 resize-none text-sm text-gray-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-400"
                 placeholder="Tell us about your event..."
               ></textarea>
               {errors.description ? (
@@ -577,9 +582,9 @@ const CreateEventModal = ({
 
             {/* Image Upload */}
             <div className="space-y-3">
-              <label className="flex items-center gap-2 text-gray-700 font-semibold text-xs sm:text-sm">
-                <div className="w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center">
-                  <FiImage size={11} className="text-primary-600" />
+              <label className="flex items-center gap-2 text-gray-700 dark:text-slate-200 font-semibold text-xs sm:text-sm">
+                <div className="w-6 h-6 bg-primary-100 dark:bg-primary-500/15 rounded-full flex items-center justify-center">
+                  <FiImage size={11} className="text-primary-600 dark:text-primary-300" />
                 </div>
                 Event Images
               </label>
@@ -619,7 +624,7 @@ const CreateEventModal = ({
                     onClick={() =>
                       document.getElementById("event-image-input").click()
                     }
-                    className="w-full py-3 border-2 border-dashed border-primary-300 rounded-xl text-primary-600 bg-white hover:bg-primary-50 transition-colors flex items-center justify-center gap-2"
+                    className="w-full py-3 border-2 border-dashed border-primary-300 dark:border-slate-600 rounded-xl text-primary-600 dark:text-primary-200 bg-white dark:bg-slate-800 hover:bg-primary-50 dark:hover:bg-slate-700 transition-colors flex items-center justify-center gap-2"
                   >
                     <FiPlus size={16} />
                     Add More Images
@@ -627,18 +632,18 @@ const CreateEventModal = ({
                 </div>
               ) : (
                 <div
-                  className="w-full min-h-32 border-2 border-dashed border-primary-300 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-primary-50 transition-colors p-6"
+                  className="w-full min-h-32 border-2 border-dashed border-primary-300 dark:border-slate-600 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-primary-50 dark:hover:bg-slate-800 transition-colors p-6 bg-white dark:bg-slate-800/60"
                   onClick={() =>
                     document.getElementById("event-image-input").click()
                   }
                 >
-                  <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center mb-3">
-                    <FiImage size={24} className="text-primary-600" />
+                  <div className="w-12 h-12 bg-primary-100 dark:bg-primary-500/15 rounded-full flex items-center justify-center mb-3">
+                    <FiImage size={24} className="text-primary-600 dark:text-primary-300" />
                   </div>
-                  <p className="text-primary-600 font-medium mb-1">
+                  <p className="text-primary-600 dark:text-primary-200 font-medium mb-1">
                     Upload Event Images
                   </p>
-                  <p className="text-gray-500 text-sm text-center">
+                  <p className="text-gray-500 dark:text-slate-400 text-sm text-center">
                     Click to select up to {MAX_EVENT_IMAGE_COUNT} images
                   </p>
                 </div>
@@ -657,13 +662,13 @@ const CreateEventModal = ({
         </div>
 
         {/* Footer */}
-        <div className="bg-gray-50 px-4 py-3 sm:p-6 pb-4 sm:pb-6 border-t border-gray-200">
+        <div className="bg-gray-50 dark:bg-slate-900 px-4 py-3 sm:p-6 pb-4 sm:pb-6 border-t border-gray-200 dark:border-slate-700">
           <div className="flex flex-row gap-3">
             <button
               type="button"
               onClick={handleClose}
               disabled={isLoading}
-              className="flex-1 py-2.5 px-4 border bg-white border-gray-300 text-gray-700 rounded-xl font-medium text-sm sm:text-base hover:bg-gray-100 transition-colors disabled:opacity-50"
+              className="flex-1 py-2.5 px-4 border bg-white dark:bg-slate-800 border-gray-300 dark:border-slate-700 text-gray-700 dark:text-slate-200 rounded-xl font-medium text-sm sm:text-base hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
             >
               Cancel
             </button>

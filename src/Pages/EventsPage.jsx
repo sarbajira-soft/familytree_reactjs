@@ -701,7 +701,7 @@ const EventsPage = () => {
                                 <button
                                   type="button"
                                   aria-label="Event actions"
-                                  className="bg-unset p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-all duration-200"
+                                  className="bg-unset p-1.5 text-gray-500 dark:text-slate-300 hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-all duration-200"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setEventActionMenuEventId((prev) =>
@@ -713,10 +713,10 @@ const EventsPage = () => {
                                 </button>
 
                                 {eventActionMenuEventId === event.id && (
-                                  <div className="absolute right-0 mt-2 w-40 rounded-xl border border-gray-200 bg-white shadow-lg z-50 overflow-hidden">
+                                  <div className="absolute right-0 mt-2 w-40 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg z-50 overflow-hidden">
                                     <button
                                       type="button"
-                                      className="w-full flex items-center rounded-lg px-3 py-2 text-left text-sm text-gray-700 hover:bg-red-50 active:bg-red-100 transition-colors"
+                                      className="w-full flex items-center rounded-lg px-3 py-2 text-left text-sm text-gray-700 dark:text-slate-200 hover:bg-red-50 dark:hover:bg-slate-800 active:bg-red-100 dark:active:bg-slate-700 transition-colors"
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         setEventActionMenuEventId(null);

@@ -180,18 +180,21 @@ const VerifyOtp = () => {
               Enter OTP
             </label>
             <input
-  id="otp"
-  type="text"
-  inputMode="numeric"
-  pattern="[0-9]*"
-  value={otp}
-  onChange={(e) => {
-    const val = e.target.value.replace(/\D/g, ''); // allow only digits
-    if (val.length <= 6) setOtp(val);
-  }}
-  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-  placeholder="Enter 6-digit OTP"
-/>
+              id="otp"
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              pattern="[0-9]*"
+              maxLength={OTP_LENGTH}
+              value={otp}
+              onChange={(e) => setOtp(sanitizeOtpInput(e.target.value))}
+              onPaste={(e) => {
+                e.preventDefault();
+                setOtp(sanitizeOtpInput(extractDigitsFromClipboardEvent(e)));
+              }}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+              placeholder={`Enter ${OTP_LENGTH}-digit OTP`}
+            />
           </div>
 
           <button

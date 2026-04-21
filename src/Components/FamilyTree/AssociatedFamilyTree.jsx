@@ -6,6 +6,7 @@ import Person from './Person';
 import TreeConnections from './TreeConnections';
 import { useUser } from '../../Contexts/UserContext';
 import { useLanguage } from '../../Contexts/LanguageContext';
+import { useTheme } from '../../Contexts/ThemeContext';
 
 const AssociatedFamilyTree = ({ familyCode, userId }) => {
   const navigate = useNavigate();
@@ -17,6 +18,8 @@ const AssociatedFamilyTree = ({ familyCode, userId }) => {
   const [error, setError] = useState(null);
   const { userInfo } = useUser();
   const { language } = useLanguage();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
   const [rootId, setRootId] = useState(null);
   const [familyCodes, setFamilyCodes] = useState([]);
   const [totalConnections, setTotalConnections] = useState(0);
@@ -123,7 +126,7 @@ const AssociatedFamilyTree = ({ familyCode, userId }) => {
     }
   }, [tree, rootId, hasScrolledToRoot]);
 
-  if (treeLoading) return <div>Loading Associated Family Tree...</div>;
+  if (treeLoading) return <div className="text-gray-500 dark:text-slate-400">Loading Associated Family Tree...</div>;
   if (error) return <div className="text-red-500">{error}</div>;
   if (!tree) return null;
 
@@ -131,8 +134,8 @@ const AssociatedFamilyTree = ({ familyCode, userId }) => {
     <div className="associated-family-tree-container">
       {/* Header with family codes and connection info */}
       {familyCodes.length > 0 && (
-        <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-          <h3 className="text-lg font-semibold text-blue-800 mb-2">Connected Family Trees</h3>
+        <div className="mb-4 p-4 bg-blue-50 dark:bg-slate-900 rounded-lg border border-blue-200 dark:border-slate-700">
+          <h3 className="text-lg font-semibold text-blue-800 dark:text-blue-200 mb-2">Connected Family Trees</h3>
           <div className="flex flex-wrap gap-2 mb-2">
             {familyCodes
                 .filter(code => code !== (familyCode || userInfo?.familyCode))
@@ -144,21 +147,21 @@ const AssociatedFamilyTree = ({ familyCode, userId }) => {
                   if (code === (userInfo?.familyCode) || code === (familyCode || '')) return;
                   navigate(`/family-tree/${code}`);
                 }}
-                className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium hover:bg-blue-200 focus:outline-none cursor-pointer transition"
+                className="px-3 py-1 bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-200 rounded-full text-sm font-medium hover:bg-blue-200 dark:hover:bg-blue-500/30 focus:outline-none cursor-pointer transition"
               >
                 {code}
               </button>
             ))}
           </div>
           {totalConnections > 0 && (
-            <p className="text-sm text-blue-600">
+            <p className="text-sm text-blue-600 dark:text-blue-300">
               Total Cross-Family Connections: {totalConnections}
             </p>
           )}
         </div>
       )}
       
-      <div style={{ position: 'relative', minHeight: 500, background: '#f9fafb', borderRadius: 12, overflow: 'auto' }}>
+      <div style={{ position: 'relative', minHeight: 500, background: isDark ? '#0f172a' : '#f9fafb', borderRadius: 12, overflow: 'auto' }}>
         {dagreGraph && (
           <TreeConnections 
             dagreGraph={dagreGraph}

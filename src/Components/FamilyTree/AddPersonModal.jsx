@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
 import { useLanguage } from '../../Contexts/LanguageContext';
+import { useTheme } from '../../Contexts/ThemeContext';
 import { X, UserPlus, Users, Edit, Plus, UserMinus, Camera, Save, ArrowLeft, Send } from 'lucide-react';
 import { fetchRelationships } from '../../utils/familyTreeApi';
 import Swal from 'sweetalert2';
@@ -24,6 +25,8 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
     const [parentSelections, setParentSelections] = useState({ father: { selectedMemberId: null, showManualEntry: false }, mother: { selectedMemberId: null, showManualEntry: false } });
     const [formSelections, setFormSelections] = useState({});
     const { language } = useLanguage();
+    const { theme } = useTheme();
+    const isDark = theme === 'dark';
 
     useEffect(() => {
         if (!isOpen) return;
@@ -1068,7 +1071,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
 
     return (
         <div 
-            className="modal-overlay-upgraded"
+            className="modal-overlay-upgraded family-tree-person-modal"
             style={{ 
                 position: 'fixed', 
                 top: 0, 
@@ -1092,48 +1095,31 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
             onClick={onClose}
         >
             <div 
-                className="modal-content-upgraded"
+                className="modal-content-upgraded flex flex-col relative w-[95vw] max-w-[500px] max-h-[calc(100dvh-140px)] rounded-3xl p-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-white/30 dark:border-slate-700/60 shadow-[0_25px_80px_rgba(0,0,0,0.25)] dark:shadow-[0_30px_90px_rgba(0,0,0,0.65)]"
                 style={{ 
-                    position: 'relative', 
-                    background: 'rgba(255, 255, 255, 0.95)',
-                    backdropFilter: 'blur(20px) saturate(1.8)',
-                    borderRadius: 24, 
-                    boxShadow: '0 25px 80px rgba(0, 0, 0, 0.25), 0 8px 32px rgba(0, 0, 0, 0.15)', 
-                    maxWidth: 500, 
-                    width: '95vw', 
-                    maxHeight: 'calc(100dvh - 140px)', 
-                    display: 'flex', 
-                    flexDirection: 'column', 
-                    padding: 0,
-                    border: '1px solid rgba(255, 255, 255, 0.3)',
                     animation: 'modalSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
                 }} 
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Modal Header */}
-                <div
-                style={{ 
-                    padding: '28px 32px 20px 32px', 
-                    borderBottom: '1px solid rgba(0, 0, 0, 0.08)', 
+                <div style={{ 
+                    padding: '24px 32px 20px 32px', 
+                    borderBottom: isDark ? '1px solid rgba(255,255,255,0.05)' : '1px solid rgba(0, 0, 0, 0.08)', 
                     display: 'flex', 
                     alignItems: 'center', 
                     justifyContent: 'space-between',
-                    background: PRIMARY_COLOR,
+                    background: isDark ? 'rgba(15, 23, 42, 0.9)' : PRIMARY_COLOR,
                     borderRadius: '24px 24px 0 0'
                 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <div
-                        
-                        style={{
+                        <div style={{
                             width: 40,
                             height: 40,
                             borderRadius: 12,
-                            background: PRIMARY_COLOR,
+                            background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.2)',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            boxShadow: '0 4px 15px rgba(63, 152, 44, 0.18)'
-
                         }}>
                             {action.type === 'parents' && <Users size={20} color="#fff" />}
                             {action.type === 'spouse' && <UserPlus size={20} color="#fff" />}
@@ -1141,20 +1127,20 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                             {action.type === 'siblings' && <UserMinus size={20} color="#fff" />}
                             {action.type === 'edit' && <Edit size={20} color="#fff" />}
                         </div>
-                        <h3 className="modal-title-upgraded" style={{ 
+                        <h3 style={{ 
                             fontSize: 24, 
                             fontWeight: 700, 
                             margin: 0,
                             color: '#fff',
-                            background: 'none',
                         }}>
                             {titles[action.type] || 'Add Person'}
                         </h3>
                     </div>
                     <button 
+                        type="button"
                         onClick={onClose} 
                         style={{ 
-                            background: 'rgba(0, 0, 0, 0.05)', 
+                            background: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)', 
                             border: 'none', 
                             fontSize: 20, 
                             cursor: 'pointer', 
@@ -1166,14 +1152,6 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                             alignItems: 'center',
                             justifyContent: 'center',
                             transition: 'all 0.2s ease'
-                        }} 
-                        onMouseEnter={(e) => {
-                            e.target.style.background = 'rgba(0, 0, 0, 0.1)';
-                            e.target.style.color = '#fff';
-                        }}
-                        onMouseLeave={(e) => {
-                            e.target.style.background = 'rgba(0, 0, 0, 0.05)';
-                            e.target.style.color = '#fff';
                         }}
                         aria-label="Close"
                     >
@@ -1182,12 +1160,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                 </div>
 
                 {/* Modal Body (Scrollable) */}
-                <form onSubmit={handleSubmit} style={{ 
-                    flex: 1, 
-                    overflow: 'auto', 
-                    padding: '24px 32px 0 32px',
-                    background: 'rgba(255, 255, 255, 0.5)'
-                }}>
+                <form onSubmit={handleSubmit} className="flex-1 overflow-auto px-8 pt-6 bg-white/50 dark:bg-transparent">
                     {/* For parents, show two dropdowns/manuals: father and mother */}
                     {action.type === 'parents' && forms.map((form) => {
                         const eligible = getEligibleMembersWithAll(form);
@@ -1206,7 +1179,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                 width: 'fit-content', 
                                 fontWeight: 600, 
                                 fontSize: 14,
-                                background: 'rgba(255, 255, 255, 0.8)',
+                                background: isDark ? 'rgba(15, 23, 42, 0.6)' : 'rgba(255, 255, 255, 0.9)',
                                 boxShadow: `0 4px 15px ${PRIMARY_COLOR}18`
                             }}>
                                 <button 
@@ -1248,7 +1221,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                 <div className="form-group-upgraded" style={{ marginBottom: 16 }}>
                                     <label style={{ 
                                         fontWeight: 600, 
-                                        color: '#333',
+                                        color: isDark ? '#f1f5f9' : '#333',
                                         marginBottom: 8,
                                         display: 'block'
                                     }}>
@@ -1262,7 +1235,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                             borderRadius: 12, 
                                             border: `2px solid ${PRIMARY_COLOR}22`, 
                                             padding: '12px 16px', 
-                                            background: 'rgba(255, 255, 255, 0.9)',
+                                            background: isDark ? 'rgba(15, 23, 42, 0.6)' : 'rgba(255, 255, 255, 0.9)',
                                             fontSize: 14,
                                             fontWeight: 500,
                                             transition: 'all 0.3s ease',
@@ -1294,7 +1267,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                         style={{
                                             borderRadius: 12,
                                             border: `1px solid ${PRIMARY_COLOR}22`,
-                                            background: 'rgba(255, 255, 255, 0.9)',
+                                            background: isDark ? 'rgba(15, 23, 42, 0.6)' : 'rgba(255, 255, 255, 0.9)',
                                             padding: '14px 16px',
                                             color: '#4b5563',
                                             fontSize: 14,
@@ -1308,7 +1281,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                             {/* Manual entry for parent if needed */}
                             {tab === 'link' && (
                                 <div className="person-form-upgraded" style={{ 
-                                    background: '#f6fdf7',
+                                    background: isDark ? 'rgba(15, 23, 42, 0.6)' : '#f6fdf7',
                                     borderRadius: 16, 
                                     padding: 24, 
                                     marginBottom: 0, 
@@ -1319,7 +1292,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                         marginBottom: 16,
                                         fontWeight: 700,
                                         fontSize: 18,
-                                        color: '#333',
+                                        color: isDark ? '#f1f5f9' : '#333',
                                         display: 'flex',
                                         alignItems: 'center',
                                         gap: 8,
@@ -1334,7 +1307,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                                 padding: '10px 12px',
                                                 borderRadius: 10,
                                                 border: `2px solid ${PRIMARY_COLOR}22`,
-                                                background: 'rgba(255, 255, 255, 0.9)',
+                                                background: isDark ? 'rgba(15, 23, 42, 0.6)' : 'rgba(255, 255, 255, 0.9)',
                                                 fontFamily: 'monospace',
                                                 fontSize: 12,
                                                 wordBreak: 'break-all',
@@ -1346,7 +1319,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
 
                                     <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
                                         <div style={{ flex: 1 }}>
-                                            <label style={{ fontWeight: 600, color: '#333', marginBottom: 6, display: 'block' }}>
+                                            <label style={{ fontWeight: 600, color: isDark ? '#f1f5f9' : '#333', marginBottom: 6, display: 'block' }}>
                                                 Receiver Family Code:
                                             </label>
                                             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -1395,7 +1368,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                                         borderRadius: 12,
                                                         border: `2px solid ${PRIMARY_COLOR}22`,
                                                         padding: '12px 16px',
-                                                        background: 'rgba(255, 255, 255, 0.9)',
+                                                        background: isDark ? 'rgba(15, 23, 42, 0.6)' : 'rgba(255, 255, 255, 0.9)',
                                                         fontSize: 14,
                                                         fontWeight: 500,
                                                         outline: 'none',
@@ -1415,7 +1388,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                                         padding: '10px 12px',
                                                         borderRadius: 10,
                                                         border: `1px solid ${PRIMARY_COLOR}33`,
-                                                        background: '#fff',
+                                                        background: isDark ? 'rgba(15, 23, 42, 0.6)' : '#fff',
                                                         cursor: targetFamilyParents?.[form.type]?.loading
                                                             ? 'not-allowed'
                                                             : 'pointer',
@@ -1429,7 +1402,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                             </div>
                                         </div>
                                         <div style={{ flex: 1 }}>
-                                            <label style={{ fontWeight: 600, color: '#333', marginBottom: 6, display: 'block' }}>
+                                            <label style={{ fontWeight: 600, color: isDark ? '#f1f5f9' : '#333', marginBottom: 6, display: 'block' }}>
                                                 Relationship Type:
                                             </label>
                                             <select
@@ -1448,7 +1421,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                                     borderRadius: 12,
                                                     border: `2px solid ${PRIMARY_COLOR}22`,
                                                     padding: '12px 16px',
-                                                    background: 'rgba(255, 255, 255, 0.9)',
+                                                    background: isDark ? 'rgba(15, 23, 42, 0.6)' : 'rgba(255, 255, 255, 0.9)',
                                                     fontSize: 14,
                                                     fontWeight: 500,
                                                     outline: 'none',
@@ -1462,7 +1435,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                     </div>
 
                                     <div style={{ marginBottom: 12 }}>
-                                        <label style={{ fontWeight: 600, color: '#333', marginBottom: 6, display: 'block' }}>
+                                        <label style={{ fontWeight: 600, color: isDark ? '#f1f5f9' : '#333', marginBottom: 6, display: 'block' }}>
                                             Receiver person (search):
                                         </label>
 
@@ -1516,7 +1489,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                                         marginTop: 8,
                                                         borderRadius: 12,
                                                         border: `1px solid ${PRIMARY_COLOR}22`,
-                                                        background: '#fff',
+                                                        background: isDark ? 'rgba(15, 23, 42, 0.6)' : '#fff',
                                                         overflow: 'hidden',
                                                     }}
                                                 >
@@ -1639,7 +1612,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                                                         <div
                                                                             style={{
                                                                                 fontWeight: 700,
-                                                                                color: '#222',
+                                                                                color: isDark ? '#f1f5f9' : '#333',
                                                                                 fontSize: 14,
                                                                                 lineHeight: 1.2,
                                                                             }}
@@ -1670,7 +1643,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                                     marginTop: 10,
                                                     padding: '10px 12px',
                                                     borderRadius: 12,
-                                                    background: 'rgba(255,255,255,0.9)',
+                                                    background: isDark ? 'rgba(15, 23, 42, 0.6)' : 'rgba(255, 255, 255, 0.9)',
                                                     border: `1px solid ${PRIMARY_COLOR}10`,
                                                     display: 'flex',
                                                     alignItems: 'center',
@@ -1678,7 +1651,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                                 }}
                                             >
                                                 <div style={{ minWidth: 0, flex: 1 }}>
-                                                    <div style={{ fontWeight: 700, color: '#222', fontSize: 13 }}>
+                                                    <div style={{ fontWeight: 700, color: isDark ? '#f1f5f9' : '#333', fontSize: 13 }}>
                                                         {targetFamilyParents?.[form.type]?.selected?.name || 'Unknown'}
                                                     </div>
                                                     <div
@@ -1716,7 +1689,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                                         padding: '6px 10px',
                                                         borderRadius: 10,
                                                         border: `1px solid ${PRIMARY_COLOR}22`,
-                                                        background: '#fff',
+                                                        background: isDark ? 'rgba(15, 23, 42, 0.6)' : '#fff',
                                                         cursor: 'pointer',
                                                         fontWeight: 700,
                                                         color: PRIMARY_COLOR,
@@ -1729,7 +1702,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                     </div>
 
                                     <div style={{ marginBottom: 12 }}>
-                                        <label style={{ fontWeight: 600, color: '#333', marginBottom: 6, display: 'block' }}>
+                                        <label style={{ fontWeight: 600, color: isDark ? '#f1f5f9' : '#333', marginBottom: 6, display: 'block' }}>
                                             Receiver nodeUid:
                                         </label>
                                         <input
@@ -1749,7 +1722,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                                 borderRadius: 12,
                                                 border: `2px solid ${PRIMARY_COLOR}22`,
                                                 padding: '12px 16px',
-                                                background: 'rgba(255, 255, 255, 0.9)',
+                                                background: isDark ? 'rgba(15, 23, 42, 0.6)' : 'rgba(255, 255, 255, 0.9)',
                                                 fontSize: 14,
                                                 fontWeight: 500,
                                                 outline: 'none',
@@ -1784,18 +1757,18 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                             )}
                             {tab === 'new' && (
                                 <div className="person-form-upgraded" style={{ 
-                                    background: '#f6fdf7',
+                                    background: isDark ? 'rgba(15, 23, 42, 0.96)' : '#f6fdf7',
                                     borderRadius: 16, 
                                     padding: 24, 
                                     marginBottom: 0, 
-                                    boxShadow: `0 4px 20px ${PRIMARY_COLOR}10`,
-                                    border: `1px solid ${PRIMARY_COLOR}10`
+                                    boxShadow: isDark ? '0 12px 30px rgba(0, 0, 0, 0.25)' : `0 4px 20px ${PRIMARY_COLOR}10`,
+                                    border: isDark ? '1px solid rgba(71, 85, 105, 0.55)' : `1px solid ${PRIMARY_COLOR}10`
                                 }}>
                                     <h4 style={{ 
                                         marginBottom: 16, 
                                         fontWeight: 700, 
                                         fontSize: 18,
-                                        color: '#333',
+                                        color: isDark ? '#e2e8f0' : '#333',
                                         display: 'flex',
                                         alignItems: 'center',
                                         gap: 8
@@ -1806,7 +1779,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                         <div className="form-group-upgraded" style={{ flex: 1 }}>
                                             <label style={{ 
                                                 fontWeight: 600, 
-                                                color: '#333',
+                                                color: isDark ? '#cbd5e1' : '#333',
                                                 marginBottom: 8,
                                                 display: 'block'
                                             }}>
@@ -1819,9 +1792,10 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                                 style={{ 
                                                     width: '100%', 
                                                     borderRadius: 12, 
-                                                    border: '2px solid rgba(102, 126, 234, 0.2)', 
+                                                    border: isDark ? '2px solid rgba(71, 85, 105, 0.8)' : '2px solid rgba(102, 126, 234, 0.2)', 
                                                     padding: '12px 16px', 
-                                                    background: 'rgba(255, 255, 255, 0.9)',
+                                                    background: isDark ? '#0f172a' : 'rgba(255, 255, 255, 0.9)',
+                                                    color: isDark ? '#f8fafc' : '#1f2937',
                                                     fontSize: 14,
                                                     fontWeight: 500,
                                                     transition: 'all 0.3s ease',
@@ -1842,7 +1816,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                         <div className="form-group-upgraded" style={{ flex: 1 }}>
                                             <label style={{ 
                                                 fontWeight: 600, 
-                                                color: '#333',
+                                                color: isDark ? '#cbd5e1' : '#333',
                                                 marginBottom: 8,
                                                 display: 'block'
                                             }}>
@@ -1872,9 +1846,10 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                                 style={{ 
                                                     width: '100%', 
                                                     borderRadius: 12, 
-                                                    border: '2px solid rgba(102, 126, 234, 0.2)', 
+                                                    border: isDark ? '2px solid rgba(71, 85, 105, 0.8)' : '2px solid rgba(102, 126, 234, 0.2)', 
                                                     padding: '12px 16px', 
-                                                    background: 'rgba(255, 255, 255, 0.9)',
+                                                    background: isDark ? '#0f172a' : 'rgba(255, 255, 255, 0.9)',
+                                                    color: isDark ? '#f8fafc' : '#1f2937',
                                                     fontSize: 14,
                                                     fontWeight: 500,
                                                     transition: 'all 0.3s ease',
@@ -1893,7 +1868,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                         <div className="form-group-upgraded" style={{ flex: 1 }}>
                                             <label style={{ 
                                                 fontWeight: 600, 
-                                                color: '#333',
+                                                color: isDark ? '#cbd5e1' : '#333',
                                                 marginBottom: 8,
                                                 display: 'block'
                                             }}>
@@ -1907,9 +1882,10 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                                 style={{ 
                                                     width: '100%', 
                                                     borderRadius: 12, 
-                                                    border: '2px solid rgba(102, 126, 234, 0.2)', 
+                                                    border: isDark ? '2px solid rgba(71, 85, 105, 0.8)' : '2px solid rgba(102, 126, 234, 0.2)', 
                                                     padding: '12px 16px', 
-                                                    background: 'rgba(255, 255, 255, 0.9)',
+                                                    background: isDark ? '#0f172a' : 'rgba(255, 255, 255, 0.9)',
+                                                    color: isDark ? '#f8fafc' : '#1f2937',
                                                     fontSize: 14,
                                                     fontWeight: 500,
                                                     transition: 'all 0.3s ease',
@@ -1933,7 +1909,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                         <div className="form-group-upgraded" style={{ flex: 1 }}>
                                             <label style={{ 
                                                 fontWeight: 600, 
-                                                color: '#333',
+                                                color: isDark ? '#cbd5e1' : '#333',
                                                 marginBottom: 8,
                                                 display: 'block'
                                             }}>
@@ -1959,23 +1935,23 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                                 <div style={{
                                                     padding: '12px 20px',
                                                     borderRadius: 12,
-                                                    border: '2px dashed rgba(102, 126, 234, 0.3)',
-                                                    background: 'rgba(102, 126, 234, 0.05)',
+                                                    border: isDark ? '2px dashed rgba(96, 165, 250, 0.45)' : '2px dashed rgba(102, 126, 234, 0.3)',
+                                                    background: isDark ? 'rgba(30, 41, 59, 0.9)' : 'rgba(102, 126, 234, 0.05)',
                                                     display: 'flex',
                                                     alignItems: 'center',
                                                     gap: 8,
                                                     transition: 'all 0.3s ease',
                                                     fontSize: 14,
                                                     fontWeight: 500,
-                                                    color: '#667eea'
+                                                    color: isDark ? '#93c5fd' : '#667eea'
                                                 }}
                                                 onMouseEnter={(e) => {
-                                                    e.target.style.borderColor = '#667eea';
-                                                    e.target.style.background = 'rgba(102, 126, 234, 0.1)';
+                                                    e.target.style.borderColor = isDark ? '#93c5fd' : '#667eea';
+                                                    e.target.style.background = isDark ? 'rgba(30, 41, 59, 1)' : 'rgba(102, 126, 234, 0.1)';
                                                 }}
                                                 onMouseLeave={(e) => {
-                                                    e.target.style.borderColor = 'rgba(102, 126, 234, 0.3)';
-                                                    e.target.style.background = 'rgba(102, 126, 234, 0.05)';
+                                                    e.target.style.borderColor = isDark ? 'rgba(96, 165, 250, 0.45)' : 'rgba(102, 126, 234, 0.3)';
+                                                    e.target.style.background = isDark ? 'rgba(30, 41, 59, 0.9)' : 'rgba(102, 126, 234, 0.05)';
                                                 }}
                                                 >
                                                     <Camera size={16} />
@@ -2040,7 +2016,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                 width: "fit-content",
                                 fontWeight: 600,
                                 fontSize: 14,
-                                background: "rgba(255, 255, 255, 0.8)",
+                                background: isDark ? "rgba(15, 23, 42, 0.6)" : "rgba(255, 255, 255, 0.9)",
                                 boxShadow: `0 4px 15px ${PRIMARY_COLOR}18`,
                               }}
                             >
@@ -2100,7 +2076,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                   <label
                                     style={{
                                       fontWeight: 600,
-                                      color: "#333",
+                                      color: isDark ? "#f1f5f9" : "#333",
                                       marginBottom: 8,
                                       display: "block",
                                     }}
@@ -2123,7 +2099,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                       borderRadius: 12,
                                       border: `2px solid ${PRIMARY_COLOR}22`,
                                       padding: "12px 16px",
-                                      background: "rgba(255, 255, 255, 0.9)",
+                                      background: isDark ? 'rgba(15, 23, 42, 0.6)' : 'rgba(255, 255, 255, 0.9)',
                                       fontSize: 14,
                                       fontWeight: 500,
                                       transition: "all 0.3s ease",
@@ -2187,7 +2163,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                     style={{
                                       borderRadius: 12,
                                       border: `1px solid ${PRIMARY_COLOR}22`,
-                                      background: "rgba(255, 255, 255, 0.9)",
+                                      background: isDark ? 'rgba(15, 23, 42, 0.6)' : 'rgba(255, 255, 255, 0.9)',
                                       padding: "14px 16px",
                                       color: "#4b5563",
                                       fontSize: 14,
@@ -2203,7 +2179,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                               <div
                                 className="person-form-upgraded"
                                 style={{
-                                  background: "#f6fdf7",
+                                  background: isDark ? 'rgba(15, 23, 42, 0.6)' : '#f6fdf7',
                                   borderRadius: 16,
                                   marginBottom: 0,
                                   border: `1px solid ${PRIMARY_COLOR}10`,
@@ -2214,7 +2190,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                     marginBottom: 16,
                                     fontWeight: 700,
                                     fontSize: 18,
-                                    color: "#333",
+                                    color: isDark ? "#f1f5f9" : "#333",
                                     display: "flex",
                                     alignItems: "center",
                                     gap: 8,
@@ -2232,7 +2208,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                       padding: "10px 12px",
                                       borderRadius: 10,
                                       border: `2px solid ${PRIMARY_COLOR}22`,
-                                      background: "rgba(255, 255, 255, 0.9)",
+                                      background: isDark ? 'rgba(15, 23, 42, 0.6)' : 'rgba(255, 255, 255, 0.9)',
                                       fontFamily: "monospace",
                                       fontSize: 12,
                                       wordBreak: "break-all",
@@ -2244,7 +2220,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
 
                                 <div style={{ display: "flex", gap: 16, marginBottom: 12 }}>
                                   <div style={{ flex: 1 }}>
-                                    <label style={{ fontWeight: 600, color: "#333", marginBottom: 6, display: "block" }}>
+                                    <label style={{ fontWeight: 600, color: isDark ? "#f1f5f9" : "#333", marginBottom: 6, display: "block" }}>
                                       Receiver Family Code:
                                     </label>
                                     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -2262,7 +2238,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                           borderRadius: 12,
                                           border: `2px solid ${PRIMARY_COLOR}22`,
                                           padding: "12px 16px",
-                                          background: "rgba(255, 255, 255, 0.9)",
+                                          background: isDark ? 'rgba(15, 23, 42, 0.6)' : 'rgba(255, 255, 255, 0.9)',
                                           fontSize: 14,
                                           fontWeight: 500,
                                           outline: "none",
@@ -2277,7 +2253,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                           padding: '10px 12px',
                                           borderRadius: 10,
                                           border: `1px solid ${PRIMARY_COLOR}33`,
-                                          background: '#fff',
+                                          background: isDark ? 'rgba(15, 23, 42, 0.6)' : '#fff',
                                           cursor: targetFamilyLoading ? 'not-allowed' : 'pointer',
                                           fontWeight: 700,
                                           color: PRIMARY_COLOR,
@@ -2289,7 +2265,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                     </div>
                                   </div>
                                   <div style={{ flex: 1 }}>
-                                    <label style={{ fontWeight: 600, color: "#333", marginBottom: 6, display: "block" }}>
+                                    <label style={{ fontWeight: 600, color: isDark ? "#f1f5f9" : "#333", marginBottom: 6, display: "block" }}>
                                       Relationship Type:
                                     </label>
                                     <select
@@ -2305,7 +2281,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                         borderRadius: 12,
                                         border: `2px solid ${PRIMARY_COLOR}22`,
                                         padding: "12px 16px",
-                                        background: "rgba(255, 255, 255, 0.9)",
+                                        background: isDark ? 'rgba(15, 23, 42, 0.6)' : 'rgba(255, 255, 255, 0.9)',
                                         fontSize: 14,
                                         fontWeight: 500,
                                         outline: "none",
@@ -2320,7 +2296,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
 
                                 {(linkRequest.relationshipType === 'parent' || linkRequest.relationshipType === 'child') && (
                                   <div style={{ marginBottom: 12 }}>
-                                    <label style={{ fontWeight: 600, color: "#333", marginBottom: 6, display: "block" }}>
+                                    <label style={{ fontWeight: 600, color: isDark ? "#f1f5f9" : "#333", marginBottom: 6, display: "block" }}>
                                       Parent Role:
                                     </label>
                                     <select
@@ -2336,7 +2312,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                         borderRadius: 12,
                                         border: `2px solid ${PRIMARY_COLOR}22`,
                                         padding: "12px 16px",
-                                        background: "rgba(255, 255, 255, 0.9)",
+                                        background: isDark ? 'rgba(15, 23, 42, 0.6)' : 'rgba(255, 255, 255, 0.9)',
                                         fontSize: 14,
                                         fontWeight: 500,
                                         outline: "none",
@@ -2349,7 +2325,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                   </div>
                                 )}
                                 <div style={{ marginBottom: 12 }}>
-                                  <label style={{ fontWeight: 600, color: "#333", marginBottom: 6, display: "block" }}>
+                                  <label style={{ fontWeight: 600, color: isDark ? "#f1f5f9" : "#333", marginBottom: 6, display: "block" }}>
                                     Receiver person (search):
                                   </label>
 
@@ -2387,7 +2363,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                         marginTop: 8,
                                         borderRadius: 12,
                                         border: `1px solid ${PRIMARY_COLOR}22`,
-                                        background: '#fff',
+                                        background: isDark ? 'rgba(15, 23, 42, 0.6)' : '#fff',
                                         overflow: 'hidden',
                                       }}
                                     >
@@ -2473,7 +2449,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                                 )}
                                               </div>
                                               <div style={{ minWidth: 0, flex: 1 }}>
-                                                <div style={{ fontWeight: 700, color: '#222', fontSize: 14, lineHeight: 1.2 }}>
+                                                <div style={{ fontWeight: 700, color: isDark ? '#f1f5f9' : '#333', fontSize: 14, lineHeight: 1.2 }}>
                                                   {p?.name || 'Unknown'}
                                                 </div>
                                                 <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>
@@ -2493,7 +2469,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                         marginTop: 10,
                                         padding: '10px 12px',
                                         borderRadius: 12,
-                                        background: 'rgba(255,255,255,0.9)',
+                                        background: isDark ? 'rgba(15, 23, 42, 0.6)' : 'rgba(255, 255, 255, 0.9)',
                                         border: `1px solid ${PRIMARY_COLOR}10`,
                                         display: 'flex',
                                         alignItems: 'center',
@@ -2531,7 +2507,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                         )}
                                       </div>
                                       <div style={{ minWidth: 0, flex: 1 }}>
-                                        <div style={{ fontWeight: 700, color: '#222', fontSize: 13 }}>
+                                        <div style={{ fontWeight: 700, color: isDark ? '#f1f5f9' : '#333', fontSize: 13 }}>
                                           {selectedTargetPerson?.name || 'Unknown'}
                                         </div>
                                         <div style={{ fontFamily: 'monospace', fontSize: 11, color: '#666', wordBreak: 'break-all' }}>
@@ -2550,7 +2526,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                           padding: '6px 10px',
                                           borderRadius: 10,
                                           border: `1px solid ${PRIMARY_COLOR}22`,
-                                          background: '#fff',
+                                          background: isDark ? 'rgba(15, 23, 42, 0.6)' : '#fff',
                                           cursor: 'pointer',
                                           fontWeight: 700,
                                           color: PRIMARY_COLOR,
@@ -2563,7 +2539,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                 </div>
 
                                 <div style={{ marginBottom: 12 }}>
-                                  <label style={{ fontWeight: 600, color: "#333", marginBottom: 6, display: "block" }}>
+                                  <label style={{ fontWeight: 600, color: isDark ? "#f1f5f9" : "#333", marginBottom: 6, display: "block" }}>
                                     Receiver nodeUid:
                                   </label>
                                   <input
@@ -2580,7 +2556,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                       borderRadius: 12,
                                       border: `2px solid ${PRIMARY_COLOR}22`,
                                       padding: "12px 16px",
-                                      background: "rgba(255, 255, 255, 0.9)",
+                                      background: isDark ? 'rgba(15, 23, 42, 0.6)' : 'rgba(255, 255, 255, 0.9)',
                                       fontSize: 14,
                                       fontWeight: 500,
                                       outline: "none",
@@ -2618,7 +2594,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                               <div
                                 className="person-form-upgraded"
                                 style={{
-                                  background: "#f6fdf7",
+                                  background: isDark ? 'rgba(15, 23, 42, 0.6)' : '#f6fdf7',
                                   borderRadius: 16,
                                   marginBottom: 0,
                                   border: `1px solid ${PRIMARY_COLOR}10`,
@@ -2631,7 +2607,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                         marginBottom: 16,
                                         fontWeight: 700,
                                         fontSize: 18,
-                                        color: "#333",
+                                        color: isDark ? "#f1f5f9" : "#333",
                                         display: "flex",
                                         alignItems: "center",
                                         gap: 8,
@@ -2644,7 +2620,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                     <div
                                       style={{
                                         marginBottom: 20,
-                                        background: "#fff",
+                                        background: isDark ? "rgba(15, 23, 42, 0.6)" : "#fff",
                                         padding: 16,
                                         borderRadius: 12,
                                         border: `1px solid ${PRIMARY_COLOR}33`,
@@ -2653,7 +2629,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                       <label
                                         style={{
                                           fontWeight: 600,
-                                          color: "#333",
+                                          color: isDark ? "#f1f5f9" : "#333",
                                           display: "block",
                                           marginBottom: 6,
                                         }}
@@ -2864,7 +2840,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                       marginBottom: 16,
                                       fontWeight: 700,
                                       fontSize: 18,
-                                      color: "#333",
+                                      color: isDark ? "#f1f5f9" : "#333",
                                       display: "flex",
                                       alignItems: "center",
                                       gap: 8,
@@ -2888,7 +2864,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                     <label
                                       style={{
                                         fontWeight: 600,
-                                        color: "#333",
+                                        color: isDark ? "#f1f5f9" : "#333",
                                         marginBottom: 8,
                                         display: "block",
                                       }}
@@ -2910,7 +2886,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                         border:
                                           "2px solid rgba(102, 126, 234, 0.2)",
                                         padding: "12px 16px",
-                                        background: "rgba(255, 255, 255, 0.9)",
+                                        background: isDark ? 'rgba(15, 23, 42, 0.6)' : 'rgba(255, 255, 255, 0.9)',
                                         fontSize: 14,
                                         fontWeight: 500,
                                         transition: "all 0.3s ease",
@@ -2937,7 +2913,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                         <label
                                           style={{
                                             fontWeight: 600,
-                                            color: "#333",
+                                            color: isDark ? "#f1f5f9" : "#333",
                                             marginBottom: 8,
                                             display: "block",
                                           }}
@@ -2964,8 +2940,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                             border:
                                               "2px solid rgba(102, 126, 234, 0.2)",
                                             padding: "12px 16px",
-                                            background:
-                                              "rgba(255, 255, 255, 0.9)",
+                                            background: isDark ? 'rgba(15, 23, 42, 0.6)' : 'rgba(255, 255, 255, 0.9)',
                                             fontSize: 14,
                                             fontWeight: 500,
                                             transition: "all 0.3s ease",
@@ -2995,7 +2970,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                     <label
                                       style={{
                                         fontWeight: 600,
-                                        color: "#333",
+                                        color: isDark ? "#f1f5f9" : "#333",
                                         marginBottom: 8,
                                         display: "block",
                                       }}
@@ -3015,7 +2990,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                         border:
                                           "2px solid rgba(102, 126, 234, 0.2)",
                                         padding: "12px 16px",
-                                        background: "rgba(255, 255, 255, 0.9)",
+                                        background: isDark ? 'rgba(15, 23, 42, 0.6)' : 'rgba(255, 255, 255, 0.9)',
                                         fontSize: 14,
                                         fontWeight: 500,
                                         transition: "all 0.3s ease",
@@ -3054,7 +3029,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                     <label
                                       style={{
                                         fontWeight: 600,
-                                        color: "#333",
+                                        color: isDark ? "#f1f5f9" : "#333",
                                         marginBottom: 8,
                                         display: "block",
                                       }}
@@ -3092,7 +3067,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                         border:
                                           "2px solid rgba(102, 126, 234, 0.2)",
                                         padding: "12px 16px",
-                                        background: "rgba(255, 255, 255, 0.9)",
+                                        background: isDark ? 'rgba(15, 23, 42, 0.6)' : 'rgba(255, 255, 255, 0.9)',
                                         fontSize: 14,
                                         fontWeight: 500,
                                         transition: "all 0.3s ease",
@@ -3120,7 +3095,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                       <label
                                         style={{
                                           fontWeight: 600,
-                                          color: "#333",
+                                          color: isDark ? "#f1f5f9" : "#333",
                                           marginBottom: 8,
                                           display: "block",
                                         }}
@@ -3139,8 +3114,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                           border:
                                             "2px solid rgba(102, 126, 234, 0.2)",
                                           padding: "12px 16px",
-                                          background:
-                                            "rgba(255, 255, 255, 0.9)",
+                                          background: isDark ? 'rgba(15, 23, 42, 0.6)' : 'rgba(255, 255, 255, 0.9)',
                                           fontSize: 14,
                                           fontWeight: 500,
                                           transition: "all 0.3s ease",
@@ -3183,7 +3157,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                     <label
                                       style={{
                                         fontWeight: 600,
-                                        color: "#333",
+                                        color: isDark ? "#f1f5f9" : "#333",
                                         marginBottom: 8,
                                         display: "block",
                                       }}

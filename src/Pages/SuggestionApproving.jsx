@@ -11,8 +11,8 @@ import { UI_MESSAGES } from '../utils/apiMessages';
 const Modal = ({ children, onClose }) => (
   <div className="fixed inset-0 bg-black bg-opacity-40 z-50 p-4 pt-12 pb-20 overflow-y-auto">
     <div className="min-h-full flex items-center justify-center">
-      <div className="bg-white rounded-2xl p-4 sm:p-8 max-w-3xl w-full shadow-2xl relative max-h-[calc(100vh-8rem)] overflow-y-auto flex flex-col">
-        <button className="absolute top-2 right-2 text-gray-400 text-2xl z-10" onClick={onClose}>&times;</button>
+      <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-8 max-w-3xl w-full shadow-2xl relative max-h-[calc(100vh-8rem)] overflow-y-auto flex flex-col border border-transparent dark:border-slate-700">
+        <button className="absolute top-2 right-2 text-gray-400 dark:text-slate-400 hover:text-gray-600 dark:hover:text-slate-200 text-2xl z-10" onClick={onClose}>&times;</button>
         {children}
       </div>
     </div>
@@ -553,7 +553,7 @@ const SuggestionApproving = () => {
         ) : (
           <div className="space-y-4">
             {requests.map((req) => (
-              <div key={req.id} className="flex flex-col sm:flex-row sm:items-center bg-white rounded-lg shadow p-4 gap-4">
+              <div key={req.id} className="flex flex-col sm:flex-row sm:items-center bg-white dark:bg-slate-900 rounded-lg shadow p-4 gap-4 border border-gray-200 dark:border-slate-700">
                 <div className="flex items-center flex-1 min-w-0">
                   <img
                     src={normalizeImageUrl(req.user?.profile)}
@@ -564,18 +564,18 @@ const SuggestionApproving = () => {
                     }}
                   />
                   <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-lg truncate">
+                    <div className="font-semibold text-lg truncate text-gray-900 dark:text-slate-100">
                       {req.user?.firstName} {req.user?.lastName}
                     </div>
-                    <div className="text-sm text-gray-500 truncate">{req.message}</div>
-                    <div className="text-xs text-gray-400 mt-1">
+                    <div className="text-sm text-gray-500 dark:text-slate-400 truncate">{req.message}</div>
+                    <div className="text-xs text-gray-400 dark:text-slate-500 mt-1">
                       {new Date(req.createdAt).toLocaleString()}
                     </div>
                   </div>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-2 sm:flex-shrink-0 w-full sm:w-auto">
                   <button
-                    className="w-full sm:w-auto bg-blue-500 text-white px-3 py-2 rounded text-sm whitespace-nowrap"
+                    className="w-full sm:w-auto bg-blue-500 text-white px-3 py-2 rounded text-sm whitespace-nowrap dark:bg-blue-600"
                     onClick={async () => {
                       const userId = req?.triggeredBy;
                       if (!userId) {
@@ -588,7 +588,7 @@ const SuggestionApproving = () => {
                     View Profile
                   </button>
                   <button
-                    className="w-full sm:w-auto bg-red-500 text-white px-3 py-2 rounded text-sm whitespace-nowrap"
+                    className="w-full sm:w-auto bg-red-500 text-white px-3 py-2 rounded text-sm whitespace-nowrap dark:bg-red-600"
                     onClick={() => {
                       setRequestToReject(req);
                       setShowRejectConfirm(true);
@@ -597,7 +597,7 @@ const SuggestionApproving = () => {
                     Reject
                   </button>
                   <button
-                    className="w-full sm:w-auto bg-green-500 text-white px-3 py-2 rounded text-sm whitespace-nowrap"
+                    className="w-full sm:w-auto bg-green-500 text-white px-3 py-2 rounded text-sm whitespace-nowrap dark:bg-green-600"
                     disabled={Number(req?.triggeredBy) === Number(effectiveUserId) || actionRequestId === req.id}
                     onClick={() => {
                       if (Number(req?.triggeredBy) === Number(effectiveUserId)) {
@@ -621,8 +621,8 @@ const SuggestionApproving = () => {
           <div className="flex flex-col gap-4">
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
               <div>
-                <h2 className="text-xl font-semibold text-gray-900">Replace a member slot</h2>
-                <p className="text-sm text-gray-500 mt-1">
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-slate-100">Replace a member slot</h2>
+                <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
                   Choose a non-app member or removed slot to replace, or add the requester as a new member.
                   {selectedMemberId && ' Click the selected member again to deselect.'}
                 </p>
@@ -631,7 +631,7 @@ const SuggestionApproving = () => {
                 <input
                   type="text"
                   placeholder="Search by name..."
-                  className="w-full px-3 py-2 dark:bg-slate-800 dark:text-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400"
+                  className="w-full px-3 py-2 bg-white dark:bg-slate-800 text-gray-900 dark:text-slate-100 border border-gray-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400"
                   value={search}
                   onChange={(e) => {
                     setSearch(e.target.value);
@@ -644,11 +644,11 @@ const SuggestionApproving = () => {
 
             <div className="flex flex-col md:flex-row gap-4 min-h-0">
               <div className="flex-1 min-h-0">
-                <div className="border border-gray-200 rounded-xl p-3 bg-white">
-                  <div className="text-sm font-medium text-gray-700 mb-3">Select member</div>
+                <div className="border border-gray-200 dark:border-slate-700 rounded-xl p-3 bg-white dark:bg-slate-900">
+                  <div className="text-sm font-medium text-gray-700 dark:text-slate-200 mb-3">Select member</div>
 
                   {filteredMembers.length === 0 ? (
-                    <div className="text-sm text-gray-500 py-10 text-center">
+                    <div className="text-sm text-gray-500 dark:text-slate-400 py-10 text-center">
                       No replaceable members or removed slots found.
                     </div>
                   ) : (
@@ -666,8 +666,8 @@ const SuggestionApproving = () => {
                               key={member.id}
                               className={`group text-left p-3 rounded-xl border transition-all ${
                                 isSelected
-                                  ? 'border-primary-500 bg-primary-50'
-                                  : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
+                                  ? 'border-primary-500 bg-primary-50 dark:bg-slate-800'
+                                  : 'border-gray-200 bg-white dark:bg-slate-900 hover:border-gray-300 dark:hover:border-slate-600 hover:shadow-sm'
                               }`}
                               onClick={() => {
                                 if (isSelected) {
@@ -683,15 +683,15 @@ const SuggestionApproving = () => {
                                 <img
                                   src={normalizeImageUrl(user.profileImage)}
                                   alt={profile.firstName || 'Member'}
-                                  className="w-14 h-14 rounded-full object-cover border"
+                                  className="w-14 h-14 rounded-full object-cover border border-gray-200 dark:border-slate-700"
                                   onError={(e) => {
                                     e.currentTarget.src = DEFAULT_AVATAR;
                                   }}
                                 />
                                 <div className="w-full text-center">
-                                  <div className="font-medium text-sm text-gray-900 truncate">{displayName}</div>
+                                  <div className="font-medium text-sm text-gray-900 dark:text-slate-100 truncate">{displayName}</div>
                                   {member?.isStructuralDummy && (
-                                    <div className="text-[11px] font-semibold text-amber-700">Removed Slot</div>
+                                    <div className="text-[11px] font-semibold text-amber-700 dark:text-amber-300">Removed Slot</div>
                                   )}
                                 </div>
                               </div>
@@ -705,8 +705,8 @@ const SuggestionApproving = () => {
               </div>
 
               <div className="w-full md:w-80 flex-shrink-0">
-                <div className="border border-gray-200 rounded-xl p-4 bg-gray-50 h-full flex flex-col">
-                  <div className="text-sm font-medium text-gray-700">Selected member</div>
+                <div className="border border-gray-200 dark:border-slate-700 rounded-xl p-4 bg-gray-50 dark:bg-slate-900 h-full flex flex-col">
+                  <div className="text-sm font-medium text-gray-700 dark:text-slate-200">Selected member</div>
 
                   {viewMember && selectedMemberId === viewMember.user.id ? (
                     <div className="mt-3">
@@ -714,27 +714,27 @@ const SuggestionApproving = () => {
                         <img
                           src={normalizeImageUrl(viewMember.user.profileImage)}
                           alt={viewMember.profile.firstName || 'Member'}
-                          className="w-12 h-12 rounded-full object-cover border"
+                          className="w-12 h-12 rounded-full object-cover border border-gray-200 dark:border-slate-700"
                           onError={(e) => {
                             e.currentTarget.src = DEFAULT_AVATAR;
                           }}
                         />
                         <div className="min-w-0">
-                          <div className="font-semibold text-gray-900 truncate">
+                          <div className="font-semibold text-gray-900 dark:text-slate-100 truncate">
                             {getDisplayName(viewMember.user, viewMember.profile)}
                           </div>
                         </div>
                       </div>
 
-                      <div className="mt-4 space-y-2 text-sm text-gray-700">
+                      <div className="mt-4 space-y-2 text-sm text-gray-700 dark:text-slate-300">
                         <div className="flex justify-between gap-2">
-                          <span className="text-gray-500">Name</span>
+                          <span className="text-gray-500 dark:text-slate-400">Name</span>
                           <span className="text-right">
                             {getDisplayName(viewMember.user, viewMember.profile)}
                           </span>
                         </div>
                         <div className="flex justify-between gap-2">
-                          <span className="text-gray-500">Age</span>
+                          <span className="text-gray-500 dark:text-slate-400">Age</span>
                           <span className="text-right">
                             {(() => {
                               const a = computeAge(viewMember.profile.dob, viewMember.profile.age);
@@ -743,11 +743,11 @@ const SuggestionApproving = () => {
                           </span>
                         </div>
                         <div className="flex justify-between gap-2">
-                          <span className="text-gray-500">Gender</span>
+                          <span className="text-gray-500 dark:text-slate-400">Gender</span>
                           <span className="text-right">{viewMember.profile.gender || '—'}</span>
                         </div>
                         <div className="flex justify-between gap-2">
-                          <span className="text-gray-500">Relation to you</span>
+                          <span className="text-gray-500 dark:text-slate-400">Relation to you</span>
                           <span className="text-right">
                             {relationLoading
                               ? 'Loading…'
@@ -760,7 +760,7 @@ const SuggestionApproving = () => {
 
                       <button
                         type="button"
-                        className="mt-4 text-sm text-primary-700 hover:text-primary-800 underline bg-white"
+                        className="mt-4 text-sm text-primary-700 dark:text-primary-300 hover:text-primary-800 dark:hover:text-primary-200 underline bg-white dark:bg-slate-900"
                         onClick={() => {
                           setSelectedMemberId(null);
                           setViewMember(null);
@@ -770,7 +770,7 @@ const SuggestionApproving = () => {
                       </button>
                     </div>
                   ) : (
-                    <div className="mt-3 text-sm text-gray-500">
+                    <div className="mt-3 text-sm text-gray-500 dark:text-slate-400">
                       Select a member from the list to view details.
                     </div>
                   )}
@@ -827,7 +827,7 @@ const SuggestionApproving = () => {
                 >
                   Yes, Replace
                 </button>
-                <button className="bg-gray-300 px-6 py-2 rounded" onClick={() => setShowConfirm(false)}>Cancel</button>
+                <button className="bg-gray-300 dark:bg-slate-700 px-6 py-2 rounded text-gray-700 dark:text-slate-100 hover:bg-gray-400 dark:hover:bg-slate-600" onClick={() => setShowConfirm(false)}>Cancel</button>
               </div>
             </Modal>
           )}
@@ -853,7 +853,7 @@ const SuggestionApproving = () => {
             </div>
             <div className="flex justify-center gap-4">
               <button
-                className="bg-gray-300 text-gray-700 px-6 py-2 rounded"
+                className="bg-gray-300 dark:bg-slate-700 text-gray-700 dark:text-slate-100 px-6 py-2 rounded hover:bg-gray-400 dark:hover:bg-slate-600"
                 onClick={() => {
                   setShowRejectConfirm(false);
                   setRequestToReject(null);

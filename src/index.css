@@ -63,6 +63,10 @@
     background-color: rgb(51 65 85) !important;
   }
 
+  html.dark .bg-gray-300 {
+    background-color: rgb(71 85 105) !important;
+  }
+
   html.dark .bg-blue-50 {
     background-color: rgb(30 41 59) !important;
   }
@@ -152,6 +156,86 @@
 
   html.dark .hover\:bg-gray-100:hover {
     background-color: rgb(30 41 59) !important;
+  }
+
+  html.dark input[type="date"],
+  html.dark input[type="time"],
+  html.dark input[type="datetime-local"],
+  html.dark select {
+    color-scheme: dark;
+    color: rgb(241 245 249) !important;
+    -webkit-text-fill-color: rgb(241 245 249) !important;
+    caret-color: rgb(241 245 249);
+  }
+
+  html.dark input[type="date"]::-webkit-calendar-picker-indicator,
+  html.dark input[type="time"]::-webkit-calendar-picker-indicator {
+    /* filter: invert(1) brightness(1.35); removed as color-scheme handles this natively */
+    opacity: 0.95;
+    cursor: pointer;
+  }
+
+  html.dark input[type="date"]::-webkit-datetime-edit,
+  html.dark input[type="date"]::-webkit-datetime-edit-fields-wrapper,
+  html.dark input[type="date"]::-webkit-datetime-edit-text,
+  html.dark input[type="date"]::-webkit-datetime-edit-month-field,
+  html.dark input[type="date"]::-webkit-datetime-edit-day-field,
+  html.dark input[type="date"]::-webkit-datetime-edit-year-field,
+  html.dark input[type="time"]::-webkit-datetime-edit,
+  html.dark input[type="time"]::-webkit-datetime-edit-fields-wrapper,
+  html.dark input[type="time"]::-webkit-datetime-edit-text,
+  html.dark input[type="time"]::-webkit-datetime-edit-hour-field,
+  html.dark input[type="time"]::-webkit-datetime-edit-minute-field,
+  html.dark input[type="datetime-local"]::-webkit-datetime-edit,
+  html.dark input[type="datetime-local"]::-webkit-datetime-edit-fields-wrapper,
+  html.dark input[type="datetime-local"]::-webkit-datetime-edit-text,
+  html.dark input[type="datetime-local"]::-webkit-datetime-edit-month-field,
+  html.dark input[type="datetime-local"]::-webkit-datetime-edit-day-field,
+  html.dark input[type="datetime-local"]::-webkit-datetime-edit-year-field,
+  html.dark input[type="datetime-local"]::-webkit-datetime-edit-hour-field,
+  html.dark input[type="datetime-local"]::-webkit-datetime-edit-minute-field {
+    color: rgb(241 245 249) !important;
+    -webkit-text-fill-color: rgb(241 245 249) !important;
+  }
+  html.dark .family-tree-person-modal .modal-content-upgraded,
+  html.dark .link-tree-modal-panel {
+    background: rgba(15, 23, 42, 0.97) !important;
+    border-color: rgba(71, 85, 105, 0.55) !important;
+  }
+
+  html.dark .family-tree-person-modal .modal-content-upgraded input,
+  html.dark .family-tree-person-modal .modal-content-upgraded select,
+  html.dark .family-tree-person-modal .modal-content-upgraded textarea,
+  html.dark .family-tree-person-modal .person-form-upgraded input,
+  html.dark .family-tree-person-modal .person-form-upgraded select,
+  html.dark .family-tree-person-modal .person-form-upgraded textarea,
+  html.dark .family-tree-person-modal .form-group-upgraded input,
+  html.dark .family-tree-person-modal .form-group-upgraded select,
+  html.dark .family-tree-person-modal .form-group-upgraded textarea,
+  html.dark .link-tree-modal input,
+  html.dark .link-tree-modal select,
+  html.dark .link-tree-modal textarea {
+    background: rgb(15 23 42) !important;
+    color: rgb(241 245 249) !important;
+    border-color: rgb(71 85 105) !important;
+  }
+
+  html.dark .family-tree-person-modal .modal-content-upgraded input::placeholder,
+  html.dark .family-tree-person-modal .modal-content-upgraded textarea::placeholder,
+  html.dark .link-tree-modal input::placeholder,
+  html.dark .link-tree-modal textarea::placeholder {
+    color: rgb(148 163 184) !important;
+  }
+
+  html.dark .family-tree-person-modal .person-form-upgraded h4,
+  html.dark .family-tree-person-modal .person-form-upgraded label,
+  html.dark .family-tree-person-modal .form-group-upgraded label {
+    color: rgb(226 232 240) !important;
+  }
+
+  html.dark .family-tree-person-modal .modal-content-upgraded button,
+  html.dark .link-tree-modal button {
+    color: inherit;
   }
 }
 
@@ -1270,3 +1354,36 @@ h6 { font-size: 0.9rem; }
  .hide-video-zoom::-webkit-media-controls-enclosure {
    overflow: hidden;
  }
+
+
+
+/* Restore Light Mode Overrides */
+html:not(.dark) .family-tree-person-modal .modal-content-upgraded input,
+html:not(.dark) .family-tree-person-modal .modal-content-upgraded select,
+html:not(.dark) .family-tree-person-modal .modal-content-upgraded textarea,
+html:not(.dark) .family-tree-person-modal .person-form-upgraded input,
+html:not(.dark) .family-tree-person-modal .person-form-upgraded select,
+html:not(.dark) .family-tree-person-modal .person-form-upgraded textarea,
+html:not(.dark) .family-tree-person-modal .form-group-upgraded input,
+html:not(.dark) .family-tree-person-modal .form-group-upgraded select,
+html:not(.dark) .family-tree-person-modal .form-group-upgraded textarea,
+html:not(.dark) .link-tree-modal input,
+html:not(.dark) .link-tree-modal select,
+html:not(.dark) .link-tree-modal textarea {
+    background-color: #fff;
+    color: #333;
+    border-color: #e2e8f0;
+}
+
+html:not(.dark) .family-tree-person-modal .modal-content-upgraded input::placeholder,
+html:not(.dark) .family-tree-person-modal .modal-content-upgraded textarea::placeholder,
+html:not(.dark) .link-tree-modal input::placeholder,
+html:not(.dark) .link-tree-modal textarea::placeholder {
+    color: #94a3b8;
+}
+
+html:not(.dark) .family-tree-person-modal .person-form-upgraded h4,
+html:not(.dark) .family-tree-person-modal .person-form-upgraded label,
+html:not(.dark) .family-tree-person-modal .form-group-upgraded label {
+    color: #334155;
+}
