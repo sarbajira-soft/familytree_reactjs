@@ -257,14 +257,33 @@ export async function clearShippingMethods(cartId, token) {
 }
 
 export async function addShippingMethod({ cartId, optionId, data = {}, token }) {
-  await clearShippingMethods(cartId, token);
+  return await addShippingMethods({
+    cartId,
+    options: [
+      {
+        optionId,
+        data,
+      },
+    ],
+    token,
+  });
+}
 
-  const body = {
-    option_id: optionId,
-    data,
-  };
+export async function addShippingMethods({ cartId, options = [], token }) {
+  const normalizedOptions = Array.isArray(options)
+    ? options
+        .map((option) => ({
+          option_id: option?.optionId || option?.option_id || '',
+          data: option?.data && typeof option.data === 'object' ? option.data : {},
+        }))
+        .filter((option) => option.option_id)
+    : [];
 
-  const res = await client.post(`/store/carts/${cartId}/shipping-methods`, body, {
+  if (!normalizedOptions.length) {
+    throw new Error('At least one shipping option is required.');
+  }
+
+  const res = await client.post(`/store/carts/${cartId}/shipping-methods/bulk`, { options: normalizedOptions }, {
     headers: buildJsonHeaders(token),
   });
 
@@ -293,6 +312,25 @@ export async function initPaymentSession({ paymentCollectionId, providerId = 'pp
 
   const data = res.data;
   return data.payment_collection || data;
+}
+
+export async function createOrReuseRazorpaySession({ cartId, token }) {
+  const res = await client.post(
+    '/store/payments/razorpay/session',
+    { cart_id: cartId },
+    { headers: buildJsonHeaders(token) },
+  );
+
+  return res.data;
+}
+
+export async function getRazorpayRecovery({ cartId, token }) {
+  const res = await client.get('/store/payments/razorpay/recovery', {
+    params: { cart_id: cartId },
+    headers: buildBaseHeaders(token),
+  });
+
+  return res.data;
 }
 
 export async function completeCart(cartId, token) {

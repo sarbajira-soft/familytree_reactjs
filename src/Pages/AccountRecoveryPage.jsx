@@ -324,11 +324,25 @@ const AccountRecoveryPage = () => {
         <form onSubmit={handleConfirmToken} className="mt-5 space-y-3">
           <label className="block text-sm font-medium text-gray-700">Recovery Token</label>
           <input
+            id="token"
             type="text"
             inputMode="numeric"
             pattern="[0-9]*"
             autoComplete="one-time-code"
             maxLength={RECOVERY_TOKEN_LENGTH}
+            inputMode="numeric"
+            pattern="[0-9]*"
+            value={token}
+            onChange={(e) => {
+              const val = e.target.value.replace(/\D/g, ''); // allow only digits
+              if (val.length <= 8) setToken(val);
+            }}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+            placeholder="Enter recovery token"
+            disabled={confirming}
+          />
+          {/* <input
+            type="number"
             value={token}
             onChange={(e) => setToken(sanitizeRecoveryTokenInput(e.target.value))}
             onPaste={(e) => {
@@ -338,7 +352,7 @@ const AccountRecoveryPage = () => {
             placeholder={`Enter ${RECOVERY_TOKEN_LENGTH}-digit recovery token`}
             className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
             disabled={confirming}
-          />
+          /> */}
           {requestDone && generatedToken && (
             <p className="text-xs text-gray-500">
               Token fallback (non-email flow): <span className="font-semibold">{generatedToken}</span>

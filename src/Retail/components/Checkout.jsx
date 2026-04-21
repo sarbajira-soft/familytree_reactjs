@@ -63,6 +63,136 @@ const formatDeliveryEstimate = (opt) => {
   return '';
 };
 
+const normalizeShippingProfileId = (option) =>
+  option?.shipping_profile_id ||
+  option?.shippingProfileId ||
+  option?.shipping_profile?.id ||
+  option?.shippingProfile?.id ||
+  option?.profile_id ||
+  null;
+
+const deriveShippingModeKey = (option) => {
+  const raw =
+    option?.type?.code ||
+    option?.type?.label ||
+    option?.metadata?.shipping_type ||
+    option?.data?.shipping_type ||
+    option?.data?.shiprocket_mode ||
+    option?.name ||
+    '';
+
+  const normalized = String(raw).trim().toLowerCase();
+
+  if (!normalized) {
+    return '';
+  }
+
+  if (normalized.includes('express')) {
+    return 'express';
+  }
+
+  if (normalized.includes('standard')) {
+    return 'standard';
+  }
+
+  return normalized;
+};
+
+const buildShippingMethodData = (option, paymentMethod) => ({
+  shipping_type:
+    option?.metadata?.shipping_type ||
+    option?.type?.label ||
+    option?.type?.code ||
+    option?.data?.shipping_type ||
+    null,
+  shiprocket_mode:
+    option?.data?.shiprocket_mode ||
+    option?.metadata?.shipping_type ||
+    option?.type?.code ||
+    null,
+  shiprocket_eta: option?.metadata?.eta || null,
+  shiprocket_eta_days:
+    typeof option?.metadata?.eta_days === 'number' ? option.metadata.eta_days : null,
+  payment_mode: paymentMethod || null,
+});
+
+const buildShippingSelections = ({ options, selectedOptionId, paymentMethod }) => {
+  const availableOptions = Array.isArray(options) ? options : [];
+  const selectedOption =
+    availableOptions.find((option) => option?.id === selectedOptionId) || null;
+
+  if (!selectedOption) {
+    throw new Error('Please select a valid shipping method.');
+  }
+
+  const groupedByProfile = availableOptions.reduce((acc, option) => {
+    const profileId = normalizeShippingProfileId(option);
+    if (!profileId) {
+      return acc;
+    }
+
+    if (!acc.has(profileId)) {
+      acc.set(profileId, []);
+    }
+
+    acc.get(profileId).push(option);
+    return acc;
+  }, new Map());
+
+  const selectedModeKey = deriveShippingModeKey(selectedOption);
+  const selectedProviderId = selectedOption?.provider_id || selectedOption?.providerId || '';
+  const selectedProfileId = normalizeShippingProfileId(selectedOption);
+
+  if (!groupedByProfile.size) {
+    return [
+      {
+        optionId: selectedOption.id,
+        data: buildShippingMethodData(selectedOption, paymentMethod),
+      },
+    ];
+  }
+
+  const resolveAmount = (option) => {
+    const amount =
+      option?.amount ??
+      option?.calculated_price?.calculated_amount ??
+      option?.calculatedPrice?.calculatedAmount ??
+      null;
+    const parsed = typeof amount === 'number' ? amount : Number(amount);
+    return Number.isFinite(parsed) ? parsed : Number.MAX_SAFE_INTEGER;
+  };
+
+  return Array.from(groupedByProfile.entries()).map(([profileId, profileOptions]) => {
+    if (profileId === selectedProfileId) {
+      return {
+        optionId: selectedOption.id,
+        data: buildShippingMethodData(selectedOption, paymentMethod),
+      };
+    }
+
+    const preferredMatch =
+      profileOptions.find(
+        (option) =>
+          deriveShippingModeKey(option) === selectedModeKey &&
+          (option?.provider_id || option?.providerId || '') === selectedProviderId,
+      ) ||
+      profileOptions.find((option) => deriveShippingModeKey(option) === selectedModeKey) ||
+      profileOptions
+        .slice()
+        .sort((left, right) => resolveAmount(left) - resolveAmount(right))[0] ||
+      null;
+
+    if (!preferredMatch?.id) {
+      throw new Error('Unable to resolve shipping methods for all items in the cart.');
+    }
+
+    return {
+      optionId: preferredMatch.id,
+      data: buildShippingMethodData(preferredMatch, paymentMethod),
+    };
+  });
+};
+
 const validateAddressFields = (addr) => {
   const errors = {};
 
@@ -135,6 +265,7 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
     createFreshCart,
     startOnlinePayment,
     showToast,
+    setPaymentRecovery,
   } = useRetail();
 
   const { selectedGiftEvent } = useGiftEvent();
@@ -540,32 +671,17 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
     setSubmitting(true);
     setWaitingForPayment(false);
     try {
-      const selectedOption =
-        shippingOptions && shippingOptions.length > 0
-          ? shippingOptions.find((opt) => opt.id === selectedShippingId) || null
-          : null;
-
-      const shippingMeta = selectedOption
-        ? {
-            shipping_type: selectedOption.metadata?.shipping_type || null,
-            shiprocket_eta: selectedOption.metadata?.eta || null,
-            shiprocket_eta_days:
-              typeof selectedOption.metadata?.eta_days === 'number'
-                ? selectedOption.metadata.eta_days
-                : null,
-            // Forward payment mode so the Shiprocket provider can
-            // distinguish COD vs online when the shipping method
-            // is actually attached to the cart.
-            payment_mode: paymentMethod || null,
-          }
-        : null;
+      const shippingSelections = buildShippingSelections({
+        options: shippingOptions,
+        selectedOptionId: selectedShippingId,
+        paymentMethod,
+      });
 
       if (paymentMethod === 'cod') {
         const order = await completeCheckout(
           shippingAddress,
           billing,
-          selectedShippingId,
-          shippingMeta,
+          shippingSelections,
         );
         setCompletedOrder(order || null);
         setSuccess('Order completed successfully!');
@@ -573,11 +689,10 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
       }
 
       // Online payment flow using Razorpay
-      const { cartId, paymentCollectionId, razorpaySession } = await startOnlinePayment(
+      const { cartId, razorpaySession } = await startOnlinePayment(
         shippingAddress,
         billing,
-        selectedShippingId,
-        shippingMeta,
+        shippingSelections,
       );
 
       // Fetch a fresh cart snapshot after applying shipping method so that
@@ -673,6 +788,42 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
             ? itemsTotal + shippingTotalValue
             : itemsTotal;
 
+        const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+        const pollPaymentRecovery = async () => {
+          const maxAttempts = 45;
+          const delayMs = 2000;
+          let lastRecovery = null;
+
+          for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+            // eslint-disable-next-line no-await-in-loop
+            lastRecovery = await cartService.getRazorpayRecovery({
+              cartId,
+              token: token || null,
+            });
+
+            if (lastRecovery?.status === 'completed' && lastRecovery?.order) {
+              return lastRecovery;
+            }
+
+            if (
+              lastRecovery?.status === 'failed' ||
+              lastRecovery?.status === 'expired' ||
+              lastRecovery?.status === 'abandoned'
+            ) {
+              throw new Error(
+                lastRecovery?.message ||
+                  'Payment could not be completed. If the amount was deducted, it will be auto-refunded or reversed by your bank.',
+              );
+            }
+
+            // eslint-disable-next-line no-await-in-loop
+            await sleep(delayMs);
+          }
+
+          return lastRecovery;
+        };
+
         const options = {
           key: razorpaySession.razorpay_key_id,
           amount: razorpaySession.amount,
@@ -698,140 +849,31 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
           },
           handler: async function () {
             try {
-              // After successful payment in Razorpay, wait for backend webhook
-              // to confirm the payment on the payment collection before
-              // completing the cart.
               setWaitingForPayment(true);
+              const recovery = await pollPaymentRecovery();
 
-              const paymentArgs = arguments && arguments.length ? arguments[0] : null;
-              const razorpay_payment_id = paymentArgs?.razorpay_payment_id;
-              const razorpay_order_id = paymentArgs?.razorpay_order_id;
-              const razorpay_signature = paymentArgs?.razorpay_signature;
-
-              if (razorpay_payment_id && razorpay_order_id && razorpay_signature && paymentCollectionId) {
-                try {
-                  await cartService.verifyRazorpayPayment({
-                    paymentCollectionId,
-                    razorpay_order_id,
-                    razorpay_payment_id,
-                    razorpay_signature,
-                    token: token || null,
-                  });
-                } catch (e) {
-                  // Ignore verify failures and fall back to polling.
-                }
-              }
-
-              const maxAttempts = 20;
-              const delayMs = 1500;
-
-              const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-              let isSuccess = false;
-
-              for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-                // eslint-disable-next-line no-await-in-loop
-                const cartAfterPayment = await cartService.getCart(
-                  cartId,
-                  token || null,
-                );
-
-                const paymentCollection =
-                  cartAfterPayment.payment_collection ||
-                  cartAfterPayment.paymentCollection ||
-                  null;
-
-                const collectionStatusRaw =
-                  paymentCollection?.status ||
-                  paymentCollection?.payment_status ||
-                  cartAfterPayment.payment_status ||
-                  cartAfterPayment.paymentStatus;
-
-                const collectionStatus = (collectionStatusRaw || '').toLowerCase();
-
-                const sessions = Array.isArray(paymentCollection?.payment_sessions)
-                  ? paymentCollection.payment_sessions
-                  : Array.isArray(paymentCollection?.paymentSessions)
-                  ? paymentCollection.paymentSessions
-                  : [];
-
-                const primarySession = sessions[0] || null;
-                const sessionStatusRaw = primarySession?.status || '';
-                const sessionStatus = sessionStatusRaw.toLowerCase();
-
-                const sessionSuccess =
-                  sessionStatus === 'authorized' || sessionStatus === 'captured';
-
-                const collectionSuccess =
-                  collectionStatus === 'authorized' ||
-                  collectionStatus === 'captured' ||
-                  collectionStatus === 'succeeded' ||
-                  collectionStatus === 'paid';
-
-                isSuccess = sessionSuccess || collectionSuccess;
-
-                if (isSuccess) {
-                  break;
-                }
-
-                const sessionFailure =
-                  sessionStatus === 'canceled' ||
-                  sessionStatus === 'failed' ||
-                  sessionStatus === 'error';
-
-                const collectionFailure =
-                  collectionStatus === 'canceled' ||
-                  collectionStatus === 'failed';
-
-                if (sessionFailure || collectionFailure) {
-                  throw new Error('Payment did not complete successfully.');
-                }
-
-                // eslint-disable-next-line no-await-in-loop
-                await sleep(delayMs);
-              }
-
-              if (!isSuccess) {
-                throw new Error('Timed out waiting for payment confirmation.');
-              }
-
-              // Webhook has confirmed payment, now complete the cart.
-              const isCartAlreadyCompletedError = (e) => {
-                const msg =
-                  e?.response?.data?.message ||
-                  e?.response?.data?.error ||
-                  e?.message ||
-                  '';
-
-                const status = e?.response?.status;
-
-                const normalized = String(msg).toLowerCase();
-                return (
-                  status === 409 ||
-                  normalized.includes('already completed') ||
-                  normalized.includes('cart is completed') ||
-                  normalized.includes('cart completed')
-                );
-              };
-
-              try {
-                const order = await cartService.completeCart(cartId, token || null);
+              if (recovery?.status === 'completed' && recovery?.order) {
                 await fetchOrders();
                 await createFreshCart();
-                setCompletedOrder(order || null);
+                setCompletedOrder(recovery.order || null);
                 setSuccess('Payment successful! Your order has been placed.');
                 resolve();
-              } catch (completeErr) {
-                if (isCartAlreadyCompletedError(completeErr)) {
-                  await fetchOrders();
-                  await createFreshCart();
-                  setCompletedOrder(null);
-                  setSuccess('Payment successful! Your order has been placed.');
-                  resolve();
-                }
-
-                throw completeErr;
+                return;
               }
+
+              setPaymentRecovery &&
+                setPaymentRecovery({
+                  active: true,
+                  source: 'checkout',
+                  cartId,
+                  status: recovery?.status || 'processing',
+                  message:
+                    recovery?.message ||
+                    'Payment received. We are finalizing your order securely.',
+                });
+
+              resolve();
+              return;
             } catch (err) {
               if (isInsufficientInventoryError(err)) {
                 showToast && showToast('Out of stock');
@@ -847,7 +889,9 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
           },
           modal: {
             ondismiss: function () {
-              setError('Payment was cancelled before completion.');
+              setError(
+                'Payment window was closed. If the amount was deducted, it will be auto-refunded or your order will appear shortly.',
+              );
               refreshCart();
               reject(new Error('Payment cancelled'));
             },
