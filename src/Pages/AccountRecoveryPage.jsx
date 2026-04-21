@@ -270,12 +270,11 @@ const AccountRecoveryPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-8">
-      <div className="w-full max-w-lg bg-white border border-gray-200 rounded-2xl shadow-sm p-6 sm:p-8">
-        <h1 className="text-2xl font-bold text-gray-900">Account Recovery</h1>
-        <p className="text-sm text-gray-600 mt-2">
-          Recover a deleted account within the 60-day window.
-        </p>
+    <>
+      <h1 className="text-2xl font-bold text-gray-900">Account Recovery</h1>
+      <p className="text-sm text-gray-600 mt-2">
+        Recover a deleted account within the 60-day window.
+      </p>
 
         {recoverable === false ? (
           <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
@@ -373,8 +372,7 @@ const AccountRecoveryPage = () => {
           </Link>
           <span>After recovery, re-request family join.</span>
         </div>
-      </div>
-    </div>
+    </>
   );
 };
 

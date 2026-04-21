@@ -151,18 +151,17 @@ const VerifyOtp = () => {
   };
 
   return (
-    <div className="min-h-screen w-full bg-gray-50 flex items-center justify-center px-4">
-      <div className="w-full max-w-md px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-center mb-1">
-          <AuthLogo className="w-28 h-28" />
-        </div>
+    <>
+      <div className="flex justify-center mb-1">
+        <AuthLogo className="w-28 h-28" />
+      </div>
 
-        <div className="text-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-800">Verify Your Account</h2>
-          <p className="text-sm text-gray-500 mt-1">
-            We've sent a verification code to {email || mobile}
-          </p>
-        </div>
+      <div className="text-center mb-6">
+        <h2 className="text-2xl font-bold text-gray-800">Verify Your Account</h2>
+        <p className="text-sm text-gray-500 mt-1">
+          We've sent a verification code to {email || mobile}
+        </p>
+      </div>
 
         {error && (
           <div className={`mb-4 p-3 text-sm rounded border ${
@@ -223,8 +222,7 @@ const VerifyOtp = () => {
             )}
           </p>
         </div>
-      </div>
-    </div>
+    </>
   );
 };
 

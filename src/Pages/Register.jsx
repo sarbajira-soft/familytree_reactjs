@@ -1,5 +1,5 @@
 import React, { useState, useRef } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import AuthLogo from "../Components/AuthLogo";
 
 const Register = () => {
@@ -218,25 +218,21 @@ const Register = () => {
   };
 
   return (
-    <div
-      className="w-full bg-gray-50 dark:bg-slate-950 flex items-center justify-center px-4 overflow-y-auto"
-      style={{ minHeight: '100dvh', paddingTop: 'env(safe-area-inset-top, 0px)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
-    >
-      <div className="w-full max-w-md px-4 sm:px-6 lg:px-8">
-        {/* Logo */}
-        <div className="flex justify-center mb-1">
-          <AuthLogo className="w-28 h-28" />
-        </div>
+    <>
+      {/* Logo */}
+      <div className="flex justify-center mb-1">
+        <AuthLogo className="w-28 h-28" />
+      </div>
 
-        {/* Title */}
-        <div className="text-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
-            Create your account
-          </h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Please enter your details to sign up
-          </p>
-        </div>
+      {/* Title */}
+      <div className="text-center mb-6">
+        <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
+          Create your account
+        </h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+          Please enter your details to sign up
+        </p>
+      </div>
 
         {apiError && (
           <div
@@ -716,12 +712,11 @@ const Register = () => {
         {/* Login Link */}
         <p className="text-center text-sm text-gray-500 mt-6 pb-8">
           Already have an account?{" "}
-          <a href="/login" className="text-[#1976d2] hover:underline">
+          <Link to="/login" className="text-[#1976d2] hover:underline">
             Login
-          </a>
+          </Link>
         </p>
-      </div>
-    </div>
+    </>
   );
 };
 
