@@ -371,12 +371,18 @@ const CreatePostModal = ({
         setImagePreview(null);
         setMessage(INVALID_IMAGE_TYPE_ERROR);
         setShowEmojiPicker(false);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
         return;
       }
 
       if (file.size > 5 * 1024 * 1024) {
         setMessage("Image size should be less than 5MB");
         setShowEmojiPicker(false);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
         return;
       }
 

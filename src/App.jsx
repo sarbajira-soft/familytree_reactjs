@@ -46,6 +46,7 @@ const PendingFamilyRequests = lazy(() =>
 
 const FamilyGalleryPage = lazy(() => import("./Pages/FamilyGalleryPage"));
 const GiftListingPage = lazy(() => import("./Pages/GiftListingPage"));
+const RetailPaymentPage = lazy(() => import("./Pages/RetailPaymentPage"));
 const EventsPage = lazy(() => import("./Pages/EventsPage"));
 const OrderManagementPage = lazy(() => import("./Pages/OrderManagementPage"));
 const SuggestionApproving = lazy(() => import("./Pages/SuggestionApproving"));
@@ -145,6 +146,8 @@ function App() {
                   </GuestRoute>
                 }
               />
+
+              <Route path="/retail/payment" element={<RetailPaymentPage />} />
 
               {/* ---------------- Onboarding (Authenticated) ---------------- */}
               <Route

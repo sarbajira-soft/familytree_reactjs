@@ -35,6 +35,16 @@ const initialState = {
   paymentRecovery: null,
 };
 
+function upsertOrderList(existingOrders, nextOrder) {
+  if (!nextOrder || !nextOrder.id) {
+    return Array.isArray(existingOrders) ? existingOrders : [];
+  }
+
+  const current = Array.isArray(existingOrders) ? existingOrders : [];
+  const remaining = current.filter((order) => order?.id !== nextOrder.id);
+  return [nextOrder, ...remaining];
+}
+
 function reducer(state, action) {
   switch (action.type) {
     case 'SET_LOADING':
@@ -71,6 +81,8 @@ function reducer(state, action) {
       return { ...state, orders: action.payload };
     case 'APPEND_ORDERS':
       return { ...state, orders: [...(state.orders || []), ...(action.payload || [])] };
+    case 'UPSERT_ORDER':
+      return { ...state, orders: upsertOrderList(state.orders, action.payload) };
     case 'RESET':
       return { ...initialState };
     default:
@@ -94,6 +106,10 @@ export const RetailProvider = ({ children }) => {
 
   const clearToast = useCallback(() => {
     dispatch({ type: 'CLEAR_TOAST' });
+  }, []);
+
+  const clearError = useCallback(() => {
+    dispatch({ type: 'SET_ERROR', payload: null });
   }, []);
 
   const setPaymentRecovery = useCallback((payload) => {
@@ -269,7 +285,15 @@ export const RetailProvider = ({ children }) => {
               }
 
               setCartPersistent(nextCart);
-              clearPaymentRecovery();
+              dispatch({ type: 'UPSERT_ORDER', payload: recovery.order });
+              setPaymentRecovery({
+                active: true,
+                source: 'orders-banner',
+                cartId: storedCartId,
+                status: 'completed',
+                message: 'Your previous payment was confirmed and the order has been placed successfully.',
+                order: recovery.order || null,
+              });
               showToast('Your previous payment was confirmed and the order has been placed.', 'success');
               return;
             }
@@ -888,7 +912,15 @@ export const RetailProvider = ({ children }) => {
             await fetchOrders();
           }
 
-          clearPaymentRecovery();
+          dispatch({ type: 'UPSERT_ORDER', payload: latestRecovery.order });
+          setPaymentRecovery({
+            active: true,
+            source: 'orders-banner',
+            cartId: recovery.cartId,
+            status: 'completed',
+            message: 'Payment successful! Your order has been placed.',
+            order: latestRecovery.order || null,
+          });
           showToast('Payment successful! Your order has been placed.', 'success');
           return;
         }
@@ -1301,6 +1333,7 @@ export const RetailProvider = ({ children }) => {
       toast: state.toast,
       showToast,
       clearToast,
+      clearError,
       setPaymentRecovery,
       clearPaymentRecovery,
       login,
@@ -1340,6 +1373,7 @@ export const RetailProvider = ({ children }) => {
       state.toast,
       showToast,
       clearToast,
+      clearError,
       setPaymentRecovery,
       clearPaymentRecovery,
       login,

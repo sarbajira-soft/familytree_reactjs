@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { FiUser, FiMapPin, FiPhone, FiMail, FiPlus, FiEdit2, FiTrash2 } from 'react-icons/fi';
 import { useRetail } from '../context/RetailContext';
+import { getErrorMessage } from '../utils/helpers';
 
 const normalizeCountryCode = (value) => (value || '').toString().trim().toLowerCase();
 
@@ -42,7 +43,15 @@ const validateAddressFields = (addr) => {
   }
 
   if (!phone) errors.phone = 'Phone is required';
-  else if (!/^\d{6,14}$/.test(phone)) errors.phone = 'Enter a valid phone number';
+  else if (country === 'in') {
+    // Indian mobile: exactly 10 digits (optionally strip leading 0 or +91)
+    const cleanPhone = phone.replace(/^0/, '').replace(/^91/, '');
+    if (!/^\d{10}$/.test(cleanPhone)) {
+      errors.phone = 'Enter a valid 10-digit mobile number';
+    }
+  } else if (!/^\d{6,15}$/.test(phone)) {
+    errors.phone = 'Enter a valid phone number (6-15 digits)';
+  }
 
   return errors;
 };
@@ -146,7 +155,7 @@ const Profile = () => {
       setProfileMessage('Profile updated successfully.');
       setIsEditingProfile(false);
     } catch (err) {
-      setProfileError(err.message || 'Failed to update profile');
+      setProfileError(getErrorMessage(err) || 'Failed to update profile');
     } finally {
       setProfileSaving(false);
     }
@@ -244,7 +253,7 @@ const Profile = () => {
       setAddresses(Array.isArray(nextAddresses) ? nextAddresses : []);
       resetAddressForm();
     } catch (err) {
-      setAddressError(err.message || 'Failed to save address');
+      setAddressError(getErrorMessage(err) || 'Failed to save address');
     } finally {
       setAddressSaving(false);
     }
@@ -263,7 +272,7 @@ const Profile = () => {
         resetAddressForm();
       }
     } catch (err) {
-      setAddressError(err.message || 'Failed to delete address');
+      setAddressError(getErrorMessage(err) || 'Failed to delete address');
     } finally {
       setAddressSaving(false);
     }
@@ -390,7 +399,7 @@ const Profile = () => {
                       onBlur={handleAddressBlur}
                       disabled={addressSaving}
                       maxLength={100}
-                      className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${addressTouched.first_name && addressErrors.first_name ? 'border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-gray-300 focus:border-orange-400 focus:ring-orange-400'}`}
+                      className={`mt-1 w-full rounded-md dark:text-white dark:bg-slate-800 border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${addressTouched.first_name && addressErrors.first_name ? 'border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-gray-300 focus:border-orange-400 focus:ring-orange-400'}`}
                     />
                     {addressTouched.first_name && addressErrors.first_name && (
                       <p className="mt-1 text-[10px] text-red-600">{addressErrors.first_name}</p>
@@ -405,7 +414,7 @@ const Profile = () => {
                       onBlur={handleAddressBlur}
                       disabled={addressSaving}
                       maxLength={100}
-                      className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${addressTouched.last_name && addressErrors.last_name ? 'border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-gray-300 focus:border-orange-400 focus:ring-orange-400'}`}
+                      className={`mt-1 w-full dark:text-white dark:bg-slate-800 rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${addressTouched.last_name && addressErrors.last_name ? 'border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-gray-300 focus:border-orange-400 focus:ring-orange-400'}`}
                     />
                     {addressTouched.last_name && addressErrors.last_name && (
                       <p className="mt-1 text-[10px] text-red-600">{addressErrors.last_name}</p>
@@ -420,7 +429,7 @@ const Profile = () => {
                       onBlur={handleAddressBlur}
                       disabled={addressSaving}
                       maxLength={100}
-                      className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${addressTouched.address_1 && addressErrors.address_1 ? 'border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-gray-300 focus:border-orange-400 focus:ring-orange-400'}`}
+                      className={`mt-1 w-full dark:text-white dark:bg-slate-800 rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${addressTouched.address_1 && addressErrors.address_1 ? 'border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-gray-300 focus:border-orange-400 focus:ring-orange-400'}`}
                     />
                     {addressTouched.address_1 && addressErrors.address_1 && (
                       <p className="mt-1 text-[10px] text-red-600">{addressErrors.address_1}</p>
@@ -435,7 +444,7 @@ const Profile = () => {
                       disabled={addressSaving}
                       maxLength={100}
                       placeholder="Landmark / Apartment / Floor (optional)"
-                      className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-400"
+                      className="mt-1 w-full dark:text-white dark:bg-slate-800 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:border-orange-400 focus:outline-none focus:ring-1 focus:ring-orange-400"
                     />
                   </div>
                   <div>
@@ -446,7 +455,7 @@ const Profile = () => {
                       onChange={handleAddressChange}
                       onBlur={handleAddressBlur}
                       disabled={addressSaving}
-                      className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${addressTouched.city && addressErrors.city ? 'border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-gray-300 focus:border-orange-400 focus:ring-orange-400'}`}
+                      className={`mt-1 w-full dark:text-white dark:bg-slate-800 rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${addressTouched.city && addressErrors.city ? 'border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-gray-300 focus:border-orange-400 focus:ring-orange-400'}`}
                     />
                     {addressTouched.city && addressErrors.city && (
                       <p className="mt-1 text-[10px] text-red-600">{addressErrors.city}</p>
@@ -460,7 +469,7 @@ const Profile = () => {
                       onChange={handleAddressChange}
                       onBlur={handleAddressBlur}
                       disabled={addressSaving}
-                      className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${addressTouched.province && addressErrors.province ? 'border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-gray-300 focus:border-orange-400 focus:ring-orange-400'}`}
+                      className={`mt-1 w-full rounded-md dark:text-white dark:bg-slate-800 border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${addressTouched.province && addressErrors.province ? 'border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-gray-300 focus:border-orange-400 focus:ring-orange-400'}`}
                     />
                     {addressTouched.province && addressErrors.province && (
                       <p className="mt-1 text-[10px] text-red-600">{addressErrors.province}</p>
@@ -476,8 +485,8 @@ const Profile = () => {
                       disabled={addressSaving}
                       inputMode="numeric"
                       pattern="[0-9]*"
-                      maxLength={10}
-                      className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${addressTouched.postal_code && addressErrors.postal_code ? 'border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-gray-300 focus:border-orange-400 focus:ring-orange-400'}`}
+                      maxLength={6}
+                      className={`mt-1 w-full dark:text-white dark:bg-slate-800 rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${addressTouched.postal_code && addressErrors.postal_code ? 'border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-gray-300 focus:border-orange-400 focus:ring-orange-400'}`}
                     />
                     {addressTouched.postal_code && addressErrors.postal_code && (
                       <p className="mt-1 text-[10px] text-red-600">{addressErrors.postal_code}</p>
@@ -493,8 +502,8 @@ const Profile = () => {
                       disabled={addressSaving}
                       inputMode="numeric"
                       pattern="[0-9]*"
-                      maxLength={14}
-                      className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${addressTouched.phone && addressErrors.phone ? 'border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-gray-300 focus:border-orange-400 focus:ring-orange-400'}`}
+                      maxLength={10}
+                      className={`mt-1 w-full dark:text-white dark:bg-slate-800 rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${addressTouched.phone && addressErrors.phone ? 'border-red-300 focus:border-red-400 focus:ring-red-400' : 'border-gray-300 focus:border-orange-400 focus:ring-orange-400'}`}
                     />
                     {addressTouched.phone && addressErrors.phone && (
                       <p className="mt-1 text-[10px] text-red-600">{addressErrors.phone}</p>
