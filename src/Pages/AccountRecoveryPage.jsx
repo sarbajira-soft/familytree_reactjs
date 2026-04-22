@@ -300,7 +300,7 @@ const AccountRecoveryPage = () => {
             value={identifier}
             onChange={(e) => setIdentifier(e.target.value)}
             placeholder="Enter account email or mobile"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
+            className="w-full rounded-lg dark:text-white dark:bg-slate-900 border border-gray-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-300"
             disabled={requesting}
           />
           <button
@@ -329,14 +329,12 @@ const AccountRecoveryPage = () => {
             pattern="[0-9]*"
             autoComplete="one-time-code"
             maxLength={RECOVERY_TOKEN_LENGTH}
-            inputMode="numeric"
-            pattern="[0-9]*"
             value={token}
             onChange={(e) => {
               const val = e.target.value.replace(/\D/g, ''); // allow only digits
               if (val.length <= 8) setToken(val);
             }}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+            className="w-full px-4 py-3 border dark:text-white dark:bg-slate-900 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
             placeholder="Enter recovery token"
             disabled={confirming}
           />

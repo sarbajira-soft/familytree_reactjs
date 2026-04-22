@@ -215,7 +215,7 @@ const ResetPassword = () => {
     const val = e.target.value.replace(/\D/g, ''); // allow only digits
     if (val.length <= 6) setOtp(val);
   }}
-  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+  className="w-full dark:text-white dark:bg-slate-900 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
   placeholder="Enter 6-digit OTP"
 />
           </div>
@@ -229,7 +229,7 @@ const ResetPassword = () => {
               type={showNewPassword ? 'text' : 'password'}
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full px-4 py-3 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+              className="w-full dark:text-white dark:bg-slate-900 px-4 py-3 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
               placeholder="Enter new password"
               autoComplete="new-password"
             />
@@ -265,7 +265,7 @@ const ResetPassword = () => {
               type={showConfirmPassword ? 'text' : 'password'}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full px-4 py-3 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+              className="w-full dark:text-white dark:bg-slate-900 px-4 py-3 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
               placeholder="Re-enter new password"
               autoComplete="new-password"
             />

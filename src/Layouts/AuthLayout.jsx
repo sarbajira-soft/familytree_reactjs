@@ -18,11 +18,18 @@ const AuthLayout = () => {
   return (
     <div className="w-full h-screen overflow-hidden flex ">
       {/* Left Side - Fixed Image (Desktop only) */}
-      <div className="hidden lg:flex lg:w-[55%] lg:h-full lg:fixed lg:left-0 lg:top-0 lg:bg-white lg:flex-col lg:justify-center">
+      <div className="hidden lg:flex lg:w-[55%] lg:h-full lg:fixed lg:left-0 lg:top-0 bg-white dark:bg-slate-900 flex-col justify-center">
+        {/* Light mode image */}
         <img
-          src="/assets/LoginPageLogo.png"
+          src="/assets/LoginPageImageLight.png"
           alt={getPageTitle()}
-          className="w-full h-full object-contain"
+          className="w-full h-full object-contain dark:hidden"
+        />
+        {/* Dark mode image */}
+        <img
+          src="/assets/LoginPageImageDark.png"
+          alt={getPageTitle()}
+          className="w-full h-full object-contain hidden dark:block"
         />
       </div>
 

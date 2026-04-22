@@ -1,11 +1,30 @@
 import React, { useEffect, useState } from 'react';
-import { FiAlertCircle, FiFilter, FiLoader, FiPackage } from 'react-icons/fi';
+import {
+  FiAlertCircle,
+  FiCheck,
+  FiCheckCircle,
+  FiClock,
+  FiX,
+  FiFilter,
+  FiLoader,
+  FiPackage,
+  FiShield,
+} from 'react-icons/fi';
 import { useRetail } from '../context/RetailContext';
 import OrderCard from './OrderCard';
 import OrderDetailsModal from './OrderDetailsModal';
 
 const Orders = () => {
-  const { orders, fetchOrders, fetchOrdersPage, loading, error, user } = useRetail();
+  const {
+    orders,
+    fetchOrders,
+    fetchOrdersPage,
+    loading,
+    error,
+    user,
+    paymentRecovery,
+    clearPaymentRecovery,
+  } = useRetail();
 
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedOrderId, setSelectedOrderId] = useState(null);
@@ -51,6 +70,111 @@ const Orders = () => {
 
   return (
     <section className="space-y-4">
+      {paymentRecovery?.active && (
+        <div className="overflow-hidden rounded-[28px] border border-emerald-100 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.10)]">
+          <div className="bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 px-5 py-4 text-white">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/20">
+                <FiCheckCircle className="text-2xl" />
+              </div>
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-50/90">
+                  Secure Checkout
+                </p>
+                <h2 className="text-lg font-semibold">
+                  {(paymentRecovery?.status || '').toString().toLowerCase() === 'completed'
+                    ? 'Order created successfully'
+                    : (paymentRecovery?.status || '').toString().toLowerCase() === 'pending_capture'
+                    ? 'Waiting for payment capture'
+                    : 'Payment received'}
+                </h2>
+              </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  clearPaymentRecovery && clearPaymentRecovery();
+                }}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/25 bg-white/10 text-white transition hover:bg-white/20"
+                aria-label="Close payment status"
+              >
+                <FiX className="text-lg" />
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-4 px-5 py-5">
+            <div className="flex items-start gap-3 rounded-2xl bg-emerald-50 px-4 py-4 text-emerald-900">
+              {(paymentRecovery?.status || '').toString().toLowerCase() === 'completed' ? (
+                <FiCheck className="mt-0.5 text-lg" />
+              ) : (
+                <FiLoader className="mt-0.5 animate-spin text-lg" />
+              )}
+              <div>
+                <p className="text-sm font-semibold">
+                  {(paymentRecovery?.status || '').toString().toLowerCase() === 'completed'
+                    ? 'Your order is ready'
+                    : 'Finalizing your order'}
+                </p>
+                <p className="mt-1 text-sm leading-6 text-emerald-900/80">
+                  {paymentRecovery?.message ||
+                    ((paymentRecovery?.status || '').toString().toLowerCase() === 'completed'
+                      ? 'Your payment was verified and the order was created successfully.'
+                      : (paymentRecovery?.status || '').toString().toLowerCase() ===
+                    'pending_capture'
+                      ? 'Your bank has authorized the payment. We are waiting for final capture confirmation before placing the order.'
+                      : 'Payment received. We are finalizing your order securely.')}
+                </p>
+                {(paymentRecovery?.status || '').toString().toLowerCase() === 'completed' &&
+                paymentRecovery?.order ? (
+                  <p className="mt-2 text-xs font-semibold text-emerald-800">
+                    Order #
+                    {paymentRecovery.order?.display_id ||
+                      paymentRecovery.order?.displayId ||
+                      paymentRecovery.order?.id ||
+                      ''}
+                    {' '}has been created.
+                  </p>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-2xl border border-gray-100 bg-gray-50 px-4 py-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+                  <FiShield className="text-emerald-600" />
+                  Payment protected
+                </div>
+                <p className="mt-2 text-xs leading-5 text-gray-600">
+                  {(paymentRecovery?.status || '').toString().toLowerCase() === 'completed'
+                    ? 'Your payment was verified successfully and the backend has already created the order.'
+                    : 'Your payment was received and is being verified on the server before the order is placed.'}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-gray-100 bg-gray-50 px-4 py-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+                  <FiClock className="text-emerald-600" />
+                  Orders will refresh here
+                </div>
+                <p className="mt-2 text-xs leading-5 text-gray-600">
+                  {(paymentRecovery?.status || '').toString().toLowerCase() === 'completed'
+                    ? 'You can close this banner anytime. Your new order is now available in the list below.'
+                    : 'We are checking your payment status automatically. Your order history will update once it completes.'}
+                </p>
+              </div>
+            </div>
+
+            <p className="text-center text-xs text-gray-500">
+              {(paymentRecovery?.status || '').toString().toLowerCase() === 'completed'
+                ? 'This banner will stay here until you close it.'
+                : 'If the amount was deducted, do not retry payment. We&apos;ll either confirm the order or the payment will be auto-reversed/refunded by the bank.'}
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-base font-semibold text-gray-900">Order history</h2>

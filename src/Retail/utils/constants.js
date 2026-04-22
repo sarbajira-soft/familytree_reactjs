@@ -1,5 +1,6 @@
 const {
   VITE_API_BASE_URL,
+  VITE_BASE_URL,
 } = import.meta.env;
 
 export const API_BASE_URL = VITE_API_BASE_URL
@@ -9,6 +10,12 @@ export const API_BASE_URL = VITE_API_BASE_URL
 export const RETAIL_PROXY_BASE_URL = API_BASE_URL
   ? `${API_BASE_URL}/retail`
   : '/retail';
+
+export const STOREFRONT_BASE_URL = VITE_BASE_URL
+  ? String(VITE_BASE_URL).replace(/\/$/, '')
+  : typeof window !== 'undefined' && window.location?.origin
+  ? String(window.location.origin).replace(/\/$/, '')
+  : '';
 
 export const MEDUSA_TOKEN_KEY = 'medusa_retail_token';
 export const MEDUSA_CART_ID_KEY = 'medusa_retail_cart_id';
