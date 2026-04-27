@@ -15,6 +15,7 @@ import Swal from "sweetalert2";
 import { toast } from "react-toastify";
 import { getToken } from "../utils/auth";
 import { authFetchResponse } from "../utils/authFetch";
+import { useTheme } from "../Contexts/ThemeContext";
 
 const EditEventModal = ({
   isOpen,
@@ -38,6 +39,8 @@ const EditEventModal = ({
   ];
   const INVALID_IMAGE_TYPE_ERROR =
     "Only image files (jpeg, png, jpg, gif) are allowed";
+
+  const { isDark } = useTheme();
 
   useEffect(() => {
     if (!isOpen) return;

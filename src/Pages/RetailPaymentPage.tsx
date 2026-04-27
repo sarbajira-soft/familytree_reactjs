@@ -5,6 +5,7 @@ import {
   decodeHostedPaymentPayload,
   initiatePayment,
   pollRazorpayRecovery,
+  type RazorpaySuccessResponse,
   type UnifiedPaymentOrder,
 } from '../Retail/utils/initiatePayment';
 
@@ -57,12 +58,72 @@ const messageMap: Record<PaymentStage, string> = {
     'We could not verify the payment yet. If money was deducted, the backend webhook and retry flow will continue to reconcile it.',
 };
 
+const APP_URL_SCHEME = String(import.meta.env.VITE_APP_URL_SCHEME || 'com.example.app').trim();
+
+const buildNativeReturnUrl = ({
+  cartId,
+  status,
+  orderId,
+}: {
+  cartId?: string;
+  status: string;
+  orderId?: string;
+}) => {
+  const params = new URLSearchParams();
+
+  if (cartId) {
+    params.set('cartId', cartId);
+  }
+  if (status) {
+    params.set('status', status);
+  }
+  if (orderId) {
+    params.set('orderId', orderId);
+  }
+
+  return `${APP_URL_SCHEME}://retail/payment-return${params.toString() ? `?${params.toString()}` : ''}`;
+};
+
+const verifyAndRecoverPayment = async (
+  paymentOrder: UnifiedPaymentOrder,
+  response: RazorpaySuccessResponse,
+) => {
+  let recovery = null;
+
+  if (paymentOrder.payment_collection_id) {
+    try {
+      recovery = await cartService.verifyRazorpayPayment({
+        paymentCollectionId: paymentOrder.payment_collection_id,
+        razorpay_order_id: response.razorpay_order_id,
+        razorpay_payment_id: response.razorpay_payment_id,
+        razorpay_signature: response.razorpay_signature,
+        token: null,
+      });
+    } catch {
+      // Fall back to the recovery sync path when direct verification is still racing.
+    }
+  }
+
+  if (recovery?.status === 'completed' && recovery?.order) {
+    return recovery;
+  }
+
+  return await pollRazorpayRecovery({
+    getRecovery: () =>
+      cartService.getRazorpayRecovery({
+        cartId: paymentOrder.cart_id || '',
+        token: null,
+      }),
+  });
+};
+
 const RetailPaymentPage = () => {
   const [searchParams] = useSearchParams();
   const [stage, setStage] = useState<PaymentStage>('booting');
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [displayOrderId, setDisplayOrderId] = useState('');
+  const nativeReturnSentRef = useRef(false);
   const hasStartedRef = useRef(false);
 
   const decodedPayload = useMemo(() => {
@@ -110,15 +171,9 @@ const RetailPaymentPage = () => {
       try {
         await initiatePayment(paymentOrder, {
           platformOverride: 'web',
-          onSuccess: async () => {
+          onSuccess: async (response) => {
             setStage('processing');
-            const recovery = await pollRazorpayRecovery({
-              getRecovery: () =>
-                cartService.getRazorpayRecovery({
-                  cartId: paymentOrder.cart_id || '',
-                  token: null,
-                }),
-            });
+            const recovery = await verifyAndRecoverPayment(paymentOrder, response);
 
             if (recovery?.status === 'completed' && recovery?.order) {
               const orderAny = recovery.order as Record<string, any>;
@@ -157,6 +212,32 @@ const RetailPaymentPage = () => {
 
     void run();
   }, [paymentOrder]);
+
+  useEffect(() => {
+    const shouldReturnToApp =
+      !nativeReturnSentRef.current &&
+      !!paymentOrder?.cart_id &&
+      ['completed', 'dismissed', 'failed', 'processing'].includes(stage) &&
+      /android|iphone|ipad|ipod/i.test(window.navigator.userAgent || '');
+
+    if (!shouldReturnToApp) {
+      return;
+    }
+
+    nativeReturnSentRef.current = true;
+
+    const timeout = window.setTimeout(() => {
+      window.location.replace(
+        buildNativeReturnUrl({
+          cartId: paymentOrder?.cart_id || '',
+          status: stage,
+          orderId: displayOrderId || '',
+        }),
+      );
+    }, stage === 'completed' ? 900 : 500);
+
+    return () => window.clearTimeout(timeout);
+  }, [displayOrderId, paymentOrder?.cart_id, stage]);
 
   return (
     <div style={pageShellStyle}>

@@ -5,6 +5,7 @@ import Header from './components/Header';
 import ProductList from './components/ProductList';
 import Cart from './components/Cart';
 import Orders from './components/Orders';
+import PaymentRecoveryModal from './components/PaymentRecoveryModal';
 import Profile from './components/Profile';
 
 const RetailToast = () => {
@@ -235,6 +236,7 @@ const RetailShell = ({
     <div className="flex min-h-screen flex-col bg-gray-50 dark:bg-slate-950">
       <RetailToast />
       <RetailToastTestTrigger />
+      <PaymentRecoveryModal />
       <Header
         activeTab={activeTab}
         setActiveTab={setTabWithUrl}

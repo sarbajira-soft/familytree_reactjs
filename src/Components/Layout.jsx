@@ -1,6 +1,7 @@
 import React, { Suspense, useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { App as CapacitorApp } from "@capacitor/app";
+import { Browser } from "@capacitor/browser";
 import Sidebar from "./Sidebar";
 import BottomNavBar from "./BottomNavBar";
 import { useNotificationSocket } from "../hooks/useNotificationSocket";
@@ -339,6 +340,42 @@ const Layout = ({ noScroll = false }) => {
       if (removeCapacitorListener) removeCapacitorListener();
     };
   }, [handleGlobalBack]);
+
+  useEffect(() => {
+    let removeUrlOpenListener = null;
+
+    const handleAppUrlOpen = async ({ url }) => {
+      if (!url || !url.includes("payment-return")) {
+        return;
+      }
+
+      try {
+        await Browser.close();
+      } catch {
+        // Best-effort only. Some Android browser implementations ignore close requests.
+      }
+
+      navigate("/gifts?tab=orders");
+    };
+
+    try {
+      const maybePromise = CapacitorApp.addListener("appUrlOpen", handleAppUrlOpen);
+      if (maybePromise && typeof maybePromise.then === "function") {
+        maybePromise.then((handle) => {
+          removeUrlOpenListener = () => handle && handle.remove && handle.remove();
+        });
+      } else {
+        removeUrlOpenListener = () =>
+          maybePromise && maybePromise.remove && maybePromise.remove();
+      }
+    } catch {
+      // ignore
+    }
+
+    return () => {
+      if (removeUrlOpenListener) removeUrlOpenListener();
+    };
+  }, [navigate]);
 
   const { userInfo, userLoading, logout } = useUser();
   const { theme, toggleTheme } = useTheme();
