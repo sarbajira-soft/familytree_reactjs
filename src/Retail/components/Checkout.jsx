@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import axios from 'axios';
 import {
   FiAlertCircle,
@@ -752,7 +753,7 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
       }
 
       // Online payment flow using Razorpay
-      const { cartId, razorpaySession } = await startOnlinePayment(
+      const { cartId, razorpaySession, paymentCollectionId } = await startOnlinePayment(
         shippingAddress,
         billing,
         shippingSelections,
@@ -801,6 +802,7 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
         amount: razorpaySession.amount,
         currency: (razorpaySession.currency || 'INR').toUpperCase(),
         order_id: razorpaySession.order_id,
+        payment_collection_id: paymentCollectionId || undefined,
         razorpay_key_id: razorpaySession.razorpay_key_id,
         cart_id: cartId,
         name: 'Familyss Store',
@@ -838,12 +840,43 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
             }),
         });
 
+      if (Capacitor.isNativePlatform()) {
+        setPaymentRecovery &&
+          setPaymentRecovery({
+            active: true,
+            source: 'native-browser',
+            presentation: 'modal',
+            cartId,
+            status: 'opening_browser',
+            message: 'Opening the secure payment browser. Once payment is completed, Familyss will continue showing live payment and order updates here.',
+          });
+      }
+
       const paymentResult = await initiatePayment(paymentOrder, {
         appBaseUrl: STOREFRONT_BASE_URL,
-        onSuccess: async () => {
+        onSuccess: async (response) => {
           try {
             setWaitingForPayment(true);
-            const recovery = await recoveryPoller();
+            let recovery = null;
+
+            if (paymentCollectionId) {
+              try {
+                recovery = await cartService.verifyRazorpayPayment({
+                  paymentCollectionId,
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature: response.razorpay_signature,
+                  token: token || null,
+                });
+              } catch {
+                // Fall back to polling recovery if direct verification races with
+                // backend updates or the provider is still syncing.
+              }
+            }
+
+            if (!(recovery?.status === 'completed' && recovery?.order)) {
+              recovery = await recoveryPoller();
+            }
 
             if (recovery?.status === 'completed' && recovery?.order) {
               await fetchOrders();
@@ -857,6 +890,7 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
               setPaymentRecovery({
                 active: true,
                 source: 'checkout',
+                presentation: 'orders-banner',
                 cartId,
                 status: recovery?.status || 'processing',
                 message:
@@ -878,6 +912,7 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
             setPaymentRecovery({
               active: true,
               source: 'native-browser',
+              presentation: 'modal',
               cartId,
               status: 'processing',
               message:
@@ -891,10 +926,11 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
           setPaymentRecovery({
             active: true,
             source: 'native-browser',
+            presentation: 'modal',
             cartId,
             status: 'processing',
             message:
-              'Payment page opened in your browser. After payment, return to the app and we will continue syncing your order status.',
+              'Payment page opened in your browser. After payment, Familyss will continue showing your payment and order status here.',
           });
         setSuccess('Payment page opened. Complete the payment in your browser.');
       }

@@ -10,6 +10,7 @@ export type RazorpaySuccessResponse = {
 export type UnifiedPaymentOrder = {
   amount: number;
   order_id: string;
+  payment_collection_id?: string;
   payment_url?: string;
   razorpay_key_id?: string;
   currency?: string;

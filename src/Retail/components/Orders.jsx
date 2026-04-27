@@ -31,6 +31,9 @@ const Orders = () => {
   const [pageOffset, setPageOffset] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const pageSize = 50;
+  const paymentRecoveryStatus = (paymentRecovery?.status || '').toString().toLowerCase();
+  const showPaymentRecoveryBanner =
+    paymentRecovery?.active && paymentRecovery?.presentation !== 'modal';
 
   useEffect(() => {
     (async () => {
@@ -70,7 +73,7 @@ const Orders = () => {
 
   return (
     <section className="space-y-4">
-      {paymentRecovery?.active && (
+      {showPaymentRecoveryBanner && (
         <div className="overflow-hidden rounded-[28px] border border-emerald-100 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.10)]">
           <div className="bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 px-5 py-4 text-white">
             <div className="flex items-start justify-between gap-3">
@@ -83,10 +86,12 @@ const Orders = () => {
                   Secure Checkout
                 </p>
                 <h2 className="text-lg font-semibold">
-                  {(paymentRecovery?.status || '').toString().toLowerCase() === 'completed'
+                  {paymentRecoveryStatus === 'completed'
                     ? 'Order created successfully'
-                    : (paymentRecovery?.status || '').toString().toLowerCase() === 'pending_capture'
+                    : paymentRecoveryStatus === 'pending_capture'
                     ? 'Waiting for payment capture'
+                    : ['failed', 'expired', 'abandoned'].includes(paymentRecoveryStatus)
+                    ? 'Payment update available'
                     : 'Payment received'}
                 </h2>
               </div>
@@ -106,28 +111,32 @@ const Orders = () => {
 
           <div className="space-y-4 px-5 py-5">
             <div className="flex items-start gap-3 rounded-2xl bg-emerald-50 px-4 py-4 text-emerald-900">
-              {(paymentRecovery?.status || '').toString().toLowerCase() === 'completed' ? (
+              {paymentRecoveryStatus === 'completed' ? (
                 <FiCheck className="mt-0.5 text-lg" />
+              ) : ['failed', 'expired', 'abandoned'].includes(paymentRecoveryStatus) ? (
+                <FiAlertCircle className="mt-0.5 text-lg" />
               ) : (
                 <FiLoader className="mt-0.5 animate-spin text-lg" />
               )}
               <div>
                 <p className="text-sm font-semibold">
-                  {(paymentRecovery?.status || '').toString().toLowerCase() === 'completed'
+                  {paymentRecoveryStatus === 'completed'
                     ? 'Your order is ready'
+                    : ['failed', 'expired', 'abandoned'].includes(paymentRecoveryStatus)
+                    ? 'We could not confirm the payment'
                     : 'Finalizing your order'}
                 </p>
                 <p className="mt-1 text-sm leading-6 text-emerald-900/80">
                   {paymentRecovery?.message ||
-                    ((paymentRecovery?.status || '').toString().toLowerCase() === 'completed'
+                    (paymentRecoveryStatus === 'completed'
                       ? 'Your payment was verified and the order was created successfully.'
-                      : (paymentRecovery?.status || '').toString().toLowerCase() ===
-                    'pending_capture'
+                      : paymentRecoveryStatus === 'pending_capture'
                       ? 'Your bank has authorized the payment. We are waiting for final capture confirmation before placing the order.'
+                      : ['failed', 'expired', 'abandoned'].includes(paymentRecoveryStatus)
+                      ? 'We could not finalize the payment. If the amount was deducted, the bank or gateway may auto-reverse it.'
                       : 'Payment received. We are finalizing your order securely.')}
                 </p>
-                {(paymentRecovery?.status || '').toString().toLowerCase() === 'completed' &&
-                paymentRecovery?.order ? (
+                {paymentRecoveryStatus === 'completed' && paymentRecovery?.order ? (
                   <p className="mt-2 text-xs font-semibold text-emerald-800">
                     Order #
                     {paymentRecovery.order?.display_id ||
@@ -147,8 +156,10 @@ const Orders = () => {
                   Payment protected
                 </div>
                 <p className="mt-2 text-xs leading-5 text-gray-600">
-                  {(paymentRecovery?.status || '').toString().toLowerCase() === 'completed'
+                  {paymentRecoveryStatus === 'completed'
                     ? 'Your payment was verified successfully and the backend has already created the order.'
+                    : ['failed', 'expired', 'abandoned'].includes(paymentRecoveryStatus)
+                    ? 'The payment could not be confirmed. Please avoid retrying immediately if money was already deducted.'
                     : 'Your payment was received and is being verified on the server before the order is placed.'}
                 </p>
               </div>
@@ -159,16 +170,20 @@ const Orders = () => {
                   Orders will refresh here
                 </div>
                 <p className="mt-2 text-xs leading-5 text-gray-600">
-                  {(paymentRecovery?.status || '').toString().toLowerCase() === 'completed'
+                  {paymentRecoveryStatus === 'completed'
                     ? 'You can close this banner anytime. Your new order is now available in the list below.'
+                    : ['failed', 'expired', 'abandoned'].includes(paymentRecoveryStatus)
+                    ? 'You can close this banner after reviewing the payment status.'
                     : 'We are checking your payment status automatically. Your order history will update once it completes.'}
                 </p>
               </div>
             </div>
 
             <p className="text-center text-xs text-gray-500">
-              {(paymentRecovery?.status || '').toString().toLowerCase() === 'completed'
+              {paymentRecoveryStatus === 'completed'
                 ? 'This banner will stay here until you close it.'
+                : ['failed', 'expired', 'abandoned'].includes(paymentRecoveryStatus)
+                ? 'If the amount was deducted, do not pay again immediately. The gateway or bank may still auto-reverse it.'
                 : 'If the amount was deducted, do not retry payment. We&apos;ll either confirm the order or the payment will be auto-reversed/refunded by the bank.'}
             </p>
           </div>
