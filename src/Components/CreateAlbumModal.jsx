@@ -484,6 +484,7 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
                         <input
                             type="text"
                             id="albumTitle"
+                            maxLength={50} 
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
                             disabled={isSubmitting}

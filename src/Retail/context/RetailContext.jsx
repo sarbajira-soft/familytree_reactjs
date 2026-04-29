@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useReducer } from 'react';
+import { Capacitor } from '@capacitor/core';
 import {
   MEDUSA_TOKEN_KEY,
   MEDUSA_CART_ID_KEY,
@@ -34,6 +35,16 @@ const initialState = {
   toast: null,
   paymentRecovery: null,
 };
+
+function upsertOrderList(existingOrders, nextOrder) {
+  if (!nextOrder || !nextOrder.id) {
+    return Array.isArray(existingOrders) ? existingOrders : [];
+  }
+
+  const current = Array.isArray(existingOrders) ? existingOrders : [];
+  const remaining = current.filter((order) => order?.id !== nextOrder.id);
+  return [nextOrder, ...remaining];
+}
 
 function reducer(state, action) {
   switch (action.type) {
@@ -71,6 +82,8 @@ function reducer(state, action) {
       return { ...state, orders: action.payload };
     case 'APPEND_ORDERS':
       return { ...state, orders: [...(state.orders || []), ...(action.payload || [])] };
+    case 'UPSERT_ORDER':
+      return { ...state, orders: upsertOrderList(state.orders, action.payload) };
     case 'RESET':
       return { ...initialState };
     default:
@@ -94,6 +107,10 @@ export const RetailProvider = ({ children }) => {
 
   const clearToast = useCallback(() => {
     dispatch({ type: 'CLEAR_TOAST' });
+  }, []);
+
+  const clearError = useCallback(() => {
+    dispatch({ type: 'SET_ERROR', payload: null });
   }, []);
 
   const setPaymentRecovery = useCallback((payload) => {
@@ -201,11 +218,16 @@ export const RetailProvider = ({ children }) => {
 
           try {
             const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+            const isNativePaymentRecovery = Capacitor.isNativePlatform();
+            const recoverySource = isNativePaymentRecovery ? 'native-browser' : 'checkout';
+            const recoveryPresentation = isNativePaymentRecovery ? 'modal' : 'banner';
             const recoverCartPayment = async () => {
               let latestRecovery = null;
 
               setPaymentRecovery({
                 active: true,
+                source: recoverySource,
+                presentation: recoveryPresentation,
                 cartId: cart.id,
                 status: 'processing',
                 message: 'Payment received. We are finalizing your order securely.',
@@ -229,6 +251,8 @@ export const RetailProvider = ({ children }) => {
                   active: !['completed', 'failed', 'expired', 'abandoned', 'not_started'].includes(
                     nextStatus,
                   ),
+                  source: recoverySource,
+                  presentation: recoveryPresentation,
                   cartId: cart.id,
                   status: nextStatus,
                   message: nextMessage,
@@ -269,12 +293,44 @@ export const RetailProvider = ({ children }) => {
               }
 
               setCartPersistent(nextCart);
-              clearPaymentRecovery();
+              dispatch({ type: 'UPSERT_ORDER', payload: recovery.order });
+              setPaymentRecovery({
+                active: true,
+                source: recoverySource,
+                presentation: isNativePaymentRecovery ? 'modal' : 'orders-banner',
+                cartId: storedCartId,
+                status: 'completed',
+                message: 'Your previous payment was confirmed and the order has been placed successfully.',
+                order: recovery.order || null,
+              });
               showToast('Your previous payment was confirmed and the order has been placed.', 'success');
               return;
             }
 
-            clearPaymentRecovery();
+            const nextStatus = recovery?.status || 'processing';
+
+            if (
+              nextStatus === 'failed' ||
+              nextStatus === 'expired' ||
+              nextStatus === 'abandoned' ||
+              nextStatus === 'not_started'
+            ) {
+              clearPaymentRecovery();
+              return;
+            }
+
+            setPaymentRecovery({
+              active: true,
+              source: recoverySource,
+              presentation: recoveryPresentation,
+              cartId: storedCartId,
+              status: nextStatus,
+              message:
+                recovery?.message ||
+                (nextStatus === 'pending_capture'
+                  ? 'Payment is authorized and waiting for capture confirmation.'
+                  : 'Payment received. We are finalizing your order securely.'),
+            });
           } catch {
             clearPaymentRecovery();
             // Ignore recovery polling failures during bootstrap.
@@ -827,7 +883,15 @@ export const RetailProvider = ({ children }) => {
   useEffect(() => {
     const recovery = state.paymentRecovery;
 
-    if (!recovery?.active || recovery?.source !== 'checkout' || !recovery?.cartId) {
+    const normalizedStatus = (recovery?.status || '').toString().toLowerCase();
+    const shouldPollRecovery =
+      recovery?.active &&
+      recovery?.cartId &&
+      !['completed', 'failed', 'expired', 'abandoned', 'not_started'].includes(
+        normalizedStatus,
+      );
+
+    if (!shouldPollRecovery) {
       return undefined;
     }
 
@@ -836,6 +900,11 @@ export const RetailProvider = ({ children }) => {
     const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
     const pollRecovery = async () => {
+      const shouldUseModalPresentation =
+        recovery?.presentation === 'modal' ||
+        recovery?.source === 'native-browser' ||
+        Capacitor.isNativePlatform();
+
       for (let attempt = 0; attempt < 45; attempt += 1) {
         let latestRecovery = null;
 
@@ -888,7 +957,16 @@ export const RetailProvider = ({ children }) => {
             await fetchOrders();
           }
 
-          clearPaymentRecovery();
+          dispatch({ type: 'UPSERT_ORDER', payload: latestRecovery.order });
+          setPaymentRecovery({
+            active: true,
+            source: shouldUseModalPresentation ? 'native-browser' : 'orders-banner',
+            presentation: shouldUseModalPresentation ? 'modal' : 'orders-banner',
+            cartId: recovery.cartId,
+            status: 'completed',
+            message: 'Payment successful! Your order has been placed.',
+            order: latestRecovery.order || null,
+          });
           showToast('Payment successful! Your order has been placed.', 'success');
           return;
         }
@@ -898,15 +976,23 @@ export const RetailProvider = ({ children }) => {
           nextStatus === 'expired' ||
           nextStatus === 'abandoned'
         ) {
+          setPaymentRecovery({
+            active: true,
+            source: shouldUseModalPresentation ? 'native-browser' : 'orders-banner',
+            presentation: shouldUseModalPresentation ? 'modal' : 'orders-banner',
+            cartId: recovery.cartId,
+            status: nextStatus,
+            message: nextMessage,
+          });
           dispatch({ type: 'SET_ERROR', payload: nextMessage });
           showToast(nextMessage);
-          clearPaymentRecovery();
           return;
         }
 
         setPaymentRecovery({
           active: true,
-          source: 'checkout',
+          source: shouldUseModalPresentation ? 'native-browser' : 'checkout',
+          presentation: shouldUseModalPresentation ? 'modal' : 'orders-banner',
           cartId: recovery.cartId,
           status: nextStatus,
           message: nextMessage,
@@ -930,6 +1016,8 @@ export const RetailProvider = ({ children }) => {
     showToast,
     state.paymentRecovery?.active,
     state.paymentRecovery?.cartId,
+    state.paymentRecovery?.presentation,
+    state.paymentRecovery?.status,
     state.paymentRecovery?.source,
     state.token,
   ]);
@@ -1301,6 +1389,7 @@ export const RetailProvider = ({ children }) => {
       toast: state.toast,
       showToast,
       clearToast,
+      clearError,
       setPaymentRecovery,
       clearPaymentRecovery,
       login,
@@ -1340,6 +1429,7 @@ export const RetailProvider = ({ children }) => {
       state.toast,
       showToast,
       clearToast,
+      clearError,
       setPaymentRecovery,
       clearPaymentRecovery,
       login,

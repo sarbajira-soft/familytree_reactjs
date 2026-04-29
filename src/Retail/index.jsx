@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { FiCheckCircle, FiClock, FiLoader, FiShield } from 'react-icons/fi';
 import { RetailProvider, useRetail } from './context/RetailContext';
 import Header from './components/Header';
 import ProductList from './components/ProductList';
 import Cart from './components/Cart';
 import Orders from './components/Orders';
+import PaymentRecoveryModal from './components/PaymentRecoveryModal';
 import Profile from './components/Profile';
 
 const RetailToast = () => {
@@ -53,81 +53,6 @@ const RetailToastTestTrigger = () => {
   }, [showToast]);
 
   return null;
-};
-
-const PaymentRecoveryScreen = () => {
-  const { paymentRecovery } = useRetail();
-
-  if (!paymentRecovery?.active) {
-    return null;
-  }
-
-  const normalizedStatus = (paymentRecovery?.status || 'processing').toString().toLowerCase();
-  const title =
-    normalizedStatus === 'pending_capture'
-      ? 'Waiting for payment capture'
-      : 'Payment received';
-  const message =
-    paymentRecovery?.message ||
-    (normalizedStatus === 'pending_capture'
-      ? 'Your bank has authorized the payment. We are waiting for final capture confirmation before placing the order.'
-      : 'We are securely finalizing your order. This usually takes only a few moments.');
-
-  return (
-    <main className="flex flex-1 items-center justify-center px-4 py-10">
-      <section className="w-full max-w-lg overflow-hidden rounded-[28px] border border-emerald-100 bg-white shadow-[0_20px_70px_rgba(15,23,42,0.12)]">
-        <div className="bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 px-6 py-5 text-white">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20">
-              <FiCheckCircle className="text-2xl" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-50/90">
-                Secure Checkout
-              </p>
-              <h1 className="text-xl font-semibold">{title}</h1>
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-5 px-6 py-6">
-          <div className="flex items-start gap-3 rounded-2xl bg-emerald-50 px-4 py-4 text-emerald-900">
-            <FiLoader className="mt-0.5 animate-spin text-lg" />
-            <div>
-              <p className="text-sm font-semibold">Finalizing your order</p>
-              <p className="mt-1 text-sm leading-6 text-emerald-900/80">{message}</p>
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-2xl border border-gray-100 bg-gray-50 px-4 py-4">
-              <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
-                <FiShield className="text-emerald-600" />
-                Payment protected
-              </div>
-              <p className="mt-2 text-xs leading-5 text-gray-600">
-                Your payment was received and is being verified on the server before the order is placed.
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-gray-100 bg-gray-50 px-4 py-4">
-              <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
-                <FiClock className="text-emerald-600" />
-                Please keep this open
-              </div>
-              <p className="mt-2 text-xs leading-5 text-gray-600">
-                We are checking your payment status automatically. Your order history will refresh once it completes.
-              </p>
-            </div>
-          </div>
-
-          <p className="text-center text-xs text-gray-500">
-            If the amount was deducted, do not retry payment. We&apos;ll either confirm the order or the payment will be auto-reversed/refunded by the bank.
-          </p>
-        </div>
-      </section>
-    </main>
-  );
 };
 
 const PullToRefresh = ({ children, onRefresh, disabled }) => {
@@ -301,20 +226,17 @@ const RetailShell = ({
 }) => {
   const { paymentRecovery } = useRetail();
 
-  if (paymentRecovery?.active) {
-    return (
-      <div className="flex min-h-screen flex-col bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.14),_transparent_42%),linear-gradient(180deg,_#f8fffc_0%,_#effcf6_100%)]">
-        <RetailToast />
-        <RetailToastTestTrigger />
-        <PaymentRecoveryScreen />
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (paymentRecovery?.active && activeTab !== 'orders') {
+      setTabWithUrl('orders');
+    }
+  }, [paymentRecovery?.active, activeTab, setTabWithUrl]);
 
   return (
     <div className="flex min-h-screen flex-col bg-gray-50 dark:bg-slate-950">
       <RetailToast />
       <RetailToastTestTrigger />
+      <PaymentRecoveryModal />
       <Header
         activeTab={activeTab}
         setActiveTab={setTabWithUrl}

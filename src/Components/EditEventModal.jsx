@@ -15,38 +15,6 @@ import { useUser } from "../Contexts/UserContext";
 import { useTheme } from "../Contexts/ThemeContext";
 import { getToken } from "../utils/auth";
 import { authFetchResponse } from "../utils/authFetch";
-import EventScheduleManager from "./EventScheduleManager";
-import {
-  createEmptySchedule,
-  EVENT_SCHEDULE_REQUIRED_MESSAGE,
-  getLegacyEventDateTime,
-  normalizeEventSchedulesInput,
-  toApiSchedules,
-  validateEventSchedules,
-} from "../utils/eventValidation";
-
-const MAX_EVENT_TITLE_LENGTH = 50;
-const MAX_EVENT_LOCATION_LENGTH = 250;
-const MAX_EVENT_DESCRIPTION_LENGTH = 250;
-const MAX_EVENT_IMAGE_COUNT = 10;
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-const ALLOWED_IMAGE_MIME_TYPES = [
-  "image/jpeg",
-  "image/png",
-  "image/jpg",
-  "image/gif",
-];
-const INVALID_IMAGE_TYPE_ERROR =
-  "Only image files (jpeg, png, jpg, gif) are allowed.";
-const EDIT_EVENT_FORM_ID = "edit-event-form";
-
-const isScheduleBlank = (schedule) =>
-  !String(schedule?.scheduleDate || "").trim() &&
-  !Boolean(schedule?.isAllDay) &&
-  !(Array.isArray(schedule?.times) ? schedule.times : []).some(
-    (slot) => String(slot?.startTime || "").trim() || String(slot?.endTime || "").trim(),
-  );
-
 const EditEventModal = ({
   isOpen,
   onClose,
@@ -54,10 +22,40 @@ const EditEventModal = ({
   onEventUpdated,
   apiBaseUrl = import.meta.env.VITE_API_BASE_URL,
 }) => {
-  const { userInfo } = useUser();
-  const { theme } = useTheme();
-  const isDark = theme === "dark";
+  const MAX_EVENT_TITLE_LENGTH = 50;
+  const MAX_EVENT_LOCATION_LENGTH = 250;
+  const MAX_EVENT_IMAGE_COUNT = 10;
+  const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+  const EVENT_DATE_MIN = "1900-01-01";
+  const EVENT_DATE_MAX = "2200-12-31";
 
+  const ALLOWED_IMAGE_MIME_TYPES = [
+    "image/jpeg",
+    "image/png",
+    "image/jpg",
+    "image/gif",
+  ];
+  const INVALID_IMAGE_TYPE_ERROR =
+    "Only image files (jpeg, png, jpg, gif) are allowed";
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (typeof onClose !== "function") return;
+    if (!window.__appModalBackStack) window.__appModalBackStack = [];
+
+    const handler = () => {
+      onClose();
+    };
+
+    window.__appModalBackStack.push(handler);
+
+    return () => {
+      const stack = window.__appModalBackStack;
+      if (!Array.isArray(stack)) return;
+      const idx = stack.lastIndexOf(handler);
+      if (idx >= 0) stack.splice(idx, 1);
+    };
+  }, [isOpen, onClose]);
   const [title, setTitle] = useState("");
   const [schedules, setSchedules] = useState([createEmptySchedule()]);
   const [location, setLocation] = useState("");

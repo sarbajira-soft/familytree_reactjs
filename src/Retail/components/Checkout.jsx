@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
 import axios from 'axios';
 import {
   FiAlertCircle,
@@ -20,8 +21,17 @@ import {
   calculateCartTotals,
   isInsufficientInventoryError,
 } from '../utils/helpers';
-import { RETAIL_PROXY_BASE_URL, buildJsonHeaders } from '../utils/constants';
+import {
+  RETAIL_PROXY_BASE_URL,
+  STOREFRONT_BASE_URL,
+  buildJsonHeaders,
+} from '../utils/constants';
 import * as cartService from '../services/cartService';
+import {
+  buildHostedPaymentUrl,
+  initiatePayment,
+  pollRazorpayRecovery,
+} from '../utils/initiatePayment';
 
 const emptyAddress = {
   first_name: '',
@@ -229,7 +239,14 @@ const validateAddressFields = (addr) => {
   }
 
   if (!phone) errors.phone = 'Phone is required';
-  else if (!/^\d{6,14}$/.test(phone)) errors.phone = 'Enter a valid phone number';
+  else if (country === 'in') {
+    const cleanPhone = phone.replace(/^0/, '').replace(/^91/, '');
+    if (!/^\d{10}$/.test(cleanPhone)) {
+      errors.phone = 'Enter a valid 10-digit mobile number';
+    }
+  } else if (!/^\d{6,15}$/.test(phone)) {
+    errors.phone = 'Enter a valid phone number (6-15 digits)';
+  }
 
   return errors;
 };
@@ -736,7 +753,7 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
       }
 
       // Online payment flow using Razorpay
-      const { cartId, razorpaySession } = await startOnlinePayment(
+      const { cartId, razorpaySession, paymentCollectionId } = await startOnlinePayment(
         shippingAddress,
         billing,
         shippingSelections,
@@ -746,217 +763,183 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
       // shipping_methods and totals are up-to-date for Razorpay notes.
       const cartForNotes = await cartService.getCart(cartId, token || null);
       const totalsForNotes = calculateCartTotals(cartForNotes);
+      const cartItems = Array.isArray(cartForNotes?.items) ? cartForNotes.items : [];
+      const notesItems = cartItems.slice(0, 10).map((item) => ({
+        product_id: item.product_id || item.product?.id || '',
+        title: item.title || '',
+        variant_id: item.variant_id || item.variant?.id || '',
+        quantity: item.quantity ?? 0,
+        unit_price:
+          item.unit_price ||
+          item.unit_price_incl_tax ||
+          item.original_item_price ||
+          0,
+      }));
 
-      const loadRazorpayScript = () =>
-        new Promise((resolve, reject) => {
-          if (window.Razorpay) {
-            resolve(window.Razorpay);
-            return;
-          }
+      const shippingTotalFromTotals =
+        typeof totalsForNotes?.shipping === 'number' ? totalsForNotes.shipping : null;
 
-          const script = document.createElement('script');
-          script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-          script.async = true;
-          script.onload = () => {
-            if (window.Razorpay) {
-              resolve(window.Razorpay);
-            } else {
-              reject(new Error('Razorpay SDK failed to load'));
-            }
-          };
-          script.onerror = () => reject(new Error('Failed to load Razorpay SDK'));
-          document.body.appendChild(script);
-        });
+      const shippingMethods = Array.isArray(cartForNotes?.shipping_methods)
+        ? cartForNotes.shipping_methods
+        : Array.isArray(cartForNotes?.shippingMethods)
+        ? cartForNotes.shippingMethods
+        : [];
 
-      const RazorpayConstructor = await loadRazorpayScript();
+      const shippingTotalFromCart = shippingMethods.reduce((sum, sm) => {
+        const amount = sm?.amount ?? sm?.price ?? sm?.total ?? sm?.original_total ?? null;
+        const num = typeof amount === 'number' ? amount : Number(amount);
+        return Number.isFinite(num) ? sum + num : sum;
+      }, 0);
 
-      await new Promise((resolve, reject) => {
-        const cartItems = Array.isArray(cartForNotes?.items) ? cartForNotes.items : [];
-        const notesItems = cartItems.slice(0, 10).map((item) => ({
-          product_id: item.product_id || item.product?.id || '',
-          title: item.title || '',
-          variant_id: item.variant_id || item.variant?.id || '',
-          quantity: item.quantity ?? 0,
-          unit_price:
-            item.unit_price ||
-            item.unit_price_incl_tax ||
-            item.original_item_price ||
-            0,
-        }));
+      const shippingTotalValue =
+        typeof shippingTotalFromTotals === 'number'
+          ? shippingTotalFromTotals
+          : shippingTotalFromCart > 0
+          ? shippingTotalFromCart
+          : null;
 
-        const shippingTotalFromTotals =
-          typeof totalsForNotes?.shipping === 'number'
-            ? totalsForNotes.shipping
-            : null;
+      const paymentOrder = {
+        amount: razorpaySession.amount,
+        currency: (razorpaySession.currency || 'INR').toUpperCase(),
+        order_id: razorpaySession.order_id,
+        payment_collection_id: paymentCollectionId || undefined,
+        razorpay_key_id: razorpaySession.razorpay_key_id,
+        cart_id: cartId,
+        name: 'Familyss Store',
+        description: 'Order payment',
+        prefill: {
+          name: `${shippingAddress.first_name} ${shippingAddress.last_name}`.trim(),
+          contact: shippingAddress.phone,
+          email: user?.email || undefined,
+        },
+        notes: {
+          customer_name:
+            `${shippingAddress.first_name} ${shippingAddress.last_name}`.trim() || undefined,
+          customer_phone: shippingAddress.phone || undefined,
+          customer_email: user?.email || undefined,
+          cart_id: cartId,
+          cart_total:
+            typeof totalsForNotes?.total === 'number' ? String(totalsForNotes.total) : undefined,
+          shipping_total:
+            typeof shippingTotalValue === 'number' ? String(shippingTotalValue) : undefined,
+          items: notesItems.length ? JSON.stringify(notesItems) : undefined,
+        },
+        theme: {
+          color: '#F97316',
+        },
+      };
 
-        const shippingMethods = Array.isArray(cartForNotes?.shipping_methods)
-          ? cartForNotes.shipping_methods
-          : Array.isArray(cartForNotes?.shippingMethods)
-          ? cartForNotes.shippingMethods
-          : [];
+      paymentOrder.payment_url = buildHostedPaymentUrl(paymentOrder, STOREFRONT_BASE_URL);
 
-        const shippingTotalFromCart = shippingMethods.reduce((sum, sm) => {
-          const amount =
-            sm?.amount ?? sm?.price ?? sm?.total ?? sm?.original_total ?? null;
-          const num = typeof amount === 'number' ? amount : Number(amount);
-          return Number.isFinite(num) ? sum + num : sum;
-        }, 0);
-
-        const shippingTotalValue =
-          typeof shippingTotalFromTotals === 'number'
-            ? shippingTotalFromTotals
-            : shippingTotalFromCart > 0
-            ? shippingTotalFromCart
-            : null;
-
-        const totalFromTotals =
-          typeof totalsForNotes?.total === 'number'
-            ? totalsForNotes.total
-            : null;
-
-        const itemsTotal = cartItems.reduce((sum, item) => {
-          const qty = typeof item?.quantity === 'number' ? item.quantity : Number(item?.quantity || 0);
-          const unit =
-            item?.unit_price ??
-            item?.unit_price_incl_tax ??
-            item?.original_item_price ??
-            0;
-          const unitNum = typeof unit === 'number' ? unit : Number(unit);
-          if (!Number.isFinite(qty) || !Number.isFinite(unitNum)) {
-            return sum;
-          }
-          return sum + qty * unitNum;
-        }, 0);
-
-        const totalAmountValue =
-          typeof totalFromTotals === 'number'
-            ? totalFromTotals
-            : typeof shippingTotalValue === 'number'
-            ? itemsTotal + shippingTotalValue
-            : itemsTotal;
-
-        const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-        const pollPaymentRecovery = async () => {
-          const maxAttempts = 45;
-          const delayMs = 2000;
-          let lastRecovery = null;
-
-          for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-            // eslint-disable-next-line no-await-in-loop
-            lastRecovery = await cartService.getRazorpayRecovery({
+      const recoveryPoller = () =>
+        pollRazorpayRecovery({
+          getRecovery: () =>
+            cartService.getRazorpayRecovery({
               cartId,
               token: token || null,
-            });
+            }),
+        });
 
-            if (lastRecovery?.status === 'completed' && lastRecovery?.order) {
-              return lastRecovery;
-            }
+      if (Capacitor.isNativePlatform()) {
+        setPaymentRecovery &&
+          setPaymentRecovery({
+            active: true,
+            source: 'native-browser',
+            presentation: 'modal',
+            cartId,
+            status: 'opening_browser',
+            message: 'Opening the secure payment browser. Once payment is completed, Familyss will continue showing live payment and order updates here.',
+          });
+      }
 
-            if (
-              lastRecovery?.status === 'failed' ||
-              lastRecovery?.status === 'expired' ||
-              lastRecovery?.status === 'abandoned'
-            ) {
-              throw new Error(
-                lastRecovery?.message ||
-                  'Payment could not be completed. If the amount was deducted, it will be auto-refunded or reversed by your bank.',
-              );
-            }
+      const paymentResult = await initiatePayment(paymentOrder, {
+        appBaseUrl: STOREFRONT_BASE_URL,
+        onSuccess: async (response) => {
+          try {
+            setWaitingForPayment(true);
+            let recovery = null;
 
-            // eslint-disable-next-line no-await-in-loop
-            await sleep(delayMs);
-          }
-
-          return lastRecovery;
-        };
-
-        const options = {
-          key: razorpaySession.razorpay_key_id,
-          amount: razorpaySession.amount,
-          currency: (razorpaySession.currency || 'INR').toUpperCase(),
-          name: 'Familyss Store',
-          description: 'Order payment',
-          order_id: razorpaySession.order_id,
-          prefill: {
-            name: `${shippingAddress.first_name} ${shippingAddress.last_name}`.trim(),
-            contact: shippingAddress.phone,
-            email: user?.email || undefined,
-          },
-          notes: {
-            customer_name: `${shippingAddress.first_name} ${shippingAddress.last_name}`.trim() || undefined,
-            customer_phone: shippingAddress.phone || undefined,
-            customer_email: user?.email || undefined,
-            cart_id: cartId,
-            cart_total:
-              typeof totalsForNotes?.total === 'number' ? String(totalsForNotes.total) : undefined,
-            shipping_total:
-              typeof shippingTotalValue === 'number' ? String(shippingTotalValue) : undefined,
-            items: notesItems.length ? JSON.stringify(notesItems) : undefined,
-          },
-          handler: async function () {
-            try {
-              setWaitingForPayment(true);
-              const recovery = await pollPaymentRecovery();
-
-              if (recovery?.status === 'completed' && recovery?.order) {
-                await fetchOrders();
-                await createFreshCart();
-                setCompletedOrder(recovery.order || null);
-                setSuccess('Payment successful! Your order has been placed.');
-                resolve();
-                return;
-              }
-
-              setPaymentRecovery &&
-                setPaymentRecovery({
-                  active: true,
-                  source: 'checkout',
-                  cartId,
-                  status: recovery?.status || 'processing',
-                  message:
-                    recovery?.message ||
-                    'Payment received. We are finalizing your order securely.',
+            if (paymentCollectionId) {
+              try {
+                recovery = await cartService.verifyRazorpayPayment({
+                  paymentCollectionId,
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature: response.razorpay_signature,
+                  token: token || null,
                 });
-
-              resolve();
-              return;
-            } catch (err) {
-              if (isInsufficientInventoryError(err)) {
-                showToast && showToast('Out of stock');
-                setError(null);
-              } else {
-                setError(getErrorMessage(err));
+              } catch {
+                // Fall back to polling recovery if direct verification races with
+                // backend updates or the provider is still syncing.
               }
-              refreshCart();
-              reject(err);
-            } finally {
-              setWaitingForPayment(false);
             }
-          },
-          modal: {
-            ondismiss: function () {
-              setError(
-                'Payment window was closed. If the amount was deducted, it will be auto-refunded or your order will appear shortly.',
-              );
-              refreshCart();
-              reject(new Error('Payment cancelled'));
-            },
-          },
-          theme: {
-            color: '#F97316',
-          },
-        };
 
-        const rzp = new RazorpayConstructor(options);
-        rzp.open();
+            if (!(recovery?.status === 'completed' && recovery?.order)) {
+              recovery = await recoveryPoller();
+            }
+
+            if (recovery?.status === 'completed' && recovery?.order) {
+              await fetchOrders();
+              await createFreshCart();
+              setCompletedOrder(recovery.order || null);
+              setSuccess('Payment successful! Your order has been placed.');
+              return;
+            }
+
+            setPaymentRecovery &&
+              setPaymentRecovery({
+                active: true,
+                source: 'checkout',
+                presentation: 'orders-banner',
+                cartId,
+                status: recovery?.status || 'processing',
+                message:
+                  recovery?.message ||
+                  'Payment received. We are finalizing your order securely.',
+              });
+          } finally {
+            setWaitingForPayment(false);
+          }
+        },
+        onDismiss: async () => {
+          setError(
+            'Payment window was closed. If the amount was deducted, it will be auto-refunded or your order will appear shortly.',
+          );
+          refreshCart();
+        },
+        onPending: async () => {
+          setPaymentRecovery &&
+            setPaymentRecovery({
+              active: true,
+              source: 'native-browser',
+              presentation: 'modal',
+              cartId,
+              status: 'processing',
+              message:
+                'Complete your payment in the opened browser. Once payment is captured, we will finalize the order securely on the backend.',
+            });
+        },
       });
+
+      if (paymentResult.flow === 'native') {
+        setPaymentRecovery &&
+          setPaymentRecovery({
+            active: true,
+            source: 'native-browser',
+            presentation: 'modal',
+            cartId,
+            status: 'processing',
+            message:
+              'Payment page opened in your browser. After payment, Familyss will continue showing your payment and order status here.',
+          });
+        setSuccess('Payment page opened. Complete the payment in your browser.');
+      }
     } catch (err) {
       if (isInsufficientInventoryError(err)) {
         showToast && showToast('Out of stock');
         setError(null);
       } else {
-        setError(err.message || 'Checkout failed');
+        setError(getErrorMessage(err) || 'Checkout failed');
       }
     } finally {
       setSubmitting(false);
@@ -1186,7 +1169,7 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
                 disabled={disabled}
                 required
                 maxLength={100}
-                className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${
+                className={`mt-1 w-full dark:text-white dark:bg-slate-800 rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${
                   shippingTouched.first_name && shippingErrors.first_name
                     ? 'border-red-300 focus:border-red-400 focus:ring-red-300'
                     : 'border-gray-300 focus:border-blue-400 focus:ring-blue-400'
@@ -1205,7 +1188,7 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
                 onBlur={handleAddressInputBlur(shippingAddress, setShippingErrors, setShippingTouched)}
                 disabled={disabled}
                 maxLength={100}
-                className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${
+                className={`mt-1 w-full dark:text-white dark:bg-slate-800 rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${
                   shippingTouched.last_name && shippingErrors.last_name
                     ? 'border-red-300 focus:border-red-400 focus:ring-red-300'
                     : 'border-gray-300 focus:border-blue-400 focus:ring-blue-400'
@@ -1225,7 +1208,7 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
                 disabled={disabled}
                 required
                 maxLength={100}
-                className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${
+                className={`mt-1 w-full dark:text-white dark:bg-slate-800 rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${
                   shippingTouched.address_1 && shippingErrors.address_1
                     ? 'border-red-300 focus:border-red-400 focus:ring-red-300'
                     : 'border-gray-300 focus:border-blue-400 focus:ring-blue-400'
@@ -1244,7 +1227,7 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
                 disabled={disabled}
                 maxLength={100}
                 placeholder="Landmark / Apartment / Floor (optional)"
-                className="mt-1 w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                className="mt-1 w-full dark:text-white dark:bg-slate-800 rounded-md border border-gray-300 px-2.5 py-1.5 text-xs focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400"
               />
             </div>
             <div>
@@ -1256,7 +1239,7 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
                 onBlur={handleAddressInputBlur(shippingAddress, setShippingErrors, setShippingTouched)}
                 disabled={disabled}
                 required
-                className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${
+                className={`mt-1 w-full dark:text-white dark:bg-slate-800 rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${
                   shippingTouched.city && shippingErrors.city
                     ? 'border-red-300 focus:border-red-400 focus:ring-red-300'
                     : 'border-gray-300 focus:border-blue-400 focus:ring-blue-400'
@@ -1275,7 +1258,7 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
                 onBlur={handleAddressInputBlur(shippingAddress, setShippingErrors, setShippingTouched)}
                 disabled={disabled}
                 required
-                className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${
+                className={`mt-1 w-full dark:text-white dark:bg-slate-800 rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${
                   shippingTouched.province && shippingErrors.province
                     ? 'border-red-300 focus:border-red-400 focus:ring-red-300'
                     : 'border-gray-300 focus:border-blue-400 focus:ring-blue-400'
@@ -1296,8 +1279,8 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
                 required
                 inputMode="numeric"
                 pattern="[0-9]*"
-                maxLength={10}
-                className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${
+                maxLength={6}
+                className={`mt-1 w-full dark:text-white dark:bg-slate-800 rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${
                   shippingTouched.postal_code && shippingErrors.postal_code
                     ? 'border-red-300 focus:border-red-400 focus:ring-red-300'
                     : 'border-gray-300 focus:border-blue-400 focus:ring-blue-400'
@@ -1318,8 +1301,8 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
                 required
                 inputMode="numeric"
                 pattern="[0-9]*"
-                maxLength={14}
-                className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${
+                maxLength={10}
+                className={`mt-1 w-full dark:text-white dark:bg-slate-800 rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${
                   shippingTouched.phone && shippingErrors.phone
                     ? 'border-red-300 focus:border-red-400 focus:ring-red-300'
                     : 'border-gray-300 focus:border-blue-400 focus:ring-blue-400'
@@ -1494,7 +1477,7 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
                     required
                     inputMode="numeric"
                     pattern="[0-9]*"
-                    maxLength={10}
+                    maxLength={6}
                     className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${
                       billingTouched.postal_code && billingErrors.postal_code
                         ? 'border-red-300 focus:border-red-400 focus:ring-red-300'
@@ -1516,7 +1499,7 @@ const Checkout = ({ onBack, onContinueShopping, onViewOrders }) => {
                     required
                     inputMode="numeric"
                     pattern="[0-9]*"
-                    maxLength={14}
+                    maxLength={10}
                     className={`mt-1 w-full rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 ${
                       billingTouched.phone && billingErrors.phone
                         ? 'border-red-300 focus:border-red-400 focus:ring-red-300'

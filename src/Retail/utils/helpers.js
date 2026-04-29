@@ -130,12 +130,24 @@ export function isInsufficientInventoryError(error) {
 }
 
 export function getErrorMessage(error) {
-  if (!error) return 'Something went wrong';
-  if (typeof error === 'string') return error;
+  const defaultMessage = 'We could not complete that request right now. Please try again.';
 
   const sanitize = (raw) => {
-    if (!raw) return 'Something went wrong';
-    const msg = String(raw);
+    if (!raw) return defaultMessage;
+
+    const compact = String(raw)
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (!compact) {
+      return defaultMessage;
+    }
+
+    const msg = compact.replace(
+      /\b(?:cart|order|ordli|pay|paycol|pp|rzpat|reg|prod|variant|item|line|region|return|claim|swap|cus|cust|addr|ful|ship|shp)_[a-z0-9_]+\b/gi,
+      'reference',
+    );
     const normalized = msg.toLowerCase();
 
     if (
@@ -158,21 +170,85 @@ export function getErrorMessage(error) {
       return 'Your cart is already completed. Please refresh and try again.';
     }
 
-    if (msg.length > 160) {
-      return 'Something went wrong. Please try again.';
+    if (
+      normalized.includes('shipping profiles') ||
+      normalized.includes('shipping profile') ||
+      normalized.includes('shipping methods are not satisfied')
+    ) {
+      return 'Some items in your cart are not available for the selected delivery method. Please refresh shipping options and try again.';
     }
 
-    return msg;
+    if (
+      normalized.includes('shipping option') ||
+      normalized.includes('no shipping options') ||
+      normalized.includes('serviceability')
+    ) {
+      return 'Delivery is not available for this address yet. Please try a different pincode or address.';
+    }
+
+    if (
+      normalized.includes('network error') ||
+      normalized.includes('failed to fetch') ||
+      normalized.includes('timeout') ||
+      normalized.includes('econn') ||
+      normalized.includes('network request failed')
+    ) {
+      return 'Please check your internet connection and try again.';
+    }
+
+    if (
+      normalized.includes('unauthorized') ||
+      normalized.includes('forbidden') ||
+      normalized.includes('not authenticated') ||
+      normalized.includes('token') && normalized.includes('expired')
+    ) {
+      return 'Your session has expired. Please sign in again and retry.';
+    }
+
+    if (
+      normalized.includes('payment session expired') ||
+      normalized.includes('session expired')
+    ) {
+      return 'Your payment session expired. Please start payment again.';
+    }
+
+    if (
+      normalized === 'an unknown error occurred.' ||
+      normalized === 'an unknown error occurred' ||
+      normalized.includes('unknown error') ||
+      normalized.includes('internal server error') ||
+      normalized.includes('unexpected error')
+    ) {
+      return defaultMessage;
+    }
+
+    if (
+      msg.length > 140 ||
+      msg.includes('\n') ||
+      normalized.includes('medusaerror') ||
+      normalized.includes('trace') ||
+      normalized.includes('stack')
+    ) {
+      return defaultMessage;
+    }
+
+    return msg === 'reference' ? defaultMessage : msg;
   };
+
+  if (!error) return defaultMessage;
+  if (typeof error === 'string') return sanitize(error);
 
   if (error.response && error.response.data) {
     const data = error.response.data;
-    if (typeof data === 'string') return data;
+    if (typeof data === 'string') return sanitize(data);
     if (data.message) return sanitize(data.message);
+    if (data.error?.message) return sanitize(data.error.message);
+    if (typeof data.error === 'string') return sanitize(data.error);
     if (Array.isArray(data.errors) && data.errors.length > 0) {
       return sanitize(data.errors[0].message || data.errors[0]);
     }
+    if (data.detail) return sanitize(data.detail);
   }
   if (error.message) return sanitize(error.message);
-  return 'Something went wrong';
+  return defaultMessage;
 }

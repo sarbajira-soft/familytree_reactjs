@@ -8,7 +8,17 @@ import { ArrowLeft } from 'lucide-react';
 import * as productService from '../services/productService';
 
 const ProductList = ({ initialProductId, searchTerm, setSearchTerm, onDetailOpenChange, onProductIdChange }) => {
-  const { products, fetchProducts, loading, error, addToCart, token, cart, selectedCategoryId } = useRetail();
+  const {
+    products,
+    fetchProducts,
+    loading,
+    error,
+    addToCart,
+    token,
+    cart,
+    selectedCategoryId,
+    clearError,
+  } = useRetail();
 
   const [sortBy, setSortBy] = useState('featured');
   const [collectionFilter, setCollectionFilter] = useState('all');
@@ -147,18 +157,46 @@ const ProductList = ({ initialProductId, searchTerm, setSearchTerm, onDetailOpen
 
   return (
     <section aria-label="Products">
-
       {error && !loading && (
-        <div className="mb-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-          <FiAlertCircle className="text-sm" />
-          <span className="flex-1 truncate">{error}</span>
-          <button
-            type="button"
-            onClick={fetchProducts}
-            className="rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold hover:bg-red-200"
-          >
-            Retry
-          </button>
+        <div className="fixed inset-0 z-[950] flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-[28px] border border-red-100 bg-white p-6 shadow-[0_24px_70px_rgba(15,23,42,0.18)]">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex h-11 w-11 items-center justify-center rounded-2xl bg-red-50 text-red-600">
+                <FiAlertCircle className="text-xl" />
+              </div>
+              <div className="flex-1">
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-red-500">
+                  Retail Error
+                </p>
+                <h3 className="mt-1 text-lg font-semibold text-gray-900">
+                  Something needs attention
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-gray-600">{error}</p>
+              </div>
+            </div>
+
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  clearError && clearError();
+                }}
+                className="inline-flex items-center justify-center rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 hover:border-gray-300 hover:text-gray-900"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  clearError && clearError();
+                  fetchProducts();
+                }}
+                className="inline-flex items-center justify-center rounded-full bg-red-500 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
