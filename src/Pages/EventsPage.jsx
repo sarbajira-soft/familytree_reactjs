@@ -7,6 +7,8 @@ import { getToken } from "../utils/auth";
 
 import {
   FiCalendar,
+  FiChevronDown,
+  FiChevronUp,
   FiMapPin,
   FiUsers,
   FiPlusSquare,
@@ -32,6 +34,13 @@ import JoinFamilyModal from "../Components/JoinFamilyModal";
 import EventsShimmer from "./EventsShimmer";
 import ReportContentModal from "../Components/ReportContentModal";
 import { hasFamilyAccess, hasFamilyAccessStatus } from "../utils/familyAccess";
+import {
+  formatEventDateLabel,
+  formatScheduleHeadline,
+  formatTimeRangeLabel,
+  getNextUpcomingSchedule,
+  normalizeEventSchedulesInput,
+} from "../utils/eventValidation";
 
 const EventsPage = () => {
   const { userInfo, userLoading } = useUser();
@@ -48,6 +57,7 @@ const EventsPage = () => {
   const [eventActionMenuEventId, setEventActionMenuEventId] = useState(null);
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [reportTarget, setReportTarget] = useState(null);
+  const [expandedEventIds, setExpandedEventIds] = useState({});
 
   const openReportModalForEvent = (event) => {
     if (!event?.id) return;
@@ -96,16 +106,42 @@ const EventsPage = () => {
         method: "GET",
       });
       return data.map((item) => {
+        const schedules = normalizeEventSchedulesInput(item);
+        const nextSchedule = item?.nextSchedule
+          ? {
+              ...item.nextSchedule,
+              times: item.nextSchedule.startTime
+                ? [
+                    {
+                      startTime: item.nextSchedule.startTime,
+                      endTime: item.nextSchedule.endTime || "",
+                    },
+                  ]
+                : [],
+            }
+          : getNextUpcomingSchedule(schedules);
+        const primarySchedule = nextSchedule || schedules[0] || null;
+        const primaryTimeLabel = primarySchedule?.isAllDay
+          ? "All day"
+          : primarySchedule?.times?.[0]
+            ? formatTimeRangeLabel(primarySchedule.times[0])
+            : item.eventTime || null;
+
         let eventData = {
           id: item.id,
           title: item.eventTitle,
           description: item.eventDescription,
-          date: item.eventDate,
-          time: item.eventTime,
+          date: primarySchedule?.scheduleDate || item.eventDate,
+          time: primaryTimeLabel,
           location: item.location,
+          familyCode: item.familyCode,
           createdBy: item.createdBy ?? item.userId ?? item.created_by,
+          updatedAt: item.updatedAt,
           // author: item.createdByName ?? item.creatorName ?? item.userName ?? item.author ?? "Unknown",
           eventType: item.eventType || "custom",
+          schedules,
+          nextSchedule: primarySchedule,
+          hasMultipleDates: item.hasMultipleDates || schedules.length > 1,
           eventImages:
             item.eventImages && item.eventImages.length > 0
               ? item.eventImages
@@ -216,6 +252,18 @@ const EventsPage = () => {
     queryClient.invalidateQueries(["events"]);
   };
 
+  const handleEventCreated = () => {
+    queryClient.invalidateQueries(["events"]);
+  };
+
+  const toggleExpandedEvent = (eventId, browserEvent) => {
+    browserEvent.stopPropagation();
+    setExpandedEventIds((previous) => ({
+      ...previous,
+      [eventId]: !previous[eventId],
+    }));
+  };
+
   const handleCreateFamily = () => {
     setIsCreateFamilyModalOpen(true);
   };
@@ -239,32 +287,23 @@ const EventsPage = () => {
   };
 
   const formatEventDate = (rawDate) => {
-    const cleaned = String(rawDate || '').replace(/\$/g, '').trim();
-    if (!cleaned) return '';
+    return formatEventDateLabel(rawDate);
+  };
 
-    if (/^\d{4}-\d{2}-\d{2}$/.test(cleaned)) {
-      const [year, month, day] = cleaned.split('-').map(Number);
-      const parsed = new Date(Date.UTC(year, month - 1, day));
-      if (!Number.isNaN(parsed.getTime())) {
-        return new Intl.DateTimeFormat('en-US', {
-          day: '2-digit',
-          month: 'short',
-          year: 'numeric',
-          timeZone: 'UTC',
-        }).format(parsed);
-      }
+  const getEventSchedulePreview = (event) => {
+    if (event.hasMultipleDates && event.nextSchedule) {
+      return `Multiple dates (next: ${formatEventDate(event.nextSchedule.scheduleDate)})`;
     }
 
-    const parsed = new Date(cleaned);
-    if (!Number.isNaN(parsed.getTime())) {
-      return new Intl.DateTimeFormat('en-US', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-      }).format(parsed);
+    if (event.nextSchedule) {
+      return formatScheduleHeadline(event.nextSchedule);
     }
 
-    return cleaned;
+    if (event.date) {
+      return `${formatEventDate(event.date)}${event.time ? ` at ${event.time}` : ""}`;
+    }
+
+    return "";
   };
 
   const displayedEvents = allEvents;
@@ -604,11 +643,18 @@ const EventsPage = () => {
                       {/* Event Content */}
                       <div className="p-3 flex-1 flex flex-col">
                         <div className="space-y-2">
-                          <h3
-                            className={`text-base font-bold text-gray-900 dark:text-slate-100 line-clamp-2 group-hover:${eventStyle.textColor} transition-colors duration-300`}
-                          >
-                            {event.title}
-                          </h3>
+                          <div className="space-y-2">
+                            <h3
+                              className={`text-base font-bold text-gray-900 dark:text-slate-100 line-clamp-2 group-hover:${eventStyle.textColor} transition-colors duration-300`}
+                            >
+                              {event.title}
+                            </h3>
+                            {event.eventType === "custom" && event.hasMultipleDates ? (
+                              <span className="inline-flex w-fit items-center rounded-full bg-primary-50 px-2.5 py-1 text-[11px] font-semibold text-primary-700 dark:bg-primary-500/15 dark:text-primary-200">
+                                Multiple dates
+                              </span>
+                            ) : null}
+                          </div>
 
                           {event.message && (
                             <p className="text-xs text-gray-600 dark:text-slate-300 italic bg-gray-50 dark:bg-slate-800 p-2 rounded-lg line-clamp-2">
@@ -627,10 +673,61 @@ const EventsPage = () => {
                               <div>
                                 <p className="text-xs text-gray-500 dark:text-slate-400">Date & Time</p>
                                 <p className="text-sm font-semibold">
-                                  {formatEventDate(event.date)} {event.time && `• ${event.time}`}
+                                  {getEventSchedulePreview(event)}
                                 </p>
+                                {event.eventType === "custom" && event.hasMultipleDates ? (
+                                  <button
+                                    type="button"
+                                    onClick={(browserEvent) => toggleExpandedEvent(event.id, browserEvent)}
+                                    className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-primary-700 transition hover:text-primary-800 dark:text-primary-200 dark:hover:text-primary-100"
+                                  >
+                                    {expandedEventIds[event.id] ? (
+                                      <>
+                                        Hide dates
+                                        <FiChevronUp size={14} />
+                                      </>
+                                    ) : (
+                                      <>
+                                        Show all dates
+                                        <FiChevronDown size={14} />
+                                      </>
+                                    )}
+                                  </button>
+                                ) : null}
                               </div>
                             </div>
+
+                            {event.eventType === "custom" &&
+                            event.hasMultipleDates &&
+                            expandedEventIds[event.id] ? (
+                              <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-700 dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-200">
+                                <div className="space-y-2">
+                                  {(event.schedules || []).map((scheduleItem) => (
+                                    <div key={`${event.id}-${scheduleItem.scheduleDate}`}>
+                                      <p className="font-semibold text-gray-800 dark:text-slate-100">
+                                        {formatEventDate(scheduleItem.scheduleDate)}
+                                      </p>
+                                      <div className="mt-1 space-y-1">
+                                        {scheduleItem.isAllDay ? (
+                                          <p className="text-xs text-gray-600 dark:text-slate-300">
+                                            All day
+                                          </p>
+                                        ) : (
+                                          (scheduleItem.times || []).map((timeSlot, slotIndex) => (
+                                            <p
+                                              key={`${scheduleItem.scheduleDate}-${slotIndex}-${timeSlot.startTime}`}
+                                              className="text-xs text-gray-600 dark:text-slate-300"
+                                            >
+                                              - {formatTimeRangeLabel(timeSlot)}
+                                            </p>
+                                          ))
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : null}
 
                             <div
                               className={`flex items-center gap-2 text-gray-700 dark:text-slate-200 ${event.location ? "" : "opacity-0 pointer-events-none"
@@ -761,6 +858,7 @@ const EventsPage = () => {
       <CreateEventModal
         isOpen={isCreateEventModalOpen}
         onClose={() => setIsCreateEventModalOpen(false)}
+        onEventCreated={handleEventCreated}
       />
       <EventViewerModal
         isOpen={isEventViewerOpen}

@@ -1,54 +1,70 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import PropTypes from "prop-types";
 import {
-  FiX,
   FiCalendar,
-  FiClock,
-  FiMapPin,
+  FiCheckCircle,
   FiFileText,
   FiImage,
-  FiPlus,
   FiLoader,
-  FiCheckCircle,
+  FiMapPin,
+  FiPlus,
+  FiX,
 } from "react-icons/fi";
 import Swal from "sweetalert2";
 import { useUser } from "../Contexts/UserContext";
 import { useTheme } from "../Contexts/ThemeContext";
 import { getToken } from "../utils/auth";
 import { authFetchResponse } from "../utils/authFetch";
+import EventScheduleManager from "./EventScheduleManager";
+import {
+  createEmptySchedule,
+  EVENT_SCHEDULE_REQUIRED_MESSAGE,
+  getLegacyEventDateTime,
+  mergeSchedulesByDate,
+  toApiSchedules,
+  validateEventSchedules,
+} from "../utils/eventValidation";
+
+const MAX_EVENT_TITLE_LENGTH = 50;
+const MAX_EVENT_DESCRIPTION_LENGTH = 250;
+const MAX_EVENT_LOCATION_LENGTH = 250;
+const MAX_EVENT_IMAGE_COUNT = 10;
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const ALLOWED_IMAGE_MIME_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/jpg",
+  "image/gif",
+];
+const INVALID_IMAGE_TYPE_ERROR =
+  "Only image files (jpeg, png, jpg, gif) are allowed.";
+const CREATE_EVENT_FORM_ID = "create-event-form";
+
+const isScheduleBlank = (schedule) =>
+  !String(schedule?.scheduleDate || "").trim() &&
+  !Boolean(schedule?.isAllDay) &&
+  !(Array.isArray(schedule?.times) ? schedule.times : []).some(
+    (slot) => String(slot?.startTime || "").trim() || String(slot?.endTime || "").trim(),
+  );
 
 const CreateEventModal = ({
   isOpen,
   onClose,
+  onEventCreated,
   apiBaseUrl = import.meta.env.VITE_API_BASE_URL,
 }) => {
-  const MAX_EVENT_TITLE_LENGTH = 50;
-  const MAX_EVENT_DESCRIPTION_LENGTH = 250;
-  const MAX_EVENT_LOCATION_LENGTH = 250;
-  const MAX_EVENT_IMAGE_COUNT = 10;
-  const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-  const EVENT_DATE_MIN = "1900-01-01";
-  const EVENT_DATE_MAX = "2100-12-31";
-
-  const ALLOWED_IMAGE_MIME_TYPES = [
-    "image/jpeg",
-    "image/png",
-    "image/jpg",
-    "image/gif",
-  ];
-  const INVALID_IMAGE_TYPE_ERROR =
-    "Only image files (jpeg, png, jpg, gif) are allowed";
   const { userInfo } = useUser();
   const { theme } = useTheme();
   const isDark = theme === "dark";
 
   const [title, setTitle] = useState("");
-  const [date, setDate] = useState("");
-  const [time, setTime] = useState("");
+  const [schedules, setSchedules] = useState([createEmptySchedule()]);
   const [location, setLocation] = useState("");
   const [description, setDescription] = useState("");
   const [images, setImages] = useState([]);
   const [imagePreviews, setImagePreviews] = useState([]);
   const [errors, setErrors] = useState({});
+  const [scheduleWarnings, setScheduleWarnings] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [familyCode, setFamilyCode] = useState("");
@@ -61,33 +77,75 @@ const CreateEventModal = ({
   const getMaxImageCountError = () =>
     `You can upload a maximum of ${MAX_EVENT_IMAGE_COUNT} images.`;
 
-  // Handle back button to close modal instead of navigating
+  const isDirty = useMemo(() => {
+    const hasScheduleDraft = mergeSchedulesByDate(schedules).some((schedule) => !isScheduleBlank(schedule));
+
+    return Boolean(
+      String(title || "").trim() ||
+      String(location || "").trim() ||
+      String(description || "").trim() ||
+      images.length > 0 ||
+      hasScheduleDraft,
+    );
+  }, [description, images.length, location, schedules, title]);
+
   useEffect(() => {
-    if (!isOpen) return;
-    if (typeof onClose !== 'function') return;
-    if (!window.__appModalBackStack) window.__appModalBackStack = [];
+    if (!isOpen) {
+      return undefined;
+    }
+    if (typeof onClose !== "function") {
+      return undefined;
+    }
+    if (!window.__appModalBackStack) {
+      window.__appModalBackStack = [];
+    }
 
     const handler = () => {
-      onClose();
+      handleClose();
     };
 
     window.__appModalBackStack.push(handler);
 
     return () => {
       const stack = window.__appModalBackStack;
-      if (!Array.isArray(stack)) return;
-      const idx = stack.lastIndexOf(handler);
-      if (idx >= 0) stack.splice(idx, 1);
+      if (!Array.isArray(stack)) {
+        return;
+      }
+      const index = stack.lastIndexOf(handler);
+      if (index >= 0) {
+        stack.splice(index, 1);
+      }
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, isDirty, isLoading, showSuccess]);
 
   useEffect(() => {
-    if (!isOpen) return;
-    const preferredCode = getPreferredFamilyCode();
-    if (preferredCode) {
-      setFamilyCode(preferredCode);
+    if (!isOpen) {
+      return undefined;
     }
+
+    const handleBeforeUnload = (event) => {
+      if (!isDirty || isLoading || showSuccess) {
+        return;
+      }
+
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isDirty, isLoading, isOpen, showSuccess]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const preferredCode = getPreferredFamilyCode();
+    setFamilyCode(preferredCode);
+    setSchedules([createEmptySchedule()]);
     setErrors({});
+    setScheduleWarnings({});
     setShowSuccess(false);
   }, [isOpen, userInfo?.familyCode]);
 
@@ -99,26 +157,54 @@ const CreateEventModal = ({
       nextPreviews.forEach((url) => {
         try {
           URL.revokeObjectURL(url);
-        } catch {}
+        } catch (error) {
+          void error;
+        }
       });
     };
   }, [images]);
 
   const resetForm = () => {
     setTitle("");
-    setDate("");
-    setTime("");
+    setSchedules([createEmptySchedule()]);
     setLocation("");
     setDescription("");
     setImages([]);
     setErrors({});
+    setScheduleWarnings({});
     setIsLoading(false);
     setShowSuccess(false);
     setFamilyCode(getPreferredFamilyCode());
   };
 
-  const handleClose = () => {
-    if (isLoading) return;
+  const confirmDiscardChanges = async () => {
+    if (!isDirty || showSuccess) {
+      return true;
+    }
+
+    const result = await Swal.fire({
+      icon: "warning",
+      title: "Discard changes?",
+      text: "You have unsaved event changes.",
+      showCancelButton: true,
+      confirmButtonColor: "#ef4444",
+      cancelButtonColor: "#2563eb",
+      confirmButtonText: "Discard",
+    });
+
+    return result.isConfirmed;
+  };
+
+  const handleClose = async ({ skipConfirm = false } = {}) => {
+    if (isLoading) {
+      return;
+    }
+
+    const canClose = skipConfirm ? true : await confirmDiscardChanges();
+    if (!canClose) {
+      return;
+    }
+
     resetForm();
     onClose?.();
   };
@@ -128,40 +214,45 @@ const CreateEventModal = ({
     const lower = text.toLowerCase();
 
     const normalizeValidationMessages = (messages) => {
-      const arr = Array.isArray(messages) ? messages : [messages];
-      const mapped = arr
-        .map((m) => String(m || "").trim())
+      const values = Array.isArray(messages) ? messages : [messages];
+      return values
+        .map((message) => String(message || "").trim())
         .filter(Boolean)
-        .map((m) => {
-          if (m === "eventTitle should not be empty") return "Event title is required.";
-          if (m === "Event title must be at most 50 characters") return "Event title must be 50 characters or less.";
-          if (m === "Location must be 250 characters or less") return "Location must be 250 characters or less.";
-          if (m === "eventDate should not be empty") return "Event date is required.";
-          if (m === "eventDate must be a valid ISO 8601 date string") return "Event date is invalid. Please choose a valid date.";
-          return m;
-        });
-      return mapped.join(" ");
+        .map((message) => {
+          if (message === "eventTitle should not be empty") {
+            return "Event title is required.";
+          }
+          if (message === "Event title must be at most 50 characters") {
+            return "Event title must be 50 characters or less.";
+          }
+          if (message === "Location must be 250 characters or less") {
+            return "Location must be 250 characters or less.";
+          }
+          return message;
+        })
+        .join(" ");
     };
 
-    const tryParseBackendJson = () => {
-      try {
-        return JSON.parse(text);
-      } catch (e) {
-        return null;
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed?.message) {
+        return normalizeValidationMessages(parsed.message);
       }
-    };
-
-    const parsed = tryParseBackendJson();
-    if (parsed && parsed.message) {
-      return normalizeValidationMessages(parsed.message);
+    } catch (error) {
+      void error;
     }
 
     if (status === 401) {
       return "Your session has expired. Please sign in again.";
     }
     if (status === 403) {
-      if (lower.includes("blocked")) return "You are blocked from this family.";
+      if (lower.includes("blocked")) {
+        return "You are blocked from this family.";
+      }
       return "You do not have permission to perform this action.";
+    }
+    if (status === 409) {
+      return "This event was updated elsewhere. Refresh and try again.";
     }
     if (status === 413 || lower.includes("file too large") || lower.includes("payload too large")) {
       return "Image is too large. Please upload images up to 5MB.";
@@ -177,15 +268,17 @@ const CreateEventModal = ({
     return normalized || "Unable to create the event. Please try again.";
   };
 
-  const handleImageChange = (e) => {
-    const files = Array.from(e.target.files || []);
-    if (!files.length) return;
+  const handleImageChange = (event) => {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) {
+      return;
+    }
 
     const invalidTypeFiles = files.filter(
-      (file) => !ALLOWED_IMAGE_MIME_TYPES.includes(String(file?.type || "").toLowerCase())
+      (file) => !ALLOWED_IMAGE_MIME_TYPES.includes(String(file?.type || "").toLowerCase()),
     );
-    const validTypeFiles = files.filter(
-      (file) => ALLOWED_IMAGE_MIME_TYPES.includes(String(file?.type || "").toLowerCase())
+    const validTypeFiles = files.filter((file) =>
+      ALLOWED_IMAGE_MIME_TYPES.includes(String(file?.type || "").toLowerCase()),
     );
 
     if (invalidTypeFiles.length > 0) {
@@ -195,7 +288,9 @@ const CreateEventModal = ({
       }));
     }
 
-    const validSizeFiles = validTypeFiles.filter((file) => Number(file?.size || 0) <= MAX_IMAGE_BYTES);
+    const validSizeFiles = validTypeFiles.filter(
+      (file) => Number(file?.size || 0) <= MAX_IMAGE_BYTES,
+    );
     const hasOversize = validSizeFiles.length !== validTypeFiles.length;
 
     if (hasOversize) {
@@ -203,12 +298,12 @@ const CreateEventModal = ({
         ...(prev || {}),
         images: "Image is too large. Please select an image less than 5MB.",
       }));
-    } else if (errors.images && invalidTypeFiles.length === 0) {
+    } else if (!invalidTypeFiles.length) {
       setErrors((prev) => ({ ...(prev || {}), images: undefined }));
     }
 
     if (!validSizeFiles.length) {
-      e.target.value = null;
+      event.target.value = null;
       return;
     }
 
@@ -216,13 +311,15 @@ const CreateEventModal = ({
       const merged = [...(prev || []), ...validSizeFiles];
       const seen = new Set();
       const unique = [];
-      for (const f of merged) {
-        const key = getImageKey(f);
+
+      merged.forEach((file) => {
+        const key = getImageKey(file);
         if (!seen.has(key)) {
           seen.add(key);
-          unique.push(f);
+          unique.push(file);
         }
-      }
+      });
+
       if (unique.length > MAX_EVENT_IMAGE_COUNT) {
         setErrors((prevErrors) => ({
           ...(prevErrors || {}),
@@ -230,16 +327,17 @@ const CreateEventModal = ({
         }));
         return unique.slice(0, MAX_EVENT_IMAGE_COUNT);
       }
+
       setErrors((prevErrors) => ({ ...(prevErrors || {}), images: undefined }));
       return unique;
     });
 
-    e.target.value = null;
+    event.target.value = null;
   };
 
   const handleRemoveImage = (index) => {
     setImages((prev) => {
-      const nextImages = (prev || []).filter((_, i) => i !== index);
+      const nextImages = (prev || []).filter((_, imageIndex) => imageIndex !== index);
       if (nextImages.length < MAX_EVENT_IMAGE_COUNT) {
         setErrors((prevErrors) => ({ ...(prevErrors || {}), images: undefined }));
       }
@@ -249,31 +347,15 @@ const CreateEventModal = ({
 
   const validateForm = () => {
     const nextErrors = {};
-
     const normalizedTitle = String(title || "").trim();
-    const normalizedDate = String(date || "").trim();
-    const normalizedTime = String(time || "").trim();
     const normalizedLocation = String(location || "").trim();
     const normalizedDescription = String(description || "").trim();
+    const scheduleValidation = validateEventSchedules(schedules);
 
     if (!normalizedTitle) {
       nextErrors.title = "Event title is required.";
     } else if (normalizedTitle.length > MAX_EVENT_TITLE_LENGTH) {
       nextErrors.title = `Event title must be ${MAX_EVENT_TITLE_LENGTH} characters or less.`;
-    }
-
-    if (!normalizedDate) {
-      nextErrors.date = "Event date is required.";
-    } else if (!/^(\d{4})-(\d{2})-(\d{2})$/.test(normalizedDate)) {
-      nextErrors.date = "Event date is invalid. Please choose a valid date.";
-    } else if (normalizedDate < EVENT_DATE_MIN || normalizedDate > EVENT_DATE_MAX) {
-      nextErrors.date = `Event date must be between ${EVENT_DATE_MIN} and ${EVENT_DATE_MAX}.`;
-    }
-
-    if (!normalizedTime) {
-      nextErrors.time = "Event time is required.";
-    } else if (!/^\d{2}:\d{2}(:\d{2})?$/.test(normalizedTime)) {
-      nextErrors.time = "Event time is invalid. Please choose a valid time.";
     }
 
     if (normalizedDescription.length > MAX_EVENT_DESCRIPTION_LENGTH) {
@@ -288,21 +370,50 @@ const CreateEventModal = ({
       nextErrors.images = getMaxImageCountError();
     }
 
-    setErrors(nextErrors);
-    return Object.keys(nextErrors).length === 0;
+    setErrors({
+      ...nextErrors,
+      schedules: scheduleValidation.errors,
+    });
+    setScheduleWarnings(scheduleValidation.warnings);
+
+    return {
+      isValid: Object.keys(nextErrors).length === 0 && scheduleValidation.isValid,
+      normalizedSchedules: scheduleValidation.normalizedSchedules,
+      hasPastDates: scheduleValidation.hasPastDates,
+    };
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
 
-    const isValid = validateForm();
-    if (!isValid) return;
+    const validation = validateForm();
+    if (!validation.isValid) {
+      return;
+    }
+
+    if (validation.hasPastDates) {
+      const result = await Swal.fire({
+        icon: "warning",
+        title: "Past date selected",
+        text: "One or more event dates are in the past. Do you want to continue?",
+        showCancelButton: true,
+        confirmButtonColor: "#2563eb",
+        cancelButtonColor: "#6b7280",
+        confirmButtonText: "Continue",
+      });
+
+      if (!result.isConfirmed) {
+        return;
+      }
+    }
 
     setIsLoading(true);
 
     const normalizedTitle = String(title || "").trim();
-
+    const normalizedLocation = String(location || "").trim();
+    const normalizedDescription = String(description || "").trim();
     const targetFamilyCode = String(familyCode || userInfo?.familyCode || "").trim();
+
     if (!userInfo?.userId || !targetFamilyCode) {
       Swal.fire({
         icon: "warning",
@@ -325,108 +436,124 @@ const CreateEventModal = ({
         return;
       }
 
+      const apiSchedules = toApiSchedules(validation.normalizedSchedules);
+      const { eventDate, eventTime } = getLegacyEventDateTime(validation.normalizedSchedules);
+
+      if (!apiSchedules.length || !eventDate) {
+        setErrors((prev) => ({
+          ...(prev || {}),
+          schedules: {
+            general: EVENT_SCHEDULE_REQUIRED_MESSAGE,
+            dates: prev?.schedules?.dates || {},
+          },
+        }));
+        setIsLoading(false);
+        return;
+      }
+
       const formData = new FormData();
-      formData.append("userId", userInfo?.userId);
+      formData.append("userId", String(userInfo.userId));
       formData.append("eventTitle", normalizedTitle);
-      if (description && String(description).trim()) {
-        formData.append("eventDescription", String(description).trim());
+      if (normalizedDescription) {
+        formData.append("eventDescription", normalizedDescription);
       }
-      formData.append("eventDate", date);
-      if (time && String(time).trim()) {
-        formData.append("eventTime", String(time).trim());
+      if (eventDate) {
+        formData.append("eventDate", eventDate);
       }
-      if (location && String(location).trim()) {
-        formData.append("location", String(location).trim());
+      if (eventTime) {
+        formData.append("eventTime", eventTime);
+      }
+      formData.append("schedules", JSON.stringify(apiSchedules));
+      if (normalizedLocation) {
+        formData.append("location", normalizedLocation);
       }
       formData.append("familyCode", targetFamilyCode);
 
-      images.forEach((img) => {
-        formData.append("eventImages", img);
+      images.forEach((image) => {
+        formData.append("eventImages", image);
       });
 
-      const createEndpoint = `${apiBaseUrl}/event/create`;
-
-      const response = await authFetchResponse(createEndpoint, {
+      const response = await authFetchResponse(`${apiBaseUrl}/event/create`, {
         method: "POST",
         skipThrow: true,
         body: formData,
       });
 
       if (!response.ok) {
-        const errText = await response.text().catch(() => "");
+        const errorText = await response.text().catch(() => "");
         Swal.fire({
           icon: "error",
           title: "Can’t create event",
-          text: getFriendlyError(response.status, errText),
+          text: getFriendlyError(response.status, errorText),
         });
         setIsLoading(false);
         return;
       }
 
-      const resData = await response.json();
-
-      // NEW: Show success popup
+      const responseData = await response.json();
+      onEventCreated?.(responseData?.data || null);
       setShowSuccess(true);
-    } catch (err) {
-      console.error("💥 Error creating event:", err);
+    } catch (error) {
+      console.error("Error creating event:", error);
       Swal.fire({
         icon: "error",
         title: "Something went wrong",
-        text: err?.message || "Unable to create the event. Please try again.",
+        text: error?.message || "Unable to create the event. Please try again.",
       });
     } finally {
       setIsLoading(false);
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen) {
+    return null;
+  }
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-start sm:items-center justify-center px-2 sm:px-4 pt-8 pb-24 sm:pt-4 sm:pb-6 z-50 font-inter">
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 px-2 pb-24 pt-8 font-inter backdrop-blur-sm sm:items-center sm:px-4 sm:pb-6 sm:pt-4">
       <div
-        className="bg-white dark:bg-slate-900 rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-md sm:max-w-2xl relative flex flex-col overflow-hidden border border-transparent dark:border-slate-700"
-        style={{ maxHeight: "calc(100vh - 140px)" }}
+        className="relative flex max-h-[calc(100vh-140px)] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-transparent bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900 sm:max-w-3xl sm:rounded-3xl"
       >
-        {/* NEW: Success Popup */}
-        {showSuccess && (
-          <div className="absolute inset-0 bg-white/90 dark:bg-slate-950/90 flex flex-col items-center justify-center z-10 p-6 text-center">
-            <div className="border-4 border-green-500 rounded-2xl p-8 bg-white dark:bg-slate-900 shadow-lg max-w-md w-full">
-              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-6 mx-auto">
+        {showSuccess ? (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/90 p-6 text-center dark:bg-slate-950/90">
+            <div className="w-full max-w-md rounded-2xl border-4 border-green-500 bg-white p-8 shadow-lg dark:bg-slate-900">
+              <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-green-100">
                 <FiCheckCircle size={40} className="text-green-600" />
               </div>
-              <h3 className="text-2xl font-bold text-gray-800 dark:text-slate-100 mb-3">
+              <h3 className="mb-3 text-2xl font-bold text-gray-800 dark:text-slate-100">
                 Success!
               </h3>
-              <p className="text-gray-600 dark:text-slate-300 mb-6 text-lg">
+              <p className="mb-6 text-lg text-gray-600 dark:text-slate-300">
                 Event created successfully.
               </p>
               <button
-                className="bg-green-600 text-white px-8 py-2 rounded-full font-semibold text-lg shadow hover:bg-green-700 transition"
-                onClick={handleClose}
+                type="button"
+                className="rounded-full bg-green-600 px-8 py-2 text-lg font-semibold text-white shadow transition hover:bg-green-700"
+                onClick={() => handleClose({ skipConfirm: true })}
               >
                 OK
               </button>
             </div>
           </div>
-        )}
+        ) : null}
 
-        {/* Header */}
-        <div className="bg-gradient-to-r from-primary-600 to-primary-700 text-white px-4 py-3 sm:p-4 relative">
+        <div className="relative bg-gradient-to-r from-primary-600 to-primary-700 px-4 py-3 text-white sm:p-4">
           <button
-            onClick={handleClose}
+            type="button"
+            onClick={() => handleClose()}
             disabled={isLoading}
-            className="absolute top-3 right-3 text-white/80 hover:text-white transition-colors p-1.5 rounded-full hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="absolute right-3 top-3 rounded-full p-1.5 text-white/80 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
             <FiX size={20} />
           </button>
           <div className="text-center">
             <div className="flex items-center justify-center gap-3">
-              <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20">
                 <FiCalendar size={14} />
               </div>
               <div>
-                <h2 className="text-lg sm:text-xl font-bold">Create New Event</h2>
-                <p className="text-primary-100 text-[11px] sm:text-xs">
+                <h2 className="text-lg font-bold sm:text-xl">Create New Event</h2>
+                <p className="text-[11px] text-primary-100 sm:text-xs">
                   Plan your next family gathering
                 </p>
               </div>
@@ -434,31 +561,31 @@ const CreateEventModal = ({
           </div>
         </div>
 
-        {/* Form Content */}
         <div className="flex-1 overflow-y-auto px-4 py-4 sm:p-6">
-          <form onSubmit={handleSubmit} className="space-y-5 sm:space-y-6">
-            {/* Event Title */}
+          <form id={CREATE_EVENT_FORM_ID} onSubmit={handleSubmit} className="space-y-5 sm:space-y-6">
             <div className="space-y-2">
-              <label className="flex items-center gap-2 text-gray-700 dark:text-slate-200 font-semibold text-xs sm:text-sm">
-                <div className="w-6 h-6 bg-primary-100 dark:bg-primary-500/15 rounded-full flex items-center justify-center">
+              <label className="flex items-center gap-2 text-xs font-semibold text-gray-700 dark:text-slate-200 sm:text-sm">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-500/15">
                   <FiFileText size={11} className="text-primary-600 dark:text-primary-300" />
-                </div>
+                </span>
                 Event Title
               </label>
               <input
                 type="text"
                 value={title}
-                onChange={(e) => {
-                  setTitle(e.target.value);
-                  if (errors.title) setErrors((prev) => ({ ...prev, title: undefined }));
+                onChange={(event) => {
+                  setTitle(event.target.value);
+                  if (errors.title) {
+                    setErrors((prev) => ({ ...prev, title: undefined }));
+                  }
                 }}
-                required
                 maxLength={MAX_EVENT_TITLE_LENGTH}
-                className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-gray-50 dark:bg-slate-800/90 focus:bg-white dark:focus:bg-slate-800 text-sm text-gray-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-400"
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 transition-all duration-200 focus:border-transparent focus:bg-white focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800/90 dark:text-slate-100 dark:focus:bg-slate-800 sm:px-4 sm:py-3"
                 placeholder="Enter event title..."
+                required
               />
-              {errors.title ? <p className="text-red-600 text-xs">{errors.title}</p> : null}
-              <div className="text-[11px] text-gray-500 flex items-center justify-between">
+              {errors.title ? <p className="text-xs text-red-600">{errors.title}</p> : null}
+              <div className="flex items-center justify-between text-[11px] text-gray-500">
                 <span>Max {MAX_EVENT_TITLE_LENGTH} characters.</span>
                 <span className={title.length > MAX_EVENT_TITLE_LENGTH ? "text-red-600" : ""}>
                   {title.length}/{MAX_EVENT_TITLE_LENGTH}
@@ -466,77 +593,40 @@ const CreateEventModal = ({
               </div>
             </div>
 
-            {/* Date and Time */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 text-gray-700 dark:text-slate-200 font-semibold text-xs sm:text-sm">
-                  <div className="w-6 h-6 bg-primary-100 dark:bg-primary-500/15 rounded-full flex items-center justify-center">
-                    <FiCalendar size={11} className="text-primary-600 dark:text-primary-300" />
-                  </div>
-                  Date
-                </label>
-                <input
-                  type="date"
-                  onKeyDown={(e) => e.preventDefault()}
-                  value={date}
-                  onChange={(e) => {
-                    setDate(e.target.value);
-                    if (errors.date) setErrors((prev) => ({ ...prev, date: undefined }));
-                  }}
-                  required
-                  min={EVENT_DATE_MIN}
-                  max={EVENT_DATE_MAX}
-                  style={{ colorScheme: isDark ? "dark" : "light" }}
-                  className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-gray-50 dark:bg-slate-800/90 focus:bg-white dark:focus:bg-slate-800 text-sm text-gray-900 dark:text-slate-100"
-                />
-                {errors.date ? <p className="text-red-600 text-xs">{errors.date}</p> : null}
-              </div>
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 text-gray-700 dark:text-slate-200 font-semibold text-xs sm:text-sm">
-                  <div className="w-6 h-6 bg-primary-100 dark:bg-primary-500/15 rounded-full flex items-center justify-center">
-                    <FiClock size={11} className="text-primary-600 dark:text-primary-300" />
-                  </div>
-                  Time
-                </label>
-                <input
-                  type="time"
-                  value={time}
-                  onChange={(e) => {
-                    setTime(e.target.value);
-                    if (errors.time) setErrors((prev) => ({ ...prev, time: undefined }));
-                  }}
-                  required
-                  style={{ colorScheme: isDark ? "dark" : "light" }}
-                  className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-gray-50 dark:bg-slate-800/90 focus:bg-white dark:focus:bg-slate-800 text-sm text-gray-900 dark:text-slate-100"
-                />
-                {errors.time ? <p className="text-red-600 text-xs">{errors.time}</p> : null}
-              </div>
-            </div>
+            <EventScheduleManager
+              value={schedules}
+              onChange={(nextSchedules) => {
+                setSchedules(nextSchedules);
+                setErrors((prev) => ({ ...(prev || {}), schedules: undefined }));
+              }}
+              errors={errors.schedules}
+              warnings={scheduleWarnings}
+              isDark={isDark}
+              disabled={isLoading}
+            />
 
-            {/* Location */}
             <div className="space-y-2">
-              <label className="flex items-center gap-2 text-gray-700 dark:text-slate-200 font-semibold text-xs sm:text-sm">
-                <div className="w-6 h-6 bg-primary-100 dark:bg-primary-500/15 rounded-full flex items-center justify-center">
+              <label className="flex items-center gap-2 text-xs font-semibold text-gray-700 dark:text-slate-200 sm:text-sm">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-500/15">
                   <FiMapPin size={11} className="text-primary-600 dark:text-primary-300" />
-                </div>
+                </span>
                 Location
               </label>
               <input
                 type="text"
-                maxLength={MAX_EVENT_LOCATION_LENGTH}
                 value={location}
-                onChange={(e) => {
-                  setLocation(e.target.value.slice(0, MAX_EVENT_LOCATION_LENGTH));
+                onChange={(event) => {
+                  setLocation(event.target.value.slice(0, MAX_EVENT_LOCATION_LENGTH));
                   if (errors.location) {
                     setErrors((prev) => ({ ...prev, location: undefined }));
                   }
                 }}
-                required
-                className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-gray-50 dark:bg-slate-800/90 focus:bg-white dark:focus:bg-slate-800 text-sm text-gray-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-400"
+                className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 transition-all duration-200 focus:border-transparent focus:bg-white focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800/90 dark:text-slate-100 dark:focus:bg-slate-800 sm:px-4 sm:py-3"
                 placeholder="Enter event location..."
+                maxLength={MAX_EVENT_LOCATION_LENGTH}
               />
-              {errors.location ? <p className="text-red-600 text-xs">{errors.location}</p> : null}
-              <div className="text-[11px] text-gray-500 flex items-center justify-between">
+              {errors.location ? <p className="text-xs text-red-600">{errors.location}</p> : null}
+              <div className="flex items-center justify-between text-[11px] text-gray-500">
                 <span>Max {MAX_EVENT_LOCATION_LENGTH} characters.</span>
                 <span className={location.length > MAX_EVENT_LOCATION_LENGTH ? "text-red-600" : ""}>
                   {location.length}/{MAX_EVENT_LOCATION_LENGTH}
@@ -544,31 +634,29 @@ const CreateEventModal = ({
               </div>
             </div>
 
-            {/* Description */}
             <div className="space-y-2">
-              <label className="flex items-center gap-2 text-gray-700 dark:text-slate-200 font-semibold text-xs sm:text-sm">
-                <div className="w-6 h-6 bg-primary-100 dark:bg-primary-500/15 rounded-full flex items-center justify-center">
+              <label className="flex items-center gap-2 text-xs font-semibold text-gray-700 dark:text-slate-200 sm:text-sm">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-500/15">
                   <FiFileText size={11} className="text-primary-600 dark:text-primary-300" />
-                </div>
+                </span>
                 Description
               </label>
               <textarea
                 value={description}
-                onChange={(e) => {
-                  setDescription(e.target.value.slice(0, MAX_EVENT_DESCRIPTION_LENGTH));
+                onChange={(event) => {
+                  setDescription(event.target.value);
                   if (errors.description) {
                     setErrors((prev) => ({ ...prev, description: undefined }));
                   }
                 }}
-                maxLength={MAX_EVENT_DESCRIPTION_LENGTH}
                 rows="4"
-                className="w-full px-3 py-2.5 sm:px-4 sm:py-3 border border-gray-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-gray-50 dark:bg-slate-800/90 focus:bg-white dark:focus:bg-slate-800 resize-none text-sm text-gray-900 dark:text-slate-100 placeholder:text-gray-400 dark:placeholder:text-slate-400"
+                className="w-full resize-none rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 text-sm text-gray-900 transition-all duration-200 focus:border-transparent focus:bg-white focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800/90 dark:text-slate-100 dark:focus:bg-slate-800 sm:px-4"
                 placeholder="Tell us about your event..."
-              ></textarea>
+              />
               {errors.description ? (
-                <p className="text-red-600 text-xs">{errors.description}</p>
+                <p className="text-xs text-red-600">{errors.description}</p>
               ) : null}
-              <div className="text-[11px] text-gray-500 flex items-center justify-between">
+              <div className="flex items-center justify-between text-[11px] text-gray-500">
                 <span>Max {MAX_EVENT_DESCRIPTION_LENGTH} characters.</span>
                 <span
                   className={
@@ -580,51 +668,41 @@ const CreateEventModal = ({
               </div>
             </div>
 
-            {/* Image Upload */}
             <div className="space-y-3">
-              <label className="flex items-center gap-2 text-gray-700 dark:text-slate-200 font-semibold text-xs sm:text-sm">
-                <div className="w-6 h-6 bg-primary-100 dark:bg-primary-500/15 rounded-full flex items-center justify-center">
+              <label className="flex items-center gap-2 text-xs font-semibold text-gray-700 dark:text-slate-200 sm:text-sm">
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-500/15">
                   <FiImage size={11} className="text-primary-600 dark:text-primary-300" />
-                </div>
+                </span>
                 Event Images
               </label>
 
-              {errors.images ? (
-                <p className="text-red-600 text-xs">{errors.images}</p>
-              ) : null}
+              {errors.images ? <p className="text-xs text-red-600">{errors.images}</p> : null}
 
               {imagePreviews.length > 0 ? (
                 <div className="space-y-3">
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    {imagePreviews.map((src, idx) => (
-                      <div key={idx} className="relative group">
+                  <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                    {imagePreviews.map((src, index) => (
+                      <div key={src} className="group relative">
                         <img
                           src={src}
-                          alt={`Preview ${idx + 1}`}
-                          className="w-full h-24 object-cover rounded-xl border-2 border-gray-200"
+                          alt={`Preview ${index + 1}`}
+                          className="h-24 w-full rounded-xl border-2 border-gray-200 object-cover"
                         />
                         <button
                           type="button"
-                          onClick={() => handleRemoveImage(idx)}
-                          className="absolute top-2 right-2 z-10 bg-black/60 hover:bg-black/70 text-white rounded-full p-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
-                          aria-label={`Remove image ${idx + 1}`}
+                          onClick={() => handleRemoveImage(index)}
+                          className="absolute right-2 top-2 z-10 rounded-full bg-black/60 p-1.5 text-white opacity-100 transition-opacity hover:bg-black/70 sm:opacity-0 sm:group-hover:opacity-100"
+                          aria-label={`Remove image ${index + 1}`}
                         >
                           <FiX size={14} />
                         </button>
-                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center pointer-events-none">
-                          <span className="text-white text-xs font-medium">
-                            Image {idx + 1}
-                          </span>
-                        </div>
                       </div>
                     ))}
                   </div>
                   <button
                     type="button"
-                    onClick={() =>
-                      document.getElementById("event-image-input").click()
-                    }
-                    className="w-full py-3 border-2 border-dashed border-primary-300 dark:border-slate-600 rounded-xl text-primary-600 dark:text-primary-200 bg-white dark:bg-slate-800 hover:bg-primary-50 dark:hover:bg-slate-700 transition-colors flex items-center justify-center gap-2"
+                    onClick={() => document.getElementById("event-image-input")?.click()}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-primary-300 py-3 text-primary-600 transition-colors hover:bg-primary-50 dark:border-primary-400/40 dark:text-primary-200 dark:hover:bg-primary-500/10"
                   >
                     <FiPlus size={16} />
                     Add More Images
@@ -632,18 +710,16 @@ const CreateEventModal = ({
                 </div>
               ) : (
                 <div
-                  className="w-full min-h-32 border-2 border-dashed border-primary-300 dark:border-slate-600 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-primary-50 dark:hover:bg-slate-800 transition-colors p-6 bg-white dark:bg-slate-800/60"
-                  onClick={() =>
-                    document.getElementById("event-image-input").click()
-                  }
+                  className="flex min-h-32 w-full cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-primary-300 p-6 transition-colors hover:bg-primary-50 dark:border-primary-400/40 dark:hover:bg-primary-500/10"
+                  onClick={() => document.getElementById("event-image-input")?.click()}
                 >
-                  <div className="w-12 h-12 bg-primary-100 dark:bg-primary-500/15 rounded-full flex items-center justify-center mb-3">
-                    <FiImage size={24} className="text-primary-600 dark:text-primary-300" />
+                  <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary-100 dark:bg-primary-500/15">
+                    <FiImage size={24} className="text-primary-600 dark:text-primary-200" />
                   </div>
-                  <p className="text-primary-600 dark:text-primary-200 font-medium mb-1">
-                    Upload Event Images
+                  <p className="mb-1 font-medium text-primary-600 dark:text-primary-200">
+                    Add Event Images
                   </p>
-                  <p className="text-gray-500 dark:text-slate-400 text-sm text-center">
+                  <p className="text-center text-sm text-gray-500 dark:text-slate-400">
                     Click to select up to {MAX_EVENT_IMAGE_COUNT} images
                   </p>
                 </div>
@@ -661,22 +737,21 @@ const CreateEventModal = ({
           </form>
         </div>
 
-        {/* Footer */}
-        <div className="bg-gray-50 dark:bg-slate-900 px-4 py-3 sm:p-6 pb-4 sm:pb-6 border-t border-gray-200 dark:border-slate-700">
-          <div className="flex flex-row gap-3">
+        <div className="border-t border-gray-200 bg-gray-50 p-4 pb-16 dark:border-slate-800 dark:bg-slate-900/70 sm:px-6">
+          <div className="flex gap-3">
             <button
               type="button"
-              onClick={handleClose}
+              onClick={() => handleClose()}
               disabled={isLoading}
-              className="flex-1 py-2.5 px-4 border bg-white dark:bg-slate-800 border-gray-300 dark:border-slate-700 text-gray-700 dark:text-slate-200 rounded-xl font-medium text-sm sm:text-base hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors disabled:opacity-50"
+              className="flex-1 rounded-xl border border-gray-300 bg-white px-6 py-3 font-medium text-gray-700 transition-colors hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
             >
               Cancel
             </button>
             <button
               type="submit"
-              onClick={handleSubmit}
+              form={CREATE_EVENT_FORM_ID}
               disabled={isLoading}
-              className="flex-1 bg-gradient-to-r from-secondary-500 to-secondary-600 text-white py-2.5 px-4 rounded-xl font-semibold text-sm sm:text-base hover:from-secondary-500 hover:to-secondary-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-secondary-500 to-secondary-600 px-6 py-3 font-semibold text-white shadow-lg transition-all duration-200 hover:scale-[1.01] hover:from-secondary-600 hover:to-secondary-700 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isLoading ? (
                 <>
@@ -694,8 +769,17 @@ const CreateEventModal = ({
   );
 };
 
+CreateEventModal.propTypes = {
+  isOpen: PropTypes.bool.isRequired,
+  onClose: PropTypes.func,
+  onEventCreated: PropTypes.func,
+  apiBaseUrl: PropTypes.string,
+};
+
+CreateEventModal.defaultProps = {
+  onClose: undefined,
+  onEventCreated: undefined,
+  apiBaseUrl: import.meta.env.VITE_API_BASE_URL,
+};
+
 export default CreateEventModal;
-
-
-
-
