@@ -17,11 +17,11 @@ const skeletonRows = Array.from({ length: 2 }, (_, index) => index);
 const EventScheduleManager = ({
   value,
   onChange,
-  errors,
-  warnings,
-  isDark,
-  disabled,
-  isLoading,
+  errors = null,
+  warnings = null,
+  isDark = false,
+  disabled = false,
+  isLoading = false,
 }) => {
   const [actionError, setActionError] = useState("");
 
@@ -264,15 +264,6 @@ EventScheduleManager.propTypes = {
   isDark: PropTypes.bool,
   disabled: PropTypes.bool,
   isLoading: PropTypes.bool,
-};
-
-EventScheduleManager.defaultProps = {
-  value: undefined,
-  errors: null,
-  warnings: null,
-  isDark: false,
-  disabled: false,
-  isLoading: false,
 };
 
 export default EventScheduleManager;

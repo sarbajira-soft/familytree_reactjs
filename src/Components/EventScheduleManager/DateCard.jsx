@@ -15,8 +15,8 @@ const DateCard = ({
   schedule,
   index,
   totalSchedules,
-  errors,
-  warnings,
+  errors = null,
+  warnings = null,
   onDateChange,
   onToggleAllDay,
   onMove,
@@ -24,8 +24,8 @@ const DateCard = ({
   onAddTime,
   onTimeChange,
   onRemoveTime,
-  isDark,
-  disabled,
+  isDark = false,
+  disabled = false,
 }) => {
   const timeCount = Array.isArray(schedule.times) ? schedule.times.length : 0;
   const addTimeDisabled = disabled || schedule.isAllDay || timeCount >= MAX_TIME_SLOTS_PER_DATE;
@@ -186,13 +186,6 @@ DateCard.propTypes = {
   onRemoveTime: PropTypes.func.isRequired,
   isDark: PropTypes.bool,
   disabled: PropTypes.bool,
-};
-
-DateCard.defaultProps = {
-  errors: null,
-  warnings: null,
-  isDark: false,
-  disabled: false,
 };
 
 export default DateCard;

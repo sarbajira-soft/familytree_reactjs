@@ -4,11 +4,11 @@ import { FiClock, FiTrash2 } from "react-icons/fi";
 
 const TimeSlot = ({
   slot,
-  errors,
+  errors = null,
   onChange,
   onRemove,
-  isDark,
-  disabled,
+  isDark = false,
+  disabled = false,
 }) => (
   <div className="rounded-xl border border-gray-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-start">
@@ -85,12 +85,6 @@ TimeSlot.propTypes = {
   onRemove: PropTypes.func.isRequired,
   isDark: PropTypes.bool,
   disabled: PropTypes.bool,
-};
-
-TimeSlot.defaultProps = {
-  errors: null,
-  isDark: false,
-  disabled: false,
 };
 
 export default TimeSlot;

@@ -15,13 +15,29 @@ import { useUser } from "../Contexts/UserContext";
 import { useTheme } from "../Contexts/ThemeContext";
 import { getToken } from "../utils/auth";
 import { authFetchResponse } from "../utils/authFetch";
+import EventScheduleManager from "./EventScheduleManager";
+import {
+  createEmptySchedule,
+  EVENT_SCHEDULE_REQUIRED_MESSAGE,
+  getLegacyEventDateTime,
+  normalizeEventSchedulesInput,
+  toApiSchedules,
+  validateEventSchedules,
+} from "../utils/eventValidation";
+
+const MAX_EVENT_DESCRIPTION_LENGTH = 250;
+const EDIT_EVENT_FORM_ID = "edit-event-form";
+
 const EditEventModal = ({
   isOpen,
   onClose,
-  event,
+  event = null,
   onEventUpdated,
   apiBaseUrl = import.meta.env.VITE_API_BASE_URL,
 }) => {
+  const { userInfo } = useUser();
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
   const MAX_EVENT_TITLE_LENGTH = 50;
   const MAX_EVENT_LOCATION_LENGTH = 250;
   const MAX_EVENT_IMAGE_COUNT = 10;
@@ -840,13 +856,6 @@ EditEventModal.propTypes = {
   }),
   onEventUpdated: PropTypes.func,
   apiBaseUrl: PropTypes.string,
-};
-
-EditEventModal.defaultProps = {
-  onClose: undefined,
-  event: null,
-  onEventUpdated: undefined,
-  apiBaseUrl: import.meta.env.VITE_API_BASE_URL,
 };
 
 export default EditEventModal;

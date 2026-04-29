@@ -776,10 +776,4 @@ CreateEventModal.propTypes = {
   apiBaseUrl: PropTypes.string,
 };
 
-CreateEventModal.defaultProps = {
-  onClose: undefined,
-  onEventCreated: undefined,
-  apiBaseUrl: import.meta.env.VITE_API_BASE_URL,
-};
-
 export default CreateEventModal;

@@ -2,7 +2,7 @@ import React from "react";
 import PropTypes from "prop-types";
 import { FiPlusCircle } from "react-icons/fi";
 
-const AddDateButton = ({ disabled, onClick, remainingCount, title }) => (
+const AddDateButton = ({ disabled = false, onClick, remainingCount, title = "" }) => (
   <button
     type="button"
     onClick={onClick}
@@ -23,11 +23,6 @@ AddDateButton.propTypes = {
   onClick: PropTypes.func.isRequired,
   remainingCount: PropTypes.number.isRequired,
   title: PropTypes.string,
-};
-
-AddDateButton.defaultProps = {
-  disabled: false,
-  title: "",
 };
 
 export default AddDateButton;
