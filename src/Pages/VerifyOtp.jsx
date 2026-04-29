@@ -112,11 +112,11 @@ const VerifyOtp = () => {
       setAuthData(data.accessToken, minimalUser, stayLoggedIn);
       await refetchUser();
 
-      if (familyCode) {
-        navigate(`/on-boarding?familyCode=${familyCode}`);
-      } else {
-        navigate('/on-boarding');
-      }
+      const nextProfileUrl = familyCode
+        ? `/profile/edit?familyCode=${encodeURIComponent(familyCode)}`
+        : '/profile/edit';
+
+      navigate(nextProfileUrl, { replace: true });
     } catch (err) {
       console.error('OTP verification failed:', err);
       setError('OTP verification failed. Please try again.');
@@ -191,7 +191,7 @@ const VerifyOtp = () => {
                 e.preventDefault();
                 setOtp(sanitizeOtpInput(extractDigitsFromClipboardEvent(e)));
               }}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+              className="w-full px-4 dark:text-white dark:bg-slate-900  py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
               placeholder={`Enter ${OTP_LENGTH}-digit OTP`}
             />
           </div>

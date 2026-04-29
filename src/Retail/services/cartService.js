@@ -324,7 +324,7 @@ export async function initPaymentSession({ paymentCollectionId, providerId = 'pp
 
 export async function createOrReuseRazorpaySession({ cartId, token }) {
   const res = await client.post(
-    '/store/payments/razorpay/session',
+    '/store/payment/initiate',
     { cart_id: cartId },
     { headers: buildJsonHeaders(token) },
   );

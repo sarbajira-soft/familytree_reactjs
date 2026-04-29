@@ -19,6 +19,41 @@ import * as orderService from '../services/orderService';
 
 const RetailContext = createContext(null);
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function isTransientNetworkMessage(message) {
+  const normalized = (message || '').toString().trim().toLowerCase();
+  return (
+    normalized.includes('internet connection') ||
+    normalized.includes('network error') ||
+    normalized.includes('failed to fetch') ||
+    normalized.includes('network request failed')
+  );
+}
+
+async function fetchOrdersPagedWithRetry(token, options = {}) {
+  let lastError = null;
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await orderService.fetchOrdersPaged(token, options);
+    } catch (error) {
+      lastError = error;
+      const message = getErrorMessage(error);
+
+      if (!isTransientNetworkMessage(message) || attempt === 2) {
+        throw error;
+      }
+
+      // Give the WebView/network stack a short moment to settle after app resume.
+      // eslint-disable-next-line no-await-in-loop
+      await sleep(700 * (attempt + 1));
+    }
+  }
+
+  throw lastError;
+}
+
 const initialState = {
   user: null,
   token: null,
@@ -217,7 +252,6 @@ export const RetailProvider = ({ children }) => {
           setCartPersistent(cart);
 
           try {
-            const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
             const isNativePaymentRecovery = Capacitor.isNativePlatform();
             const recoverySource = isNativePaymentRecovery ? 'native-browser' : 'checkout';
             const recoveryPresentation = isNativePaymentRecovery ? 'modal' : 'banner';
@@ -293,6 +327,7 @@ export const RetailProvider = ({ children }) => {
               }
 
               setCartPersistent(nextCart);
+              dispatch({ type: 'SET_ERROR', payload: null });
               dispatch({ type: 'UPSERT_ORDER', payload: recovery.order });
               setPaymentRecovery({
                 active: true,
@@ -864,12 +899,13 @@ export const RetailProvider = ({ children }) => {
     dispatch({ type: 'SET_LOADING', payload: true });
     dispatch({ type: 'SET_ERROR', payload: null });
 
-    try {
-      const orders = await orderService.fetchOrdersPaged(state.token, {
+      try {
+      const orders = await fetchOrdersPagedWithRetry(state.token, {
         limit: 50,
         offset: 0,
         order: '-created_at',
       });
+      dispatch({ type: 'SET_ERROR', payload: null });
       dispatch({ type: 'SET_ORDERS', payload: orders });
       return orders;
     } catch (err) {
@@ -952,6 +988,7 @@ export const RetailProvider = ({ children }) => {
           }
 
           setCartPersistent(recoveredCart);
+          dispatch({ type: 'SET_ERROR', payload: null });
 
           if (state.token) {
             await fetchOrders();
@@ -1033,11 +1070,12 @@ export const RetailProvider = ({ children }) => {
       dispatch({ type: 'SET_ERROR', payload: null });
 
       try {
-        const orders = await orderService.fetchOrdersPaged(state.token, {
+        const orders = await fetchOrdersPagedWithRetry(state.token, {
           limit,
           offset,
           order: '-created_at',
         });
+        dispatch({ type: 'SET_ERROR', payload: null });
 
         if (append) {
           dispatch({ type: 'APPEND_ORDERS', payload: orders });
@@ -1047,13 +1085,23 @@ export const RetailProvider = ({ children }) => {
 
         return orders;
       } catch (err) {
-        dispatch({ type: 'SET_ERROR', payload: getErrorMessage(err) });
-        return [];
+        const message = getErrorMessage(err);
+        const suppressTransientError =
+          isTransientNetworkMessage(message) &&
+          state.paymentRecovery?.active &&
+          Array.isArray(state.orders) &&
+          state.orders.length > 0;
+
+        if (!suppressTransientError) {
+          dispatch({ type: 'SET_ERROR', payload: message });
+        }
+
+        return suppressTransientError ? state.orders : [];
       } finally {
         dispatch({ type: 'SET_LOADING', payload: false });
       }
     },
-    [state.token],
+    [state.paymentRecovery?.active, state.token],
   );
 
   const retrieveOrder = useCallback(

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { App as CapacitorApp } from '@capacitor/app';
 import { RetailProvider, useRetail } from './context/RetailContext';
 import Header from './components/Header';
 import ProductList from './components/ProductList';
@@ -224,13 +225,60 @@ const RetailShell = ({
   setIsProductDetailOpen,
   setActiveInitialProductId,
 }) => {
-  const { paymentRecovery } = useRetail();
+  const { paymentRecovery, clearError, fetchOrders, refreshCart } = useRetail();
 
   useEffect(() => {
     if (paymentRecovery?.active && activeTab !== 'orders') {
       setTabWithUrl('orders');
     }
   }, [paymentRecovery?.active, activeTab, setTabWithUrl]);
+
+  useEffect(() => {
+    let removeListener = null;
+    let resumeTimer = null;
+
+    const handleAppStateChange = ({ isActive }) => {
+      if (!isActive || !paymentRecovery?.active) {
+        return;
+      }
+
+      clearError && clearError();
+      setTabWithUrl('orders');
+
+      if (resumeTimer) {
+        window.clearTimeout(resumeTimer);
+      }
+
+      resumeTimer = window.setTimeout(() => {
+        Promise.allSettled([
+          fetchOrders ? fetchOrders() : Promise.resolve([]),
+          refreshCart ? refreshCart() : Promise.resolve(),
+        ]).catch(() => {});
+      }, 650);
+    };
+
+    try {
+      const maybePromise = CapacitorApp.addListener('appStateChange', handleAppStateChange);
+      if (maybePromise && typeof maybePromise.then === 'function') {
+        maybePromise.then((handle) => {
+          removeListener = () => handle && handle.remove && handle.remove();
+        });
+      } else {
+        removeListener = () => maybePromise && maybePromise.remove && maybePromise.remove();
+      }
+    } catch {
+      // ignore when Capacitor is not available
+    }
+
+    return () => {
+      if (resumeTimer) {
+        window.clearTimeout(resumeTimer);
+      }
+      if (removeListener) {
+        removeListener();
+      }
+    };
+  }, [clearError, fetchOrders, paymentRecovery?.active, refreshCart, setTabWithUrl]);
 
   return (
     <div className="flex min-h-screen flex-col bg-gray-50 dark:bg-slate-950">

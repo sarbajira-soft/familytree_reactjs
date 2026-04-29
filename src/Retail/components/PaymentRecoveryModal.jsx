@@ -70,8 +70,14 @@ const PaymentRecoveryModal = () => {
       : 'Please complete the payment in the browser. Once the gateway confirms it, we will create your order here.');
 
   return (
-    <div className="fixed inset-0 z-[1200] flex items-end justify-center bg-slate-950/45 px-4 py-6 sm:items-center">
-      <div className="w-full max-w-md overflow-hidden rounded-[32px] bg-white shadow-[0_28px_90px_rgba(15,23,42,0.28)]">
+    <div
+      className="fixed left-0 right-0 z-[10020] overflow-y-auto bg-slate-950/45 px-4 py-4 sm:inset-0 sm:flex sm:items-center sm:justify-center sm:px-6 sm:py-8"
+      style={{
+        top: 'calc(env(safe-area-inset-top, 0px) + 5.75rem)',
+        bottom: 'calc(env(safe-area-inset-bottom, 0px) + 5.5rem)',
+      }}
+    >
+      <div className="mx-auto w-full max-w-md overflow-hidden rounded-[32px] bg-white shadow-[0_28px_90px_rgba(15,23,42,0.28)] sm:max-h-[calc(100vh-4rem)] sm:overflow-y-auto">
         <div
           className={`px-5 py-5 text-white ${
             isCompleted
