@@ -355,7 +355,9 @@ const Layout = ({ noScroll = false }) => {
         // Best-effort only. Some Android browser implementations ignore close requests.
       }
 
-      navigate("/gifts?tab=orders");
+      window.setTimeout(() => {
+        navigate("/gifts?tab=orders");
+      }, 250);
     };
 
     try {
