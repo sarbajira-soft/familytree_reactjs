@@ -10,6 +10,14 @@ import {
   FiTrash2,
 } from "react-icons/fi";
 import { AnimatePresence, motion } from "framer-motion";
+import {
+  formatEventDateLabel,
+  formatScheduleHeadline,
+  formatTimeRangeLabel,
+  getNextUpcomingSchedule,
+  normalizeEventSchedulesInput,
+} from "../utils/eventValidation";
+
 const EventViewerModal = ({
   isOpen,
   onClose,
@@ -19,35 +27,6 @@ const EventViewerModal = ({
   onDelete,
 }) => {
   const [activeIndex, setActiveIndex] = useState(0);
-
-  const formatEventDate = (rawDate) => {
-    const cleaned = String(rawDate || '').replace(/\$/g, '').trim();
-    if (!cleaned) return '';
-
-    if (/^\d{4}-\d{2}-\d{2}$/.test(cleaned)) {
-      const [year, month, day] = cleaned.split('-').map(Number);
-      const parsed = new Date(Date.UTC(year, month - 1, day));
-      if (!Number.isNaN(parsed.getTime())) {
-        return new Intl.DateTimeFormat('en-US', {
-          day: '2-digit',
-          month: 'short',
-          year: 'numeric',
-          timeZone: 'UTC',
-        }).format(parsed);
-      }
-    }
-
-    const parsed = new Date(cleaned);
-    if (!Number.isNaN(parsed.getTime())) {
-      return new Intl.DateTimeFormat('en-US', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-      }).format(parsed);
-    }
-
-    return cleaned;
-  };
 
   useEffect(() => {
     if (!isOpen) return;
@@ -71,6 +50,12 @@ const EventViewerModal = ({
   // full screen
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [rotation, setRotation] = useState(0);
+
+  useEffect(() => {
+    setActiveIndex(0);
+    setIsFullScreen(false);
+    setRotation(0);
+  }, [event?.id, isOpen]);
 
   useEffect(() => {
     if (!isFullScreen) return;
@@ -167,22 +152,50 @@ const EventViewerModal = ({
     setActiveIndex(idx);
   };
 
+  // scroll fullscreen carousel to active index when it opens
+  useEffect(() => {
+    if (isFullScreen && fsCarouselRef.current) {
+      const idx = activeIndex;
+      fsCarouselRef.current.scrollTo({
+        left: idx * fsCarouselRef.current.clientWidth,
+        behavior: "auto",
+      });
+    }
+  }, [isFullScreen]);
+
   if (!isOpen || !event) return null;
 
   const images = event.eventImages || [];
+  const schedules = normalizeEventSchedulesInput(event).filter(
+    (schedule) => String(schedule?.scheduleDate || "").trim(),
+  );
+  const nextSchedule = event.nextSchedule || getNextUpcomingSchedule(schedules);
+  const scheduleCount = schedules.length;
+  const hasMultipleSchedules = scheduleCount > 1;
+  const fallbackDateLabel = event.date ? formatEventDateLabel(event.date) : "";
+  const primaryScheduleLabel = nextSchedule
+    ? formatScheduleHeadline(nextSchedule)
+    : fallbackDateLabel
+      ? `${fallbackDateLabel}${event.time ? ` at ${event.time}` : ""}`
+      : "";
+  const primaryTimeLabel = nextSchedule?.isAllDay
+    ? "All day"
+    : nextSchedule?.times?.[0]
+      ? formatTimeRangeLabel(nextSchedule.times[0])
+      : event.time || "";
 
   return (
     <AnimatePresence>
       <motion.div
-        className="fixed inset-0 z-50 flex items-start justify-center bg-black bg-opacity-90 backdrop-blur px-2 sm:px-4 pt-10 pb-24 sm:pt-8 sm:pb-8"
+        className="fixed inset-0 z-50 flex items-start justify-center bg-black bg-opacity-60 backdrop-blur px-2 sm:px-4 pt-10 pb-10 sm:pt-8 sm:pb-8"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
       >
         <motion.div
-          className="relative bg-white rounded-2xl m-3 shadow-2xl w-full max-w-5xl flex flex-col overflow-hidden"
-          style={{ maxHeight: "calc(100vh - 160px)" }}
+          className="relative bg-white rounded-2xl m-3 shadow-2xl w-full max-w-5xl  min-h-0  flex flex-col overflow-hidden"
+          style={{ maxHeight: "calc(100vh - 80px)" }}
           initial={{ scale: 0.98, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.98, opacity: 0 }}
@@ -237,7 +250,10 @@ const EventViewerModal = ({
                         src={src}
                         alt={`Event ${i + 1}`}
                         className="max-w-full max-h-full object-contain mx-auto my-auto rounded-xl"
-                        onClick={() => setIsFullScreen(true)}
+                        onClick={() => {
+                          setActiveIndex(i);
+                          setIsFullScreen(true);
+                        }}
                         onError={(e) => (e.target.src = "/fallback-image.png")}
                       />
                     </div>
@@ -282,7 +298,7 @@ const EventViewerModal = ({
             </div>
 
             {/* RIGHT PANEL - details + comments */}
-            <div className="flex-1 flex flex-col h-full bg-gray-50 border-t md:border-t-0 md:border-l border-gray-200 min-h-0">
+            <div className="flex-1 flex flex-col  bg-gray-50 border-t md:border-t-0 md:border-l border-gray-200 min-h-0">
               {/* meta / actions */}
               <div className="p-4 border-b flex-shrink-0">
                 <div className="flex items-center justify-between gap-3">
@@ -291,7 +307,7 @@ const EventViewerModal = ({
                       {event.title}
                     </div>
                     <div className="text-xs text-gray-500">
-                      {formatEventDate(event.date)} • {event.time}
+                      {primaryScheduleLabel || "Schedule unavailable"}
                     </div>
                     {event.location && (
                       <div className="text-xs text-gray-500 mt-1">
@@ -311,7 +327,7 @@ const EventViewerModal = ({
                       <h4 className="font-semibold text-sm text-gray-800 mb-2">
                         About this event
                       </h4>
-                      <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                      <p className="text-sm text-gray-700 whitespace-pre-wrap break-all">
                         {event.description}
                       </p>
                     </div>
@@ -320,21 +336,33 @@ const EventViewerModal = ({
                   {/* info cards */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="bg-white p-3 rounded-xl border border-gray-100">
-                      <div className="text-xs text-gray-500">Date</div>
+                      <div className="text-xs text-gray-500">
+                        {hasMultipleSchedules ? "Next date" : "Date"}
+                      </div>
                       <div className="font-medium text-gray-800">
-                        {formatEventDate(event.date)}
+                        {nextSchedule?.scheduleDate
+                          ? formatEventDateLabel(nextSchedule.scheduleDate)
+                          : fallbackDateLabel || "Not available"}
                       </div>
                     </div>
                     <div className="bg-white p-3 rounded-xl border border-gray-100">
                       <div className="text-xs text-gray-500">Time</div>
                       <div className="font-medium text-gray-800">
-                        {event.time}
+                        {primaryTimeLabel || "Not specified"}
                       </div>
                     </div>
+                    {hasMultipleSchedules && (
+                      <div className="bg-white p-3 rounded-xl border border-gray-100">
+                        <div className="text-xs text-gray-500">Schedule dates</div>
+                        <div className="font-medium text-gray-800">
+                          {scheduleCount}
+                        </div>
+                      </div>
+                    )}
                     {event.location && (
                       <div className="bg-white p-3 rounded-xl border border-gray-100 col-span-1 sm:col-span-2">
                         <div className="text-xs text-gray-500">Location</div>
-                        <div className="font-medium text-gray-800">
+                        <div className="font-medium text-gray-800 whitespace-pre-wrap break-all">
                           {event.location}
                         </div>
                       </div>
@@ -348,6 +376,40 @@ const EventViewerModal = ({
                       </div>
                     )}
                   </div>
+
+                  {schedules.length > 0 && (
+                    <div className="bg-white rounded-xl p-3 border border-gray-100">
+                      <h4 className="font-semibold text-sm text-gray-800 mb-3">
+                        Event schedule
+                      </h4>
+                      <div className="space-y-3">
+                        {schedules.map((scheduleItem) => (
+                          <div
+                            key={scheduleItem.id || scheduleItem.scheduleDate}
+                            className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2"
+                          >
+                            <div className="font-medium text-sm text-gray-900">
+                              {formatEventDateLabel(scheduleItem.scheduleDate)}
+                            </div>
+                            <div className="mt-1 space-y-1">
+                              {scheduleItem.isAllDay ? (
+                                <p className="text-sm text-gray-600">All day</p>
+                              ) : (
+                                (scheduleItem.times || []).map((timeSlot, index) => (
+                                  <p
+                                    key={`${scheduleItem.scheduleDate}-${index}-${timeSlot.startTime}`}
+                                    className="text-sm text-gray-600"
+                                  >
+                                    {formatTimeRangeLabel(timeSlot)}
+                                  </p>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

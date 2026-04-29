@@ -24,9 +24,8 @@ import {
   FiMoreVertical,
 } from "react-icons/fi";
 
-import CreateEventModal from "../Components/CreateEventModal";
+import EventModal from "../Components/EventModal";
 import EventViewerModal from "../Components/EventViewerModal";
-import EditEventModal from "../Components/EditEventModal";
 import NoFamilyView from "../Components/NoFamilyView";
 import PendingApprovalView from "../Components/PendingApprovalView";
 import CreateFamilyModal from "../Components/CreateFamilyModal";
@@ -48,9 +47,8 @@ const EventsPage = () => {
   const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = useState("upcoming");
-  const [isCreateEventModalOpen, setIsCreateEventModalOpen] = useState(false);
+  const [eventModalMode, setEventModalMode] = useState(null);
   const [isEventViewerOpen, setIsEventViewerOpen] = useState(false);
-  const [isEditEventModalOpen, setIsEditEventModalOpen] = useState(false);
   const [isCreateFamilyModalOpen, setIsCreateFamilyModalOpen] = useState(false);
   const [isJoinFamilyModalOpen, setIsJoinFamilyModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState(null);
@@ -180,7 +178,10 @@ const EventsPage = () => {
     cacheTime: 10 * 60 * 1000,
   });
 
-  const handleCreateEventClick = () => setIsCreateEventModalOpen(true);
+  const handleCreateEventClick = () => {
+    setSelectedEvent(null);
+    setEventModalMode("create");
+  };
 
   const handleViewEvent = (event) => {
     setSelectedEvent(event);
@@ -194,11 +195,11 @@ const EventsPage = () => {
 
   const handleEditEvent = () => {
     setIsEventViewerOpen(false);
-    setIsEditEventModalOpen(true);
+    setEventModalMode("edit");
   };
 
-  const handleCloseEditModal = () => {
-    setIsEditEventModalOpen(false);
+  const handleCloseEventModal = () => {
+    setEventModalMode(null);
     setSelectedEvent(null);
   };
 
@@ -343,7 +344,7 @@ const EventsPage = () => {
   const handleEditEventFromCard = (event, e) => {
     e.stopPropagation();
     setSelectedEvent(event);
-    setIsEditEventModalOpen(true);
+    setEventModalMode("edit");
   };
 
   const handleDeleteEventFromCard = async (event, e) => {
@@ -675,59 +676,8 @@ const EventsPage = () => {
                                 <p className="text-sm font-semibold">
                                   {getEventSchedulePreview(event)}
                                 </p>
-                                {event.eventType === "custom" && event.hasMultipleDates ? (
-                                  <button
-                                    type="button"
-                                    onClick={(browserEvent) => toggleExpandedEvent(event.id, browserEvent)}
-                                    className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-primary-700 transition hover:text-primary-800 dark:text-primary-200 dark:hover:text-primary-100"
-                                  >
-                                    {expandedEventIds[event.id] ? (
-                                      <>
-                                        Hide dates
-                                        <FiChevronUp size={14} />
-                                      </>
-                                    ) : (
-                                      <>
-                                        Show all dates
-                                        <FiChevronDown size={14} />
-                                      </>
-                                    )}
-                                  </button>
-                                ) : null}
                               </div>
                             </div>
-
-                            {event.eventType === "custom" &&
-                            event.hasMultipleDates &&
-                            expandedEventIds[event.id] ? (
-                              <div className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-700 dark:border-slate-800 dark:bg-slate-800/60 dark:text-slate-200">
-                                <div className="space-y-2">
-                                  {(event.schedules || []).map((scheduleItem) => (
-                                    <div key={`${event.id}-${scheduleItem.scheduleDate}`}>
-                                      <p className="font-semibold text-gray-800 dark:text-slate-100">
-                                        {formatEventDate(scheduleItem.scheduleDate)}
-                                      </p>
-                                      <div className="mt-1 space-y-1">
-                                        {scheduleItem.isAllDay ? (
-                                          <p className="text-xs text-gray-600 dark:text-slate-300">
-                                            All day
-                                          </p>
-                                        ) : (
-                                          (scheduleItem.times || []).map((timeSlot, slotIndex) => (
-                                            <p
-                                              key={`${scheduleItem.scheduleDate}-${slotIndex}-${timeSlot.startTime}`}
-                                              className="text-xs text-gray-600 dark:text-slate-300"
-                                            >
-                                              - {formatTimeRangeLabel(timeSlot)}
-                                            </p>
-                                          ))
-                                        )}
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            ) : null}
 
                             <div
                               className={`flex items-center gap-2 text-gray-700 dark:text-slate-200 ${event.location ? "" : "opacity-0 pointer-events-none"
@@ -745,11 +695,11 @@ const EventsPage = () => {
                             </div>
                           </div>
 
-                          {event.description && (
+                          {/* {event.description && (
                             <p className="text-gray-600 dark:text-slate-300 text-xs leading-relaxed line-clamp-2">
                               {event.description}
                             </p>
-                          )}
+                          )} */}
                         </div>
 
                         <div className="flex items-center justify-between pt-2 mt-auto border-t border-gray-100 dark:border-slate-800">
@@ -810,10 +760,10 @@ const EventsPage = () => {
                                 </button>
 
                                 {eventActionMenuEventId === event.id && (
-                                  <div className="absolute right-0 mt-2 w-40 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg z-50 overflow-hidden">
+                                  <div className="absolute z-[1000] right-0 bottom-full mb-2 w-40 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg overflow-hidden">
                                     <button
                                       type="button"
-                                      className="w-full flex items-center rounded-lg px-3 py-2 text-left text-sm text-gray-700 dark:text-slate-200 hover:bg-red-50 dark:hover:bg-slate-800 active:bg-red-100 dark:active:bg-slate-700 transition-colors"
+                                      className="w-full flex items-center  rounded-lg px-3 py-2 text-left text-sm text-gray-700 dark:text-slate-200 hover:bg-red-50 dark:hover:bg-slate-800 active:bg-red-100 dark:active:bg-slate-700 transition-colors"
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         setEventActionMenuEventId(null);
@@ -855,10 +805,13 @@ const EventsPage = () => {
       )}
 
       {/* Modals */}
-      <CreateEventModal
-        isOpen={isCreateEventModalOpen}
-        onClose={() => setIsCreateEventModalOpen(false)}
+      <EventModal
+        isOpen={Boolean(eventModalMode)}
+        onClose={handleCloseEventModal}
+        mode={eventModalMode || "create"}
+        event={eventModalMode === "edit" ? selectedEvent : null}
         onEventCreated={handleEventCreated}
+        onEventUpdated={handleEventUpdated}
       />
       <EventViewerModal
         isOpen={isEventViewerOpen}
@@ -876,13 +829,6 @@ const EventsPage = () => {
         targetId={reportTarget?.targetId}
         targetLabel={reportTarget?.targetLabel}
       />
-      <EditEventModal
-        isOpen={isEditEventModalOpen}
-        onClose={handleCloseEditModal}
-        event={selectedEvent}
-        onEventUpdated={handleEventUpdated}
-      />
-
       <CreateFamilyModal
         isOpen={isCreateFamilyModalOpen}
         onClose={() => setIsCreateFamilyModalOpen(false)}

@@ -10,9 +10,9 @@ import {
 } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import CreateAlbumModal from "../Components/CreateAlbumModal";
-import CreateEventModal from "../Components/CreateEventModal";
 import CreatePostModal from "../Components/CreatePostModal";
 import DashboardGiftProductModal from "../Components/DashboardGiftProductModal";
+import EventModal from "../Components/EventModal";
 import GalleryViewerModal from "../Components/GalleryViewerModal";
 import { useGiftEvent } from "../Contexts/GiftEventContext";
 import { useUser } from "../Contexts/UserContext";
@@ -937,9 +937,10 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
         </div>
       )}
 
-      <CreateEventModal
+      <EventModal
         isOpen={isCreateEventModalOpen}
         onClose={() => setIsCreateEventModalOpen(false)}
+        mode="create"
       />
       <CreateAlbumModal
         isOpen={isCreateAlbumModalOpen}

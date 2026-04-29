@@ -53,6 +53,24 @@ const EventScheduleManager = ({
   };
 
   const handleDateChange = (scheduleId, scheduleDate) => {
+    const currentIndex = schedules.findIndex((schedule) => schedule.id === scheduleId);
+    const previousScheduleDate =
+      currentIndex > 0 ? String(schedules[currentIndex - 1]?.scheduleDate || "").trim() : "";
+    const nextScheduleDate =
+      currentIndex >= 0 && currentIndex < schedules.length - 1
+        ? String(schedules[currentIndex + 1]?.scheduleDate || "").trim()
+        : "";
+
+    if (scheduleDate && previousScheduleDate && scheduleDate <= previousScheduleDate) {
+      setActionError("Each date must be later than the previous date.");
+      return;
+    }
+
+    if (scheduleDate && nextScheduleDate && scheduleDate >= nextScheduleDate) {
+      setActionError("Each date must be earlier than the next date.");
+      return;
+    }
+
     commitSchedules(
       schedules.map((schedule) =>
         schedule.id === scheduleId ? { ...schedule, scheduleDate } : schedule,
@@ -207,16 +225,6 @@ const EventScheduleManager = ({
           </p>
         </div>
 
-        <AddDateButton
-          onClick={handleAddDate}
-          disabled={disabled || schedules.length >= MAX_EVENT_DATES}
-          remainingCount={Math.max(0, MAX_EVENT_DATES - schedules.length)}
-          title={
-            schedules.length >= MAX_EVENT_DATES
-              ? `You can add up to ${MAX_EVENT_DATES} dates per event.`
-              : "Add another date"
-          }
-        />
       </div>
 
       {topLevelError ? (
@@ -233,6 +241,10 @@ const EventScheduleManager = ({
             schedule={schedule}
             index={index}
             totalSchedules={schedules.length}
+            previousScheduleDate={index > 0 ? schedules[index - 1]?.scheduleDate || "" : ""}
+            nextScheduleDate={
+              index < schedules.length - 1 ? schedules[index + 1]?.scheduleDate || "" : ""
+            }
             errors={errors?.dates?.[schedule.id] || null}
             warnings={warnings?.dates?.[schedule.id] || null}
             onDateChange={handleDateChange}
@@ -246,6 +258,19 @@ const EventScheduleManager = ({
             disabled={disabled}
           />
         ))}
+      </div>
+
+      <div className="flex justify-end">
+        <AddDateButton
+          onClick={handleAddDate}
+          disabled={disabled || schedules.length >= MAX_EVENT_DATES}
+          remainingCount={Math.max(0, MAX_EVENT_DATES - schedules.length)}
+          title={
+            schedules.length >= MAX_EVENT_DATES
+              ? `You can add up to ${MAX_EVENT_DATES} dates per event.`
+              : "Add another date"
+          }
+        />
       </div>
     </section>
   );

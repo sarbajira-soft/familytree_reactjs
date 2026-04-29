@@ -9,12 +9,33 @@ import {
 } from "react-icons/fi";
 import TimeSlot from "./TimeSlot";
 import AddTimeButton from "./AddTimeButton";
-import { MAX_TIME_SLOTS_PER_DATE } from "../../utils/eventValidation";
+import {
+  EVENT_DATE_MAX,
+  EVENT_DATE_MIN,
+  MAX_TIME_SLOTS_PER_DATE,
+} from "../../utils/eventValidation";
+
+const shiftDateString = (dateString, dayOffset) => {
+  if (!dateString) {
+    return "";
+  }
+
+  const [year, month, day] = String(dateString).split("-").map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (Number.isNaN(parsed.getTime())) {
+    return "";
+  }
+
+  parsed.setUTCDate(parsed.getUTCDate() + dayOffset);
+  return parsed.toISOString().split("T")[0];
+};
 
 const DateCard = ({
   schedule,
   index,
   totalSchedules,
+  previousScheduleDate = "",
+  nextScheduleDate = "",
   errors = null,
   warnings = null,
   onDateChange,
@@ -34,6 +55,12 @@ const DateCard = ({
     : timeCount >= MAX_TIME_SLOTS_PER_DATE
       ? `You can add up to ${MAX_TIME_SLOTS_PER_DATE} time slots for one date.`
       : "Add another time slot";
+  const minDate = previousScheduleDate
+    ? shiftDateString(previousScheduleDate, 1) || EVENT_DATE_MIN
+    : EVENT_DATE_MIN;
+  const maxDate = nextScheduleDate
+    ? shiftDateString(nextScheduleDate, -1) || EVENT_DATE_MAX
+    : EVENT_DATE_MAX;
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-950/90">
@@ -91,8 +118,8 @@ const DateCard = ({
             value={schedule.scheduleDate}
             onChange={(event) => onDateChange(schedule.id, event.target.value)}
             disabled={disabled}
-            min="1900-01-01"
-            max="2100-12-31"
+            min={minDate}
+            max={maxDate}
             style={{ colorScheme: isDark ? "dark" : "light" }}
             className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-primary-400 focus:ring-2 focus:ring-primary-500/30 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
           />
@@ -107,16 +134,24 @@ const DateCard = ({
           ) : null}
         </div>
 
-        <label className="inline-flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-medium text-gray-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
-          <input
-            type="checkbox"
-            checked={Boolean(schedule.isAllDay)}
-            onChange={(event) => onToggleAllDay(schedule.id, event.target.checked)}
-            disabled={disabled}
-            className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-          />
-          <span>All day</span>
-        </label>
+        <div className="flex flex-col gap-2">
+          <label className="flex items-center gap-2 text-xs font-semibold text-gray-700 dark:text-slate-200 invisible">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary-100 text-primary-700 dark:bg-primary-500/15 dark:text-primary-200">
+              <FiCalendar size={12} />
+            </span>
+            Spacer
+          </label>
+          <label className="inline-flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-medium text-gray-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+            <input
+              type="checkbox"
+              checked={Boolean(schedule.isAllDay)}
+              onChange={(event) => onToggleAllDay(schedule.id, event.target.checked)}
+              disabled={disabled}
+              className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+            />
+            <span>All day</span>
+          </label>
+        </div>
       </div>
 
       {errors?.general ? (
@@ -169,6 +204,8 @@ DateCard.propTypes = {
   }).isRequired,
   index: PropTypes.number.isRequired,
   totalSchedules: PropTypes.number.isRequired,
+  previousScheduleDate: PropTypes.string,
+  nextScheduleDate: PropTypes.string,
   errors: PropTypes.shape({
     scheduleDate: PropTypes.string,
     general: PropTypes.string,
