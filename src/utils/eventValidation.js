@@ -1,5 +1,6 @@
 export const MAX_EVENT_DATES = 5;
 export const MAX_TIME_SLOTS_PER_DATE = 3;
+export const MAX_SCHEDULE_TITLE_LENGTH = 25;
 export const EVENT_DATE_MIN = "1900-01-01";
 export const EVENT_DATE_MAX = "2100-12-31";
 export const DATE_ONLY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -97,6 +98,9 @@ export const createEmptySchedule = (values = {}) => {
 
   return {
     id: values.id || nextScheduleId(),
+    scheduleTitle: asTrimmedString(
+      values.scheduleTitle || values.schedule_title || values.title || values.eventName,
+    ),
     scheduleDate: asTrimmedString(values.scheduleDate || values.date),
     isAllDay,
     sortOrder: Number.isFinite(Number(values.sortOrder)) ? Number(values.sortOrder) : 0,
@@ -108,6 +112,7 @@ export const isScheduleDraftBlank = (schedule = {}) => {
   const normalizedSchedule = createEmptySchedule(schedule);
 
   return (
+    !asTrimmedString(normalizedSchedule.scheduleTitle) &&
     !asTrimmedString(normalizedSchedule.scheduleDate) &&
     !Boolean(normalizedSchedule.isAllDay) &&
     !hasMeaningfulTimeValue(normalizedSchedule.times)
@@ -119,10 +124,7 @@ const getSchedulesForSubmission = (schedules = []) =>
 
 export const mergeSchedulesByDate = (schedules = []) => {
   const safeSchedules = Array.isArray(schedules) ? schedules : [];
-  const mergedByDate = new Map();
-  const orderedKeys = [];
-
-  safeSchedules.forEach((rawSchedule, index) => {
+  return safeSchedules.map((rawSchedule, index) => {
     const schedule = createEmptySchedule({
       ...rawSchedule,
       times:
@@ -136,30 +138,6 @@ export const mergeSchedulesByDate = (schedules = []) => {
                 ? rawSchedule.timeSlots
                 : rawSchedule?.times,
     });
-    const key = schedule.scheduleDate || `__blank__${schedule.id || index}`;
-
-    if (!mergedByDate.has(key)) {
-      mergedByDate.set(key, {
-        ...schedule,
-        id: schedule.id || nextScheduleId(),
-        times: sortTimeSlots(schedule.times),
-      });
-      orderedKeys.push(key);
-      return;
-    }
-
-    const current = mergedByDate.get(key);
-    const mergedTimes = sortTimeSlots([...(current.times || []), ...(schedule.times || [])]);
-
-    mergedByDate.set(key, {
-      ...current,
-      isAllDay: current.isAllDay || schedule.isAllDay,
-      times: mergedTimes,
-    });
-  });
-
-  return orderedKeys.map((key, index) => {
-    const schedule = mergedByDate.get(key);
     const normalizedTimes = schedule.isAllDay
       ? []
       : sortTimeSlots(
@@ -177,6 +155,7 @@ export const mergeSchedulesByDate = (schedules = []) => {
 };
 
 export const normalizeEventSchedulesInput = (input) => {
+  const fallbackScheduleTitle = asTrimmedString(input?.eventTitle || input?.title);
   const rawSchedules = Array.isArray(input)
     ? input
     : Array.isArray(input?.schedules)
@@ -188,6 +167,12 @@ export const normalizeEventSchedulesInput = (input) => {
       rawSchedules.map((schedule, index) =>
         createEmptySchedule({
           id: schedule.id,
+          scheduleTitle:
+            schedule.scheduleTitle ||
+            schedule.schedule_title ||
+            schedule.title ||
+            schedule.eventName ||
+            fallbackScheduleTitle,
           scheduleDate: schedule.scheduleDate || schedule.schedule_date,
           isAllDay: schedule.isAllDay,
           sortOrder: schedule.sortOrder ?? index,
@@ -208,6 +193,7 @@ export const normalizeEventSchedulesInput = (input) => {
   if (fallbackDate) {
     return [
       createEmptySchedule({
+        scheduleTitle: fallbackScheduleTitle,
         scheduleDate: fallbackDate,
         isAllDay: !fallbackTime || fallbackTime.toLowerCase() === "all day",
         times:
@@ -223,6 +209,7 @@ export const normalizeEventSchedulesInput = (input) => {
 
 export const toApiSchedules = (schedules = []) =>
   getSchedulesForSubmission(schedules).map((schedule, index) => ({
+    scheduleTitle: asTrimmedString(schedule.scheduleTitle),
     scheduleDate: asTrimmedString(schedule.scheduleDate),
     isAllDay: Boolean(schedule.isAllDay),
     sortOrder: index,
@@ -277,10 +264,19 @@ export const validateEventSchedules = (schedules = [], options = {}) => {
 
   normalizedSchedules.forEach((schedule, index) => {
     const scheduleErrors = {
+      scheduleTitle: "",
       scheduleDate: "",
       general: "",
       times: {},
     };
+
+    const scheduleTitle = asTrimmedString(schedule.scheduleTitle);
+    if (!scheduleTitle) {
+      scheduleErrors.scheduleTitle = "Event name is required.";
+    } else if (scheduleTitle.length > MAX_SCHEDULE_TITLE_LENGTH) {
+      scheduleErrors.scheduleTitle =
+        `Schedule name must be ${MAX_SCHEDULE_TITLE_LENGTH} characters or less.`;
+    }
 
     const scheduleDate = asTrimmedString(schedule.scheduleDate);
     if (!scheduleDate) {
@@ -350,6 +346,7 @@ export const validateEventSchedules = (schedules = [], options = {}) => {
     });
 
     if (
+      scheduleErrors.scheduleTitle ||
       scheduleErrors.scheduleDate ||
       scheduleErrors.general ||
       Object.keys(scheduleErrors.times).length > 0
@@ -449,15 +446,18 @@ export const formatScheduleHeadline = (schedule) => {
     return "";
   }
 
+  const scheduleTitle = asTrimmedString(schedule.scheduleTitle);
   const formattedDate = formatEventDateLabel(schedule.scheduleDate);
   if (schedule.isAllDay) {
-    return `${formattedDate} all day`;
+    const headline = `${formattedDate} all day`;
+    return scheduleTitle ? `${scheduleTitle} - ${headline}` : headline;
   }
 
   const firstTime = Array.isArray(schedule.times) ? schedule.times[0] : null;
   if (!firstTime) {
-    return formattedDate;
+    return scheduleTitle ? `${scheduleTitle} - ${formattedDate}` : formattedDate;
   }
 
-  return `${formattedDate} at ${formatTimeRangeLabel(firstTime)}`;
+  const headline = `${formattedDate} at ${formatTimeRangeLabel(firstTime)}`;
+  return scheduleTitle ? `${scheduleTitle} - ${headline}` : headline;
 };

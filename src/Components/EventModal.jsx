@@ -44,6 +44,7 @@ const CREATE_EVENT_FORM_ID = "create-event-form";
 const EDIT_EVENT_FORM_ID = "edit-event-form";
 
 const isScheduleBlank = (schedule) =>
+  !String(schedule?.scheduleTitle || "").trim() &&
   !String(schedule?.scheduleDate || "").trim() &&
   !Boolean(schedule?.isAllDay) &&
   !(Array.isArray(schedule?.times) ? schedule.times : []).some(
@@ -675,8 +676,8 @@ const EventModal = ({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 px-2 pb-24 pt-8 font-inter backdrop-blur-sm sm:items-center sm:px-4 sm:pb-6 sm:pt-4">
-      <div className="relative flex max-h-[calc(100vh-50px)] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-transparent bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900 sm:max-w-3xl sm:rounded-3xl">
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 px-2 pb-20 pt-8 font-inter backdrop-blur-sm sm:items-center sm:px-4 sm:pb-6 sm:pt-4">
+      <div className="relative flex max-h-[calc(100vh-120px)] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-transparent bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900 sm:max-w-3xl sm:rounded-3xl">
         {!isEditMode && showSuccess ? (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/90 p-6 text-center dark:bg-slate-950/90">
             <div className="w-full max-w-md rounded-2xl border-4 border-green-500 bg-white p-8 shadow-lg dark:bg-slate-900">

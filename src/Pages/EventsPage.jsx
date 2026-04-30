@@ -108,6 +108,11 @@ const EventsPage = () => {
         const nextSchedule = item?.nextSchedule
           ? {
               ...item.nextSchedule,
+              scheduleTitle:
+                item.nextSchedule.scheduleTitle ||
+                item.nextSchedule.schedule_title ||
+                item.nextSchedule.title ||
+                item.eventTitle,
               times: item.nextSchedule.startTime
                 ? [
                     {
@@ -293,7 +298,7 @@ const EventsPage = () => {
 
   const getEventSchedulePreview = (event) => {
     if (event.hasMultipleDates && event.nextSchedule) {
-      return `Multiple dates (next: ${formatEventDate(event.nextSchedule.scheduleDate)})`;
+      return `Multiple schedules (next: ${formatScheduleHeadline(event.nextSchedule)})`;
     }
 
     if (event.nextSchedule) {
@@ -652,7 +657,7 @@ const EventsPage = () => {
                             </h3>
                             {event.eventType === "custom" && event.hasMultipleDates ? (
                               <span className="inline-flex w-fit items-center rounded-full bg-primary-50 px-2.5 py-1 text-[11px] font-semibold text-primary-700 dark:bg-primary-500/15 dark:text-primary-200">
-                                Multiple dates
+                                Multiple schedules
                               </span>
                             ) : null}
                           </div>

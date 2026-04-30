@@ -5,6 +5,7 @@ import {
   FiArrowDown,
   FiArrowUp,
   FiCalendar,
+  FiFileText,
   FiTrash2,
 } from "react-icons/fi";
 import TimeSlot from "./TimeSlot";
@@ -13,6 +14,7 @@ import {
   EVENT_DATE_MAX,
   EVENT_DATE_MIN,
   MAX_TIME_SLOTS_PER_DATE,
+  MAX_SCHEDULE_TITLE_LENGTH,
 } from "../../utils/eventValidation";
 
 const shiftDateString = (dateString, dayOffset) => {
@@ -38,6 +40,7 @@ const DateCard = ({
   nextScheduleDate = "",
   errors = null,
   warnings = null,
+  onTitleChange,
   onDateChange,
   onToggleAllDay,
   onMove,
@@ -105,7 +108,28 @@ const DateCard = ({
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[1fr_auto]">
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+        <div className="space-y-2">
+          <label className="flex items-center gap-2 text-xs font-semibold text-gray-700 dark:text-slate-200">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary-100 text-primary-700 dark:bg-primary-500/15 dark:text-primary-200">
+              <FiFileText size={12} />
+            </span>
+            Event name
+          </label>
+          <input
+            type="text"
+            value={schedule.scheduleTitle || ""}
+            onChange={(event) => onTitleChange(schedule.id, event.target.value)}
+            disabled={disabled}
+            maxLength={MAX_SCHEDULE_TITLE_LENGTH}
+            className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-primary-400 focus:ring-2 focus:ring-primary-500/30 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+            placeholder="Example: Mehendi, Reception, Ceremony"
+          />
+          {errors?.scheduleTitle ? (
+            <p className="text-xs text-red-600 dark:text-red-400">{errors.scheduleTitle}</p>
+          ) : null}
+        </div>
+
         <div className="space-y-2">
           <label className="flex items-center gap-2 text-xs font-semibold text-gray-700 dark:text-slate-200">
             <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary-100 text-primary-700 dark:bg-primary-500/15 dark:text-primary-200">
@@ -192,6 +216,7 @@ const DateCard = ({
 DateCard.propTypes = {
   schedule: PropTypes.shape({
     id: PropTypes.string.isRequired,
+    scheduleTitle: PropTypes.string,
     scheduleDate: PropTypes.string,
     isAllDay: PropTypes.bool,
     times: PropTypes.arrayOf(
@@ -207,6 +232,7 @@ DateCard.propTypes = {
   previousScheduleDate: PropTypes.string,
   nextScheduleDate: PropTypes.string,
   errors: PropTypes.shape({
+    scheduleTitle: PropTypes.string,
     scheduleDate: PropTypes.string,
     general: PropTypes.string,
     times: PropTypes.object,
@@ -214,6 +240,7 @@ DateCard.propTypes = {
   warnings: PropTypes.shape({
     scheduleDate: PropTypes.string,
   }),
+  onTitleChange: PropTypes.func.isRequired,
   onDateChange: PropTypes.func.isRequired,
   onToggleAllDay: PropTypes.func.isRequired,
   onMove: PropTypes.func.isRequired,
