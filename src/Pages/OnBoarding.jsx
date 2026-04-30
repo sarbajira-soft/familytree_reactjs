@@ -1184,7 +1184,7 @@ const FamilySection = ({
           </div>
         )}
       </div>
-
+{/* 
       <div>
         <label
           htmlFor="religionId"
@@ -1353,7 +1353,7 @@ const FamilySection = ({
         {errors.kuladevata && (
           <p className="text-red-500 text-xs mt-1">{errors.kuladevata}</p>
         )}
-      </div>
+      </div> */}
     </div>
   </div>
 );

@@ -78,6 +78,14 @@ const EventScheduleManager = ({
     );
   };
 
+  const handleTitleChange = (scheduleId, scheduleTitle) => {
+    commitSchedules(
+      schedules.map((schedule) =>
+        schedule.id === scheduleId ? { ...schedule, scheduleTitle } : schedule,
+      ),
+    );
+  };
+
   const handleToggleAllDay = (scheduleId, isAllDay) => {
     commitSchedules(
       schedules.map((schedule) =>
@@ -221,7 +229,7 @@ const EventScheduleManager = ({
             Event Schedule
           </div>
           <p className="mt-1 text-xs text-gray-500 dark:text-slate-400">
-            Add up to {MAX_EVENT_DATES} dates and {MAX_TIME_SLOTS_PER_DATE} time slots per date.
+            Add up to {MAX_EVENT_DATES} schedule entries and {MAX_TIME_SLOTS_PER_DATE} time slots per entry.
           </p>
         </div>
 
@@ -247,6 +255,7 @@ const EventScheduleManager = ({
             }
             errors={errors?.dates?.[schedule.id] || null}
             warnings={warnings?.dates?.[schedule.id] || null}
+            onTitleChange={handleTitleChange}
             onDateChange={handleDateChange}
             onToggleAllDay={handleToggleAllDay}
             onMove={handleMoveSchedule}

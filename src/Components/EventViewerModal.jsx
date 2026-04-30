@@ -187,7 +187,7 @@ const EventViewerModal = ({
   return (
     <AnimatePresence>
       <motion.div
-        className="fixed inset-0 z-50 flex items-start justify-center bg-black bg-opacity-60 backdrop-blur px-2 sm:px-4 pt-10 pb-10 sm:pt-8 sm:pb-8"
+        className="fixed inset-0 z-50 flex items-start justify-center bg-black bg-opacity-60 backdrop-blur px-2 sm:px-4 pt-10 pb-20 sm:pt-8 sm:pb-8"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -195,7 +195,7 @@ const EventViewerModal = ({
       >
         <motion.div
           className="relative bg-white rounded-2xl m-3 shadow-2xl w-full max-w-5xl  min-h-0  flex flex-col overflow-hidden"
-          style={{ maxHeight: "calc(100vh - 80px)" }}
+          style={{ maxHeight: "calc(100vh - 120px)" }}
           initial={{ scale: 0.98, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0.98, opacity: 0 }}
@@ -306,14 +306,14 @@ const EventViewerModal = ({
                     <div className="text-lg font-semibold text-gray-900">
                       {event.title}
                     </div>
-                    <div className="text-xs text-gray-500">
+                    {/* <div className="text-xs text-gray-500">
                       {primaryScheduleLabel || "Schedule unavailable"}
                     </div>
                     {event.location && (
                       <div className="text-xs text-gray-500 mt-1">
                         {event.location}
                       </div>
-                    )}
+                    )} */}
                   </div>
                 </div>
               </div>
@@ -353,7 +353,7 @@ const EventViewerModal = ({
                     </div>
                     {hasMultipleSchedules && (
                       <div className="bg-white p-3 rounded-xl border border-gray-100">
-                        <div className="text-xs text-gray-500">Schedule dates</div>
+                        <div className="text-xs text-gray-500">Schedules</div>
                         <div className="font-medium text-gray-800">
                           {scheduleCount}
                         </div>
@@ -383,12 +383,18 @@ const EventViewerModal = ({
                         Event schedule
                       </h4>
                       <div className="space-y-3">
-                        {schedules.map((scheduleItem) => (
+                        {schedules.map((scheduleItem, index) => (
                           <div
-                            key={scheduleItem.id || scheduleItem.scheduleDate}
+                            key={
+                              scheduleItem.id ||
+                              `${scheduleItem.scheduleDate}-${scheduleItem.scheduleTitle || index}`
+                            }
                             className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2"
                           >
                             <div className="font-medium text-sm text-gray-900">
+                              {scheduleItem.scheduleTitle || event.title}
+                            </div>
+                            <div className="mt-0.5 text-sm text-gray-700">
                               {formatEventDateLabel(scheduleItem.scheduleDate)}
                             </div>
                             <div className="mt-1 space-y-1">
