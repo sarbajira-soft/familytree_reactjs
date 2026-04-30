@@ -108,15 +108,15 @@ const VerifyOtp = () => {
         mobile: mobile || '',
       };
 
-      const stayLoggedIn = localStorage.getItem('stayLoggedIn') === 'true';
-      setAuthData(data.accessToken, minimalUser, stayLoggedIn);
+      // Save auth data and update user context before navigating
+      setAuthData(data.accessToken, minimalUser, true);
       await refetchUser();
 
-      const nextProfileUrl = familyCode
-        ? `/profile/edit?familyCode=${encodeURIComponent(familyCode)}`
-        : '/profile/edit';
-
-      navigate(nextProfileUrl, { replace: true });
+      if (familyCode) {
+        navigate(`/on-boarding?familyCode=${familyCode}`);
+      } else {
+        navigate('/on-boarding');
+      }
     } catch (err) {
       console.error('OTP verification failed:', err);
       setError('OTP verification failed. Please try again.');

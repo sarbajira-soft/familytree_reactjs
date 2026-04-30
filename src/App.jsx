@@ -31,6 +31,7 @@ const ResetPassword = lazy(() => import("./Pages/ResetPassword"));
 const VerifyOtp = lazy(() => import("./Pages/VerifyOtp"));
 const AccountRecoveryPage = lazy(() => import("./Pages/AccountRecoveryPage"));
 const TermsAndConditions = lazy(() => import("./Pages/TermsAndConditions"));
+const OnBoarding = lazy(() => import("./Pages/OnBoarding"));
 const Dashboard = lazy(() => import("./Pages/Dashboard"));
 const MyProfile = lazy(() => import("./Pages/MyProfile"));
 const MyFamilyMember = lazy(() => import("./Pages/MyFamilyMember"));
@@ -148,12 +149,12 @@ function App() {
 
               <Route path="/retail/payment" element={<RetailPaymentPage />} />
 
-              {/* ---------------- Post-registration Redirect ---------------- */}
+               {/* ---------------- Onboarding (Authenticated) ---------------- */}
               <Route
                 path="/on-boarding"
                 element={
                   <PrivateRoute>
-                    <Navigate to="/profile/edit" replace />
+                    <OnBoarding />
                   </PrivateRoute>
                 }
               />
