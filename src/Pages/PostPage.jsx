@@ -5,7 +5,6 @@ import {
   FiUsers,
   FiPlusCircle,
   FiGlobe,
-  FiClock,
   FiSmile,
   FiChevronDown,
   FiMoreVertical,
@@ -30,6 +29,7 @@ import { getToken } from "../utils/auth";
 
 const EMPTY_VTT_TRACK_SRC = "data:text/vtt,WEBVTT";
 const DEFAULT_AVATAR = "/assets/user.png";
+const FEED_PAGE_SIZE = 20;
 
 const logger = console;
 
@@ -38,8 +38,11 @@ const PostPage = () => {
   const [user, setUser] = useState(null);
   const [activeFeed, setActiveFeed] = useState("public");
   const [posts, setPosts] = useState([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
   const videoRefs = useRef({});
   const videoObserverRef = useRef(null);
+  const loadMoreRef = useRef(null);
   const [isMuted, setIsMuted] = useState(true);
   const [manualPausedIds, setManualPausedIds] = useState(() => new Set());
   const manualPausedIdsRef = useRef(new Set());
@@ -47,6 +50,8 @@ const PostPage = () => {
   const centerIconTimeoutRef = useRef(null);
   const [likeLoadingIds, setLikeLoadingIds] = useState(new Set());
   const [loadingFeed, setLoadingFeed] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [feedError, setFeedError] = useState(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isPostViewerOpen, setIsPostViewerOpen] = useState(false);
   const [selectedPost, setSelectedPost] = useState(null);
@@ -77,6 +82,46 @@ const PostPage = () => {
   const feedMenuRef = useRef(null);
   const feedMenuButtonRef = useRef(null);
   const navigate = useNavigate();
+
+  const getListFromApiResponse = (payload) =>
+    Array.isArray(payload)
+      ? payload
+      : Array.isArray(payload?.data)
+        ? payload.data
+        : [];
+
+  const mapFeedPost = (post) => ({
+    id: post.id,
+    author: post.user?.name || "Unknown",
+    authorId: post.user?.userId || post.createdBy || null,
+    avatar: post.user?.profile || DEFAULT_AVATAR,
+    time: new Date(post.createdAt).toLocaleString(),
+    caption: post.caption,
+    fullImageUrl: post.postImage,
+    postVideo: post.postVideo,
+    likes: post.likeCount,
+    comments: post.commentCount,
+    liked: post.isLiked,
+    privacy: post.privacy,
+  });
+
+  const mergePostsById = (existingPosts, incomingPosts) => {
+    const merged = new Map();
+
+    (Array.isArray(existingPosts) ? existingPosts : []).forEach((post) => {
+      if (post?.id !== undefined && post?.id !== null) {
+        merged.set(Number(post.id), post);
+      }
+    });
+
+    incomingPosts.forEach((post) => {
+      const key = Number(post.id);
+      const previous = merged.get(key);
+      merged.set(key, previous ? { ...previous, ...post } : post);
+    });
+
+    return Array.from(merged.values());
+  };
 
   const openReportModalForPost = (post) => {
     if (!post?.id) return;
@@ -125,7 +170,7 @@ const PostPage = () => {
 
   const handlePostCreated = (createdPost) => {
     if (!createdPost || !createdPost.id) {
-      fetchPosts();
+      fetchPosts({ pageToLoad: 1, replace: true });
       return;
     }
 
@@ -160,6 +205,7 @@ const PostPage = () => {
       return;
     }
 
+    setFeedError(null);
     setPosts((prev) => {
       const existing = Array.isArray(prev) ? prev : [];
       if (existing.some((p) => Number(p?.id) === Number(mapped.id))) return existing;
@@ -244,52 +290,95 @@ const PostPage = () => {
     };
   }, []);
 
-  const fetchPosts = async (captionSearch = "") => {
-    setLoadingFeed(true);
+  const fetchPosts = async ({
+    captionSearch = "",
+    pageToLoad = 1,
+    replace = false,
+  } = {}) => {
+    const isInitialPage = replace || pageToLoad === 1;
+
+    if (isInitialPage) {
+      setLoadingFeed(true);
+    } else {
+      setLoadingMore(true);
+    }
+
     try {
       let url =
         activeFeed === "family"
-          ? `${import.meta.env.VITE_API_BASE_URL}/post/by-options?privacy=private`
+          ? `${import.meta.env.VITE_API_BASE_URL}/post/by-options?privacy=family`
           : `${import.meta.env.VITE_API_BASE_URL
           }/post/by-options?privacy=public`;
+
+      url += `&page=${pageToLoad}&limit=${FEED_PAGE_SIZE}`;
 
       if (captionSearch.trim())
         url += `&caption=${encodeURIComponent(captionSearch.trim())}`;
 
-      const res = await authFetchResponse(url, { method: "GET" });
-      const data = await res.json();
-      const nextPosts = Array.isArray(data)
-        ? data.map((p) => ({
-          id: p.id,
-          author: p.user?.name || "Unknown",
-          authorId: p.user?.userId || p.createdBy || null,
-          avatar: p.user?.profile || DEFAULT_AVATAR,
-          time: new Date(p.createdAt).toLocaleString(),
-          caption: p.caption,
-          fullImageUrl: p.postImage,
-          postVideo: p.postVideo,
-          likes: p.likeCount,
-          comments: p.commentCount,
-          liked: p.isLiked,
-          privacy: p.privacy,
-        }))
-        : [];
+      const res = await authFetchResponse(url, { method: "GET", skipThrow: true });
+      const payload = await res.json().catch(() => ({}));
 
-      setPosts(
-        nextPosts.filter(
-          (post) => !blockedUserIds.has(Number(post.authorId)),
-        ),
+      if (!res.ok) {
+        throw new Error(payload?.message || "Failed to load posts.");
+      }
+
+      const nextPosts = getListFromApiResponse(payload)
+        .map(mapFeedPost)
+        .filter((post) => !blockedUserIds.has(Number(post.authorId)));
+
+      setPosts((prev) =>
+        replace ? nextPosts : mergePostsById(prev, nextPosts),
       );
+      setPage(Number(payload?.page || pageToLoad));
+      setHasMore(Boolean(payload?.hasMore));
+      setFeedError(null);
     } catch (e) {
       logger.error("BLOCK OVERRIDE: Failed to fetch posts", e);
+      setFeedError(e?.message || "Failed to load posts.");
+      if (replace) {
+        setPosts([]);
+        setHasMore(false);
+      }
     } finally {
-      setLoadingFeed(false);
+      if (isInitialPage) {
+        setLoadingFeed(false);
+      } else {
+        setLoadingMore(false);
+      }
     }
   };
 
   useEffect(() => {
-    fetchPosts();
+    setPosts([]);
+    setPage(1);
+    setHasMore(true);
+    setFeedError(null);
+    setPostComments({});
+    setVisibleComments({});
+    fetchPosts({ pageToLoad: 1, replace: true });
   }, [activeFeed]);
+
+  useEffect(() => {
+    if (!loadMoreRef.current || !hasMore || loadingFeed || loadingMore || feedError) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry?.isIntersecting) {
+          fetchPosts({ pageToLoad: page + 1 });
+        }
+      },
+      { rootMargin: "240px 0px" },
+    );
+
+    observer.observe(loadMoreRef.current);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [page, hasMore, loadingFeed, loadingMore, feedError, activeFeed]);
 
   useEffect(() => {
     if (!posts || posts.length === 0) return;
@@ -1146,6 +1235,19 @@ const PostPage = () => {
 
       {/* Feed */}
       <div className="space-y-5">
+        {feedError && (
+          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700 flex items-center justify-between gap-3">
+            <span>{feedError}</span>
+            <button
+              type="button"
+              onClick={() => fetchPosts({ pageToLoad: 1, replace: true })}
+              className="bg-red-600 text-white px-3 py-1.5 rounded-full text-xs font-medium hover:bg-red-700 transition-colors"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
         {loadingFeed ? (
           <div className="space-y-5 animate-pulse">
             <PostsShimmer />
@@ -1439,20 +1541,29 @@ const PostPage = () => {
                 )}
               </div>
             ))}
-            {/* All Caught Up Message */}
-            <div className="flex flex-col items-center justify-center py-8 text-center text-gray-500">
-              <div className="w-16 h-16 flex items-center justify-center rounded-full bg-gradient-to-br from-pink-100 to-blue-100 mb-3">
-                <FiClock className="text-gray-600 text-3xl" />
+            {hasMore && !feedError && (
+              <div
+                ref={loadMoreRef}
+                className="flex items-center justify-center gap-3 py-4 text-sm text-gray-500"
+              >
+                {loadingMore ? (
+                  <>
+                    <span className="animate-spin inline-block h-4 w-4 rounded-full border-2 border-gray-300 border-t-primary-500" />
+                    <span>Loading more posts...</span>
+                  </>
+                ) : (
+                  <span>Scroll to load more posts.</span>
+                )}
               </div>
-              <h3 className="font-semibold text-gray-700 text-lg">
-                You’re all caught up!
-              </h3>
-              <p className="text-sm text-gray-500 mt-1">
-                You’ve seen all new posts.
-              </p>
-            </div>
+            )}
+
+            {!hasMore && (
+              <div className="py-4 text-center text-sm text-gray-500">
+                No more posts to load.
+              </div>
+            )}
           </>
-        ) : (
+        ) : feedError ? null : (
           <div className="text-center bg-white rounded-xl border p-10 shadow-sm">
             <p className="text-gray-600 mb-4">
               No posts in the {activeFeed} feed yet.

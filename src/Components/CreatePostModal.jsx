@@ -910,7 +910,7 @@ const CreatePostModal = ({
 
     const formData = new FormData();
     formData.append("caption", content.trim());
-    formData.append("privacy", privacy === "family" ? "private" : privacy);
+    formData.append("privacy", privacy);
     formData.append("status", "1");
 
     if (privacy === "family") {

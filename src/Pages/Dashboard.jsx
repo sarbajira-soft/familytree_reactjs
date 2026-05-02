@@ -316,18 +316,13 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: ["dashboardData", userInfo?.userId, userInfo?.familyCode],
     queryFn: async () => {
-      const [posts, stats, events] = await Promise.all([
-        authFetch(
-          // Bug 51: show family feed across linked families (spouse-connected families may have different codes)
-          `${apiBaseUrl}/post/by-options?privacy=private`,
-          { method: "GET" }
-        ),
+      const [stats, events] = await Promise.all([
         authFetch(`${apiBaseUrl}/family/member/${userInfo.familyCode}/stats`, {
           method: "GET",
         }),
         authFetch(`${apiBaseUrl}/event/upcoming/all`, { method: "GET" }),
       ]);
-      return { posts, stats, events };
+      return { stats, events };
     },
     enabled: !!userInfo?.familyCode && !!token,
   });
