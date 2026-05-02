@@ -15,18 +15,13 @@ import { logger } from "../utils/logger";
 
 import { authFetchResponse } from "../utils/authFetch";
 import { getToken } from "../utils/auth";
+import { getGalleryListFromApiResponse, mapGallerySummary } from "../utils/galleryAdapter";
 
 const EMPTY_VTT_TRACK_SRC = "data:text/vtt,WEBVTT";
 const SHIMMER_CARD_KEYS = ["a", "b", "c"];
 const DEFAULT_BLOCK_STATUS = {
   isBlockedByMe: false,
   isBlockedByThem: false,
-};
-
-const getListFromApiResponse = (json) => {
-  if (Array.isArray(json)) return json;
-  if (Array.isArray(json?.data)) return json.data;
-  return [];
 };
 
 const renderPostMedia = (post) => {
@@ -523,7 +518,7 @@ const UserProfile = () => {
       }
 
       const json = await response.json();
-      const list = getListFromApiResponse(json);
+      const list = getGalleryListFromApiResponse(json);
 
       return list.map((post) => ({
         id: post.id,
@@ -548,7 +543,7 @@ const UserProfile = () => {
     queryKey: ["userGalleries", Number(userId)],
     queryFn: async () => {
       const response = await authFetchResponse(
-        `/gallery/by-options?createdBy=${userId}`,
+        `/gallery/by-options?createdBy=${userId}&page=1&limit=100`,
         { method: "GET", skipThrow: true }
       );
 
@@ -557,28 +552,19 @@ const UserProfile = () => {
       }
 
       const json = await response.json();
-      const list = getListFromApiResponse(json);
+      const list = getGalleryListFromApiResponse(json);
 
-      return list.map((gallery) => ({
-        id: gallery.id,
-        title: gallery.galleryTitle,
-        description: gallery.galleryDescription,
-        author: displayName,
-        cover: gallery.coverPhoto,
-        photosCount: Array.isArray(gallery.galleryAlbums)
-          ? gallery.galleryAlbums.length
-          : 0,
-        likes: gallery.likeCount,
-        isLiked: gallery.isLiked,
-        comments: new Array(gallery.commentCount).fill(""),
-        photos: (gallery.galleryAlbums || []).map((photo, index) => ({
-          id: photo.id,
-          url: photo.album,
-          caption: `Photo ${index + 1}`,
-          likes: 0,
-          comments: [],
-        })),
-      }));
+      return list.map((gallery) =>
+        mapGallerySummary({
+          ...gallery,
+          author: displayName,
+          user: {
+            ...(gallery.user || {}),
+            name: displayName,
+            userId: Number(userId),
+          },
+        }),
+      );
     },
     enabled: !!userId && !!token && !isPrivateAccount && !isBlockedByMe && !isBlockedByThem,
     staleTime: 3 * 60 * 1000,

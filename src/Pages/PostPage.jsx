@@ -26,10 +26,11 @@ import DeleteConfirmModal from "./DeleteConfirmModal";
 import EmojiPicker from "emoji-picker-react";
 import { authFetch, authFetchResponse } from "../utils/authFetch";
 import { getToken } from "../utils/auth";
+import useSeenBatch from "../hooks/useSeenBatch";
 
 const EMPTY_VTT_TRACK_SRC = "data:text/vtt,WEBVTT";
 const DEFAULT_AVATAR = "/assets/user.png";
-const FEED_PAGE_SIZE = 20;
+const FEED_BATCH_SIZE = 20;
 
 const logger = console;
 
@@ -38,7 +39,7 @@ const PostPage = () => {
   const [user, setUser] = useState(null);
   const [activeFeed, setActiveFeed] = useState("public");
   const [posts, setPosts] = useState([]);
-  const [page, setPage] = useState(1);
+  const [nextCursor, setNextCursor] = useState(null);
   const [hasMore, setHasMore] = useState(true);
   const videoRefs = useRef({});
   const videoObserverRef = useRef(null);
@@ -83,6 +84,17 @@ const PostPage = () => {
   const feedMenuButtonRef = useRef(null);
   const navigate = useNavigate();
 
+  const { registerSeenTarget } = useSeenBatch({
+    posts,
+    onMarkSeenLocal: (postId) => {
+      setPosts((prevPosts) =>
+        prevPosts.map((post) =>
+          Number(post.id) === Number(postId) ? { ...post, seen: true } : post,
+        ),
+      );
+    },
+  });
+
   const getListFromApiResponse = (payload) =>
     Array.isArray(payload)
       ? payload
@@ -92,6 +104,7 @@ const PostPage = () => {
 
   const mapFeedPost = (post) => ({
     id: post.id,
+    createdAt: post.createdAt,
     author: post.user?.name || "Unknown",
     authorId: post.user?.userId || post.createdBy || null,
     avatar: post.user?.profile || DEFAULT_AVATAR,
@@ -103,6 +116,8 @@ const PostPage = () => {
     comments: post.commentCount,
     liked: post.isLiked,
     privacy: post.privacy,
+    seen: Boolean(post.isSeen),
+    finalScore: Number(post.finalScore || 0),
   });
 
   const mergePostsById = (existingPosts, incomingPosts) => {
@@ -170,7 +185,7 @@ const PostPage = () => {
 
   const handlePostCreated = (createdPost) => {
     if (!createdPost || !createdPost.id) {
-      fetchPosts({ pageToLoad: 1, replace: true });
+      fetchPosts({ cursorToLoad: null, replace: true });
       return;
     }
 
@@ -186,6 +201,7 @@ const PostPage = () => {
 
     const mapped = {
       id: createdPost.id,
+      createdAt: createdPost.createdAt || new Date().toISOString(),
       author: createdPost.user?.name || "Unknown",
       authorId: createdPost.user?.userId || createdPost.createdBy || null,
       avatar: createdPost.user?.profile || DEFAULT_AVATAR,
@@ -199,6 +215,8 @@ const PostPage = () => {
       comments: createdPost.commentCount ?? 0,
       liked: createdPost.isLiked ?? false,
       privacy: createdPost.privacy,
+      seen: false,
+      finalScore: 0,
     };
 
     if (blockedUserIds.has(Number(mapped.authorId))) {
@@ -292,10 +310,10 @@ const PostPage = () => {
 
   const fetchPosts = async ({
     captionSearch = "",
-    pageToLoad = 1,
+    cursorToLoad = null,
     replace = false,
   } = {}) => {
-    const isInitialPage = replace || pageToLoad === 1;
+    const isInitialPage = replace || !cursorToLoad;
 
     if (isInitialPage) {
       setLoadingFeed(true);
@@ -304,13 +322,11 @@ const PostPage = () => {
     }
 
     try {
-      let url =
-        activeFeed === "family"
-          ? `${import.meta.env.VITE_API_BASE_URL}/post/by-options?privacy=family`
-          : `${import.meta.env.VITE_API_BASE_URL
-          }/post/by-options?privacy=public`;
+      let url = `${import.meta.env.VITE_API_BASE_URL}/feed?privacy=${activeFeed}&limit=${FEED_BATCH_SIZE}`;
 
-      url += `&page=${pageToLoad}&limit=${FEED_PAGE_SIZE}`;
+      if (cursorToLoad) {
+        url += `&cursor=${encodeURIComponent(cursorToLoad)}`;
+      }
 
       if (captionSearch.trim())
         url += `&caption=${encodeURIComponent(captionSearch.trim())}`;
@@ -322,14 +338,14 @@ const PostPage = () => {
         throw new Error(payload?.message || "Failed to load posts.");
       }
 
-      const nextPosts = getListFromApiResponse(payload)
+      const nextPosts = (Array.isArray(payload?.posts) ? payload.posts : [])
         .map(mapFeedPost)
         .filter((post) => !blockedUserIds.has(Number(post.authorId)));
 
       setPosts((prev) =>
         replace ? nextPosts : mergePostsById(prev, nextPosts),
       );
-      setPage(Number(payload?.page || pageToLoad));
+      setNextCursor(payload?.nextCursor || null);
       setHasMore(Boolean(payload?.hasMore));
       setFeedError(null);
     } catch (e) {
@@ -337,6 +353,7 @@ const PostPage = () => {
       setFeedError(e?.message || "Failed to load posts.");
       if (replace) {
         setPosts([]);
+        setNextCursor(null);
         setHasMore(false);
       }
     } finally {
@@ -350,16 +367,16 @@ const PostPage = () => {
 
   useEffect(() => {
     setPosts([]);
-    setPage(1);
+    setNextCursor(null);
     setHasMore(true);
     setFeedError(null);
     setPostComments({});
     setVisibleComments({});
-    fetchPosts({ pageToLoad: 1, replace: true });
+    fetchPosts({ cursorToLoad: null, replace: true });
   }, [activeFeed]);
 
   useEffect(() => {
-    if (!loadMoreRef.current || !hasMore || loadingFeed || loadingMore || feedError) {
+    if (!loadMoreRef.current || !hasMore || !nextCursor || loadingFeed || loadingMore || feedError) {
       return;
     }
 
@@ -367,7 +384,7 @@ const PostPage = () => {
       (entries) => {
         const entry = entries[0];
         if (entry?.isIntersecting) {
-          fetchPosts({ pageToLoad: page + 1 });
+          fetchPosts({ cursorToLoad: nextCursor });
         }
       },
       { rootMargin: "240px 0px" },
@@ -378,7 +395,7 @@ const PostPage = () => {
     return () => {
       observer.disconnect();
     };
-  }, [page, hasMore, loadingFeed, loadingMore, feedError, activeFeed]);
+  }, [nextCursor, hasMore, loadingFeed, loadingMore, feedError, activeFeed]);
 
   useEffect(() => {
     if (!posts || posts.length === 0) return;
@@ -669,6 +686,18 @@ const PostPage = () => {
             c.id === tempComment.id ? newCommentData : c
           ),
         }));
+        setPosts((prevPosts) =>
+          prevPosts.map((post) =>
+            post.id === postId
+              ? {
+                  ...post,
+                  comments: Number.isFinite(Number(newCommentData?.commentCount))
+                    ? Number(newCommentData.commentCount)
+                    : post.comments + 1,
+                }
+              : post,
+          ),
+        );
         setActiveEmojiPostId((prev) => (prev === postId ? null : prev));
       } else {
         logger.error("BLOCK OVERRIDE: Failed to post comment");
@@ -783,6 +812,11 @@ const PostPage = () => {
 
     const comments = await fetchComments(postId);
     setPostComments((prev) => ({ ...prev, [postId]: comments }));
+    setPosts((prevPosts) =>
+      prevPosts.map((post) =>
+        post.id === postId ? { ...post, comments: countComments(comments || []) } : post,
+      ),
+    );
   };
 
   // Handle inline edit comment
@@ -892,6 +926,13 @@ const PostPage = () => {
       if (response.ok) {
         const comments = await fetchComments(postId);
         setPostComments((prev) => ({ ...prev, [postId]: comments }));
+        setPosts((prevPosts) =>
+          prevPosts.map((post) =>
+            post.id === postId
+              ? { ...post, comments: countComments(comments || []) }
+              : post,
+          ),
+        );
         setReplyingToCommentId(null);
         setReplyText({});
       }
@@ -1240,7 +1281,7 @@ const PostPage = () => {
             <span>{feedError}</span>
             <button
               type="button"
-              onClick={() => fetchPosts({ pageToLoad: 1, replace: true })}
+              onClick={() => fetchPosts({ cursorToLoad: null, replace: true })}
               className="bg-red-600 text-white px-3 py-1.5 rounded-full text-xs font-medium hover:bg-red-700 transition-colors"
             >
               Retry
@@ -1257,6 +1298,8 @@ const PostPage = () => {
             {visiblePosts.map((post) => (
               <div
                 key={post.id}
+                ref={registerSeenTarget(post.id)}
+                data-postid={post.id}
                 className="bg-white rounded-xl border pb-3 border-gray-200 shadow-sm hover:shadow-md transition-all overflow-hidden"
               >
                 {/* Header */}

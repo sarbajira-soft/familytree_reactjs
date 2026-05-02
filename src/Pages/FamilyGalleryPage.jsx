@@ -9,9 +9,10 @@ import CreateAlbumModal from '../Components/CreateAlbumModal';
 import { useUser } from '../Contexts/UserContext'; // Import useUser context
 import GalleryPageShimmer from './GalleryPageShimmer';
 
-import { authFetch } from '../utils/authFetch';
+import { authFetchResponse } from '../utils/authFetch';
 import { getToken } from '../utils/auth';
 import { hasFamilyAccess } from '../utils/familyAccess';
+import { getGalleryListFromApiResponse, mapGallerySummary } from '../utils/galleryAdapter';
 
 const GalleryCollage = ({ photos = [], onOpenAlbum }) => {
   // ... (rest of the code remains the same)
@@ -29,6 +30,10 @@ const FamilyGalleryPage = () => {
   const [isCreateAlbumModalOpen, setIsCreateAlbumModalOpen] = useState(false);
   const [galleryAlbums, setGalleryAlbums] = useState([]); // Initialize as empty array for API data
   const [loadingAlbums, setLoadingAlbums] = useState(true); // Loading state for albums
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [feedError, setFeedError] = useState('');
   const [showSearchInput, setShowSearchInput] = useState(false);
   const [searchCaption, setSearchCaption] = useState('');
 
@@ -48,69 +53,83 @@ const FamilyGalleryPage = () => {
   }, []);
 
   // Function to fetch gallery albums from the API
-  const fetchGalleries = async (galleryTitleSearch = '') => {
+  const fetchGalleries = async (nextPage = 1, galleryTitleSearch = '', replace = true) => {
     // For family feed, check if user has familyCode and is approved
     if (activeFeed === 'family' && !canAccessFamilyFeed) {
       setGalleryAlbums([]);
       setLoadingAlbums(false);
+      setLoadingMore(false);
+      setFeedError('');
+      setHasMore(false);
+      setPage(1);
       return;
     }
 
     if (!userInfo || !token) {
       setLoadingAlbums(false);
+      setLoadingMore(false);
       return;
     }
 
-    setLoadingAlbums(true);
+    if (replace) {
+      setLoadingAlbums(true);
+    } else {
+      setLoadingMore(true);
+    }
+    setFeedError('');
     try {
       let endpoint = '';
 
       // Determine the API URL based on the active feed
       if (activeFeed === 'family') {
-        endpoint = `/gallery/by-options?privacy=private`;
+        endpoint = `/gallery/by-options?privacy=family`;
       } else {
         endpoint = `/gallery/by-options?privacy=public`;
       }
+
+      endpoint += `&page=${nextPage}&limit=20`;
 
       if (galleryTitleSearch.trim()) {
         endpoint += `&galleryTitle=${encodeURIComponent(galleryTitleSearch.trim())}`;
       }
 
-      const data = await authFetch(endpoint, { method: 'GET' });
+      const response = await authFetchResponse(endpoint, {
+        method: 'GET',
+        skipThrow: true,
+      });
+      const payload = await response.json().catch(() => ({}));
 
-      // Format the API response to match the expected structure
-      const formattedGalleries = data.map(gallery => ({
-        id: gallery.id,
-        title: gallery.galleryTitle,
-        description: gallery.galleryDescription,
-        author: gallery.user?.name || 'Unknown',
-        authorId: gallery.user?.userId || gallery.createdBy || null,
-        privacy: gallery.privacy,
-        photosCount: gallery.galleryAlbums.length,
-        likes: gallery.likeCount,
-        isLiked: gallery.isLiked,
-        comments: new Array(gallery.commentCount).fill(""),
-        coverPhoto: gallery.coverPhoto || 'https://picsum.photos/seed/default_album_cover/400/300', // Default cover if none
-        photos: gallery.galleryAlbums.map((photo, index) => ({
-          id: photo.id,
-          url: photo.album,
-          caption: photo.caption || `Photo ${index + 1}`,
-          likes: photo.likeCount || 0, 
-          comments: photo.commentCount ? new Array(photo.commentCount).fill("") : [],
-        })),
-      }));
-      setGalleryAlbums(formattedGalleries);
+      if (!response.ok) {
+        throw new Error(payload?.message || 'Failed to fetch galleries.');
+      }
+
+      const formattedGalleries = getGalleryListFromApiResponse(payload).map(mapGallerySummary);
+
+      setGalleryAlbums((prev) => {
+        if (replace) {
+          return formattedGalleries;
+        }
+
+        const seen = new Set(prev.map((gallery) => gallery.id));
+        return [...prev, ...formattedGalleries.filter((gallery) => !seen.has(gallery.id))];
+      });
+      setPage(nextPage);
+      setHasMore(Boolean(payload?.hasMore));
     } catch (error) {
       console.error('Failed to fetch galleries:', error);
-      setGalleryAlbums([]); // Clear albums on error
+      setFeedError(error?.message || 'Failed to load galleries.');
+      if (replace) {
+        setGalleryAlbums([]);
+      }
     } finally {
       setLoadingAlbums(false);
+      setLoadingMore(false);
     }
   };
 
   // Fetch galleries whenever activeFeed, userInfo, or token changes
   useEffect(() => {
-    fetchGalleries();
+    fetchGalleries(1, searchCaption, true);
   }, [activeFeed, canAccessFamilyFeed, userInfo?.familyCode, userInfo?.approveStatus, token]);
 
   const filteredAlbums = galleryAlbums; // No need to filter here, API should return filtered results
@@ -169,7 +188,7 @@ const FamilyGalleryPage = () => {
   };
 
   const onGalleryCreated = () => {
-    fetchGalleries();
+    fetchGalleries(1, searchCaption, true);
   };
 
   const handleOpenAlbumFromCollage = (albumId) => {
@@ -290,7 +309,7 @@ const FamilyGalleryPage = () => {
                     clearTimeout(searchTimeoutRef.current);
 
                   searchTimeoutRef.current = setTimeout(() => {
-                    fetchGalleries(value);
+                    fetchGalleries(1, value, true);
                   }, 500);
                 }}
                 onBlur={() => {
@@ -320,6 +339,12 @@ const FamilyGalleryPage = () => {
           {loadingAlbums ? (
             <GalleryPageShimmer />
           ) : (
+            <>
+              {feedError ? (
+                <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                  {feedError}
+                </div>
+              ) : null}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8 auto-rows-fr">
               {filteredAlbums.length > 0 ? (
                 filteredAlbums.map((album) => (
@@ -339,15 +364,15 @@ const FamilyGalleryPage = () => {
                         className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
-                        {album.photos.length > 0 && (
+                        {album.photosCount > 0 && (
                           <span className="text-white text-sm font-semibold bg-black/50 px-2 py-1 rounded-full backdrop-blur-sm">
-                            {album.photos.length} Photos
+                            {album.photosCount} Photos
                           </span>
                         )}
                       </div>
-                      {album.photos.length > 1 && (
+                      {album.photosCount > 1 && (
                         <div className="absolute top-3 right-3 bg-primary-600 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-md animate-bounce-slow">
-                          +{album.photos.length - 1} More
+                          +{album.photosCount - 1} More
                         </div>
                       )}
                     </button>
@@ -407,7 +432,7 @@ const FamilyGalleryPage = () => {
                       </p>
 
                       <div className="flex items-center gap-2 text-sm text-gray-500">
-                        {album.privacy === "private" ? ( // Changed 'family' to 'private' to match API
+                        {album.privacy === "family" ? (
                           <span
                             className="flex items-center gap-1 text-primary-600 bg-primary-50 px-3 py-1 rounded-full font-medium"
                             title="Family Album"
@@ -438,6 +463,19 @@ const FamilyGalleryPage = () => {
                 </div>
               )}
             </div>
+            {filteredAlbums.length > 0 && hasMore ? (
+              <div className="mt-8 flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => fetchGalleries(page + 1, searchCaption, false)}
+                  disabled={loadingMore}
+                  className="rounded-full bg-primary-700 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-800 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {loadingMore ? 'Loading...' : 'Load more'}
+                </button>
+              </div>
+            ) : null}
+            </>
           )}
         </div>
       </div>

@@ -26,6 +26,7 @@ import ProfileShimmer from "./ProfileShimmer";
 import DeleteConfirmationModal from "../Components/DeleteConfirmationModal";
 import { authFetch, authFetchResponse } from "../utils/authFetch";
 import { getToken } from "../utils/auth";
+import { getGalleryListFromApiResponse, mapGalleryDetail, mapGallerySummary } from "../utils/galleryAdapter";
 import { toast } from "react-toastify";
 
 const ProfilePage = () => {
@@ -353,33 +354,20 @@ const ProfilePage = () => {
     queryKey: ["userGalleries", userInfo?.userId],
     queryFn: async () => {
       const json = await authFetch(
-        `/gallery/by-options?createdBy=${userInfo.userId}`,
+        `/gallery/by-options?createdBy=${userInfo.userId}&page=1&limit=100`,
         { method: "GET" }
       );
-      const list = Array.isArray(json)
-        ? json
-        : Array.isArray(json?.data)
-          ? json.data
-          : [];
 
-      return list.map((gallery) => ({
-        id: gallery.id,
-        title: gallery.galleryTitle,
-        description: gallery.galleryDescription,
-        author: userInfo.firstName + " " + userInfo.lastName,
-        cover: gallery.coverPhoto,
-        photosCount: gallery.galleryAlbums.length,
-        likes: gallery.likeCount,
-        isLiked: gallery.isLiked,
-        comments: new Array(gallery.commentCount).fill(""),
-        photos: gallery.galleryAlbums.map((photo, index) => ({
-          id: photo.id,
-          url: photo.album,
-          caption: `Photo ${index + 1}`,
-          likes: 0,
-          comments: [],
-        })),
-      }));
+      return getGalleryListFromApiResponse(json).map((gallery) =>
+        mapGallerySummary({
+          ...gallery,
+          user: {
+            ...(gallery.user || {}),
+            name: `${userInfo.firstName || ""} ${userInfo.lastName || ""}`.trim() || "Unknown",
+            userId: userInfo.userId,
+          },
+        }),
+      );
     },
     enabled: !!userInfo?.userId && !!token,
     staleTime: 3 * 60 * 1000, // 3 minutes
@@ -611,34 +599,17 @@ const ProfilePage = () => {
   const handleEditAlbum = async (e, albumId) => {
     e.stopPropagation();
     try {
-      const viewerUserId = userInfo?.userId;
-      const response = await authFetchResponse(
-        `/gallery/${albumId}?userId=${viewerUserId}`,
-        {
-          method: "GET",
-          skipThrow: true,
-        }
-      );
+      const response = await authFetchResponse(`/gallery/${albumId}`, {
+        method: "GET",
+        skipThrow: true,
+      });
 
       if (!response.ok) {
         throw new Error(`Failed to fetch album: ${response.statusText}`);
       }
 
       const data = await response.json();
-
-      // Format the album data for the edit modal
-      const formattedAlbum = {
-        id: data.id,
-        title: data.galleryTitle,
-        description: data.galleryDescription,
-        privacy: data.privacy,
-        familyCode: data.familyCode,
-        coverPhotoUrl: data.coverPhoto,
-        galleryPhotos: data.galleryAlbums.map((photo) => ({
-          id: photo.id,
-          url: photo.album,
-        })),
-      };
+      const formattedAlbum = mapGalleryDetail(data);
 
       setAlbumToEdit(formattedAlbum);
       setIsEditAlbumModalOpen(true);

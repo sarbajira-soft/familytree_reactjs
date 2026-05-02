@@ -85,7 +85,7 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
             setFamilyCode(String(albumData.familyCode || getPreferredFamilyCode() || '').trim());
             setCoverPhotoFile(null);
             setGalleryPhotoFiles([]);
-            setCurrentCoverPhotoUrl(albumData.coverPhoto || null);
+            setCurrentCoverPhotoUrl(albumData.coverPhoto || albumData.coverImage || albumData.cover || null);
             setCurrentGalleryPhotos(
                 Array.isArray(albumData.images)
                     ? albumData.images
@@ -314,7 +314,7 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
         const formData = new FormData();
         formData.append('galleryTitle', trimmedTitle);
         formData.append('galleryDescription', description || '');
-        formData.append('privacy', privacy === 'family' ? 'private' : privacy);
+        formData.append('privacy', privacy);
 
         const nextStatus = 1;
         if (Number.isFinite(Number(nextStatus))) {
