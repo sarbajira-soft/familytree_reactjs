@@ -20,6 +20,7 @@ import { fetchProducts as fetchMedusaProducts, fetchRegions } from "../Retail/se
 import { getProductThumbnail } from "../Retail/utils/helpers";
 import { getToken } from "../utils/auth";
 import { authFetch } from "../utils/authFetch";
+import { getGalleryListFromApiResponse, mapGallerySummary } from "../utils/galleryAdapter";
 import DashboardShimmer from "./DashboardShimmer";
 import PostPage from "./PostPage";
 import { MEDUSA_REGION_ID_KEY } from "../Retail/utils/constants";
@@ -330,7 +331,7 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
   const { data: galleryData, isLoading: isGalleryLoading } = useQuery({
     queryKey: ["dashboardGallery", userInfo?.userId],
     queryFn: async () =>
-      authFetch(`${apiBaseUrl}/gallery/by-options?privacy=public`, {
+      authFetch(`${apiBaseUrl}/gallery/by-options?privacy=public&page=1&limit=3`, {
         method: "GET",
       }),
     enabled: !!token,
@@ -347,43 +348,11 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
 
   const galleryPreview = useMemo(() => {
     if (!galleryData) return [];
-    const rawGallery = galleryData;
-    const list = Array.isArray(rawGallery?.data) ? rawGallery.data : rawGallery;
-    return Array.isArray(list) ? list.slice(0, 3) : [];
+    return getGalleryListFromApiResponse(galleryData).map(mapGallerySummary);
   }, [galleryData]);
 
-  const formatAlbumForModal = (album) => {
-    return {
-      id: album.id,
-      title: album.galleryTitle || album.title || "Album",
-      description: album.galleryDescription || album.description || "",
-      author: album.user?.name || "Unknown",
-      privacy: album.privacy,
-      photosCount: album.galleryAlbums?.length || 0,
-      likes: album.likeCount || 0,
-      isLiked: album.isLiked || false,
-      comments: new Array(album.commentCount || 0).fill(""),
-      coverPhoto:
-        album.coverPhoto ||
-        (album.galleryAlbums &&
-          album.galleryAlbums[0] &&
-          album.galleryAlbums[0].album) ||
-        "https://via.placeholder.com/400x300?text=Photo",
-      photos: (album.galleryAlbums || []).map((photo, index) => ({
-        id: photo.id,
-        url: photo.album,
-        caption: photo.caption || `Photo ${index + 1}`,
-        likes: photo.likeCount || 0,
-        comments: photo.commentCount
-          ? new Array(photo.commentCount).fill("")
-          : [],
-      })),
-    };
-  };
-
   const openGalleryModal = (album) => {
-    const formattedAlbum = formatAlbumForModal(album);
-    setSelectedAlbum(formattedAlbum);
+    setSelectedAlbum(album);
     setIsGalleryModalOpen(true);
   };
 

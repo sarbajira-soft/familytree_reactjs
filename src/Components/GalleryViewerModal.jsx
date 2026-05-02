@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   FaRegHeart,
   FaHeart,
@@ -16,6 +16,7 @@ import { buildCommentTree, countComments } from "../utils/commentUtils";
 import Swal from "sweetalert2";
 
 import { authFetchResponse } from "../utils/authFetch";
+import { mapGalleryDetail } from "../utils/galleryAdapter";
 
 const GalleryViewerModal = ({
   isOpen,
@@ -63,8 +64,14 @@ const GalleryViewerModal = ({
   const [totalLikes, setTotalLikes] = useState(0);
   const [newComment, setNewComment] = useState("");
   const [commentLoading, setCommentLoading] = useState(false);
-  const [comments, setComments] = useState([]);
+  const [galleryDetail, setGalleryDetail] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState("");
+  const [commentRows, setCommentRows] = useState([]);
   const [isCommentsFetching, setIsCommentsFetching] = useState(false);
+  const [loadingMoreComments, setLoadingMoreComments] = useState(false);
+  const [commentPage, setCommentPage] = useState(1);
+  const [hasMoreComments, setHasMoreComments] = useState(false);
   const commentsRef = useRef(null);
   const carouselRef = useRef(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -73,6 +80,9 @@ const GalleryViewerModal = ({
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const textareaRef = useRef(null);
   const emojiPickerRef = useRef(null);
+  const activeAlbum = galleryDetail || album;
+  const photos = activeAlbum?.photos || [];
+  const comments = useMemo(() => buildCommentTree(commentRows), [commentRows]);
 
   useEffect(() => {
     if (!isFullScreen) return;
@@ -101,63 +111,144 @@ const GalleryViewerModal = ({
     }
     setCurrentPhotoIndex(i);
   };
-  const goToPrevFS = () =>
-    goToIndexFS(
-      (currentPhotoIndex - 1 + album.photos.length) % album.photos.length
-    );
-  const goToNextFS = () =>
-    goToIndexFS((currentPhotoIndex + 1) % album.photos.length);
+  const goToPrevFS = () => {
+    if (!photos.length) return;
+    goToIndexFS((currentPhotoIndex - 1 + photos.length) % photos.length);
+  };
+  const goToNextFS = () => {
+    if (!photos.length) return;
+    goToIndexFS((currentPhotoIndex + 1) % photos.length);
+  };
 
   const goToPrev = () => {
+    if (!carouselRef.current) return;
     const width = carouselRef.current.clientWidth;
     carouselRef.current.scrollBy({ left: -width, behavior: "smooth" });
   };
 
   const goToNext = () => {
+    if (!carouselRef.current) return;
     const width = carouselRef.current.clientWidth;
     carouselRef.current.scrollBy({ left: width, behavior: "smooth" });
   };
 
-
-
-  const fetchComments = async (galleryId) => {
+  const fetchGalleryDetail = async (galleryId) => {
     const targetId = Number(galleryId);
     if (!Number.isFinite(targetId) || Number.isNaN(targetId) || targetId <= 0) {
       return;
     }
 
-    setIsCommentsFetching(true);
+    setDetailLoading(true);
+    setDetailError("");
     try {
-      const res = await authFetchResponse(`/gallery/${targetId}/comments`, {
+      const res = await authFetchResponse(`/gallery/${targetId}`, {
         method: "GET",
         skipThrow: true,
       });
       const data = await res.json().catch(() => ({}));
-      const next = Array.isArray(data?.comments) ? data.comments : [];
-      setComments(buildCommentTree(next));
-      setTimeout(() => {
-        if (commentsRef.current) {
-          commentsRef.current.scrollTop = commentsRef.current.scrollHeight;
+      if (!res.ok) {
+        throw new Error(data?.message || "Unable to load this gallery.");
+      }
+
+      const nextGallery = mapGalleryDetail(data?.data || data);
+      setGalleryDetail(nextGallery);
+      setIsLiked(Boolean(nextGallery?.isLiked));
+      setTotalLikes(Number(nextGallery?.likes || 0));
+    } catch (err) {
+      console.error("Fetching gallery failed", err);
+      setDetailError(err?.message || "Unable to load this gallery.");
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const fetchComments = async (galleryId, pageToLoad = 1, replace = true) => {
+    const targetId = Number(galleryId);
+    if (!Number.isFinite(targetId) || Number.isNaN(targetId) || targetId <= 0) {
+      return;
+    }
+
+    if (replace) {
+      setIsCommentsFetching(true);
+    } else {
+      setLoadingMoreComments(true);
+    }
+
+    try {
+      const res = await authFetchResponse(
+        `/gallery/${targetId}/comments?page=${pageToLoad}&limit=10`,
+        {
+          method: "GET",
+          skipThrow: true,
         }
-      }, 100);
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.message || "Unable to load comments.");
+      }
+
+      const next = Array.isArray(data?.comments) ? data.comments : [];
+      setCommentRows((prev) => {
+        if (replace) {
+          return next;
+        }
+
+        const merged = [...prev];
+        next.forEach((comment) => {
+          if (!merged.some((existing) => existing.id === comment.id)) {
+            merged.push(comment);
+          }
+        });
+        return merged;
+      });
+      setCommentPage(pageToLoad);
+      setHasMoreComments(Boolean(data?.hasMore));
+
+      if (replace) {
+        setTimeout(() => {
+          if (commentsRef.current) {
+            commentsRef.current.scrollTop = commentsRef.current.scrollHeight;
+          }
+        }, 100);
+      }
     } catch (err) {
       console.error("Fetching comments failed", err);
+      if (replace) {
+        setCommentRows([]);
+      }
     } finally {
       setIsCommentsFetching(false);
+      setLoadingMoreComments(false);
     }
   };
 
   useEffect(() => {
-    if (isOpen) setCurrentPhotoIndex(0);
+    if (isOpen) {
+      setCurrentPhotoIndex(0);
+      setRotation(0);
+    }
   }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen || !album?.id) return;
+    setGalleryDetail(null);
+    setDetailError("");
     setIsLiked(album.isLiked || false);
     setTotalLikes(album.likes || 0);
-    setComments([]);
-    fetchComments(album.id);
+    setCommentRows([]);
+    setCommentPage(1);
+    setHasMoreComments(false);
+    fetchGalleryDetail(album.id);
+    fetchComments(album.id, 1, true);
   }, [isOpen, album?.id]);
+
+  useEffect(() => {
+    if (!isOpen || !isFullScreen || !fsCarouselRef.current) return;
+    fsCarouselRef.current.scrollTo({
+      left: currentPhotoIndex * fsCarouselRef.current.clientWidth,
+      behavior: "auto",
+    });
+  }, [currentPhotoIndex, isFullScreen, isOpen, photos.length]);
 
   useEffect(() => {
     const handleClickOutsideEmoji = (event) => {
@@ -178,11 +269,9 @@ const GalleryViewerModal = ({
     };
   }, [showEmojiPicker]);
 
-  if (!album || !album.photos || album.photos.length === 0) {
+  if (!album) {
     return null;
   }
-
-  const currentPhoto = album.photos[currentPhotoIndex];
 
   // Like API
   const toggleLike = async () => {
@@ -200,6 +289,16 @@ const GalleryViewerModal = ({
       const data = await res.json();
       setIsLiked(Boolean(data.liked));
       setTotalLikes(data.totalLikes);
+      setGalleryDetail((prev) =>
+        prev
+          ? {
+              ...prev,
+              isLiked: Boolean(data.liked),
+              likes: Number(data.totalLikes || 0),
+              likeCount: Number(data.totalLikes || 0),
+            }
+          : prev,
+      );
     } catch (err) {
       console.error("Like failed", err);
     }
@@ -255,7 +354,7 @@ const GalleryViewerModal = ({
       }
       setNewComment("");
       setShowEmojiPicker(false);
-      await fetchComments(album.id);
+      await fetchComments(album.id, 1, true);
     } catch (err) {
       console.error("Post failed", err);
       Swal.fire({
@@ -279,7 +378,7 @@ const GalleryViewerModal = ({
     if (!res.ok) {
       throw new Error("Unable to update your comment.");
     }
-    fetchComments(album.id);
+    fetchComments(album.id, 1, true);
   };
   const handleDeleteComment = async (commentId) => {
     const res = await authFetchResponse(`/gallery/comment/${commentId}`, {
@@ -289,7 +388,7 @@ const GalleryViewerModal = ({
     if (!res.ok) {
       throw new Error("Unable to delete your comment.");
     }
-    fetchComments(album.id);
+    fetchComments(album.id, 1, true);
   };
   const handleReplyComment = async (parentCommentId, replyText) => {
     const res = await authFetchResponse(`/gallery/comment/reply`, {
@@ -307,7 +406,7 @@ const GalleryViewerModal = ({
     if (!res.ok) {
       throw new Error("Unable to post your reply.");
     }
-    fetchComments(album.id);
+    fetchComments(album.id, 1, true);
   };
 
   // Scroll listener: update current image index
@@ -368,20 +467,37 @@ const GalleryViewerModal = ({
                   className="w-full h-[35vh] md:h-[80vh] overflow-x-auto snap-x snap-mandatory no-scrollbar flex relative"
                   onScroll={handleScroll}
                 >
-                  {album.photos.map((img, idx) => (
-                    <div
-                      key={idx}
-                      className="w-full h-full flex-shrink-0 snap-center flex items-center justify-center bg-black"
-                    >
-                      <img
-                        src={img.url}
-                        alt={img.caption}
-                        className="max-w-full max-h-full object-contain mx-auto my-auto"
-                        onClick={() => setIsFullScreen(true)}
-                        onError={(e) => (e.target.src = "/fallback-image.png")}
-                      />
+                  {detailLoading ? (
+                    <div className="w-full h-full flex items-center justify-center text-white">
+                      <div className="flex items-center gap-3">
+                        <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        <span>Loading gallery...</span>
+                      </div>
                     </div>
-                  ))}
+                  ) : detailError ? (
+                    <div className="w-full h-full flex items-center justify-center px-6 text-center text-white/90">
+                      {detailError}
+                    </div>
+                  ) : photos.length > 0 ? (
+                    photos.map((img, idx) => (
+                      <div
+                        key={idx}
+                        className="w-full h-full flex-shrink-0 snap-center flex items-center justify-center bg-black"
+                      >
+                        <img
+                          src={img.url}
+                          alt={img.caption}
+                          className="max-w-full max-h-full object-contain mx-auto my-auto"
+                          onClick={() => setIsFullScreen(true)}
+                          onError={(e) => (e.target.src = "/fallback-image.png")}
+                        />
+                      </div>
+                    ))
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center px-6 text-center text-white/90">
+                      No photos available for this gallery.
+                    </div>
+                  )}
                 </div>
 
                 {/* Prev Button — show only if NOT the first image */}
@@ -395,7 +511,7 @@ const GalleryViewerModal = ({
                 )}
 
                 {/* Next Button — show only if NOT the last image */}
-                {currentPhotoIndex < album.photos.length - 1 && (
+                {currentPhotoIndex < photos.length - 1 && (
                   <button
                     onClick={goToNext}
                     className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 p-3 rounded-full text-white shadow-lg select-none z-20"
@@ -406,8 +522,8 @@ const GalleryViewerModal = ({
 
                 {/* Gradient Title */}
                 <div className="absolute top-0 left-0 p-4 text-white bg-gradient-to-b from-black/70 to-transparent w-full z-10">
-                  <h2 className="text-lg font-semibold">{album.title}</h2>
-                  <p className="text-sm opacity-80">by {album.author}</p>
+                  <h2 className="text-lg font-semibold">{activeAlbum?.title}</h2>
+                  <p className="text-sm opacity-80">by {activeAlbum?.author}</p>
                 </div>
               </div>
 
@@ -437,7 +553,7 @@ const GalleryViewerModal = ({
                       <span>{totalLikes}</span>
                     </button>
                     <span className="flex items-center gap-2 px-4 py-2 rounded-full bg-gray-200 text-gray-700">
-                      <FaCommentDots size={18} /> {comments.length}
+                      <FaCommentDots size={18} /> {countComments(comments)}
                     </span>
                   </div>
                 </div>
@@ -451,7 +567,11 @@ const GalleryViewerModal = ({
                     ref={commentsRef}
                     className="flex-1 overflow-y-auto overflow-x-auto px-4 pb-4 custom-scrollbar no-scrollbar min-h-0 overscroll-contain"
                   >
-                    {comments.length > 0 ? (
+                    {isCommentsFetching ? (
+                      <div className="flex justify-center py-6 text-gray-500">
+                        Loading comments...
+                      </div>
+                    ) : comments.length > 0 ? (
                       <div className="min-w-max space-y-3">
                         {comments.map((comment) => (
                           <CommentItem
@@ -471,6 +591,18 @@ const GalleryViewerModal = ({
                         Be the first to leave a comment!
                       </p>
                     )}
+                    {hasMoreComments ? (
+                      <div className="mt-4 flex justify-center">
+                        <button
+                          type="button"
+                          onClick={() => fetchComments(album.id, commentPage + 1, false)}
+                          disabled={loadingMoreComments}
+                          className="rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {loadingMoreComments ? "Loading..." : "Load more comments"}
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
                   {/* Comment input */}
                   <div className="px-4 pt-2 pb-4 bg-gray-50 flex-shrink-0 border-t relative">
@@ -521,7 +653,7 @@ const GalleryViewerModal = ({
                     )}
                   </div>
                   {/* <div className="mt-2 pt-2 border-t text-center text-sm text-gray-600">
-                    Photo {currentPhotoIndex + 1} of {album.photos.length}
+                    Photo {currentPhotoIndex + 1} of {photos.length}
                   </div> */}
                 </div>
               </div>
@@ -575,7 +707,7 @@ const GalleryViewerModal = ({
                   setCurrentPhotoIndex(index);
                 }}
               >
-                {album.photos.map((img, idx) => (
+                {photos.map((img, idx) => (
                   <div
                     key={idx}
                     className="w-full h-full flex-shrink-0 snap-center flex items-center justify-center p-4"
@@ -604,7 +736,7 @@ const GalleryViewerModal = ({
               )}
 
               {/* Next Button — show only if NOT the last image */}
-              {currentPhotoIndex < album.photos.length - 1 && (
+              {currentPhotoIndex < photos.length - 1 && (
                 <button
                   onClick={goToNextFS}
                   className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 p-3 rounded-full text-white shadow-lg select-none z-20"
@@ -615,7 +747,7 @@ const GalleryViewerModal = ({
 
               {/* Pagination */}
               <div className="absolute bottom-7 w-full flex justify-center gap-2">
-                {album.photos.map((_, idx) => (
+                {photos.map((_, idx) => (
                   <span
                     key={idx}
                     className={`inline-block w-2 h-2 rounded-full ${

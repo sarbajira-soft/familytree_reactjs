@@ -36,7 +36,7 @@ export const useUserPosts = (userId, enabled = true) => {
 export const useUserGalleries = (userId, enabled = true) => {
   return useQuery({
     queryKey: ['userGalleries', userId],
-    queryFn: () => authFetch(`/gallery/by-options?createdBy=${userId}`),
+    queryFn: () => authFetch(`/gallery/by-options?createdBy=${userId}&page=1&limit=100`),
     enabled: enabled && !!userId,
     staleTime: 3 * 60 * 1000,
   });
