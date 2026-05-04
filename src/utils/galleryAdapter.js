@@ -36,6 +36,7 @@ const getRawImages = (gallery) => {
 
 export const getGalleryListFromApiResponse = (payload) => {
   if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.galleries)) return payload.galleries;
   if (Array.isArray(payload?.data)) return payload.data;
   return [];
 };
@@ -82,6 +83,9 @@ export const mapGallerySummary = (gallery) => {
     commentCount,
     comments: new Array(commentCount).fill(""),
     isLiked: Boolean(gallery?.isLiked),
+    isSeen: Boolean(gallery?.isSeen || gallery?.seen),
+    seen: Boolean(gallery?.isSeen || gallery?.seen),
+    finalScore: Number(gallery?.finalScore || 0),
     createdBy: gallery?.createdBy || gallery?.user?.userId || null,
     createdAt: gallery?.createdAt || null,
     user: gallery?.user || null,

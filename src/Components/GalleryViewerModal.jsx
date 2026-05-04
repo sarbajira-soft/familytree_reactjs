@@ -24,6 +24,7 @@ const GalleryViewerModal = ({
   album,
   currentUser,
   authToken,
+  onSeenEligible,
 }) => {
   const currentUserId =
     currentUser?.userId ??
@@ -80,6 +81,7 @@ const GalleryViewerModal = ({
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const textareaRef = useRef(null);
   const emojiPickerRef = useRef(null);
+  const seenTimerRef = useRef(null);
   const activeAlbum = galleryDetail || album;
   const photos = activeAlbum?.photos || [];
   const comments = useMemo(() => buildCommentTree(commentRows), [commentRows]);
@@ -153,7 +155,7 @@ const GalleryViewerModal = ({
       const nextGallery = mapGalleryDetail(data?.data || data);
       setGalleryDetail(nextGallery);
       setIsLiked(Boolean(nextGallery?.isLiked));
-      setTotalLikes(Number(nextGallery?.likes || 0));
+      setTotalLikes(Number(nextGallery?.likeCount ?? nextGallery?.likes ?? 0));
     } catch (err) {
       console.error("Fetching gallery failed", err);
       setDetailError(err?.message || "Unable to load this gallery.");
@@ -234,13 +236,40 @@ const GalleryViewerModal = ({
     setGalleryDetail(null);
     setDetailError("");
     setIsLiked(album.isLiked || false);
-    setTotalLikes(album.likes || 0);
+    setTotalLikes(album.likeCount ?? album.likes ?? 0);
     setCommentRows([]);
     setCommentPage(1);
     setHasMoreComments(false);
     fetchGalleryDetail(album.id);
     fetchComments(album.id, 1, true);
   }, [isOpen, album?.id]);
+
+  useEffect(() => {
+    if (seenTimerRef.current) {
+      clearTimeout(seenTimerRef.current);
+      seenTimerRef.current = null;
+    }
+
+    if (!isOpen || !album?.id || typeof onSeenEligible !== "function") {
+      return undefined;
+    }
+
+    if (activeAlbum?.isSeen || activeAlbum?.seen) {
+      return undefined;
+    }
+
+    seenTimerRef.current = window.setTimeout(() => {
+      onSeenEligible(Number(album.id));
+      seenTimerRef.current = null;
+    }, 3000);
+
+    return () => {
+      if (seenTimerRef.current) {
+        clearTimeout(seenTimerRef.current);
+        seenTimerRef.current = null;
+      }
+    };
+  }, [isOpen, album?.id, activeAlbum?.isSeen, activeAlbum?.seen, onSeenEligible]);
 
   useEffect(() => {
     if (!isOpen || !isFullScreen || !fsCarouselRef.current) return;
