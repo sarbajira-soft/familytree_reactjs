@@ -1,67 +1,90 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { FiMoreVertical, FiPlusCircle } from "react-icons/fi";
+import { MdPeople, MdPublic } from "react-icons/md";
 
-import GalleryViewerModal from '../Components/GalleryViewerModal';
-import ReportContentModal from '../Components/ReportContentModal';
-import {  FiMoreVertical, FiPlusCircle } from 'react-icons/fi';
-import { MdPublic, MdPeople } from 'react-icons/md';
-import CreateAlbumModal from '../Components/CreateAlbumModal';
-import { useUser } from '../Contexts/UserContext'; // Import useUser context
-import GalleryPageShimmer from './GalleryPageShimmer';
-
-import { authFetchResponse } from '../utils/authFetch';
-import { getToken } from '../utils/auth';
-import { hasFamilyAccess } from '../utils/familyAccess';
-import { getGalleryListFromApiResponse, mapGallerySummary } from '../utils/galleryAdapter';
-
-const GalleryCollage = ({ photos = [], onOpenAlbum }) => {
-  // ... (rest of the code remains the same)
-};
+import GalleryViewerModal from "../Components/GalleryViewerModal";
+import ReportContentModal from "../Components/ReportContentModal";
+import CreateAlbumModal from "../Components/CreateAlbumModal";
+import { useUser } from "../Contexts/UserContext";
+import GalleryPageShimmer from "./GalleryPageShimmer";
+import useGallerySeenBatch from "../hooks/useGallerySeenBatch";
+import { authFetchResponse } from "../utils/authFetch";
+import { getToken } from "../utils/auth";
+import { hasFamilyAccess } from "../utils/familyAccess";
+import {
+  getGalleryListFromApiResponse,
+  mapGallerySummary,
+} from "../utils/galleryAdapter";
 
 const FamilyGalleryPage = () => {
-  const { userInfo, userLoading } = useUser(); // Get user info from context
+  const { userInfo } = useUser();
   const canAccessFamilyFeed = hasFamilyAccess(userInfo);
-  const [token, setToken] = useState(null); // State to store the token
+  const [token] = useState(() => getToken());
   const navigate = useNavigate();
 
-  const [activeFeed, setActiveFeed] = useState('public'); // Changed to 'public' as default
+  const [activeFeed, setActiveFeed] = useState("public");
   const [isGalleryModalOpen, setIsGalleryModalOpen] = useState(false);
-  const [selectedAlbum, setSelectedAlbum] = useState(null); // To store the album currently viewed in modal
+  const [selectedAlbum, setSelectedAlbum] = useState(null);
   const [isCreateAlbumModalOpen, setIsCreateAlbumModalOpen] = useState(false);
-  const [galleryAlbums, setGalleryAlbums] = useState([]); // Initialize as empty array for API data
-  const [loadingAlbums, setLoadingAlbums] = useState(true); // Loading state for albums
+  const [galleryAlbums, setGalleryAlbums] = useState([]);
+  const [loadingAlbums, setLoadingAlbums] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
-  const [feedError, setFeedError] = useState('');
-  const [showSearchInput, setShowSearchInput] = useState(false);
-  const [searchCaption, setSearchCaption] = useState('');
-
-  const searchTimeoutRef = useRef(null);
-
+  const [nextCursor, setNextCursor] = useState(null);
+  const [feedError, setFeedError] = useState("");
+  const [searchCaption, setSearchCaption] = useState("");
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [reportTarget, setReportTarget] = useState(null);
-
   const [albumActionMenuAlbumId, setAlbumActionMenuAlbumId] = useState(null);
 
-  // Fetch token from localStorage on component mount
-  useEffect(() => {
-    const storedToken = getToken();
-    if (storedToken) {
-      setToken(storedToken);
-    }
-  }, []);
+  const searchTimeoutRef = useRef(null);
+  const requestIdRef = useRef(0);
+  const paginationCursorRef = useRef(null);
+  const loadMoreTriggerRef = useRef(null);
+  const activeReplaceRequestKeyRef = useRef(null);
 
-  // Function to fetch gallery albums from the API
-  const fetchGalleries = async (nextPage = 1, galleryTitleSearch = '', replace = true) => {
-    // For family feed, check if user has familyCode and is approved
-    if (activeFeed === 'family' && !canAccessFamilyFeed) {
+  const markGallerySeenLocal = (galleryId) => {
+    const normalizedGalleryId = Number(galleryId);
+
+    setGalleryAlbums((prev) =>
+      prev.map((gallery) =>
+        Number(gallery?.id) === normalizedGalleryId
+          ? { ...gallery, isSeen: true, seen: true }
+          : gallery,
+      ),
+    );
+
+    setSelectedAlbum((prev) =>
+      Number(prev?.id) === normalizedGalleryId
+        ? { ...prev, isSeen: true, seen: true }
+        : prev,
+    );
+  };
+
+  const { queueSeenGallery } = useGallerySeenBatch({
+    galleries: galleryAlbums,
+    onMarkSeenLocal: markGallerySeenLocal,
+    batchSize: 3,
+    flushIntervalMs: 15000,
+  });
+
+  const fetchGalleries = async ({
+    cursor = null,
+    galleryTitleSearch = "",
+    replace = true,
+  } = {}) => {
+    const normalizedSearch = String(galleryTitleSearch || "").trim();
+    const cursorKey = cursor || "__initial__";
+    const requestKey = `${activeFeed}|${cursorKey}|${normalizedSearch}`;
+
+    if (activeFeed === "family" && !canAccessFamilyFeed) {
       setGalleryAlbums([]);
       setLoadingAlbums(false);
       setLoadingMore(false);
-      setFeedError('');
+      setFeedError("");
       setHasMore(false);
-      setPage(1);
+      setNextCursor(null);
       return;
     }
 
@@ -71,109 +94,169 @@ const FamilyGalleryPage = () => {
       return;
     }
 
-    if (replace) {
-      setLoadingAlbums(true);
-    } else {
+    if (!replace) {
+      if (!cursor || paginationCursorRef.current === cursorKey) {
+        return;
+      }
+      paginationCursorRef.current = cursorKey;
       setLoadingMore(true);
-    }
-    setFeedError('');
-    try {
-      let endpoint = '';
-
-      // Determine the API URL based on the active feed
-      if (activeFeed === 'family') {
-        endpoint = `/gallery/by-options?privacy=family`;
-      } else {
-        endpoint = `/gallery/by-options?privacy=public`;
+    } else {
+      if (activeReplaceRequestKeyRef.current === requestKey) {
+        return;
       }
 
-      endpoint += `&page=${nextPage}&limit=20`;
+      activeReplaceRequestKeyRef.current = requestKey;
+      requestIdRef.current += 1;
+      setLoadingAlbums(true);
+      setNextCursor(null);
+      paginationCursorRef.current = null;
+    }
 
-      if (galleryTitleSearch.trim()) {
-        endpoint += `&galleryTitle=${encodeURIComponent(galleryTitleSearch.trim())}`;
+    const requestId = requestIdRef.current;
+    setFeedError("");
+
+    try {
+      let endpoint = `/gallery/feed?privacy=${activeFeed}&limit=20`;
+
+      if (cursor) {
+        endpoint += `&cursor=${encodeURIComponent(cursor)}`;
+      }
+
+      if (normalizedSearch) {
+        endpoint += `&galleryTitle=${encodeURIComponent(normalizedSearch)}`;
       }
 
       const response = await authFetchResponse(endpoint, {
-        method: 'GET',
+        method: "GET",
         skipThrow: true,
       });
       const payload = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        throw new Error(payload?.message || 'Failed to fetch galleries.');
+        throw new Error(payload?.message || "Failed to fetch galleries.");
       }
 
-      const formattedGalleries = getGalleryListFromApiResponse(payload).map(mapGallerySummary);
+      if (replace && requestId !== requestIdRef.current) {
+        return;
+      }
+
+      const formattedGalleries = getGalleryListFromApiResponse(payload).map(
+        mapGallerySummary,
+      );
 
       setGalleryAlbums((prev) => {
         if (replace) {
           return formattedGalleries;
         }
 
-        const seen = new Set(prev.map((gallery) => gallery.id));
-        return [...prev, ...formattedGalleries.filter((gallery) => !seen.has(gallery.id))];
+        const seenIds = new Set(prev.map((gallery) => Number(gallery?.id)));
+        return [
+          ...prev,
+          ...formattedGalleries.filter(
+            (gallery) => !seenIds.has(Number(gallery?.id)),
+          ),
+        ];
       });
-      setPage(nextPage);
       setHasMore(Boolean(payload?.hasMore));
+      setNextCursor(payload?.nextCursor || null);
     } catch (error) {
-      console.error('Failed to fetch galleries:', error);
-      setFeedError(error?.message || 'Failed to load galleries.');
+      console.error("Failed to fetch galleries:", error);
+      setFeedError(error?.message || "Failed to load galleries.");
       if (replace) {
         setGalleryAlbums([]);
+        setHasMore(false);
+        setNextCursor(null);
       }
     } finally {
-      setLoadingAlbums(false);
-      setLoadingMore(false);
+      if (replace) {
+        setLoadingAlbums(false);
+        if (activeReplaceRequestKeyRef.current === requestKey) {
+          activeReplaceRequestKeyRef.current = null;
+        }
+      } else {
+        setLoadingMore(false);
+        paginationCursorRef.current = null;
+      }
     }
   };
 
-  // Fetch galleries whenever activeFeed, userInfo, or token changes
   useEffect(() => {
-    fetchGalleries(1, searchCaption, true);
-  }, [activeFeed, canAccessFamilyFeed, userInfo?.familyCode, userInfo?.approveStatus, token]);
+    void fetchGalleries({
+      cursor: null,
+      galleryTitleSearch: searchCaption,
+      replace: true,
+    });
+  }, [
+    activeFeed,
+    userInfo?.userId,
+    userInfo?.familyCode,
+    userInfo?.approveStatus,
+    token,
+  ]);
 
-  const filteredAlbums = galleryAlbums; // No need to filter here, API should return filtered results
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+        searchTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const target = loadMoreTriggerRef.current;
+    if (!target || !hasMore || !nextCursor || loadingAlbums || loadingMore) {
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (!entry?.isIntersecting) {
+          return;
+        }
+
+        void fetchGalleries({
+          cursor: nextCursor,
+          galleryTitleSearch: searchCaption,
+          replace: false,
+        });
+      },
+      {
+        rootMargin: "320px 0px",
+      },
+    );
+
+    observer.observe(target);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [hasMore, nextCursor, loadingAlbums, loadingMore, searchCaption]);
+
+  const filteredAlbums = galleryAlbums;
 
   const goToUserProfile = (targetUserId) => {
     if (!targetUserId) return;
     const myId = userInfo?.userId;
     if (myId && Number(targetUserId) === Number(myId)) {
-      navigate('/myprofile');
+      navigate("/myprofile");
     } else {
       navigate(`/user/${targetUserId}`);
     }
   };
-
-  const collagePhotos = useMemo(() => {
-    if (!filteredAlbums.length) return [];
-
-    return filteredAlbums
-      .filter((a) => a && a.coverPhoto) // prevents undefined
-      .map((album) => ({
-        id: album.id,
-        url:
-          album.coverPhoto || "https://picsum.photos/seed/default_album/400/300",
-        caption: album.title,
-        albumTitle: album.title,
-        albumId: album.id,
-      }));
-  }, [filteredAlbums]);
 
   const openGalleryModal = (album) => {
     setSelectedAlbum(album);
     setIsGalleryModalOpen(true);
   };
 
-  const openCreateAlbumModal = () => {
-    setIsCreateAlbumModalOpen(true);
-  };
-
   const openReportModalForAlbum = (album) => {
     if (!album?.id) return;
     setReportTarget({
-      targetType: 'gallery',
+      targetType: "gallery",
       targetId: album.id,
-      targetLabel: album?.title ? `Album: ${album.title}` : 'Album',
+      targetLabel: album?.title ? `Album: ${album.title}` : "Album",
     });
     setReportModalOpen(true);
   };
@@ -183,159 +266,99 @@ const FamilyGalleryPage = () => {
     setReportTarget(null);
   };
 
-  const handleCloseCreateAlbumModal = () => {
-    setIsCreateAlbumModalOpen(false);
-  };
-
   const onGalleryCreated = () => {
-    fetchGalleries(1, searchCaption, true);
-  };
-
-  const handleOpenAlbumFromCollage = (albumId) => {
-    const album = filteredAlbums.find((a) => a.id === albumId);
-    if (album) {
-      openGalleryModal(album);
-    }
+    fetchGalleries({
+      cursor: null,
+      galleryTitleSearch: searchCaption,
+      replace: true,
+    });
   };
 
   useEffect(() => {
-    if (!albumActionMenuAlbumId) return;
+    if (!albumActionMenuAlbumId) return undefined;
 
-    const handleDocMouseDown = (e) => {
-      const el = e.target;
-      if (el?.closest?.('[data-album-action-menu]')) return;
+    const handleDocMouseDown = (event) => {
+      if (event?.target?.closest?.("[data-album-action-menu]")) return;
       setAlbumActionMenuAlbumId(null);
     };
 
-    document.addEventListener('mousedown', handleDocMouseDown);
+    document.addEventListener("mousedown", handleDocMouseDown);
     return () => {
-      document.removeEventListener('mousedown', handleDocMouseDown);
+      document.removeEventListener("mousedown", handleDocMouseDown);
     };
   }, [albumActionMenuAlbumId]);
 
   return (
     <>
-      <div className="flex flex-col max-w-7xl mx-auto px-4 py-8 md:px-6 lg:px-8">
-        {/* Main Content (Gallery) Column - Now full width */}
+      <div className="mx-auto flex max-w-7xl flex-col px-4 py-8 md:px-6 lg:px-8">
         <div className="w-full">
-
-          {/* Top Bar - Enhanced with Create Album button */}
-          <div
-            className="
-  flex flex-col sm:flex-row 
-  items-start sm:items-center 
-  justify-between gap-4 
-  pb-6 mb-6 border-b border-gray-200
-"
-          >
-            {/* Title */}
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 leading-none">
+          <div className="mb-6 flex flex-col items-start justify-between gap-4 border-b border-gray-200 pb-6 sm:flex-row sm:items-center">
+            <h1 className="text-2xl font-extrabold leading-none text-gray-900 sm:text-3xl">
               Gallery Hub
             </h1>
 
-            {/* RIGHT SIDE ACTIONS */}
-            <div
-              className="
-    w-full sm:w-auto 
-    flex flex-col sm:flex-row 
-    items-start sm:items-center 
-    gap-3
-  "
-            >
-              <div className="w-full flex flex-row gap-2">
-                {/* FEED SWITCHER */}
-                <div
-                  className="
-      flex flex-1 sm:flex-none 
-      justify-between sm:justify-start 
-      gap-2 bg-gray-100 p-1 rounded-full
-    "
-                >
+            <div className="flex w-full flex-col items-start gap-3 sm:w-auto sm:flex-row sm:items-center">
+              <div className="flex w-full flex-row gap-2">
+                <div className="flex flex-1 justify-between gap-2 rounded-full bg-gray-100 p-1 sm:flex-none sm:justify-start">
                   <button
                     onClick={() => setActiveFeed("public")}
-                    className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 
-          py-1.5 px-2.5 sm:px-4 text-xs sm:text-sm font-semibold rounded-full transition-all
-          ${
-            activeFeed === "public"
-              ? "bg-gradient-to-r from-secondary-500 to-secondary-600 text-white shadow"
-              : "bg-primary-700 text-white hover:bg-primary-800"
-          }`}
+                    className={`flex flex-1 items-center justify-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-semibold transition-all sm:flex-none sm:px-4 sm:text-sm ${
+                      activeFeed === "public"
+                        ? "bg-gradient-to-r from-secondary-500 to-secondary-600 text-white shadow"
+                        : "bg-primary-700 text-white hover:bg-primary-800"
+                    }`}
                   >
                     <MdPublic size={16} /> Public
                   </button>
 
-                  {canAccessFamilyFeed && (
-                      <button
-                        onClick={() => setActiveFeed("family")}
-                        className={`flex-1 sm:flex-none flex items-center justify-center 
-            gap-1.5 py-1.5 px-2.5 sm:px-4 text-xs sm:text-sm font-semibold rounded-full transition-all
-            ${
-              activeFeed === "family"
-                ? "bg-gradient-to-r from-secondary-500 to-secondary-600 text-white shadow"
-                : "bg-primary-700 text-white hover:bg-primary-800"
-            }`}
-                      >
-                        <MdPeople size={16} /> Family
-                      </button>
-                    )}
+                  {canAccessFamilyFeed ? (
+                    <button
+                      onClick={() => setActiveFeed("family")}
+                      className={`flex flex-1 items-center justify-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-semibold transition-all sm:flex-none sm:px-4 sm:text-sm ${
+                        activeFeed === "family"
+                          ? "bg-gradient-to-r from-secondary-500 to-secondary-600 text-white shadow"
+                          : "bg-primary-700 text-white hover:bg-primary-800"
+                      }`}
+                    >
+                      <MdPeople size={16} /> Family
+                    </button>
+                  ) : null}
                 </div>
 
-                {/* CREATE ALBUM BTN */}
                 <button
-                  className="
-        flex items-center justify-center 
-        gap-1.5 px-2.5 sm:px-4 py-1.5 
-        bg-primary-700 hover:bg-primary-800 text-white 
-        text-xs sm:text-sm font-semibold rounded-full shadow 
-        transition-all whitespace-nowrap flex-none
-      "
-                  onClick={openCreateAlbumModal}
+                  className="flex flex-none items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-primary-700 px-2.5 py-1.5 text-xs font-semibold text-white shadow transition-all hover:bg-primary-800 sm:px-4 sm:text-sm"
+                  onClick={() => setIsCreateAlbumModalOpen(true)}
                 >
                   <FiPlusCircle size={16} /> Create Album
                 </button>
               </div>
 
-              {/* SEARCH */}
               <input
                 type="text"
                 autoFocus
                 placeholder="Search Albums..."
                 value={searchCaption}
-                onChange={(e) => {
-                  const value = e.target.value;
+                onChange={(event) => {
+                  const value = event.target.value;
                   setSearchCaption(value);
 
-                  if (searchTimeoutRef.current)
+                  if (searchTimeoutRef.current) {
                     clearTimeout(searchTimeoutRef.current);
+                  }
 
                   searchTimeoutRef.current = setTimeout(() => {
-                    fetchGalleries(1, value, true);
-                  }, 500);
+                    void fetchGalleries({
+                      cursor: null,
+                      galleryTitleSearch: value,
+                      replace: true,
+                    });
+                  }, 400);
                 }}
-                onBlur={() => {
-                  if (!searchCaption) setShowSearchInput(false);
-                }}
-                className="
-        w-full sm:w-48 px-3 py-2 
-        rounded-full border border-gray-300 
-        text-sm focus:outline-none 
-        focus:ring-2 focus:ring-primary-400
-        dark:bg-slate-800
-        dark:text-white
-      "
+                className="w-full rounded-full border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 dark:bg-slate-800 dark:text-white sm:w-48"
               />
             </div>
           </div>
 
-          {/* Collage-style hero using photos from albums */}
-          {collagePhotos.length > 0 && (
-            <GalleryCollage
-              photos={collagePhotos}
-              onOpenAlbum={handleOpenAlbumFromCollage}
-            />
-          )}
-
-          {/* Gallery Content - Updated to 4-column grid */}
           {loadingAlbums ? (
             <GalleryPageShimmer />
           ) : (
@@ -345,151 +368,171 @@ const FamilyGalleryPage = () => {
                   {feedError}
                 </div>
               ) : null}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8 auto-rows-fr">
-              {filteredAlbums.length > 0 ? (
-                filteredAlbums.map((album) => (
-                  <div
-                    key={album.id}
-                    className="bg-white rounded-2xl overflow-hidden shadow-xl border border-gray-100 transform hover:scale-[1.03] transition-all duration-300 ease-in-out group relative"
-                  >
-                    <button
-                      type="button"
-                      className="relative w-full h-56 bg-gray-100 overflow-hidden text-left"
-                      onClick={() => openGalleryModal(album)}
-                      aria-label={`Open album ${album.title || ''}`}
+
+              <div className="grid auto-rows-fr grid-cols-1 gap-8 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                {filteredAlbums.length > 0 ? (
+                  filteredAlbums.map((album) => (
+                    <div
+                      key={album.id}
+                      className="group relative overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-xl transition-all duration-300 ease-in-out hover:scale-[1.03]"
                     >
-                      <img
-                        src={album.coverPhoto}
-                        alt={album.title}
-                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-4">
-                        {album.photosCount > 0 && (
-                          <span className="text-white text-sm font-semibold bg-black/50 px-2 py-1 rounded-full backdrop-blur-sm">
-                            {album.photosCount} Photos
-                          </span>
-                        )}
-                      </div>
-                      {album.photosCount > 1 && (
-                        <div className="absolute top-3 right-3 bg-primary-600 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-md animate-bounce-slow">
-                          +{album.photosCount - 1} More
+                      <button
+                        type="button"
+                        className="relative h-56 w-full overflow-hidden bg-gray-100 text-left"
+                        onClick={() => openGalleryModal(album)}
+                        aria-label={`Open album ${album.title || ""}`}
+                      >
+                        <img
+                          src={album.coverPhoto}
+                          alt={album.title}
+                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-110"
+                        />
+                        <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/60 to-transparent p-4 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                          {album.photosCount > 0 ? (
+                            <span className="rounded-full bg-black/50 px-2 py-1 text-sm font-semibold text-white backdrop-blur-sm">
+                              {album.photosCount} Photos
+                            </span>
+                          ) : null}
                         </div>
-                      )}
-                    </button>
-                    <div className="p-5">
-                      <div className="flex items-start justify-between gap-3">
-                        <h3 className="font-bold text-xl text-gray-900 mb-2 line-clamp-1">
-                          {album.title}
-                        </h3>
-
-                        {album?.authorId && userInfo?.userId &&
-                        Number(album.authorId) !== Number(userInfo.userId) ? (
-                          <div className="relative" data-album-action-menu>
-                            <button
-                              type="button"
-                              className="inline-flex h-9 w-9 items-center justify-center rounded-full text-gray-700 hover:bg-gray-100 active:bg-gray-200 transition-colors"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setAlbumActionMenuAlbumId((prev) =>
-                                  prev === album.id ? null : album.id,
-                                );
-                              }}
-                              aria-label="Album actions"
-                            >
-                              <FiMoreVertical />
-                            </button>
-
-                            {albumActionMenuAlbumId === album.id && (
-                              <div className="absolute right-0 mt-2 w-40 rounded-xl border border-gray-200 bg-white shadow-lg z-10 overflow-hidden">
-                                <button
-                                  type="button"
-                                  className="w-full flex items-center px-3 py-2 text-left text-sm text-gray-700 hover:bg-red-50 active:bg-red-100 transition-colors"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setAlbumActionMenuAlbumId(null);
-                                    openReportModalForAlbum(album);
-                                  }}
-                                >
-                                  Report
-                                </button>
-                              </div>
-                            )}
+                        {album.photosCount > 1 ? (
+                          <div className="animate-bounce-slow absolute right-3 top-3 rounded-full bg-primary-600 px-3 py-1.5 text-xs font-bold text-white shadow-md">
+                            +{album.photosCount - 1} More
                           </div>
                         ) : null}
-                      </div>
+                        {!album.isSeen ? (
+                          <div className="absolute left-3 top-3 rounded-full bg-emerald-500 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-white shadow">
+                            New
+                          </div>
+                        ) : null}
+                      </button>
 
-                      <p className="text-sm text-gray-600 mb-3">
-                        by{" "}
-                        <span
-                          className="font-medium text-primary-700 cursor-pointer"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            goToUserProfile(album.authorId);
-                          }}
-                        >
-                          {album.author}
-                        </span>
-                      </p>
+                      <div className="p-5">
+                        <div className="flex items-start justify-between gap-3">
+                          <h3 className="mb-2 line-clamp-1 text-xl font-bold text-gray-900">
+                            {album.title}
+                          </h3>
 
-                      <div className="flex items-center gap-2 text-sm text-gray-500">
-                        {album.privacy === "family" ? (
+                          {album?.authorId &&
+                          userInfo?.userId &&
+                          Number(album.authorId) !== Number(userInfo.userId) ? (
+                            <div className="relative" data-album-action-menu>
+                              <button
+                                type="button"
+                                className="inline-flex h-9 w-9 items-center justify-center rounded-full text-gray-700 transition-colors hover:bg-gray-100 active:bg-gray-200"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setAlbumActionMenuAlbumId((prev) =>
+                                    prev === album.id ? null : album.id,
+                                  );
+                                }}
+                                aria-label="Album actions"
+                              >
+                                <FiMoreVertical />
+                              </button>
+
+                              {albumActionMenuAlbumId === album.id ? (
+                                <div className="absolute right-0 z-10 mt-2 w-40 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg">
+                                  <button
+                                    type="button"
+                                    className="w-full px-3 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-red-50 active:bg-red-100"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      setAlbumActionMenuAlbumId(null);
+                                      openReportModalForAlbum(album);
+                                    }}
+                                  >
+                                    Report
+                                  </button>
+                                </div>
+                              ) : null}
+                            </div>
+                          ) : null}
+                        </div>
+
+                        <p className="mb-3 text-sm text-gray-600">
+                          by{" "}
                           <span
-                            className="flex items-center gap-1 text-primary-600 bg-primary-50 px-3 py-1 rounded-full font-medium"
-                            title="Family Album"
+                            className="cursor-pointer font-medium text-primary-700"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              goToUserProfile(album.authorId);
+                            }}
                           >
-                            <MdPeople size={16} /> Family
+                            {album.author}
                           </span>
-                        ) : (
-                          <span
-                            className="flex items-center gap-1 text-secondary-400 bg-secondary-50 px-3 py-1 rounded-full font-medium"
-                            title="Public Album"
-                          >
-                            <MdPublic size={16} /> Public
-                          </span>
-                        )}
+                        </p>
+
+                        <div className="flex items-center justify-between gap-3 text-sm text-gray-500">
+                          {album.privacy === "family" ? (
+                            <span
+                              className="flex items-center gap-1 rounded-full bg-primary-50 px-3 py-1 font-medium text-primary-600"
+                              title="Family Album"
+                            >
+                              <MdPeople size={16} /> Family
+                            </span>
+                          ) : (
+                            <span
+                              className="flex items-center gap-1 rounded-full bg-secondary-50 px-3 py-1 font-medium text-secondary-400"
+                              title="Public Album"
+                            >
+                              <MdPublic size={16} /> Public
+                            </span>
+                          )}
+
+                          <div className="flex items-center gap-3 text-xs font-medium text-gray-500">
+                            <span>{album.likeCount || 0} likes</span>
+                            <span>{album.commentCount || 0} comments</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
+                  ))
+                ) : (
+                  <div className="flex items-center justify-center rounded-2xl border border-gray-100 bg-white p-10 text-center text-gray-600 shadow-xl sm:col-span-2 md:col-span-3 lg:col-span-4">
+                    <div>
+                      <p className="mb-4 text-2xl font-bold text-gray-800">
+                        No albums here yet!
+                      </p>
+                      <p className="text-lg">
+                        Looks like the {activeFeed === "family" ? "Family" : "Public"} feed is a bit quiet. Why not be the first to share?
+                      </p>
+                    </div>
                   </div>
-                ))
-              ) : (
-                <div className="lg:col-span-4 sm:col-span-2 md:col-span-3 bg-white rounded-2xl shadow-xl p-10 text-center text-gray-600 border border-gray-100 flex flex-col items-center justify-center">
-                  <p className="text-2xl font-bold mb-4 text-gray-800">
-                    No albums here yet!
-                  </p>
-                  <p className="text-lg mb-6">
-                    Looks like the {activeFeed === 'family' ? 'Family' : 'Public'} feed is a bit quiet. Why
-                    not be the first to share?
-                  </p>
-                </div>
-              )}
-            </div>
-            {filteredAlbums.length > 0 && hasMore ? (
-              <div className="mt-8 flex justify-center">
-                <button
-                  type="button"
-                  onClick={() => fetchGalleries(page + 1, searchCaption, false)}
-                  disabled={loadingMore}
-                  className="rounded-full bg-primary-700 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-800 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {loadingMore ? 'Loading...' : 'Load more'}
-                </button>
+                )}
               </div>
-            ) : null}
+
+              {filteredAlbums.length > 0 ? (
+                <div ref={loadMoreTriggerRef} className="mt-6 flex justify-center py-4">
+                  {loadingMore ? (
+                    <span className="text-sm font-medium text-gray-500">
+                      Loading more galleries...
+                    </span>
+                  ) : hasMore ? (
+                    <span className="text-sm text-gray-400">
+                      Scroll to load more
+                    </span>
+                  ) : (
+                    <span className="text-sm text-gray-400">
+                      You&apos;re all caught up
+                    </span>
+                  )}
+                </div>
+              ) : null}
             </>
           )}
         </div>
       </div>
 
-      {/* Gallery Viewer Modal (Existing) */}
-      {selectedAlbum && (
+      {selectedAlbum ? (
         <GalleryViewerModal
           isOpen={isGalleryModalOpen}
           onClose={() => setIsGalleryModalOpen(false)}
           album={selectedAlbum}
           currentUser={userInfo}
           authToken={token}
+          onSeenEligible={queueSeenGallery}
         />
-      )}
+      ) : null}
 
       <ReportContentModal
         isOpen={reportModalOpen}
@@ -512,5 +555,3 @@ const FamilyGalleryPage = () => {
 };
 
 export default FamilyGalleryPage;
-
-
