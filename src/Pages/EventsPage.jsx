@@ -1,20 +1,16 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useUser } from "../Contexts/UserContext";
 import Swal from "sweetalert2";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { authFetch, authFetchResponse } from "../utils/authFetch";
 import { getToken } from "../utils/auth";
 
 import {
   FiCalendar,
-  FiChevronDown,
-  FiChevronUp,
   FiMapPin,
   FiUsers,
   FiPlusSquare,
   FiList,
-  FiClock as FiUpcoming,
-  FiLoader,
   FiArrowRight,
   FiGlobe,
   FiEdit3,
@@ -41,6 +37,97 @@ import {
   normalizeEventSchedulesInput,
 } from "../utils/eventValidation";
 
+const EVENTS_PAGE_SIZE = 20;
+
+const getEventFeedEndpoint = (activeTab) => {
+  if (activeTab === "upcoming") return "/events/upcoming";
+  if (activeTab === "my-events") return "/events/mine";
+  return "/events";
+};
+
+const normalizeEventItem = (item, apiBaseUrl) => {
+  const schedules = normalizeEventSchedulesInput(item);
+  const fallbackNextSchedule = item?.nextEventDate
+    ? {
+        scheduleTitle: item?.title || item?.eventTitle || "Event",
+        scheduleDate: item.nextEventDate,
+        isAllDay: true,
+        times: [],
+      }
+    : null;
+  const nextSchedule = item?.nextSchedule
+    ? {
+        ...item.nextSchedule,
+        scheduleTitle:
+          item.nextSchedule.scheduleTitle ||
+          item.nextSchedule.schedule_title ||
+          item.nextSchedule.title ||
+          item.title ||
+          item.eventTitle,
+        times: item.nextSchedule.startTime
+          ? [
+              {
+                startTime: item.nextSchedule.startTime,
+                endTime: item.nextSchedule.endTime || "",
+              },
+            ]
+          : item.nextSchedule.times || [],
+      }
+    : getNextUpcomingSchedule(schedules) || fallbackNextSchedule;
+  const primarySchedule = nextSchedule || schedules[0] || null;
+  const primaryTimeLabel = primarySchedule?.isAllDay
+    ? "All day"
+    : primarySchedule?.times?.[0]
+      ? formatTimeRangeLabel(primarySchedule.times[0])
+      : item.eventTime || item.time || null;
+
+  let eventData = {
+    id: item.id,
+    title: item.title || item.eventTitle,
+    description: item.description || item.eventDescription || "",
+    date: primarySchedule?.scheduleDate || item.nextEventDate || item.eventDate || item.date,
+    time: primaryTimeLabel,
+    location: item.location || "",
+    familyCode: item.familyCode,
+    createdBy: item.createdBy ?? item.userId ?? item.created_by,
+    updatedAt: item.updatedAt,
+    eventType: item.eventType || "custom",
+    schedules,
+    nextSchedule: primarySchedule,
+    hasMultipleDates: item.hasMultipleDates || schedules.length > 1,
+    eventImages:
+      item.eventImages && item.eventImages.length > 0
+        ? item.eventImages
+        : item.coverImage
+          ? [item.coverImage]
+          : item.images && item.images.length > 0
+            ? item.images.map((img) => `${apiBaseUrl}/uploads/event/${img.imageUrl}`)
+            : [],
+    attendeesCount: null,
+    memberDetails: item.memberDetails || null,
+    createdAt: item.createdAt || null,
+  };
+
+  if (item.eventType === "birthday" && item.memberDetails) {
+    eventData = {
+      ...eventData,
+      profileImage: item.memberDetails.profileImage || item.coverImage || null,
+      age: item.memberDetails.age,
+      message: item.memberDetails.message,
+    };
+  } else if (item.eventType === "anniversary" && item.memberDetails) {
+    eventData = {
+      ...eventData,
+      profileImage: item.memberDetails.profileImage || item.coverImage || null,
+      spouseName: item.memberDetails.spouseName,
+      yearsOfMarriage: item.memberDetails.yearsOfMarriage,
+      message: item.memberDetails.message,
+    };
+  }
+
+  return eventData;
+};
+
 const EventsPage = () => {
   const { userInfo, userLoading } = useUser();
   const canAccessFamilyEvents = hasFamilyAccess(userInfo);
@@ -55,7 +142,7 @@ const EventsPage = () => {
   const [eventActionMenuEventId, setEventActionMenuEventId] = useState(null);
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [reportTarget, setReportTarget] = useState(null);
-  const [expandedEventIds, setExpandedEventIds] = useState({});
+  const [isEventDetailLoading, setIsEventDetailLoading] = useState(false);
 
   const openReportModalForEvent = (event) => {
     if (!event?.id) return;
@@ -85,112 +172,81 @@ const EventsPage = () => {
     };
   }, [eventActionMenuEventId]);
 
-  // Use React Query for events with tab-based caching
-  const { data: allEvents = [], isLoading: eventsLoading } = useQuery({
-    queryKey: ["events", activeTab, userInfo?.familyCode],
-    queryFn: async () => {
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
-      let endpoint;
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
 
-      if (activeTab === "upcoming") {
-        endpoint = `${apiBaseUrl}/event/upcoming/all`;
-      } else if (activeTab === "my-events") {
-        endpoint = `${apiBaseUrl}/event/my-events`;
-      } else if (activeTab === "all") {
-        endpoint = `${apiBaseUrl}/event/all`;
+  const {
+    data: pagedEvents,
+    isLoading: eventsLoading,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+  } = useInfiniteQuery({
+    queryKey: ["events", activeTab, userInfo?.familyCode],
+    queryFn: async ({ pageParam }) => {
+      const endpoint = getEventFeedEndpoint(activeTab);
+      const params = new URLSearchParams({
+        limit: String(EVENTS_PAGE_SIZE),
+      });
+      if (pageParam) {
+        params.set("cursor", pageParam);
       }
 
-      const data = await authFetch(endpoint, {
+      const response = await authFetch(`${apiBaseUrl}${endpoint}?${params.toString()}`, {
         method: "GET",
       });
-      return data.map((item) => {
-        const schedules = normalizeEventSchedulesInput(item);
-        const nextSchedule = item?.nextSchedule
-          ? {
-              ...item.nextSchedule,
-              scheduleTitle:
-                item.nextSchedule.scheduleTitle ||
-                item.nextSchedule.schedule_title ||
-                item.nextSchedule.title ||
-                item.eventTitle,
-              times: item.nextSchedule.startTime
-                ? [
-                    {
-                      startTime: item.nextSchedule.startTime,
-                      endTime: item.nextSchedule.endTime || "",
-                    },
-                  ]
-                : [],
-            }
-          : getNextUpcomingSchedule(schedules);
-        const primarySchedule = nextSchedule || schedules[0] || null;
-        const primaryTimeLabel = primarySchedule?.isAllDay
-          ? "All day"
-          : primarySchedule?.times?.[0]
-            ? formatTimeRangeLabel(primarySchedule.times[0])
-            : item.eventTime || null;
 
-        let eventData = {
-          id: item.id,
-          title: item.eventTitle,
-          description: item.eventDescription,
-          date: primarySchedule?.scheduleDate || item.eventDate,
-          time: primaryTimeLabel,
-          location: item.location,
-          familyCode: item.familyCode,
-          createdBy: item.createdBy ?? item.userId ?? item.created_by,
-          updatedAt: item.updatedAt,
-          // author: item.createdByName ?? item.creatorName ?? item.userName ?? item.author ?? "Unknown",
-          eventType: item.eventType || "custom",
-          schedules,
-          nextSchedule: primarySchedule,
-          hasMultipleDates: item.hasMultipleDates || schedules.length > 1,
-          eventImages:
-            item.eventImages && item.eventImages.length > 0
-              ? item.eventImages
-              : item.images && item.images.length > 0
-                ? item.images.map(
-                  (img) => `${apiBaseUrl}/uploads/event/${img.imageUrl}`
-                )
-                : [],
-          attendeesCount: null,
-        };
+      if (Array.isArray(response)) {
+        return { data: response, nextCursor: null };
+      }
 
-        if (item.eventType === "birthday" && item.memberDetails) {
-          eventData = {
-            ...eventData,
-            memberDetails: item.memberDetails,
-            profileImage: item.memberDetails.profileImage,
-            age: item.memberDetails.age,
-            message: item.memberDetails.message,
-          };
-        } else if (item.eventType === "anniversary" && item.memberDetails) {
-          eventData = {
-            ...eventData,
-            memberDetails: item.memberDetails,
-            profileImage: item.memberDetails.profileImage,
-            spouseName: item.memberDetails.spouseName,
-            yearsOfMarriage: item.memberDetails.yearsOfMarriage,
-            message: item.memberDetails.message,
-          };
-        }
-
-        return eventData;
-      });
+      return {
+        data: Array.isArray(response?.data) ? response.data : [],
+        nextCursor: response?.nextCursor || null,
+      };
     },
+    getNextPageParam: (lastPage) => lastPage?.nextCursor?.cursor || undefined,
+    initialPageParam: null,
     enabled: canAccessFamilyEvents,
     staleTime: 2 * 60 * 1000,
     cacheTime: 10 * 60 * 1000,
   });
+
+  const displayedEvents = useMemo(() => {
+    const pages = Array.isArray(pagedEvents?.pages) ? pagedEvents.pages : [];
+    return pages
+      .flatMap((page) => (Array.isArray(page?.data) ? page.data : []))
+      .map((item) => normalizeEventItem(item, apiBaseUrl));
+  }, [apiBaseUrl, pagedEvents]);
+
+  const fetchEventDetails = async (eventId) => {
+    const eventDetail = await authFetch(`${apiBaseUrl}/event/${eventId}`, {
+      method: "GET",
+    });
+    return normalizeEventItem(eventDetail, apiBaseUrl);
+  };
 
   const handleCreateEventClick = () => {
     setSelectedEvent(null);
     setEventModalMode("create");
   };
 
-  const handleViewEvent = (event) => {
-    setSelectedEvent(event);
-    setIsEventViewerOpen(true);
+  const handleViewEvent = async (event) => {
+    if (!event?.id) return;
+    try {
+      setIsEventDetailLoading(true);
+      const detailedEvent = await fetchEventDetails(event.id);
+      setSelectedEvent(detailedEvent);
+      setIsEventViewerOpen(true);
+    } catch (error) {
+      Swal.fire({
+        icon: "error",
+        title: "Unable to load event",
+        text: error?.message || "Please try again.",
+        confirmButtonColor: "#d33",
+      });
+    } finally {
+      setIsEventDetailLoading(false);
+    }
   };
 
   const handleCloseEventViewer = () => {
@@ -242,7 +298,7 @@ const EventsPage = () => {
 
       setIsEventViewerOpen(false);
       setSelectedEvent(null);
-      queryClient.invalidateQueries(["events"]);
+      queryClient.invalidateQueries({ queryKey: ["events"] });
     } catch (error) {
       console.error("Error deleting event:", error);
       Swal.fire({
@@ -255,19 +311,11 @@ const EventsPage = () => {
   };
 
   const handleEventUpdated = () => {
-    queryClient.invalidateQueries(["events"]);
+    queryClient.invalidateQueries({ queryKey: ["events"] });
   };
 
   const handleEventCreated = () => {
-    queryClient.invalidateQueries(["events"]);
-  };
-
-  const toggleExpandedEvent = (eventId, browserEvent) => {
-    browserEvent.stopPropagation();
-    setExpandedEventIds((previous) => ({
-      ...previous,
-      [eventId]: !previous[eventId],
-    }));
+    queryClient.invalidateQueries({ queryKey: ["events"] });
   };
 
   const handleCreateFamily = () => {
@@ -312,8 +360,6 @@ const EventsPage = () => {
     return "";
   };
 
-  const displayedEvents = allEvents;
-
   const getEventTypeStyle = (eventType) => {
     switch (eventType) {
       case "birthday":
@@ -346,10 +392,24 @@ const EventsPage = () => {
     }
   };
 
-  const handleEditEventFromCard = (event, e) => {
+  const handleEditEventFromCard = async (event, e) => {
     e.stopPropagation();
-    setSelectedEvent(event);
-    setEventModalMode("edit");
+    if (!event?.id) return;
+    try {
+      setIsEventDetailLoading(true);
+      const detailedEvent = await fetchEventDetails(event.id);
+      setSelectedEvent(detailedEvent);
+      setEventModalMode("edit");
+    } catch (error) {
+      Swal.fire({
+        icon: "error",
+        title: "Unable to load event",
+        text: error?.message || "Please try again.",
+        confirmButtonColor: "#d33",
+      });
+    } finally {
+      setIsEventDetailLoading(false);
+    }
   };
 
   const handleDeleteEventFromCard = async (event, e) => {
@@ -381,7 +441,7 @@ const EventsPage = () => {
         text: "Event has been deleted successfully.",
         confirmButtonColor: "#10b981",
       });
-      queryClient.invalidateQueries(["events"]);
+      queryClient.invalidateQueries({ queryKey: ["events"] });
     } catch (error) {
       console.error("Error deleting event:", error);
       Swal.fire({
@@ -581,7 +641,7 @@ const EventsPage = () => {
                           : "cursor-default"
                         }`}
                       onClick={
-                        event.eventType === "custom"
+                        event.eventType === "custom" && !isEventDetailLoading
                           ? () => handleViewEvent(event)
                           : undefined
                       }
@@ -724,6 +784,7 @@ const EventsPage = () => {
                               event.eventType === "custom" && (
                                 <>
                                   <button
+                                    disabled={isEventDetailLoading}
                                     onClick={(e) =>
                                       handleEditEventFromCard(event, e)
                                     }
@@ -805,6 +866,19 @@ const EventsPage = () => {
                 </div>
               )}
             </div>
+
+            {hasNextPage ? (
+              <div className="flex justify-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => fetchNextPage()}
+                  disabled={isFetchingNextPage}
+                  className="rounded-xl bg-[#1976D2] px-5 py-2.5 text-sm font-semibold text-white shadow hover:bg-[#1565C0] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isFetchingNextPage ? "Loading..." : "Load More Events"}
+                </button>
+              </div>
+            ) : null}
           </div>
         </div>
       )}

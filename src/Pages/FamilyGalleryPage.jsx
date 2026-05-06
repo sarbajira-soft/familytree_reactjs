@@ -106,12 +106,12 @@ const FamilyGalleryPage = () => {
       }
 
       activeReplaceRequestKeyRef.current = requestKey;
-      requestIdRef.current += 1;
       setLoadingAlbums(true);
       setNextCursor(null);
       paginationCursorRef.current = null;
     }
 
+    requestIdRef.current += 1;
     const requestId = requestIdRef.current;
     setFeedError("");
 
@@ -136,7 +136,7 @@ const FamilyGalleryPage = () => {
         throw new Error(payload?.message || "Failed to fetch galleries.");
       }
 
-      if (replace && requestId !== requestIdRef.current) {
+      if (requestId !== requestIdRef.current) {
         return;
       }
 
@@ -160,6 +160,9 @@ const FamilyGalleryPage = () => {
       setHasMore(Boolean(payload?.hasMore));
       setNextCursor(payload?.nextCursor || null);
     } catch (error) {
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
       console.error("Failed to fetch galleries:", error);
       setFeedError(error?.message || "Failed to load galleries.");
       if (replace) {
@@ -168,13 +171,19 @@ const FamilyGalleryPage = () => {
         setNextCursor(null);
       }
     } finally {
+      const isCurrentRequest = requestId === requestIdRef.current;
+
       if (replace) {
-        setLoadingAlbums(false);
-        if (activeReplaceRequestKeyRef.current === requestKey) {
+        if (isCurrentRequest) {
+          setLoadingAlbums(false);
+        }
+        if (isCurrentRequest && activeReplaceRequestKeyRef.current === requestKey) {
           activeReplaceRequestKeyRef.current = null;
         }
       } else {
-        setLoadingMore(false);
+        if (isCurrentRequest) {
+          setLoadingMore(false);
+        }
         paginationCursorRef.current = null;
       }
     }
