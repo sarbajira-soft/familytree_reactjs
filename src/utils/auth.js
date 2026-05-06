@@ -2,6 +2,8 @@
  * Utility functions for handling authentication
  */
 
+import { clearStoredPushDeviceState } from './pushDeviceState';
+
 // Key names for localStorage
 const STORAGE_KEYS = {
   ACCESS_TOKEN: 'access_token',
@@ -98,6 +100,7 @@ export const clearAuthData = () => {
     localStorage.removeItem(key);
   });
   sessionStorage.removeItem('tempLoginSession');
+  clearStoredPushDeviceState();
 };
 
 /**

@@ -7,10 +7,11 @@ import {
   FiGift,
   FiImage,
   FiUsers,
+  FiMessageCircle,
 } from "react-icons/fi";
 
 import { RiGitMergeLine } from "react-icons/ri";
-const BottomNavBar = ({ activeTab, setActiveTab, onNavigate }) => {
+const BottomNavBar = ({ activeTab, setActiveTab, onNavigate, chatBadge }) => {
   const navigate = useNavigate();
 
   const tabs = [
@@ -19,6 +20,13 @@ const BottomNavBar = ({ activeTab, setActiveTab, onNavigate }) => {
       label: "Home",
       icon: <FiHome size={18} />,
       path: "/dashboard",
+    },
+    {
+      id: "chat",
+      label: "Chat",
+      icon: <FiMessageCircle size={18} />,
+      path: "/chat",
+      badge: chatBadge || 0,
     },
     {
       id: "upcomingEvent",
@@ -80,8 +88,13 @@ const BottomNavBar = ({ activeTab, setActiveTab, onNavigate }) => {
               onClick={() => handleItemClick(item)}
               className="flex flex-col items-center justify-center flex-1 py-1 cursor-pointer"
             >
-              <div className={`p-0 ${isActive ? 'text-white' : 'text-white/80'}`}>
+              <div className={`p-0 relative ${isActive ? 'text-white' : 'text-white/80'}`}>
                 {item.icon}
+                {item.badge > 0 && (
+                  <span className="absolute -top-1 -right-2 inline-flex items-center justify-center px-1 py-0.5 text-[9px] font-bold leading-none text-white bg-red-500 rounded-full min-w-[16px] h-[16px]">
+                    {item.badge > 99 ? '99+' : item.badge}
+                  </span>
+                )}
               </div>
               <span className={`text-xs mt-1 ${isActive ? 'text-white font-semibold' : 'text-white/80'}`}>
                 {item.label}

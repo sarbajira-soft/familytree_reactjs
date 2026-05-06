@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import PropTypes from 'prop-types';
-import { FiTrash2, FiEye, FiLoader, FiShare2, FiSearch } from 'react-icons/fi';
+import { useNavigate } from 'react-router-dom';
+import { FiTrash2, FiEye, FiLoader, FiShare2, FiSearch, FiMessageCircle } from 'react-icons/fi';
 import { FaBirthdayCake, FaPhone, FaHome, FaMale, FaFemale } from 'react-icons/fa';
 import Swal from 'sweetalert2';
 import { BlockedBadge } from './block/BlockedBadge';
@@ -8,6 +9,7 @@ import { logger } from '../utils/logger';
 import { authFetch } from '../utils/authFetch';
 import { shareFamilyInvite } from '../utils/familyInviteShare';
 import { fetchFamilyTree, deleteFamilyMember, getMembersNotInTree, replaceDummyUser, replaceStructuralDummy as replaceStructuralDummySlot, selfRemoveFromFamily } from '../utils/familyTreeApi';
+import { createConversation } from '../services/chat.service';
 import {
   buildDefaultFamilyPrivacySettings,
   fetchFamilyPrivacySettings,
@@ -29,10 +31,12 @@ const relationColors = {
 
 
 const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [familyMembers, setFamilyMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [viewLoadingStates, setViewLoadingStates] = useState({});
+  const [chatStartingStates, setChatStartingStates] = useState({});
   const [deletedMemberIds, setDeletedMemberIds] = useState(() => new Set());
   const [linkedFamilies, setLinkedFamilies] = useState([]);
   const [selectedAssociatedFamilyCode, setSelectedAssociatedFamilyCode] = useState('');
@@ -223,6 +227,7 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
   const birthFamilyCode = normalizeFamilyCode(
     familyCode || currentUser?.familyCode || currentUser?.userProfile?.familyCode,
   );
+  const currentUserId = Number(currentUser?.userId || currentUser?.id || 0);
 
   const calculateAge = (dob) => {
     if (!dob) return 'N/A';
@@ -500,10 +505,56 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
       });
     }
   };
+
+  const handleStartChat = async (member, event) => {
+    event?.stopPropagation?.();
+
+    const targetUserId = Number(member?.userId || member?.user?.id || 0);
+    const requestFamilyCode = normalizeFamilyCode(member?.familyCode || birthFamilyCode);
+    const stateKey = String(targetUserId || '');
+
+    if (
+      !targetUserId ||
+      !requestFamilyCode ||
+      targetUserId === currentUserId ||
+      !member?.user?.isAppUser ||
+      member?.blockStatus?.isBlockedByMe ||
+      member?.blockStatus?.isBlockedByThem ||
+      chatStartingStates[stateKey]
+    ) {
+      return;
+    }
+
+    setChatStartingStates((prev) => ({ ...prev, [stateKey]: true }));
+
+    try {
+      const conversation = await createConversation(requestFamilyCode, targetUserId);
+      const conversationId = Number(conversation?.id || 0);
+      const resolvedFamilyCode = normalizeFamilyCode(conversation?.familyCode || requestFamilyCode);
+
+      if (!conversationId || !resolvedFamilyCode) {
+        throw new Error('Unable to open this conversation right now.');
+      }
+
+      navigate(
+        `/chat/${conversationId}?familyCode=${encodeURIComponent(resolvedFamilyCode)}`,
+      );
+    } catch (error) {
+      logger.error('Failed to start direct chat', error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Unable to start chat',
+        text: error?.message || 'Unable to start this conversation right now.',
+      });
+    } finally {
+      setChatStartingStates((prev) => ({ ...prev, [stateKey]: false }));
+    }
+  };
+
   const handleDeleteMember = async (memberId, targetFamilyCode, memberUserId, event) => {
     event?.stopPropagation?.();
     if (!memberId || !birthFamilyCode) return;
-    const isSelf = Number(memberUserId) === Number(currentUser?.userId || currentUser?.id);
+    const isSelf = Number(memberUserId) === currentUserId;
 
     const confirmResult = await Swal.fire({
       icon: 'warning',
@@ -725,7 +776,6 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
   const blockedMembers = filteredMembers.filter(
     (member) => member?.blockStatus?.isBlockedByMe,
   );
-  const currentUserId = Number(currentUser?.userId || currentUser?.id);
   const canSelfRemove = activeBirthMembers.some(
     (member) => Number(member?.userId) === currentUserId,
   );
@@ -739,9 +789,21 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
     memberIdsInTree = new Set(),
     showWhatsAppInvite = false,
     showNotInTreeBadge = false,
-  }) => (
-    <div
-      onClick={() => {
+  }) => {
+    const memberUserId = Number(member?.userId || member?.user?.id || 0);
+    const chatStateKey = String(memberUserId || '');
+    const canStartChat =
+      !disabled &&
+      !deletedMemberIds.has(member.memberId) &&
+      Boolean(member?.user?.isAppUser) &&
+      memberUserId > 0 &&
+      memberUserId !== currentUserId &&
+      !member?.blockStatus?.isBlockedByMe &&
+      !member?.blockStatus?.isBlockedByThem;
+
+    return (
+      <div
+        onClick={() => {
         if (
           !deletedMemberIds.has(member.memberId) &&
           currentUserIsFamilyAdmin &&
@@ -751,9 +813,9 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
           handleViewMember(member.userId, { stopPropagation: () => { } });
         }
       }}
-      className={`group relative flex flex-col sm:flex-row items-stretch bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm hover:shadow-md hover:border-primary-300 dark:hover:border-sky-500/40 transition-all duration-200 overflow-hidden ${currentUserIsFamilyAdmin && !disabled ? 'cursor-pointer' : 'cursor-default'
-        } ${deletedMemberIds.has(member.memberId) || disabled ? 'opacity-60 grayscale' : ''}`}
-    >
+        className={`group relative flex flex-col sm:flex-row items-stretch bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm hover:shadow-md hover:border-primary-300 dark:hover:border-sky-500/40 transition-all duration-200 overflow-hidden ${currentUserIsFamilyAdmin && !disabled ? 'cursor-pointer' : 'cursor-default'
+          } ${deletedMemberIds.has(member.memberId) || disabled ? 'opacity-60 grayscale' : ''}`}
+      >
       {/* Left Accent Bar */}
       <div className={`w-1.5 flex-shrink-0 ${member.gender === 'male' ? 'bg-sky-400' : member.gender === 'female' ? 'bg-pink-400' : 'bg-gray-300 dark:bg-slate-600'}`}></div>
 
@@ -858,6 +920,24 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
 
           {/* Actions (Col 2) */}
           <div className="sm:col-span-2 flex items-center justify-center sm:justify-end gap-2 sm:pl-4 border-t sm:border-t-0 sm:border-l border-gray-100 dark:border-slate-700 pt-4 sm:pt-0 pb-1 sm:pb-0 h-full">
+            {canStartChat && (
+              <button
+                onClick={(e) => handleStartChat(member, e)}
+                disabled={chatStartingStates[chatStateKey]}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all border font-semibold text-sm ${
+                  chatStartingStates[chatStateKey]
+                    ? 'bg-primary-50 text-primary-400 border-primary-100 cursor-not-allowed'
+                    : 'bg-white dark:bg-slate-900 text-primary-600 border-primary-200 hover:bg-primary-50 hover:border-primary-300 hover:shadow-sm'
+                } tooltip`}
+                title="Message"
+              >
+                {chatStartingStates[chatStateKey] ? (
+                  <FiLoader size={16} className="animate-spin" />
+                ) : (
+                  <FiMessageCircle size={16} />
+                )}
+              </button>
+            )}
             {currentUserIsFamilyAdmin && !disabled && (
               <>
                 {allowManageActions && member.membershipType === 'member' && !member.user?.isAppUser && (
@@ -909,7 +989,8 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
         </div>
       </div>
     </div>
-  );
+    );
+  };
 
   const PrivacyControls = () => (
     <section className="w-full rounded-2xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">

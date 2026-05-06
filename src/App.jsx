@@ -61,6 +61,8 @@ const ProfileModule = lazy(() => import("./Pages/ProfileFormPage"));
 const UserProfile = lazy(() => import("./Pages/UserProfile"));
 const EditProfilePage = lazy(() => import("./Pages/EditProfilePage"));
 const BlockedMembersPage = lazy(() => import("./Pages/BlockedMembersPage"));
+const ChatPage = lazy(() => import("./Pages/ChatPage"));
+const ChatWindowPage = lazy(() => import("./Pages/ChatWindowPage"));
 
 // ---------------- Loading Fallback ----------------
 const LoadingFallback = () => (
@@ -242,6 +244,9 @@ function App() {
                 <Route path="/gifts" element={<GiftListingPage />} />
                 <Route path="/gifts-memories" element={<GiftListingPage />} />
                 <Route path="/events" element={<EventsPage />} />
+                {/* Chat Feature Routes */}
+                <Route path="/chat" element={<ChatPage />} />
+                <Route path="/chat/:conversationId" element={<ChatWindowPage />} />
                 <Route path="/upcoming-events" element={<EventsPage />} />
                 <Route
                   path="/suggestion-approving"
