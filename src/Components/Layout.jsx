@@ -4,6 +4,7 @@ import { App as CapacitorApp } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
 import Sidebar from "./Sidebar";
 import BottomNavBar from "./BottomNavBar";
+import { ChatProvider, useChat } from "../Contexts/ChatContext";
 import { useNotificationSocket } from "../hooks/useNotificationSocket";
 import {
   FiAlertCircle,
@@ -23,6 +24,7 @@ import {
   FiLogOut,
   FiMail,
   FiMenu,
+  FiMessageCircle,
   FiMoon,
   FiPackage,
   FiShield,
@@ -144,7 +146,7 @@ const PullToRefresh = ({ children, onRefresh, disabled }) => {
   );
 };
 
-const Layout = ({ noScroll = false }) => {
+const LayoutContent = ({ noScroll = false }) => {
   const [activeTab, setActiveTab] = useState("profile");
   const location = useLocation();
   const navigate = useNavigate();
@@ -173,8 +175,11 @@ const Layout = ({ noScroll = false }) => {
       "/family-gallery": "gallery",
       "/gifts": "gifts",
       "/gifts-memories": "gifts",
+      "/chat": "chat",
     };
-    const tabId = pathToTabId[location.pathname];
+    const tabId =
+      pathToTabId[location.pathname] ||
+      (location.pathname.startsWith("/chat/") ? "chat" : null);
     if (tabId) setActiveTab(tabId);
   }, [location.pathname]);
 
@@ -381,6 +386,7 @@ const Layout = ({ noScroll = false }) => {
 
   const { userInfo, userLoading, logout } = useUser();
   const { theme, toggleTheme } = useTheme();
+  const { unreadChatCount } = useChat();
   const profileDisplayName = [userInfo?.firstName, userInfo?.lastName]
     .filter(Boolean)
     .join(' ')
@@ -441,6 +447,11 @@ const Layout = ({ noScroll = false }) => {
     return !userInfo.familyCode || userInfo.approveStatus !== "approved";
   }, [userInfo]);
 
+  const hasChatAccess = useMemo(() => {
+    const status = String(userInfo?.approveStatus || "").toLowerCase();
+    return Boolean(userInfo?.familyCode) && ["approved", "associated"].includes(status);
+  }, [userInfo]);
+
   const shouldLockScroll = useMemo(
     () => noScroll,
     [noScroll]
@@ -448,6 +459,9 @@ const Layout = ({ noScroll = false }) => {
 
   const isGiftsRoute =
     location.pathname === "/gifts" || location.pathname === "/gifts-memories";
+
+  const isChatRoute =
+    location.pathname === "/chat" || location.pathname.startsWith("/chat/");
 
   const isTreeRoute =
     location.pathname.startsWith("/family-tree") ||
@@ -458,10 +472,11 @@ const Layout = ({ noScroll = false }) => {
 
   const pullDisabled = useMemo(() => {
     if (shouldLockScroll) return true;
+    if (isChatRoute) return true;
     if (isGiftsRoute) return true;
     if (isRestrictedUser) return true;
     return sidebarOpen || notificationOpen || supportHelpOpen || termsModalOpen;
-  }, [shouldLockScroll, isGiftsRoute, isRestrictedUser, sidebarOpen, notificationOpen, supportHelpOpen, termsModalOpen]);
+  }, [shouldLockScroll, isChatRoute, isGiftsRoute, isRestrictedUser, sidebarOpen, notificationOpen, supportHelpOpen, termsModalOpen]);
 
   const handlePullRefresh = useCallback(async () => {
     window.location.reload();
@@ -783,6 +798,27 @@ const Layout = ({ noScroll = false }) => {
 
             {/* Right Section */}
             <div className={`flex items-center ${isMobile ? "space-x-3" : "space-x-4"}`}>
+              {hasChatAccess && (
+                <div className="relative">
+                  <button
+                    onClick={() => navigateTo("/chat")}
+                    aria-label="Open chat"
+                    className={`bg-unset relative rounded-3xl transition-colors ${
+                      isChatRoute
+                        ? "bg-primary-50 text-primary-700 dark:bg-slate-800 dark:text-slate-100"
+                        : "text-primary-600 hover:bg-gray-100 dark:hover:bg-slate-800"
+                    } ${isMobile ? "p-1" : "p-1.5"}`}
+                  >
+                    <FiMessageCircle size={isMobile ? 18 : 20} />
+                    {unreadChatCount > 0 && (
+                      <span className="absolute top-0 right-0 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-500 rounded-full">
+                        {unreadChatCount > 99 ? "99+" : unreadChatCount}
+                      </span>
+                    )}
+                  </button>
+                </div>
+              )}
+
               {/* Notifications */}
               <div className="relative">
                 <button
@@ -1050,9 +1086,11 @@ const Layout = ({ noScroll = false }) => {
             Note: extra bottom padding ensures content is not hidden
             behind the fixed mobile BottomNavBar. */}
         <div
-          className={`flex-1 bg-gray-50 ${
+          className={`flex-1 min-h-0 bg-gray-50 ${
             shouldLockScroll
               ? "overflow-hidden"
+              : isChatRoute
+                ? "overflow-hidden pt-0 px-0 pb-0"
               : isTreeRoute
                 ? "overflow-hidden pt-0 px-0 pb-0"
                 : "overflow-y-auto pt-0 px-1 pb-16 md:px-2 md:pb-12 lg:pb-4"
@@ -1062,7 +1100,7 @@ const Layout = ({ noScroll = false }) => {
             <Suspense fallback={outletFallback}>
               <Outlet />
             </Suspense>
-          ) : isGiftsRoute || isTreeRoute ? (
+          ) : isChatRoute || isGiftsRoute || isTreeRoute ? (
             <Suspense fallback={outletFallback}>
               <Outlet />
             </Suspense>
@@ -1085,6 +1123,7 @@ const Layout = ({ noScroll = false }) => {
             onNavigate={() => {
               setNotificationOpen(false);
             }}
+            chatBadge={unreadChatCount}
           />
         )}
       </main>
@@ -1119,6 +1158,12 @@ const Layout = ({ noScroll = false }) => {
     </div>
   );
 };
+
+const Layout = (props) => (
+  <ChatProvider>
+    <LayoutContent {...props} />
+  </ChatProvider>
+);
 
 export default Layout;
 

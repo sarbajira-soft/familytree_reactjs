@@ -12,6 +12,7 @@ import {
 
 import { authFetchResponse } from '../utils/authFetch';
 import { hasFamilyAccessStatus } from '../utils/familyAccess';
+import { removeCurrentChatPushRegistration } from '../services/chatPush.service';
 
 const UserContext = createContext();
 
@@ -36,7 +37,13 @@ export const UserProvider = ({ children }) => {
     initializeAuth();
   }, []);
 
-  const clearUserData = useCallback(() => {
+  const clearUserData = useCallback(async () => {
+    try {
+      await removeCurrentChatPushRegistration();
+    } catch (error) {
+      console.warn('Push cleanup during logout failed:', error);
+    }
+
     setUserInfo(null);
     setUserLoading(false);
     clearAuthData();
@@ -118,7 +125,7 @@ export const UserProvider = ({ children }) => {
         console.warn('Failed to parse 401 response:', err);
       }
 
-      clearUserData();
+      await clearUserData();
       redirectToLogin();
     },
     [clearUserData, redirectToLogin],
