@@ -29,6 +29,57 @@ import { getToken } from "../utils/auth";
 import { getGalleryListFromApiResponse, mapGalleryDetail, mapGallerySummary } from "../utils/galleryAdapter";
 import { toast } from "react-toastify";
 
+const PROFILE_ITEMS_PER_PAGE = 9;
+
+const PaginationControls = ({
+  page,
+  totalPages,
+  totalItems,
+  currentItemsCount,
+  itemLabel,
+  isFetching,
+  onPrevious,
+  onNext,
+}) => {
+  if (!totalItems) {
+    return null;
+  }
+
+  const safeTotalPages = Math.max(Number(totalPages) || 1, 1);
+  const startItem = (page - 1) * PROFILE_ITEMS_PER_PAGE + 1;
+  const endItem = Math.min(startItem + currentItemsCount - 1, totalItems);
+
+  return (
+    <div className="mt-6 flex flex-col gap-3 rounded-2xl border border-gray-100 bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+      <div className="text-sm text-gray-600">
+        Showing {startItem}-{endItem} of {totalItems} {itemLabel}
+      </div>
+
+      <div className="flex items-center justify-end gap-2">
+        <button
+          type="button"
+          onClick={onPrevious}
+          disabled={page <= 1 || isFetching}
+          className="rounded-full border border-gray-200 px-4 py-2 text-sm font-medium text-gray-700 transition hover:border-primary-300 hover:text-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Previous
+        </button>
+        <span className="min-w-[90px] text-center text-sm font-semibold text-gray-700">
+          Page {page} of {safeTotalPages}
+        </span>
+        <button
+          type="button"
+          onClick={onNext}
+          disabled={page >= safeTotalPages || isFetching}
+          className="rounded-full bg-primary-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const ProfilePage = () => {
   const [token, setToken] = useState(null);
   const [user, setUser] = useState(null);
@@ -42,6 +93,8 @@ const ProfilePage = () => {
 
   const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
   const [profilePhotoError, setProfilePhotoError] = useState("");
+  const [postPage, setPostPage] = useState(1);
+  const [galleryPage, setGalleryPage] = useState(1);
 
   const profileFileInputRef = useRef(null);
 
@@ -132,6 +185,11 @@ const ProfilePage = () => {
 
     setUser(userObj);
   }, [userInfo]);
+
+  useEffect(() => {
+    setPostPage(1);
+    setGalleryPage(1);
+  }, [userInfo?.userId]);
 
   const handleChangePhotoClick = () => {
     if (profileFileInputRef.current) {
@@ -316,12 +374,11 @@ const ProfilePage = () => {
     }
   };
 
-  // Use React Query for posts with caching
-  const { data: userPosts = [], isLoading: loadingPosts } = useQuery({
-    queryKey: ["userPosts", userInfo?.userId],
+  const userPostsQuery = useQuery({
+    queryKey: ["userPosts", userInfo?.userId, postPage],
     queryFn: async () => {
       const json = await authFetch(
-        `/post/by-options?createdBy=${userInfo.userId}`,
+        `/post/by-options?createdBy=${userInfo.userId}&page=${postPage}&limit=${PROFILE_ITEMS_PER_PAGE}`,
         { method: "GET" }
       );
       const list = Array.isArray(json)
@@ -330,49 +387,89 @@ const ProfilePage = () => {
           ? json.data
           : [];
 
-      return list.map((post) => ({
-        id: post.id,
-        type: post.postVideo ? "video" : "image",
-        url: post.postImage,
-        fullImageUrl: post.postImage,
-        postVideo: post.postVideo,
-        caption: post.caption,
-        likes: post.likeCount,
-        isLiked: post.isLiked,
-        comments: new Array(post.commentCount).fill(""),
-        privacy: post.privacy,
-        familyCode: post.familyCode,
-      }));
+      return {
+        items: list.map((post) => ({
+          id: post.id,
+          type: post.postVideo ? "video" : "image",
+          url: post.postImage,
+          fullImageUrl: post.postImage,
+          postVideo: post.postVideo,
+          caption: post.caption,
+          likes: post.likeCount,
+          isLiked: post.isLiked,
+          comments: new Array(post.commentCount).fill(""),
+          privacy: post.privacy,
+          familyCode: post.familyCode,
+        })),
+        total: Number(json?.total ?? list.length),
+        page: Number(json?.page || postPage),
+        limit: Number(json?.limit || PROFILE_ITEMS_PER_PAGE),
+        totalPages: Math.max(
+          Number(
+            json?.totalPages ??
+            Math.ceil(Number(json?.total ?? list.length) / Number(json?.limit || PROFILE_ITEMS_PER_PAGE)),
+          ),
+          0,
+        ),
+        hasMore: Boolean(json?.hasMore),
+      };
     },
     enabled: !!userInfo?.userId && !!token,
+    placeholderData: (previousData) => previousData,
     staleTime: 3 * 60 * 1000, // 3 minutes
     cacheTime: 10 * 60 * 1000, // 10 minutes
   });
 
-  // Use React Query for galleries with caching
-  const { data: userGalleries = [], isLoading: loadingGalleries } = useQuery({
-    queryKey: ["userGalleries", userInfo?.userId],
+  const userGalleriesQuery = useQuery({
+    queryKey: ["userGalleries", userInfo?.userId, galleryPage],
     queryFn: async () => {
       const json = await authFetch(
-        `/gallery/by-options?createdBy=${userInfo.userId}&page=1&limit=100`,
+        `/gallery/by-options?createdBy=${userInfo.userId}&page=${galleryPage}&limit=${PROFILE_ITEMS_PER_PAGE}`,
         { method: "GET" }
       );
+      const list = getGalleryListFromApiResponse(json);
 
-      return getGalleryListFromApiResponse(json).map((gallery) =>
-        mapGallerySummary({
-          ...gallery,
-          user: {
-            ...(gallery.user || {}),
-            name: `${userInfo.firstName || ""} ${userInfo.lastName || ""}`.trim() || "Unknown",
-            userId: userInfo.userId,
-          },
-        }),
-      );
+      return {
+        items: list.map((gallery) =>
+          mapGallerySummary({
+            ...gallery,
+            user: {
+              ...(gallery.user || {}),
+              name: `${userInfo.firstName || ""} ${userInfo.lastName || ""}`.trim() || "Unknown",
+              userId: userInfo.userId,
+            },
+          }),
+        ),
+        total: Number(json?.total ?? list.length),
+        page: Number(json?.page || galleryPage),
+        limit: Number(json?.limit || PROFILE_ITEMS_PER_PAGE),
+        totalPages: Math.max(
+          Number(
+            json?.totalPages ??
+            Math.ceil(Number(json?.total ?? list.length) / Number(json?.limit || PROFILE_ITEMS_PER_PAGE)),
+          ),
+          0,
+        ),
+        hasMore: Boolean(json?.hasMore),
+      };
     },
     enabled: !!userInfo?.userId && !!token,
+    placeholderData: (previousData) => previousData,
     staleTime: 3 * 60 * 1000, // 3 minutes
     cacheTime: 10 * 60 * 1000, // 10 minutes
   });
+
+  const userPosts = userPostsQuery.data?.items || [];
+  const userPostsTotal = Number(userPostsQuery.data?.total || 0);
+  const userPostsTotalPages = Math.max(Number(userPostsQuery.data?.totalPages || 0), 1);
+  const loadingPosts = userPostsQuery.isLoading;
+  const fetchingPosts = userPostsQuery.isFetching;
+
+  const userGalleries = userGalleriesQuery.data?.items || [];
+  const userGalleriesTotal = Number(userGalleriesQuery.data?.total || 0);
+  const userGalleriesTotalPages = Math.max(Number(userGalleriesQuery.data?.totalPages || 0), 1);
+  const loadingGalleries = userGalleriesQuery.isLoading;
+  const fetchingGalleries = userGalleriesQuery.isFetching;
 
   // Update user profile when userInfo or counts change
   useEffect(() => {
@@ -392,21 +489,25 @@ const ProfilePage = () => {
       familyCode:
         userInfo.familyCode ||
         "",
-      postsCount: userPosts.length,
-      galleryCount: userGalleries.length,
+      postsCount: userPostsTotal,
+      galleryCount: userGalleriesTotal,
     };
 
     setUser(userObj);
-  }, [userInfo, userPosts.length, userGalleries.length]);
+  }, [userInfo, userPostsTotal, userGalleriesTotal]);
 
-  const handlePostCreated = () => {
-    queryClient.invalidateQueries({
+  const handlePostCreated = async () => {
+    setShowPosts(true);
+    setPostPage(1);
+    await queryClient.invalidateQueries({
       queryKey: ["userPosts", userInfo?.userId],
     });
   };
 
-  const onGalleryCreated = () => {
-    queryClient.invalidateQueries({
+  const onGalleryCreated = async () => {
+    setShowPosts(false);
+    setGalleryPage(1);
+    await queryClient.invalidateQueries({
       queryKey: ["userGalleries", userInfo?.userId],
     });
   };
@@ -436,16 +537,25 @@ const ProfilePage = () => {
   };
 
   const handleLikePostInModal = (postId) => {
-    setUserPosts((prevPosts) =>
-      prevPosts.map((post) => {
-        if (post.id === postId) {
+    queryClient.setQueryData(["userPosts", userInfo?.userId, postPage], (old) => {
+      if (!old || !Array.isArray(old.items)) {
+        return old;
+      }
+
+      return {
+        ...old,
+        items: old.items.map((post) => {
+          if (post.id !== postId) {
+            return post;
+          }
+
           const newIsLiked = !post.isLiked;
           const newLikes = newIsLiked ? post.likes + 1 : post.likes - 1;
           return { ...post, likes: newLikes, isLiked: newIsLiked };
-        }
-        return post;
-      })
-    );
+        }),
+      };
+    });
+
     setSelectedPost((prevPost) => {
       if (!prevPost || prevPost.id !== postId) return prevPost;
       const newIsLiked = !prevPost.isLiked;
@@ -470,34 +580,47 @@ const ProfilePage = () => {
     onMutate: async ({ postId, currentIsLiked }) => {
       // Optimistically update the cache
       await queryClient.cancelQueries({
-        queryKey: ["userPosts", userInfo?.userId],
+        queryKey: ["userPosts", userInfo?.userId, postPage],
       });
       const previousPosts = queryClient.getQueryData([
         "userPosts",
         userInfo?.userId,
+        postPage,
       ]);
 
-      queryClient.setQueryData(["userPosts", userInfo?.userId], (old) =>
-        old?.map((post) =>
-          post.id === postId
-            ? {
-              ...post,
-              isLiked: !currentIsLiked,
-              likes: currentIsLiked ? post.likes - 1 : post.likes + 1,
-            }
-            : post
-        )
-      );
+      queryClient.setQueryData(["userPosts", userInfo?.userId, postPage], (old) => {
+        if (!old || !Array.isArray(old.items)) {
+          return old;
+        }
+
+        return {
+          ...old,
+          items: old.items.map((post) =>
+            post.id === postId
+              ? {
+                  ...post,
+                  isLiked: !currentIsLiked,
+                  likes: currentIsLiked ? post.likes - 1 : post.likes + 1,
+                }
+              : post,
+          ),
+        };
+      });
 
       return { previousPosts };
     },
     onError: (err, variables, context) => {
       // Rollback on error
       queryClient.setQueryData(
-        ["userPosts", userInfo?.userId],
+        ["userPosts", userInfo?.userId, postPage],
         context.previousPosts
       );
       console.error("Error toggling like:", err);
+    },
+    onSettled: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["userPosts", userInfo?.userId],
+      });
     },
   });
 
@@ -550,49 +673,14 @@ const ProfilePage = () => {
     setIsDeleteModalOpen(true);
   };
 
-  const handlePostUpdated = async (updatedData) => {
-    // Close modal first
+  const handlePostUpdated = async () => {
     setIsEditPostModalOpen(false);
     setPostToEditDetails(null);
-    
-    // First update cache immediately for instant UI refresh if we have data
-    if (updatedData) {
-      const id = updatedData.id || updatedData.data?.id;
-      const caption = updatedData.caption || updatedData.data?.caption;
-      const privacy = updatedData.privacy || updatedData.data?.privacy;
-      const postImage = updatedData.postImage || updatedData.url || updatedData.data?.postImage;
-      const postVideo = updatedData.postVideo || updatedData.data?.postVideo;
-      
-      if (id) {
-        queryClient.setQueryData(["userPosts", userInfo?.userId], (old) => {
-          if (!old) return old;
-          return old.map((post) =>
-            post.id === id
-              ? {
-                  ...post,
-                  caption: caption || post.caption,
-                  privacy: privacy || post.privacy,
-                  fullImageUrl: postImage || post.fullImageUrl,
-                  url: postImage || post.url,
-                  postVideo: postVideo || post.postVideo,
-                }
-              : post
-          );
-        });
-      }
-    }
-    
-    // Clear the cache and force fresh fetch
-    queryClient.removeQueries({
-      queryKey: ["userPosts", userInfo?.userId],
-      exact: true,
-    });
-    
-    // Fetch fresh data
-    await queryClient.fetchQuery({
+
+    await queryClient.invalidateQueries({
       queryKey: ["userPosts", userInfo?.userId],
     });
-    
+
     toast.success("Post updated successfully!");
   };
 
@@ -624,48 +712,14 @@ const ProfilePage = () => {
     }
   };
 
-  const handleAlbumUpdated = async (updatedData) => {
-    // Close modal first
+  const handleAlbumUpdated = async () => {
     setIsEditAlbumModalOpen(false);
     setAlbumToEdit(null);
-    
-    // First update cache immediately for instant UI refresh if we have data
-    if (updatedData) {
-      const id = updatedData.id || updatedData.data?.id;
-      const title = updatedData.galleryTitle || updatedData.title || updatedData.data?.galleryTitle;
-      const description = updatedData.galleryDescription || updatedData.description || updatedData.data?.galleryDescription;
-      const cover = updatedData.coverPhoto || updatedData.cover || updatedData.data?.coverPhoto;
-      const privacy = updatedData.privacy || updatedData.data?.privacy;
-      
-      if (id) {
-        queryClient.setQueryData(["userGalleries", userInfo?.userId], (old) => {
-          if (!old) return old;
-          return old.map((gallery) =>
-            gallery.id === id
-              ? {
-                  ...gallery,
-                  title: title || gallery.title,
-                  description: description || gallery.description,
-                  cover: cover || gallery.cover,
-                  privacy: privacy || gallery.privacy,
-                }
-              : gallery
-          );
-        });
-      }
-    }
-    
-    // Clear the cache and force fresh fetch
-    queryClient.removeQueries({
-      queryKey: ["userGalleries", userInfo?.userId],
-      exact: true,
-    });
-    
-    // Fetch fresh data
-    await queryClient.fetchQuery({
+
+    await queryClient.invalidateQueries({
       queryKey: ["userGalleries", userInfo?.userId],
     });
-    
+
     toast.success("Gallery updated successfully!");
   };
 
@@ -692,12 +746,14 @@ const ProfilePage = () => {
           throw new Error(`Failed to delete post: ${response.statusText}`);
         }
 
-        // Remove post from cache immediately instead of refetching
-        queryClient.setQueryData(["userPosts", userInfo?.userId], (old) => {
-          if (!old) return old;
-          return old.filter((post) => post.id !== itemToDelete.id);
+        const shouldGoToPreviousPostPage = postPage > 1 && userPosts.length === 1;
+        if (shouldGoToPreviousPostPage) {
+          setPostPage((prev) => Math.max(prev - 1, 1));
+        }
+        await queryClient.invalidateQueries({
+          queryKey: ["userPosts", userInfo?.userId],
         });
-        
+
         toast.success("Post deleted successfully!");
       } else if (deleteType === 'gallery') {
         const response = await authFetchResponse(`/gallery/${itemToDelete.id}`, {
@@ -709,12 +765,14 @@ const ProfilePage = () => {
           throw new Error(`Failed to delete gallery: ${response.statusText}`);
         }
 
-        // Remove gallery from cache immediately instead of refetching
-        queryClient.setQueryData(["userGalleries", userInfo?.userId], (old) => {
-          if (!old) return old;
-          return old.filter((gallery) => gallery.id !== itemToDelete.id);
+        const shouldGoToPreviousGalleryPage = galleryPage > 1 && userGalleries.length === 1;
+        if (shouldGoToPreviousGalleryPage) {
+          setGalleryPage((prev) => Math.max(prev - 1, 1));
+        }
+        await queryClient.invalidateQueries({
+          queryKey: ["userGalleries", userInfo?.userId],
         });
-        
+
         toast.success("Gallery deleted successfully!");
       }
     } catch (error) {
@@ -944,101 +1002,113 @@ const ProfilePage = () => {
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {userPosts.length > 0 ? (
-                userPosts.map((post) => (
-                  <div
-                    key={post.id}
-                    className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {userPosts.length > 0 ? (
+                  userPosts.map((post) => (
+                    <div
+                      key={post.id}
+                      className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100
                                             transform hover:scale-[1.02] hover:shadow-lg transition-all duration-300 group relative"
-                    onClick={() => {
-                      const hasMedia = Boolean(post?.postVideo || post?.fullImageUrl);
-                      if (!hasMedia) return;
-                      handleViewPost(post);
-                    }}
-                  >
-                    <div className="relative w-full h-64 overflow-hidden">
-                      {post.postVideo ? (
-                        <video
-                          src={post.postVideo}
-                          className="hide-video-zoom w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-                          controls
-                          controlsList="nofullscreen nodownload noremoteplayback noplaybackrate"
-                          disablePictureInPicture
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      ) : post.fullImageUrl ? (
-                        <img
-                          src={post.fullImageUrl}
-                          alt="Post image"
-                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-                        />
-                      ) : (
-                        <div className="text-black text-center text-lg italic">
-                          {/* No media available */}
-                        </div>
-                      )}
+                      onClick={() => {
+                        const hasMedia = Boolean(post?.postVideo || post?.fullImageUrl);
+                        if (!hasMedia) return;
+                        handleViewPost(post);
+                      }}
+                    >
+                      <div className="relative w-full h-64 overflow-hidden">
+                        {post.postVideo ? (
+                          <video
+                            src={post.postVideo}
+                            className="hide-video-zoom w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                            controls
+                            controlsList="nofullscreen nodownload noremoteplayback noplaybackrate"
+                            disablePictureInPicture
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        ) : post.fullImageUrl ? (
+                          <img
+                            src={post.fullImageUrl}
+                            alt="Post image"
+                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                          />
+                        ) : (
+                          <div className="text-black text-center text-lg italic">
+                            {/* No media available */}
+                          </div>
+                        )}
 
-                      <div
-                        className="absolute top-2 right-2 flex gap-2
+                        <div
+                          className="absolute top-2 right-2 flex gap-2
      opacity-100
      md:opacity-0 md:group-hover:opacity-100
      transition-opacity duration-300"
-                      >
-                        <button
-                          onClick={(e) => handleEditPost(e, post.id)}
-                          className="bg-white p-1.5 rounded-full shadow-md text-gray-700 hover:text-primary-600 hover:bg-gray-100 transition-colors"
-                          title="Edit Post"
                         >
-                          <FiEdit3 size={16} />
-                        </button>
+                          <button
+                            onClick={(e) => handleEditPost(e, post.id)}
+                            className="bg-white p-1.5 rounded-full shadow-md text-gray-700 hover:text-primary-600 hover:bg-gray-100 transition-colors"
+                            title="Edit Post"
+                          >
+                            <FiEdit3 size={16} />
+                          </button>
 
-                        <button
-                          onClick={(e) => handleDeletePost(e, post.id)}
-                          className="bg-white p-1.5 rounded-full shadow-md text-red-500 hover:text-red-700 hover:bg-gray-100 transition-colors"
-                          title="Delete Post"
-                        >
-                          <FiTrash2 size={16} />
-                        </button>
+                          <button
+                            onClick={(e) => handleDeletePost(e, post.id)}
+                            className="bg-white p-1.5 rounded-full shadow-md text-red-500 hover:text-red-700 hover:bg-gray-100 transition-colors"
+                            title="Delete Post"
+                          >
+                            <FiTrash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="p-4">
+                        <p className="text-sm font-medium text-gray-800 mb-2 line-clamp-2">
+                          {post.caption}
+                        </p>
+                        <div className="flex items-center text-gray-500 text-xs gap-4">
+                          <span
+                            className="flex items-center gap-1 cursor-pointer"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleLikeToggle(post.id, post.isLiked);
+                            }}
+                          >
+                            <FiHeart
+                              size={14}
+                              className={
+                                post.isLiked
+                                  ? "text-secondary-600"
+                                  : "text-gray-400"
+                              }
+                            />
+                            {post.likes}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <FiMessageCircle size={14} /> {post.comments.length}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                    <div className="p-4">
-                      <p className="text-sm font-medium text-gray-800 mb-2 line-clamp-2">
-                        {post.caption}
-                      </p>
-                      <div className="flex items-center text-gray-500 text-xs gap-4">
-                        <span
-                          className="flex items-center gap-1 cursor-pointer"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleLikeToggle(post.id, post.isLiked);
-                          }}
-                        >
-                          <FiHeart
-                            size={14}
-                            className={
-                              post.isLiked
-                                ? "text-secondary-600"
-                                : "text-gray-400"
-                            }
-                          />
-                          {post.likes}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <FiMessageCircle size={14} /> {post.comments.length}
-                        </span>
-                      </div>
-                    </div>
+                  ))
+                ) : (
+                  <div className="lg:col-span-3 text-center py-12 bg-white rounded-2xl shadow-md border border-gray-100">
+                    <p className="text-gray-500 text-lg mb-4">
+                      No posts yet. Share your first family moment!
+                    </p>
                   </div>
-                ))
-              ) : (
-                <div className="lg:col-span-3 text-center py-12 bg-white rounded-2xl shadow-md border border-gray-100">
-                  <p className="text-gray-500 text-lg mb-4">
-                    No posts yet. Share your first family moment!
-                  </p>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+              <PaginationControls
+                page={postPage}
+                totalPages={userPostsTotalPages}
+                totalItems={userPostsTotal}
+                currentItemsCount={userPosts.length}
+                itemLabel="posts"
+                isFetching={fetchingPosts}
+                onPrevious={() => setPostPage((prev) => Math.max(prev - 1, 1))}
+                onNext={() => setPostPage((prev) => Math.min(prev + 1, userPostsTotalPages))}
+              />
+            </>
           )
         ) : loadingGalleries ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1047,66 +1117,78 @@ const ProfilePage = () => {
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {userGalleries.length > 0 ? (
-              userGalleries.map((gallery) => (
-                <div
-                  key={gallery.id}
-                  className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {userGalleries.length > 0 ? (
+                userGalleries.map((gallery) => (
+                  <div
+                    key={gallery.id}
+                    className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100
                                             transform hover:scale-[1.02] hover:shadow-lg transition-all duration-300 cursor-pointer group relative"
-                  onClick={() => handleViewAlbum(gallery)}
-                >
-                  <div className="relative w-full h-64 overflow-hidden">
-                    <img
-                      src={gallery.cover}
-                      alt={gallery.title}
-                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex items-end p-4">
-                      <div className="text-white">
-                        <h3 className="text-lg font-semibold mb-0.5">
-                          {gallery.title}
-                        </h3>
-                        <p className="text-sm opacity-90">
-                          {gallery.photosCount} photos
-                        </p>
+                    onClick={() => handleViewAlbum(gallery)}
+                  >
+                    <div className="relative w-full h-64 overflow-hidden">
+                      <img
+                        src={gallery.cover}
+                        alt={gallery.title}
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex items-end p-4">
+                        <div className="text-white">
+                          <h3 className="text-lg font-semibold mb-0.5">
+                            {gallery.title}
+                          </h3>
+                          <p className="text-sm opacity-90">
+                            {gallery.photosCount} photos
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                    <div
-                      className="absolute top-2 right-2 flex gap-2
+                      <div
+                        className="absolute top-2 right-2 flex gap-2
      opacity-100
      md:opacity-0 md:group-hover:opacity-100
      transition-opacity duration-300"
-                    >
-                      <button
-                        onClick={(e) =>
-                          handleEditAlbum(e, gallery.id)
-                        }
-                        className="bg-white p-1.5 rounded-full shadow-md text-gray-700 hover:text-primary-600 hover:bg-gray-100 transition-colors"
-                        title="Edit Gallery"
                       >
-                        <FiEdit3 size={16} />
-                      </button>
+                        <button
+                          onClick={(e) =>
+                            handleEditAlbum(e, gallery.id)
+                          }
+                          className="bg-white p-1.5 rounded-full shadow-md text-gray-700 hover:text-primary-600 hover:bg-gray-100 transition-colors"
+                          title="Edit Gallery"
+                        >
+                          <FiEdit3 size={16} />
+                        </button>
 
-                      <button
-                        onClick={(e) => handleDeleteAlbum(e, gallery.id)}
-                        className="bg-white p-1.5 rounded-full shadow-md text-red-500 hover:text-red-700 hover:bg-gray-100 transition-colors"
-                        title="Delete Gallery"
-                      >
-                        <FiTrash2 size={16} />
-                      </button>
+                        <button
+                          onClick={(e) => handleDeleteAlbum(e, gallery.id)}
+                          className="bg-white p-1.5 rounded-full shadow-md text-red-500 hover:text-red-700 hover:bg-gray-100 transition-colors"
+                          title="Delete Gallery"
+                        >
+                          <FiTrash2 size={16} />
+                        </button>
+                      </div>
                     </div>
                   </div>
+                ))
+              ) : (
+                <div className="lg:col-span-3 text-center py-12 bg-white rounded-2xl shadow-md border border-gray-100">
+                  <p className="text-gray-500 text-lg mb-4">
+                    No galleries yet. Organize your cherished memories!
+                  </p>
                 </div>
-              ))
-            ) : (
-              <div className="lg:col-span-3 text-center py-12 bg-white rounded-2xl shadow-md border border-gray-100">
-                <p className="text-gray-500 text-lg mb-4">
-                  No galleries yet. Organize your cherished memories!
-                </p>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+            <PaginationControls
+              page={galleryPage}
+              totalPages={userGalleriesTotalPages}
+              totalItems={userGalleriesTotal}
+              currentItemsCount={userGalleries.length}
+              itemLabel="galleries"
+              isFetching={fetchingGalleries}
+              onPrevious={() => setGalleryPage((prev) => Math.max(prev - 1, 1))}
+              onNext={() => setGalleryPage((prev) => Math.min(prev + 1, userGalleriesTotalPages))}
+            />
+          </>
         )}
       </div>
 

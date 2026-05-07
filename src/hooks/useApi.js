@@ -45,15 +45,21 @@ export const useUserGalleries = (userId, enabled = true) => {
 // Hook for events by tab
 export const useEvents = (activeTab, familyCode, approveStatus, enabled = true) => {
   const getEndpoint = () => {
-    if (activeTab === 'upcoming') return '/event/upcoming/all';
-    if (activeTab === 'my-events') return '/event/my-events';
-    if (activeTab === 'all') return '/event/all';
-    return '/event/upcoming/all';
+    if (activeTab === 'upcoming') return '/events/upcoming?limit=20';
+    if (activeTab === 'my-events') return '/events/mine?limit=20';
+    if (activeTab === 'all') return '/events?limit=20';
+    return '/events/upcoming?limit=20';
   };
 
   return useQuery({
     queryKey: ['events', activeTab, familyCode],
-    queryFn: () => authFetch(getEndpoint()),
+    queryFn: async () => {
+      const response = await authFetch(getEndpoint());
+      if (Array.isArray(response)) {
+        return response;
+      }
+      return Array.isArray(response?.data) ? response.data : [];
+    },
     enabled: enabled && !!familyCode && hasFamilyAccessStatus(approveStatus),
     staleTime: 2 * 60 * 1000, // 2 minutes
   });

@@ -39,6 +39,24 @@ const getLocalDateKey = (dateValue) => {
   return `${year}-${month}-${day}`;
 };
 
+const normalizeDashboardEvent = (item) => {
+  const dateValue = item?.nextEventDate || item?.eventDate || item?.date || null;
+  const timeValue = item?.eventTime || item?.time || null;
+  const title = item?.title || item?.eventTitle || "Special Event";
+
+  return {
+    ...item,
+    title,
+    eventTitle: item?.eventTitle || title,
+    date: dateValue,
+    eventDate: item?.eventDate || dateValue,
+    time: timeValue,
+    eventTime: item?.eventTime || timeValue,
+    eventDescription: item?.eventDescription || item?.description || "",
+    coverImage: item?.coverImage || null,
+  };
+};
+
 const MiniEventCalendar = ({ events = [] }) => {
   const todayKey = getLocalDateKey(new Date());
   const [currentMonth, setCurrentMonth] = useState(() => {
@@ -321,7 +339,7 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
         authFetch(`${apiBaseUrl}/family/member/${userInfo.familyCode}/stats`, {
           method: "GET",
         }),
-        authFetch(`${apiBaseUrl}/event/upcoming/all`, { method: "GET" }),
+        authFetch(`${apiBaseUrl}/events/upcoming?limit=6`, { method: "GET" }),
       ]);
       return { stats, events };
     },
@@ -341,7 +359,8 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
     if (!dashboardData?.events) return [];
     const rawEvents = dashboardData.events;
     const list = Array.isArray(rawEvents?.data) ? rawEvents.data : rawEvents;
-    return Array.isArray(list) ? list : [];
+    const safeList = Array.isArray(list) ? list : [];
+    return safeList.map(normalizeDashboardEvent);
   }, [dashboardData]);
 
   const productSuggestionsPool = medusaProducts;
