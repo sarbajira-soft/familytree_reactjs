@@ -7,7 +7,11 @@ import {
   FiUserPlus,
   FiX,
 } from 'react-icons/fi';
-import { getInitials } from '../../services/chat.service';
+import {
+  getChatMemberBadges,
+  getChatMemberMetaText,
+  getInitials,
+} from '../../services/chat.service';
 
 const ChatRoomMembersModal = ({
   isOpen,
@@ -40,7 +44,7 @@ const ChatRoomMembersModal = ({
     }
 
     return members.filter((member) =>
-      [member?.name, member?.familyRole]
+      [member?.name, member?.familyRole, member?.sourceFamilyCode]
         .filter(Boolean)
         .join(' ')
         .toLowerCase()
@@ -54,13 +58,19 @@ const ChatRoomMembersModal = ({
     }
 
     return availableMembers.filter((member) =>
-      [member?.name, member?.familyRole]
+      [member?.name, member?.familyRole, member?.sourceFamilyCode]
         .filter(Boolean)
         .join(' ')
         .toLowerCase()
         .includes(normalizedQuery),
     );
   }, [availableMembers, normalizedQuery]);
+
+  const currentMemberCount = members.length;
+  const availableMemberCount = availableMembers.length;
+  const searchPlaceholder = canManage
+    ? 'Search active app users in this room or add list'
+    : 'Search active app users in this room';
 
   if (!isOpen) {
     return null;
@@ -79,18 +89,20 @@ const ChatRoomMembersModal = ({
   return (
     <div className="chat-modal-overlay" role="presentation">
       <div
-        className="chat-modal chat-modal--wide"
+        className={`chat-modal chat-modal--members${
+          canManage ? ' chat-modal--members-manage' : ''
+        }`}
         role="dialog"
         aria-modal="true"
         aria-label={`Members in ${roomName}`}
       >
-        <div className="chat-modal-header">
+        <div className="chat-modal-header chat-modal-header--members">
           <div>
             <h3>{roomName || 'Room members'}</h3>
             <p>
               {canManage
-                ? 'View members, add more family members, or remove someone from this room.'
-                : 'View everyone currently in this room.'}
+                ? 'See the active app users in this room, add more eligible users, or remove someone.'
+                : 'Only active Familyss app users currently in this room appear here.'}
             </p>
           </div>
           <button
@@ -103,29 +115,48 @@ const ChatRoomMembersModal = ({
           </button>
         </div>
 
-        <label className="chat-member-search">
+        <div className="chat-room-members-summary">
+          <div className="chat-room-members-stat">
+            <span className="chat-room-members-stat-label">Room members</span>
+            <strong>{currentMemberCount}</strong>
+            <small>Active Familyss app users</small>
+          </div>
+          {canManage ? (
+            <div className="chat-room-members-stat chat-room-members-stat--soft">
+              <span className="chat-room-members-stat-label">Available to add</span>
+              <strong>{availableMemberCount}</strong>
+              <small>Eligible app users from this family scope</small>
+            </div>
+          ) : null}
+        </div>
+
+        <label className="chat-member-search chat-member-search--members">
           <FiSearch size={16} />
           <input
             type="text"
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
-            placeholder="Search room members"
+            placeholder={searchPlaceholder}
           />
         </label>
 
         {error ? <div className="chat-modal-error">{error}</div> : null}
 
-        <div className="chat-room-members-layout custom-scrollbar">
+        <div className="chat-room-members-layout chat-room-members-layout--stack custom-scrollbar">
           <section className="chat-room-members-section">
             <div className="chat-room-members-heading">
-              <h4>Current members</h4>
-              <span>{members.length}</span>
+              <div>
+                <h4>Room members</h4>
+                <p>Only active Familyss app users are shown here.</p>
+              </div>
+              <span>{currentMemberCount}</span>
             </div>
 
             {filteredCurrentMembers.length > 0 ? (
               <div className="chat-room-members-list">
                 {filteredCurrentMembers.map((member) => {
                   const isSelf = Number(member?.userId || 0) === Number(currentUserId || 0);
+                  const badges = getChatMemberBadges(member);
                   return (
                     <div className="chat-room-member-row" key={`current-${member.userId}`}>
                       {renderMemberAvatar(member)}
@@ -136,8 +167,17 @@ const ChatRoomMembersModal = ({
                           {member.isFamilyAdmin ? (
                             <span className="chat-member-chip">Admin</span>
                           ) : null}
+                          {badges.map((badge) => (
+                            <span
+                              className={`chat-member-chip ${badge.className}`}
+                              key={`current-${member.userId}-${badge.key}`}
+                              title={badge.title}
+                            >
+                              {badge.label}
+                            </span>
+                          ))}
                         </div>
-                        <div className="chat-member-role">{member.familyRole || 'Family member'}</div>
+                        <div className="chat-member-role">{getChatMemberMetaText(member)}</div>
                       </div>
 
                       {canManage && !isSelf ? (
@@ -157,8 +197,8 @@ const ChatRoomMembersModal = ({
               </div>
             ) : (
               <div className="chat-member-empty chat-member-empty--compact">
-                <p>No matching room members</p>
-                <span>Try a different search term.</span>
+                <p>No matching app users found</p>
+                <span>Try another search term for this room.</span>
               </div>
             )}
           </section>
@@ -166,15 +206,19 @@ const ChatRoomMembersModal = ({
           {canManage ? (
             <section className="chat-room-members-section">
               <div className="chat-room-members-heading">
-                <h4>Add members</h4>
-                <span>{availableMembers.length}</span>
+                <div>
+                  <h4>Add app users</h4>
+                  <p>Choose from eligible Familyss app users in this family scope.</p>
+                </div>
+                <span>{availableMemberCount}</span>
               </div>
 
               {filteredAvailableMembers.length > 0 ? (
                 <div className="chat-room-members-list">
-                  {filteredAvailableMembers.map((member) => {
-                    const isSelected = selectedIds.includes(Number(member?.userId || 0));
-                    return (
+                {filteredAvailableMembers.map((member) => {
+                  const isSelected = selectedIds.includes(Number(member?.userId || 0));
+                  const badges = getChatMemberBadges(member);
+                  return (
                       <button
                         type="button"
                         className={`chat-member-row${isSelected ? ' selected' : ''}`}
@@ -189,8 +233,17 @@ const ChatRoomMembersModal = ({
                             {member.isFamilyAdmin ? (
                               <span className="chat-member-chip">Admin</span>
                             ) : null}
+                            {badges.map((badge) => (
+                              <span
+                                className={`chat-member-chip ${badge.className}`}
+                                key={`available-${member.userId}-${badge.key}`}
+                                title={badge.title}
+                              >
+                                {badge.label}
+                              </span>
+                            ))}
                           </div>
-                          <div className="chat-member-role">{member.familyRole || 'Family member'}</div>
+                          <div className="chat-member-role">{getChatMemberMetaText(member)}</div>
                         </div>
 
                         <div className={`chat-member-select${isSelected ? ' selected' : ''}`}>
@@ -202,8 +255,8 @@ const ChatRoomMembersModal = ({
                 </div>
               ) : (
                 <div className="chat-member-empty chat-member-empty--compact">
-                  <p>No more members to add</p>
-                  <span>Everyone eligible for this family room is already included.</span>
+                  <p>No more app users to add</p>
+                  <span>Every eligible Familyss app user is already in this room.</span>
                 </div>
               )}
             </section>

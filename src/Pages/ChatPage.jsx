@@ -54,6 +54,8 @@ import {
   deleteMessage as deleteMsg,
   deleteRoomConversation,
   formatDateSeparator,
+  getChatMemberBadges,
+  getChatMemberMetaText,
   formatFullTime,
   formatMessageTime,
   getConversation,
@@ -100,6 +102,11 @@ const toConversationType = (conversation) =>
 
 const isSameConversation = (left, right) =>
   Number(left || 0) === Number(right || 0);
+
+const isUnavailableConversationError = (error) => {
+  const status = Number(error?.status || 0);
+  return status === 403 || status === 404;
+};
 
 const resizeComposer = (element) => {
   if (!element) return;
@@ -338,6 +345,7 @@ const ChatPage = () => {
   const [listLoading, setListLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState(null);
+  const [resolvedConversationId, setResolvedConversationId] = useState(null);
   const [selectedType, setSelectedType] = useState(CONVERSATION_TYPES.DIRECT);
   const [conversation, setConversation] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -373,6 +381,10 @@ const ChatPage = () => {
   const [createRoomSubmitting, setCreateRoomSubmitting] = useState(false);
   const [createRoomName, setCreateRoomName] = useState('');
   const [createRoomMemberIds, setCreateRoomMemberIds] = useState([]);
+  const [roomNameEditorOpen, setRoomNameEditorOpen] = useState(false);
+  const [roomNameDraft, setRoomNameDraft] = useState('');
+  const [roomNameError, setRoomNameError] = useState('');
+  const [roomNameSubmitting, setRoomNameSubmitting] = useState(false);
 
   const messagesEndRef = useRef(null);
   const menuRef = useRef(null);
@@ -416,6 +428,10 @@ const ChatPage = () => {
     setCreateRoomSubmitting(false);
     setCreateRoomName('');
     setCreateRoomMemberIds([]);
+    setRoomNameEditorOpen(false);
+    setRoomNameDraft('');
+    setRoomNameError('');
+    setRoomNameSubmitting(false);
     familyMembersFamilyCodeRef.current = '';
   }, [activeFamilyCode]);
 
@@ -500,6 +516,16 @@ const ChatPage = () => {
     [familyMembers],
   );
 
+  useEffect(() => {
+    if (!hasFamilyScope) {
+      return;
+    }
+
+    loadFamilyMembers().catch((error) => {
+      console.error('Failed to preload family members for chat:', error);
+    });
+  }, [activeFamilyCode, hasFamilyScope, loadFamilyMembers]);
+
   const resolveConversationFamilyCode = useCallback(
     (conversationId, fallbackFamilyCode = '') => {
       const cachedConversation = getCachedConversation(conversationId);
@@ -572,6 +598,7 @@ const ChatPage = () => {
     stopLocalTyping();
     clearRemoteTyping();
     setSelectedId(null);
+    setResolvedConversationId(null);
     setSelectedType(CONVERSATION_TYPES.DIRECT);
     setConversation(null);
     setMessages([]);
@@ -581,6 +608,10 @@ const ChatPage = () => {
     setInfoPanelOpen(false);
     setShowComposerPicker(false);
     setText('');
+    setRoomNameEditorOpen(false);
+    setRoomNameDraft('');
+    setRoomNameError('');
+    setRoomNameSubmitting(false);
   }, [activeFamilyCode, clearRemoteTyping, stopLocalTyping]);
 
   const clearOpenConversation = useCallback(
@@ -588,6 +619,7 @@ const ChatPage = () => {
       stopLocalTyping();
       clearRemoteTyping();
       setSelectedId(null);
+      setResolvedConversationId(null);
       setSelectedType(CONVERSATION_TYPES.DIRECT);
       setConversation(null);
       setMessages([]);
@@ -600,6 +632,10 @@ const ChatPage = () => {
       setRoomMembersOpen(false);
       setSelectedRoomMemberIds([]);
       setRoomMembersError('');
+      setRoomNameEditorOpen(false);
+      setRoomNameDraft('');
+      setRoomNameError('');
+      setRoomNameSubmitting(false);
       setMessageSearchOpen(false);
       setMessageSearchQuery('');
       setActiveMessageSearchIndex(-1);
@@ -790,6 +826,7 @@ const ChatPage = () => {
       openRequestIdRef.current = requestId;
 
       setSelectedId(targetConversationId);
+      setResolvedConversationId(null);
       setSelectedType(conversationType);
       setChatLoading(true);
       setReplyTo(null);
@@ -803,6 +840,10 @@ const ChatPage = () => {
       setRoomMembersOpen(false);
       setSelectedRoomMemberIds([]);
       setRoomMembersError('');
+      setRoomNameEditorOpen(false);
+      setRoomNameDraft('');
+      setRoomNameError('');
+      setRoomNameSubmitting(false);
       stopLocalTyping();
       clearRemoteTyping();
 
@@ -825,29 +866,47 @@ const ChatPage = () => {
       }
 
       try {
-        const [conversationResponse, messageResponse] = await Promise.all([
-          getConversation(targetConversationId, familyCode),
-          getMessages(targetConversationId, null, currentUserId, familyCode),
-        ]);
+        const conversationPromise = getConversation(targetConversationId, familyCode);
+        const messagePromise = getMessages(
+          targetConversationId,
+          null,
+          currentUserId,
+          familyCode,
+        );
+        const conversationResponse = await conversationPromise;
 
         if (openRequestIdRef.current !== requestId) {
           return;
         }
 
         const nextConversation = cacheConversation(conversationResponse);
+        setConversation(nextConversation);
+        setSelectedType(toConversationType(nextConversation));
+        setResolvedConversationId(targetConversationId);
+
+        const messageResponse = await messagePromise;
+
+        if (openRequestIdRef.current !== requestId) {
+          return;
+        }
+
         const nextMessages = cacheMessages(
           targetConversationId,
           messageResponse?.messages || [],
         );
 
-        setConversation(nextConversation);
-        setSelectedType(toConversationType(nextConversation));
         setMessages(nextMessages);
         syncListsFromCache(familyCode);
         await markConversationReadNow(targetConversationId, { suppressErrors: true });
       } catch (error) {
         if (openRequestIdRef.current === requestId) {
           console.error('Failed to open conversation:', error);
+          setResolvedConversationId(null);
+          if (isUnavailableConversationError(error)) {
+            removeCachedConversation(targetConversationId, familyCode);
+            syncListsFromCache(familyCode);
+            clearOpenConversation();
+          }
         }
       } finally {
         if (openRequestIdRef.current === requestId) {
@@ -856,6 +915,7 @@ const ChatPage = () => {
       }
     },
     [
+      clearOpenConversation,
       clearRemoteTyping,
       currentUserId,
       markConversationReadNow,
@@ -903,11 +963,27 @@ const ChatPage = () => {
   ]);
 
   useEffect(() => {
-    if (!selectedId || !activeFamilyCode) {
+    const normalizedActiveFamilyCode = normalizeFamilyCode(activeFamilyCode);
+    if (!selectedId || !resolvedConversationId || !normalizedActiveFamilyCode) {
       return undefined;
     }
 
-    joinConversation(selectedId, activeFamilyCode);
+    if (!isSameConversation(selectedId, resolvedConversationId)) {
+      return undefined;
+    }
+
+    const selectedConversationFamilyCode = normalizeFamilyCode(
+      conversation?.familyCode || getCachedConversation(selectedId)?.familyCode || '',
+    );
+
+    if (
+      selectedConversationFamilyCode &&
+      selectedConversationFamilyCode !== normalizedActiveFamilyCode
+    ) {
+      return undefined;
+    }
+
+    joinConversation(selectedId, normalizedActiveFamilyCode);
 
     return () => {
       leaveConversation(selectedId);
@@ -917,8 +993,10 @@ const ChatPage = () => {
   }, [
     activeFamilyCode,
     clearRemoteTyping,
+    conversation?.familyCode,
     joinConversation,
     leaveConversation,
+    resolvedConversationId,
     selectedId,
     stopLocalTyping,
   ]);
@@ -1600,21 +1678,50 @@ const ChatPage = () => {
     clearOpenConversation,
   ]);
 
-  const handleRenameRoom = useCallback(async () => {
+  const handleRenameRoom = useCallback(() => {
     if (!conversation?.roomId || !activeFamilyCode) {
       return;
     }
 
-    const nextRoomName = window.prompt(
-      'Enter a room name',
-      String(conversation?.roomName || '').trim(),
-    );
-    const normalizedRoomName = String(nextRoomName || '').trim();
-    if (!normalizedRoomName || normalizedRoomName === String(conversation?.roomName || '').trim()) {
-      setMenuOpen(false);
+    setMenuOpen(false);
+    setInfoPanelOpen(false);
+    setRoomNameDraft(String(conversation?.roomName || '').trim());
+    setRoomNameError('');
+    setRoomNameEditorOpen(true);
+  }, [
+    activeFamilyCode,
+    conversation?.roomId,
+    conversation?.roomName,
+  ]);
+
+  const handleCloseRoomNameEditor = useCallback(() => {
+    if (roomNameSubmitting) {
       return;
     }
 
+    setRoomNameEditorOpen(false);
+    setRoomNameDraft('');
+    setRoomNameError('');
+  }, [roomNameSubmitting]);
+
+  const handleSubmitRoomName = useCallback(async () => {
+    if (!conversation?.roomId || !activeFamilyCode) {
+      return;
+    }
+
+    const normalizedRoomName = String(roomNameDraft || '').trim();
+    if (!normalizedRoomName) {
+      setRoomNameError('Room name is required.');
+      return;
+    }
+
+    if (normalizedRoomName === String(conversation?.roomName || '').trim()) {
+      handleCloseRoomNameEditor();
+      return;
+    }
+
+    setRoomNameSubmitting(true);
+    setRoomNameError('');
     try {
       const nextConversation = await updateRoomConversation(
         conversation.roomId,
@@ -1622,17 +1729,21 @@ const ChatPage = () => {
         { roomName: normalizedRoomName },
       );
       applyConversationRefresh(nextConversation);
+      setRoomNameEditorOpen(false);
+      setRoomNameDraft('');
     } catch (error) {
       console.error('Failed to rename room:', error);
-      window.alert(error?.message || 'Failed to rename this room');
+      setRoomNameError(error?.message || 'Failed to rename this room');
     } finally {
-      setMenuOpen(false);
+      setRoomNameSubmitting(false);
     }
   }, [
     activeFamilyCode,
     applyConversationRefresh,
     conversation?.roomId,
     conversation?.roomName,
+    handleCloseRoomNameEditor,
+    roomNameDraft,
   ]);
 
   const handleRemoveRoomPhoto = useCallback(async () => {
@@ -1946,9 +2057,11 @@ const ChatPage = () => {
     return conversations.filter((conversationItem) => {
       if (!query) return true;
       const participant = conversationItem?.participants?.[0] || {};
-      const fullName = `${participant.firstName || ''} ${participant.lastName || ''}`
-        .trim()
-        .toLowerCase();
+      const fullName = (
+        `${participant.firstName || ''} ${participant.lastName || ''}`.trim() ||
+        participant?.name ||
+        ''
+      ).toLowerCase();
       return fullName.includes(query);
     });
   }, [conversations, search]);
@@ -2080,6 +2193,15 @@ const ChatPage = () => {
   }, [conversation, typingUserIds]);
 
   const isGroup = selectedType === CONVERSATION_TYPES.GROUP;
+  const familyMemberMap = useMemo(
+    () =>
+      new Map(
+        familyMembers
+          .map((member) => [Number(member?.userId || 0), member])
+          .filter(([memberId]) => memberId > 0),
+      ),
+    [familyMembers],
+  );
   const currentRoomMembers = useMemo(() => {
     const roomMembers = Array.isArray(conversation?.roomMembers)
       ? conversation.roomMembers
@@ -2088,29 +2210,32 @@ const ChatPage = () => {
       return [];
     }
 
-    const familyMemberMap = new Map(
-      (Array.isArray(familyMembers) ? familyMembers : []).map((member) => [
-        Number(member?.userId || 0),
-        member,
-      ]),
-    );
-
-    return roomMembers.map((member) => {
-      const memberId = Number(member?.userId || 0);
-      const familyMember = familyMemberMap.get(memberId);
-      return {
-        ...member,
-        ...(familyMember || {}),
-        userId: memberId,
-        profileUrl: familyMember?.profileUrl || member?.profileUrl || '',
-        name:
-          familyMember?.name ||
-          member?.name ||
-          `${member?.firstName || ''} ${member?.lastName || ''}`.trim() ||
-          'Family Member',
-      };
-    });
-  }, [conversation?.roomMembers, familyMembers]);
+    return roomMembers
+      .map((member) => {
+        const memberId = Number(member?.userId || 0);
+        const familyMember = familyMemberMap.get(memberId);
+        return {
+          ...member,
+          ...(familyMember || {}),
+          userId: memberId,
+          familyCode:
+            familyMember?.familyCode ||
+            normalizeFamilyCode(conversation?.familyCode || activeFamilyCode),
+          sourceFamilyCode:
+            familyMember?.sourceFamilyCode ||
+            normalizeFamilyCode(conversation?.familyCode || activeFamilyCode),
+          membershipType: familyMember?.membershipType || 'member',
+          isNotInTree: Boolean(familyMember?.isNotInTree),
+          profileUrl: familyMember?.profileUrl || member?.profileUrl || '',
+          name:
+            familyMember?.name ||
+            member?.name ||
+            `${member?.firstName || ''} ${member?.lastName || ''}`.trim() ||
+            'Family Member',
+        };
+      })
+      .filter(Boolean);
+  }, [activeFamilyCode, conversation?.familyCode, conversation?.roomMembers, familyMemberMap]);
   const currentRoomMemberIds = useMemo(
     () =>
       new Set(
@@ -2142,17 +2267,16 @@ const ChatPage = () => {
       ) || null,
     [activeFamilyCode, families],
   );
-  const currentFamilyIsAdmin = Boolean(activeFamily?.isAdmin);
   const activeParticipant = conversation?.participants?.[0] || {};
   const selectedContactMember = useMemo(
-    () =>
-      familyMembers.find(
-        (member) =>
-          Number(member?.userId || 0) === Number(activeParticipant?.userId || 0),
-      ) || null,
-    [activeParticipant?.userId, familyMembers],
+    () => familyMemberMap.get(Number(activeParticipant?.userId || 0)) || null,
+    [activeParticipant?.userId, familyMemberMap],
   );
-  const roomMemberCount = Number(conversation?.memberCount || currentRoomMembers.length || 0);
+  const familyMembersLoadedForScope =
+    familyMembersFamilyCodeRef.current === normalizeFamilyCode(activeFamilyCode);
+  const roomMemberCount = familyMembersLoadedForScope
+    ? currentRoomMembers.length
+    : Number(conversation?.memberCount || currentRoomMembers.length || 0);
   const canManageRoom = Boolean(isGroup && conversation?.canManageRoom);
   const canManageRoomMembers =
     canManageRoom &&
@@ -2161,7 +2285,9 @@ const ChatPage = () => {
   const headerName = isGroup
     ? conversation?.roomName || 'Group'
     : `${activeParticipant.firstName || ''} ${activeParticipant.lastName || ''}`.trim() ||
+      activeParticipant?.name ||
       'Chat';
+  const directChatBadges = isGroup ? [] : getChatMemberBadges(selectedContactMember || {});
   const headerInitials = getInitials(
     activeParticipant.firstName,
     activeParticipant.lastName,
@@ -2190,7 +2316,7 @@ const ChatPage = () => {
   const roomTypeLabel = getRoomTypeLabel(conversation?.roomType);
   const infoPrimaryMeta = isGroup
     ? `${roomTypeLabel} in ${infoFamilyLabel}`
-    : `${selectedContactMember?.familyRole || 'Family member'} in ${infoFamilyLabel}`;
+    : `${getChatMemberMetaText(selectedContactMember || {})} in ${infoFamilyLabel}`;
   const showDesktopInfoPanel = Boolean(infoPanelOpen && !isMobile && selectedId);
   const showMobileInfoPanel = Boolean(infoPanelOpen && isMobile && selectedId);
 
@@ -2399,7 +2525,21 @@ const ChatPage = () => {
                   </div>
                   <div className="chat-info-member-chip-text">
                     <span>{member.name}</span>
-                    <small>{member.familyRole || 'Family member'}</small>
+                    <small>{getChatMemberMetaText(member)}</small>
+                    <div className="chat-member-chip-row chat-member-chip-row--compact">
+                      {member.isFamilyAdmin ? (
+                        <span className="chat-member-chip">Admin</span>
+                      ) : null}
+                      {getChatMemberBadges(member).map((badge) => (
+                        <span
+                          className={`chat-member-chip ${badge.className}`}
+                          key={`info-member-${member.userId}-${badge.key}`}
+                          title={badge.title}
+                        >
+                          {badge.label}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -2538,48 +2678,52 @@ const ChatPage = () => {
             </div>
           </div>
 
-          <div className="chat-sidebar-tabs">
-            <button
-              className={`chat-pill${activeTab === 'messages' ? ' active' : ''}`}
-              onClick={() => setActiveTab('messages')}
-              type="button"
-            >
-              Messages {msgCount > 0 && <span className="chat-pill-badge">{msgCount}</span>}
-            </button>
-            <button
-              className={`chat-pill${activeTab === 'rooms' ? ' active' : ''}`}
-              onClick={() => setActiveTab('rooms')}
-              type="button"
-            >
-              Rooms {roomCount > 0 && <span className="chat-pill-badge">{roomCount}</span>}
-            </button>
-          </div>
+          <div className="chat-sidebar-toolbar">
+            <div className="chat-sidebar-tabs">
+              <button
+                className={`chat-pill${activeTab === 'messages' ? ' active' : ''}`}
+                onClick={() => setActiveTab('messages')}
+                type="button"
+              >
+                Messages {msgCount > 0 && <span className="chat-pill-badge">{msgCount}</span>}
+              </button>
+              <button
+                className={`chat-pill${activeTab === 'rooms' ? ' active' : ''}`}
+                onClick={() => setActiveTab('rooms')}
+                type="button"
+              >
+                Rooms {roomCount > 0 && <span className="chat-pill-badge">{roomCount}</span>}
+              </button>
+            </div>
 
-          {hasFamilyScope ? (
-            <div className="chat-sidebar-actions">
-              {activeTab === 'messages' ? (
+            {hasFamilyScope ? (
+              activeTab === 'messages' ? (
                 <button
-                  className="chat-sidebar-action"
+                  className="chat-sidebar-action chat-sidebar-action--inline"
                   onClick={handleOpenNewConversation}
                   type="button"
                 >
                   <FiPlus size={14} />
                   New conversation
                 </button>
-              ) : currentFamilyIsAdmin ? (
+              ) : (
                 <button
-                  className="chat-sidebar-action"
+                  className="chat-sidebar-action chat-sidebar-action--inline"
                   onClick={handleOpenCreateRoom}
                   type="button"
                 >
                   <FiPlus size={14} />
                   Create room
                 </button>
-              ) : (
-                <span className="chat-sidebar-note">
-                  Only family admins can create rooms.
-                </span>
-              )}
+              )
+            ) : null}
+          </div>
+
+          {hasFamilyScope && activeTab === 'rooms' ? (
+            <div className="chat-sidebar-note-row">
+              <span className="chat-sidebar-note">
+                Custom rooms can include linked, associated, and not-in-tree app users.
+              </span>
             </div>
           ) : null}
 
@@ -2606,8 +2750,12 @@ const ChatPage = () => {
               filteredConversations.length > 0 ? (
                 filteredConversations.map((conversationItem) => {
                   const participant = conversationItem?.participants?.[0] || {};
+                  const participantMember =
+                    familyMemberMap.get(Number(participant?.userId || 0)) || null;
+                  const participantBadges = getChatMemberBadges(participantMember || {});
                   const fullName =
                     `${participant.firstName || ''} ${participant.lastName || ''}`.trim() ||
+                    participant?.name ||
                     'Unknown';
                   const initials = getInitials(
                     participant.firstName,
@@ -2633,7 +2781,18 @@ const ChatPage = () => {
                       </div>
                       <div className="chat-li-body">
                         <div className="chat-li-top">
-                          <span className="chat-li-name">{fullName}</span>
+                          <div className="chat-li-name-row">
+                            <span className="chat-li-name">{fullName}</span>
+                            {participantBadges.map((badge) => (
+                              <span
+                                className={`chat-member-chip ${badge.className}`}
+                                key={`${conversationItem.id}-${badge.key}`}
+                                title={badge.title}
+                              >
+                                {badge.label}
+                              </span>
+                            ))}
+                          </div>
                           <span
                             className={`chat-li-time${
                               conversationItem.unreadCount ? ' unread' : ''
@@ -2714,7 +2873,14 @@ const ChatPage = () => {
           {!selectedId ? (
             <div className="chat-placeholder">
               <div className="chat-placeholder-icon">💬</div>
-              <h2>{hasFamilyScope ? 'Select a chat' : 'Family chat is unavailable'}</h2>
+              <h2>
+                {hasFamilyScope ? 'Start with your family circle' : 'Family chat is unavailable'}
+              </h2>
+              <p>
+                {hasFamilyScope
+                  ? 'Choose a conversation to share updates, memories, and support together.'
+                  : 'Switch to an available family to open your chat space.'}
+              </p>
             </div>
           ) : chatLoading ? (
             <div className="chat-placeholder">
@@ -2773,7 +2939,16 @@ const ChatPage = () => {
 
                   <div className="chat-header-info">
                     <div className="chat-header-name">
-                      {headerName}
+                      <span className="chat-header-name-text">{headerName}</span>
+                      {directChatBadges.map((badge) => (
+                        <span
+                          className={`chat-member-chip ${badge.className}`}
+                          key={`header-${badge.key}`}
+                          title={badge.title}
+                        >
+                          {badge.label}
+                        </span>
+                      ))}
                       <span className="chat-header-badge">
                         {isChatConnected ? 'Active' : 'Offline'}
                       </span>
@@ -3344,7 +3519,7 @@ const ChatPage = () => {
       <ChatPickerModal
         isOpen={newConversationOpen}
         title="New conversation"
-        subtitle="Choose a family member to start a direct chat."
+        subtitle="Choose a Familyss app user from your family circle to start a direct chat."
         members={availableDirectMembers}
         selectedIds={newConversationMemberId ? [Number(newConversationMemberId)] : []}
         onToggleMember={(member) => {
@@ -3363,8 +3538,9 @@ const ChatPage = () => {
         isSubmitting={newConversationSubmitting}
         selectionMode="single"
         error={newConversationError}
-        emptyStateTitle="No family members available"
-        emptyStateSubtitle="Approved or associated members will appear here."
+        emptyStateTitle="No family app users available"
+        emptyStateSubtitle="Associated and linked Familyss users will appear here when available."
+        searchPlaceholder="Search family app users"
         submitDisabled={!newConversationMemberId}
         disableMember={(member) =>
           Boolean(
@@ -3387,7 +3563,7 @@ const ChatPage = () => {
       <ChatPickerModal
         isOpen={createRoomOpen}
         title="Create room"
-        subtitle="Pick a room name and choose the members you want to include."
+        subtitle="Pick a room name and choose the Familyss app users you want to include."
         members={availableDirectMembers}
         selectedIds={createRoomMemberIds}
         onToggleMember={handleToggleCreateRoomMember}
@@ -3401,8 +3577,9 @@ const ChatPage = () => {
         submitLabel="Create room"
         isSubmitting={createRoomSubmitting}
         error={createRoomError}
-        emptyStateTitle="No family members available"
-        emptyStateSubtitle="Approved or associated members will appear here."
+        emptyStateTitle="No family app users available"
+        emptyStateSubtitle="Associated and linked Familyss users will appear here when available."
+        searchPlaceholder="Search family app users"
         submitDisabled={!String(createRoomName || '').trim()}
         topContent={
           <div className="chat-form-group">
@@ -3425,6 +3602,76 @@ const ChatPage = () => {
         }
       />
 
+      {roomNameEditorOpen ? (
+        <div className="chat-modal-overlay" role="presentation">
+          <div
+            className="chat-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Edit room name"
+          >
+            <div className="chat-modal-header">
+              <div>
+                <h3>Edit room name</h3>
+                <p>Choose a clear family room name that everyone will recognize.</p>
+              </div>
+              <button
+                type="button"
+                className="chat-modal-close"
+                onClick={handleCloseRoomNameEditor}
+                aria-label="Close"
+                disabled={roomNameSubmitting}
+              >
+                <FiX size={18} />
+              </button>
+            </div>
+
+            <div className="chat-modal-top-content">
+              <div className="chat-form-group">
+                <label className="chat-form-label" htmlFor="chat-room-name-editor">
+                  Room name
+                </label>
+                <input
+                  id="chat-room-name-editor"
+                  className="chat-form-input"
+                  type="text"
+                  value={roomNameDraft}
+                  onChange={(event) => {
+                    setRoomNameDraft(event.target.value);
+                    if (roomNameError) {
+                      setRoomNameError('');
+                    }
+                  }}
+                  placeholder="Enter room name"
+                  maxLength={100}
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            {roomNameError ? <div className="chat-modal-error">{roomNameError}</div> : null}
+
+            <div className="chat-modal-actions">
+              <button
+                type="button"
+                className="chat-modal-btn chat-modal-btn--secondary"
+                onClick={handleCloseRoomNameEditor}
+                disabled={roomNameSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="chat-modal-btn chat-modal-btn--primary"
+                onClick={handleSubmitRoomName}
+                disabled={roomNameSubmitting}
+              >
+                {roomNameSubmitting ? 'Saving...' : 'Save room name'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <ChatRoomMembersModal
         isOpen={roomMembersOpen}
         roomName={conversation?.roomName || 'Room members'}
