@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FiMoreVertical, FiPlusCircle } from "react-icons/fi";
+import { FiHeart, FiMessageCircle, FiMoreVertical, FiPlusCircle, FiShare2 } from "react-icons/fi";
 import { MdPeople, MdPublic } from "react-icons/md";
 
 import GalleryViewerModal from "../Components/GalleryViewerModal";
+import PublicGalleryShareSheet from "../Components/PublicGalleryShareSheet";
 import ReportContentModal from "../Components/ReportContentModal";
 import CreateAlbumModal from "../Components/CreateAlbumModal";
 import { useUser } from "../Contexts/UserContext";
@@ -37,6 +38,7 @@ const FamilyGalleryPage = () => {
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [reportTarget, setReportTarget] = useState(null);
   const [albumActionMenuAlbumId, setAlbumActionMenuAlbumId] = useState(null);
+  const [shareGallery, setShareGallery] = useState(null);
 
   const searchTimeoutRef = useRef(null);
   const requestIdRef = useRef(0);
@@ -477,20 +479,34 @@ const FamilyGalleryPage = () => {
                               className="flex items-center gap-1 rounded-full bg-primary-50 px-3 py-1 font-medium text-primary-600"
                               title="Family Album"
                             >
-                              <MdPeople size={16} /> Family
+                              <MdPeople size={16} /> 
                             </span>
                           ) : (
                             <span
                               className="flex items-center gap-1 rounded-full bg-secondary-50 px-3 py-1 font-medium text-secondary-400"
                               title="Public Album"
                             >
-                              <MdPublic size={16} /> Public
+                              <MdPublic size={16} /> 
                             </span>
                           )}
 
                           <div className="flex items-center gap-3 text-xs font-medium text-gray-500">
-                            <span>{album.likeCount || 0} likes</span>
-                            <span>{album.commentCount || 0} comments</span>
+                             <span className="flex items-center gap-1 ">{album.likeCount || 0} <FiHeart size={14} className="text-red-500" /></span>
+                            <span className="flex items-center gap-1">{album.commentCount || 0} <FiMessageCircle size={14} className="text-blue-500" /></span>
+                            {album.privacy === "public" ? (
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setShareGallery(album);
+                                }}
+                                className="inline-flex items-center gap-1 rounded-full  px-3 py-1 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-200"
+                              >
+                                <FiShare2 size={14} />
+                                {/* Share */}
+                              </button>
+                            ) : null}
+                           
                           </div>
                         </div>
                       </div>
@@ -558,6 +574,12 @@ const FamilyGalleryPage = () => {
         currentUser={userInfo}
         authToken={token}
         mode="create"
+      />
+
+      <PublicGalleryShareSheet
+        isOpen={Boolean(shareGallery)}
+        gallery={shareGallery}
+        onClose={() => setShareGallery(null)}
       />
     </>
   );

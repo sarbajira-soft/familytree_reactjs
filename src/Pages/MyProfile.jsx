@@ -31,6 +31,24 @@ import { toast } from "react-toastify";
 
 const PROFILE_ITEMS_PER_PAGE = 9;
 
+const getPrivacyBadgeConfig = (privacy) => {
+  const normalized = String(privacy || '').toLowerCase();
+
+  if (normalized === 'family') {
+    return { label: 'Family', className: 'bg-blue-600/90 text-white' };
+  }
+
+  if (normalized === 'public') {
+    return { label: 'Public', className: 'bg-orange-600/90 text-white' };
+  }
+
+  if (normalized) {
+    return { label: normalized.charAt(0).toUpperCase() + normalized.slice(1), className: 'bg-gray-800/80 text-white' };
+  }
+
+  return null;
+};
+
 const PaginationControls = ({
   page,
   totalPages,
@@ -173,7 +191,7 @@ const ProfilePage = () => {
       name: userInfo.name || "Username",
       fullName: `${userInfo.firstName || ""} ${userInfo.lastName || ""}`.trim(),
       basicInfo: userInfo.bio ? userInfo.bio.split(".")[0] : "Family member",
-      bio: userInfo.bio || "No bio yet",
+      bio: userInfo.bio || "",
       contactNumber: userInfo.contactNumber || "",
       email: userInfo.email || "",
       familyCode:
@@ -483,7 +501,7 @@ const ProfilePage = () => {
       name: userInfo.name || "Username",
       fullName: `${userInfo.firstName || ""} ${userInfo.lastName || ""}`.trim(),
       basicInfo: userInfo.bio ? userInfo.bio.split(".")[0] : "Family member",
-      bio: userInfo.bio || "No bio yet",
+      bio: userInfo.bio || "",
       contactNumber: userInfo.contactNumber || "",
       email: userInfo.email || "",
       familyCode:
@@ -839,7 +857,7 @@ const ProfilePage = () => {
                         </h1>
                         {user.familyCode && (
                           <div className="flex items-center justify-center md:justify-start gap-2 mt-1">
-                            <span className="inline-flex items-center rounded-full bg-white/10 backdrop-blur-md px-3 py-1 text-[11px] font-semibold text-white ring-1 ring-white/20">
+                            <span className="inline-flex items-center rounded-full bg-white/10 backdrop-blur-md px-3 py-1 text-[11px] font-semibold text-black dark:text-white  ring-1 ring-white/20">
                               Family Code: {user.familyCode}
                             </span>
                           </div>
@@ -1038,6 +1056,18 @@ const ProfilePage = () => {
                           </div>
                         )}
 
+                        {(() => {
+                          const badge = getPrivacyBadgeConfig(post.privacy);
+                          if (!badge) return null;
+                          return (
+                            <div
+                              className={`absolute bottom-2 right-2 rounded-full px-3 py-1 text-[11px] font-semibold shadow-sm ring-1 ring-white/30 ${badge.className}`}
+                            >
+                              {badge.label}
+                            </div>
+                          );
+                        })()}
+
                         <div
                           className="absolute top-2 right-2 flex gap-2
      opacity-100
@@ -1143,6 +1173,18 @@ const ProfilePage = () => {
                           </p>
                         </div>
                       </div>
+
+                      {(() => {
+                        const badge = getPrivacyBadgeConfig(gallery.privacy);
+                        if (!badge) return null;
+                        return (
+                          <div
+                            className={`absolute bottom-2 right-2 rounded-full px-3 py-1 text-[11px] font-semibold shadow-sm ring-1 ring-white/30 ${badge.className}`}
+                          >
+                            {badge.label}
+                          </div>
+                        );
+                      })()}
                       <div
                         className="absolute top-2 right-2 flex gap-2
      opacity-100

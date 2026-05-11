@@ -376,40 +376,47 @@ export const UserProvider = ({ children }) => {
     };
   }, [fetchUserDetails]);
 
-  // Listen for localStorage changes (when user logs in)
-  
-  // FIXED: Simplified session management - only handle actual browser close
   useEffect(() => {
-    // Set up session management on page load
-    const handlePageLoad = () => {
-      const stayLoggedIn = localStorage.getItem('stayLoggedIn');
-      
-      // Only check if this is actually a fresh browser session
-      // Use sessionStorage to detect if this is a new browser session vs page refresh
-      if (!sessionStorage.getItem('browserSessionActive')) {
-        // This is a new browser session
-        sessionStorage.setItem('browserSessionActive', 'true');
-        
-        // If user previously chose not to stay logged in, clear the session
-        if (stayLoggedIn === 'false') {
-          clearUserData();
-          
-          // Redirect to login if on a protected page
+    const handleStorageChange = (event) => {
+      if (!event?.key) {
+        return;
+      }
+
+      if (event.key === 'access_token') {
+        if (!event.newValue) {
+          setUserInfo(null);
+          setUserLoading(false);
+
           const path = globalThis?.location?.pathname;
           if (path && path !== '/login' && path !== '/register') {
             redirectToLogin();
           }
+          return;
+        }
+
+        setUserLoading(true);
+        fetchUserDetails({ silent: true });
+        return;
+      }
+
+      if (event.key === 'userInfo') {
+        if (event.newValue) {
+          try {
+            setUserInfo(JSON.parse(event.newValue));
+          } catch (error) {
+            console.warn('Failed to parse userInfo from storage event:', error);
+          }
+        } else {
+          setUserInfo(null);
         }
       }
     };
 
-    // Run page load check immediately
-    handlePageLoad();
-
-    // REMOVED: beforeunload and visibility change handlers as they were causing issues
-    // The session will only be cleared when a new browser session starts (not during page refreshes or form submissions)
-
-  }, [clearUserData, redirectToLogin]);
+    globalThis.addEventListener('storage', handleStorageChange);
+    return () => {
+      globalThis.removeEventListener('storage', handleStorageChange);
+    };
+  }, [fetchUserDetails, redirectToLogin]);
 
   const contextValue = useMemo(() => ({
     userInfo,

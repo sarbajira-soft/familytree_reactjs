@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.familyss.app",
+      "sha256_cert_fingerprints": [
+        "C8:2A:BA:98:C7:5B:35:07:1C:FA:17:AF:A2:E8:60:66:9C:BD:05:2A:72:03:7A:03:06:88:56:40:03:C7:93:A2"
+      ]
+    }
+  }
+]
