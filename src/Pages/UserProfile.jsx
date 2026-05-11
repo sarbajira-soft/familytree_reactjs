@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import PropTypes from "prop-types";
 import { useNavigate, useParams } from "react-router-dom";
 import { FiGrid, FiImage } from "react-icons/fi";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 
 import PostViewerModal from "../Components/PostViewerModal";
 import GalleryViewerModal from "../Components/GalleryViewerModal";
@@ -19,9 +19,17 @@ import { getGalleryListFromApiResponse, mapGallerySummary } from "../utils/galle
 
 const EMPTY_VTT_TRACK_SRC = "data:text/vtt,WEBVTT";
 const SHIMMER_CARD_KEYS = ["a", "b", "c"];
+const PROFILE_CONTENT_PAGE_SIZE = 18;
 const DEFAULT_BLOCK_STATUS = {
   isBlockedByMe: false,
   isBlockedByThem: false,
+};
+
+const getPostListFromApiResponse = (payload) => {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.posts)) return payload.posts;
+  if (Array.isArray(payload?.data)) return payload.data;
+  return [];
 };
 
 const renderPostMedia = (post) => {
@@ -64,7 +72,15 @@ const renderPostMedia = (post) => {
   );
 };
 
-const renderPostsContent = ({ loadingPosts, userPosts, handleViewPost }) => {
+const renderPostsContent = ({
+  loadingPosts,
+  userPosts,
+  postsError,
+  handleViewPost,
+  hasMorePosts,
+  loadingMorePosts,
+  onLoadMorePosts,
+}) => {
   if (loadingPosts) {
     return (
       <div className="flex flex-col sm:flex-row gap-4">
@@ -79,26 +95,49 @@ const renderPostsContent = ({ loadingPosts, userPosts, handleViewPost }) => {
     );
   }
 
+  if (postsError) {
+    return (
+      <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
+        {postsError}
+      </div>
+    );
+  }
+
   if (userPosts.length > 0) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {userPosts.map((post) => (
-          <button
-            type="button"
-            key={post.id}
-            className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100 transform hover:scale-[1.02] hover:shadow-lg transition-all duration-300 cursor-pointer group relative text-left"
-            onClick={() => handleViewPost(post)}
-          >
-            <div className="relative w-full h-64 overflow-hidden">
-              {renderPostMedia(post)}
-            </div>
-            <div className="p-4">
-              <p className="text-sm font-medium text-gray-800 mb-2 line-clamp-2">
-                {post.caption}
-              </p>
-            </div>
-          </button>
-        ))}
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {userPosts.map((post) => (
+            <button
+              type="button"
+              key={post.id}
+              className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100 transform hover:scale-[1.02] hover:shadow-lg transition-all duration-300 cursor-pointer group relative text-left"
+              onClick={() => handleViewPost(post)}
+            >
+              <div className="relative w-full h-64 overflow-hidden">
+                {renderPostMedia(post)}
+              </div>
+              <div className="p-4">
+                <p className="text-sm font-medium text-gray-800 mb-2 line-clamp-2">
+                  {post.caption}
+                </p>
+              </div>
+            </button>
+          ))}
+        </div>
+
+        {hasMorePosts ? (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={onLoadMorePosts}
+              disabled={loadingMorePosts}
+              className="rounded-full bg-primary-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-800 disabled:opacity-60"
+            >
+              {loadingMorePosts ? "Loading..." : "Load more posts"}
+            </button>
+          </div>
+        ) : null}
       </div>
     );
   }
@@ -110,7 +149,15 @@ const renderPostsContent = ({ loadingPosts, userPosts, handleViewPost }) => {
   );
 };
 
-const renderGalleriesContent = ({ loadingGalleries, userGalleries, handleViewAlbum }) => {
+const renderGalleriesContent = ({
+  loadingGalleries,
+  userGalleries,
+  galleriesError,
+  handleViewAlbum,
+  hasMoreGalleries,
+  loadingMoreGalleries,
+  onLoadMoreGalleries,
+}) => {
   if (loadingGalleries) {
     return (
       <div className="flex flex-col sm:flex-row gap-4">
@@ -125,31 +172,54 @@ const renderGalleriesContent = ({ loadingGalleries, userGalleries, handleViewAlb
     );
   }
 
+  if (galleriesError) {
+    return (
+      <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
+        {galleriesError}
+      </div>
+    );
+  }
+
   if (userGalleries.length > 0) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {userGalleries.map((gallery) => (
-          <button
-            type="button"
-            key={gallery.id}
-            className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100 transform hover:scale-[1.02] hover:shadow-lg transition-all duration-300 cursor-pointer group relative text-left"
-            onClick={() => handleViewAlbum(gallery)}
-          >
-            <div className="relative w-full h-64 overflow-hidden">
-              <img
-                src={gallery.cover}
-                alt={gallery.title}
-                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex items-end p-4">
-                <div className="text-white">
-                  <h3 className="text-lg font-semibold mb-0.5">{gallery.title}</h3>
-                  <p className="text-sm opacity-90">{gallery.photosCount} photos</p>
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {userGalleries.map((gallery) => (
+            <button
+              type="button"
+              key={gallery.id}
+              className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100 transform hover:scale-[1.02] hover:shadow-lg transition-all duration-300 cursor-pointer group relative text-left"
+              onClick={() => handleViewAlbum(gallery)}
+            >
+              <div className="relative w-full h-64 overflow-hidden">
+                <img
+                  src={gallery.cover}
+                  alt={gallery.title}
+                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex items-end p-4">
+                  <div className="text-white">
+                    <h3 className="text-lg font-semibold mb-0.5">{gallery.title}</h3>
+                    <p className="text-sm opacity-90">{gallery.photosCount} photos</p>
+                  </div>
                 </div>
               </div>
-            </div>
-          </button>
-        ))}
+            </button>
+          ))}
+        </div>
+
+        {hasMoreGalleries ? (
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={onLoadMoreGalleries}
+              disabled={loadingMoreGalleries}
+              className="rounded-full bg-primary-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary-800 disabled:opacity-60"
+            >
+              {loadingMoreGalleries ? "Loading..." : "Load more galleries"}
+            </button>
+          </div>
+        ) : null}
       </div>
     );
   }
@@ -174,6 +244,8 @@ const UserProfileView = ({
   userGalleries,
   loadingPosts,
   loadingGalleries,
+  postsError,
+  galleriesError,
   isPrivateAccount,
   blockStatus,
   onBlockStatusChange,
@@ -191,6 +263,15 @@ const UserProfileView = ({
   isPostViewerOpen,
   selectedPost,
   handleClosePostViewer,
+  totalPostsCount,
+  totalGalleriesCount,
+  canViewProfileContent,
+  hasMorePosts,
+  hasMoreGalleries,
+  loadingMorePosts,
+  loadingMoreGalleries,
+  onLoadMorePosts,
+  onLoadMoreGalleries,
 }) => {
   const isGalleriesSelected = showPosts === false;
 
@@ -265,13 +346,13 @@ const UserProfileView = ({
           <div className="flex justify-center md:justify-start gap-8 mt-5 pt-4 border-t border-gray-100">
             <div className="text-center">
               <span className="block font-bold text-xl md:text-2xl text-gray-900">
-                {userPosts.length}
+                {totalPostsCount ?? "—"}
               </span>
               <span className="block text-sm text-gray-500">Posts</span>
             </div>
             <div className="text-center">
               <span className="block font-bold text-xl md:text-2xl text-gray-900">
-                {userGalleries.length}
+                {totalGalleriesCount ?? "—"}
               </span>
               <span className="block text-sm text-gray-500">Galleries</span>
             </div>
@@ -280,14 +361,14 @@ const UserProfileView = ({
       </div>
     );
 
-  const privateSection = isPrivateAccount ? (
+  const privateSection = isPrivateAccount && !canViewProfileContent ? (
     <div className="bg-white rounded-2xl shadow-md border border-gray-100 p-6 text-center">
       <p className="text-gray-900 font-semibold text-lg">This account is private</p>
       <p className="text-gray-500 text-sm mt-1">Posts and galleries are hidden.</p>
     </div>
   ) : null;
 
-  const toggleSection = isPrivateAccount
+  const toggleSection = isPrivateAccount && !canViewProfileContent
     ? null
     : (
         <div className="flex items-center justify-between bg-white rounded-xl shadow-sm p-2 md:p-3 border border-gray-100 gap-1 md:gap-3 w-full">
@@ -326,13 +407,25 @@ const UserProfileView = ({
       );
 
   let contentSection = null;
-  if (!isPrivateAccount) {
+  if (!isPrivateAccount || canViewProfileContent) {
     contentSection = showPosts
-      ? renderPostsContent({ loadingPosts, userPosts, handleViewPost })
+      ? renderPostsContent({
+          loadingPosts,
+          userPosts,
+          postsError,
+          handleViewPost,
+          hasMorePosts,
+          loadingMorePosts,
+          onLoadMorePosts,
+        })
       : renderGalleriesContent({
           loadingGalleries,
           userGalleries,
+          galleriesError,
           handleViewAlbum,
+          hasMoreGalleries,
+          loadingMoreGalleries,
+          onLoadMoreGalleries,
         });
   }
 
@@ -377,6 +470,8 @@ UserProfileView.propTypes = {
   userGalleries: PropTypes.arrayOf(PropTypes.object),
   loadingPosts: PropTypes.bool,
   loadingGalleries: PropTypes.bool,
+  postsError: PropTypes.string,
+  galleriesError: PropTypes.string,
   isPrivateAccount: PropTypes.bool,
   blockStatus: PropTypes.shape({
     isBlockedByMe: PropTypes.bool,
@@ -397,6 +492,15 @@ UserProfileView.propTypes = {
   isPostViewerOpen: PropTypes.bool,
   selectedPost: PropTypes.any,
   handleClosePostViewer: PropTypes.func,
+  totalPostsCount: PropTypes.number,
+  totalGalleriesCount: PropTypes.number,
+  canViewProfileContent: PropTypes.bool,
+  hasMorePosts: PropTypes.bool,
+  hasMoreGalleries: PropTypes.bool,
+  loadingMorePosts: PropTypes.bool,
+  loadingMoreGalleries: PropTypes.bool,
+  onLoadMorePosts: PropTypes.func,
+  onLoadMoreGalleries: PropTypes.func,
 };
 
 const UserProfile = () => {
@@ -504,72 +608,126 @@ const UserProfile = () => {
 
   const avatar = userProfile?.profile || "/assets/user.png";
   const bio = userProfile?.bio || "No bio yet";
+  const canLoadProfileContent =
+    !!userId &&
+    !!token &&
+    !!profile &&
+    !loadingProfile &&
+    !error &&
+    !isBlockedByMe &&
+    !isBlockedByThem;
 
-  const { data: userPosts = [], isLoading: loadingPosts } = useQuery({
+  const postsQuery = useInfiniteQuery({
     queryKey: ["userPosts", Number(userId)],
-    queryFn: async () => {
+    initialPageParam: 1,
+    queryFn: async ({ pageParam = 1 }) => {
       const response = await authFetchResponse(
-        `/post/by-options?createdBy=${userId}`,
+        `/post/by-options?createdBy=${userId}&page=${pageParam}&limit=${PROFILE_CONTENT_PAGE_SIZE}`,
         { method: "GET", skipThrow: true }
       );
+      const json = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(
+          json?.message || json?.error || `Failed to load posts (${response.status})`,
+        );
       }
 
-      const json = await response.json();
-      const list = getGalleryListFromApiResponse(json);
-
-      return list.map((post) => ({
-        id: post.id,
-        type: post.postVideo ? "video" : "image",
-        url: post.postImage,
-        fullImageUrl: post.postImage,
-        postVideo: post.postVideo,
-        caption: post.caption,
-        likes: post.likeCount,
-        isLiked: post.isLiked,
-        comments: new Array(post.commentCount).fill(""),
-        privacy: post.privacy,
-        familyCode: post.familyCode,
-      }));
+      const list = getPostListFromApiResponse(json);
+      return {
+        items: list.map((post) => ({
+          id: post.id,
+          type: post.postVideo ? "video" : "image",
+          url: post.postImage,
+          fullImageUrl: post.postImage,
+          postVideo: post.postVideo,
+          caption: post.caption,
+          likes: Number(post.likeCount || 0),
+          isLiked: Boolean(post.isLiked),
+          comments: new Array(Number(post.commentCount || 0)).fill(""),
+          privacy: post.privacy,
+          familyCode: post.familyCode,
+          authorId: post.user?.userId || post.createdBy || Number(userId),
+          author: post.user?.name || displayName,
+          avatar: post.user?.profile || avatar,
+          createdBy: post.createdBy || Number(userId),
+        })),
+        total: Number(json?.total || 0),
+        hasMore: Boolean(json?.hasMore),
+        page: Number(json?.page || pageParam),
+      };
     },
-    enabled: !!userId && !!token && !isPrivateAccount && !isBlockedByMe && !isBlockedByThem,
+    getNextPageParam: (lastPage) =>
+      lastPage?.hasMore ? Number(lastPage.page || 1) + 1 : undefined,
+    enabled: canLoadProfileContent && showPosts,
     staleTime: 3 * 60 * 1000,
     cacheTime: 10 * 60 * 1000,
   });
 
-  const { data: userGalleries = [], isLoading: loadingGalleries } = useQuery({
+  const galleriesQuery = useInfiniteQuery({
     queryKey: ["userGalleries", Number(userId)],
-    queryFn: async () => {
+    initialPageParam: 1,
+    queryFn: async ({ pageParam = 1 }) => {
       const response = await authFetchResponse(
-        `/gallery/by-options?createdBy=${userId}&page=1&limit=100`,
+        `/gallery/by-options?createdBy=${userId}&page=${pageParam}&limit=${PROFILE_CONTENT_PAGE_SIZE}`,
         { method: "GET", skipThrow: true }
       );
+      const json = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(
+          json?.message || json?.error || `Failed to load galleries (${response.status})`,
+        );
       }
 
-      const json = await response.json();
       const list = getGalleryListFromApiResponse(json);
-
-      return list.map((gallery) =>
-        mapGallerySummary({
-          ...gallery,
-          author: displayName,
-          user: {
-            ...(gallery.user || {}),
-            name: displayName,
-            userId: Number(userId),
-          },
-        }),
-      );
+      return {
+        items: list.map((gallery) =>
+          mapGallerySummary({
+            ...gallery,
+            author: displayName,
+            user: {
+              ...(gallery.user || {}),
+              name: displayName,
+              userId: Number(userId),
+            },
+          }),
+        ),
+        total: Number(json?.total || 0),
+        hasMore: Boolean(json?.hasMore),
+        page: Number(json?.page || pageParam),
+      };
     },
-    enabled: !!userId && !!token && !isPrivateAccount && !isBlockedByMe && !isBlockedByThem,
+    getNextPageParam: (lastPage) =>
+      lastPage?.hasMore ? Number(lastPage.page || 1) + 1 : undefined,
+    enabled: canLoadProfileContent && !showPosts,
     staleTime: 3 * 60 * 1000,
     cacheTime: 10 * 60 * 1000,
   });
+
+  const userPosts = useMemo(
+    () => postsQuery.data?.pages?.flatMap((page) => page.items || []) || [],
+    [postsQuery.data],
+  );
+  const userGalleries = useMemo(
+    () => galleriesQuery.data?.pages?.flatMap((page) => page.items || []) || [],
+    [galleriesQuery.data],
+  );
+
+  const totalPostsCount =
+    postsQuery.data?.pages?.length > 0
+      ? Number(postsQuery.data.pages[0]?.total || 0)
+      : null;
+  const totalGalleriesCount =
+    galleriesQuery.data?.pages?.length > 0
+      ? Number(galleriesQuery.data.pages[0]?.total || 0)
+      : null;
+  const loadingPosts = postsQuery.isLoading || (postsQuery.isFetching && !postsQuery.data);
+  const loadingGalleries =
+    galleriesQuery.isLoading || (galleriesQuery.isFetching && !galleriesQuery.data);
+  const postsError = postsQuery.error?.message || null;
+  const galleriesError = galleriesQuery.error?.message || null;
+  const canViewProfileContent = canLoadProfileContent;
 
   const handleViewAlbum = (album) => {
     setSelectedAlbum(album);
@@ -625,6 +783,8 @@ const UserProfile = () => {
       userGalleries={userGalleries}
       loadingPosts={loadingPosts}
       loadingGalleries={loadingGalleries}
+      postsError={postsError}
+      galleriesError={galleriesError}
       isPrivateAccount={isPrivateAccount}
       blockStatus={profileBlockStatus}
       onBlockStatusChange={handleProfileBlockStatusChange}
@@ -642,6 +802,15 @@ const UserProfile = () => {
       isPostViewerOpen={isPostViewerOpen}
       selectedPost={selectedPost}
       handleClosePostViewer={handleClosePostViewer}
+      totalPostsCount={totalPostsCount}
+      totalGalleriesCount={totalGalleriesCount}
+      canViewProfileContent={canViewProfileContent}
+      hasMorePosts={Boolean(postsQuery.hasNextPage)}
+      hasMoreGalleries={Boolean(galleriesQuery.hasNextPage)}
+      loadingMorePosts={postsQuery.isFetchingNextPage}
+      loadingMoreGalleries={galleriesQuery.isFetchingNextPage}
+      onLoadMorePosts={() => postsQuery.fetchNextPage()}
+      onLoadMoreGalleries={() => galleriesQuery.fetchNextPage()}
     />
   );
 };

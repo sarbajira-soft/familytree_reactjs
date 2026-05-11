@@ -21,6 +21,7 @@ import OfflineUI from "./Components/OfflineUI";
 import PrivateRoute from "./Routes/PrivateRoute";
 import GuestRoute from "./Routes/GuestRoute";
 import Layout from "./Components/Layout";
+import AppUrlListener from "./Components/AppUrlListener";
 import AuthLayout from "./Layouts/AuthLayout";
 
 // ✅ Lazy load all pages for code splitting
@@ -63,6 +64,10 @@ const EditProfilePage = lazy(() => import("./Pages/EditProfilePage"));
 const BlockedMembersPage = lazy(() => import("./Pages/BlockedMembersPage"));
 const ChatPage = lazy(() => import("./Pages/ChatPage"));
 const ChatWindowPage = lazy(() => import("./Pages/ChatWindowPage"));
+const PublicSharedPostPage = lazy(() => import("./Pages/PublicSharedPostPage"));
+const SharedPostScreen = lazy(() => import("./Pages/SharedPostScreen"));
+const PublicSharedGalleryPage = lazy(() => import("./Pages/PublicSharedGalleryPage"));
+const SharedGalleryScreen = lazy(() => import("./Pages/SharedGalleryScreen"));
 
 // ---------------- Loading Fallback ----------------
 const LoadingFallback = () => (
@@ -120,8 +125,13 @@ function App() {
           <UserProvider>
             <Router>
               <AppContent />
+              <AppUrlListener />
               <Suspense fallback={<LoadingFallback />}>
                 <Routes>
+              <Route path="/p/:shareId" element={<PublicSharedPostPage />} />
+              <Route path="/g/:shareId" element={<PublicSharedGalleryPage />} />
+              <Route path="/shared-post/:shareId" element={<SharedPostScreen />} />
+              <Route path="/shared-gallery/:shareId" element={<SharedGalleryScreen />} />
               {/* ---------------- Guest-only Auth Routes (Persistent Layout) ---------------- */}
               <Route
                 element={
@@ -184,6 +194,8 @@ function App() {
               >
                 {/* Dashboard & Profile */}
                 <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/app/shared-post/:shareId" element={<SharedPostScreen />} />
+                <Route path="/app/shared-gallery/:shareId" element={<SharedGalleryScreen />} />
                 <Route path="/myprofile" element={<MyProfile />} />
                 <Route path="/profile/edit" element={<EditProfilePage />} />
                 <Route path="/user/:userId" element={<UserProfile />} />

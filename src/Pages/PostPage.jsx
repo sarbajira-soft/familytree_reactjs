@@ -13,6 +13,7 @@ import {
   FiVolume2,
   FiPause,
   FiPlay,
+  FiShare2,
 } from "react-icons/fi";
 import { MdPeople, MdPublic } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
@@ -20,6 +21,7 @@ import CreatePostModal from "../Components/CreatePostModal";
 import PostViewerModal from "../Components/PostViewerModal";
 import CommentItem from "../Components/CommentItem";
 import ReportContentModal from "../Components/ReportContentModal";
+import PublicPostShareSheet from "../Components/PublicPostShareSheet";
 import { useUser } from "../Contexts/UserContext";
 import PostsShimmer from "./PostsShimmer";
 import DeleteConfirmModal from "./DeleteConfirmModal";
@@ -78,6 +80,7 @@ const PostPage = () => {
   const [postActionMenuPostId, setPostActionMenuPostId] = useState(null);
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [reportTarget, setReportTarget] = useState(null);
+  const [shareSheetPost, setShareSheetPost] = useState(null);
   const commentInputRefs = useRef({});
   const emojiPickerRef = useRef(null);
   const feedMenuRef = useRef(null);
@@ -115,6 +118,8 @@ const PostPage = () => {
     likes: post.likeCount,
     comments: post.commentCount,
     liked: post.isLiked,
+    publicShareId: post.publicShareId || null,
+    shareUrl: post.shareUrl || null,
     privacy: post.privacy,
     seen: Boolean(post.isSeen),
     finalScore: Number(post.finalScore || 0),
@@ -214,6 +219,8 @@ const PostPage = () => {
       likes: createdPost.likeCount ?? 0,
       comments: createdPost.commentCount ?? 0,
       liked: createdPost.isLiked ?? false,
+      publicShareId: createdPost.publicShareId || null,
+      shareUrl: createdPost.shareUrl || null,
       privacy: createdPost.privacy,
       seen: false,
       finalScore: 0,
@@ -1488,6 +1495,15 @@ const PostPage = () => {
                     <FaCommentDots size={19} />
                     <span className="text-sm">{post.comments}</span>
                   </button>
+                  {post.privacy === "public" ? (
+                    <button
+                      onClick={() => setShareSheetPost(post)}
+                      className="flex items-center bg-white gap-2 text-gray-700 hover:text-emerald-600 transition-colors duration-200 active:scale-95"
+                    >
+                      <FiShare2 size={19} />
+                      <span className="text-sm">Share</span>
+                    </button>
+                  ) : null}
                 </div>
 
                 {/* Comments Section */}
@@ -1640,6 +1656,12 @@ const PostPage = () => {
         currentUser={userInfo}
         authToken={token}
         mode="create"
+      />
+
+      <PublicPostShareSheet
+        isOpen={!!shareSheetPost}
+        post={shareSheetPost}
+        onClose={() => setShareSheetPost(null)}
       />
 
       <PostViewerModal

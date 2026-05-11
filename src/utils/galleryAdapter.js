@@ -65,6 +65,8 @@ export const mapGallerySummary = (gallery) => {
 
   return {
     id: gallery?.id,
+    publicShareId: gallery?.publicShareId || null,
+    shareUrl: gallery?.shareUrl || null,
     title: gallery?.galleryTitle || gallery?.title || "Album",
     galleryTitle: gallery?.galleryTitle || gallery?.title || "Album",
     description: gallery?.galleryDescription || gallery?.description || "",

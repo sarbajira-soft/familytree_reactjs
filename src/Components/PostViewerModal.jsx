@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
 import { FaRegHeart, FaHeart, FaCommentDots, FaTimes, FaUndoAlt } from "react-icons/fa";
-import { FiSmile, FiSend } from "react-icons/fi";
+import { FiShare2, FiSmile, FiSend } from "react-icons/fi";
 import { AnimatePresence, motion } from "framer-motion";
 import EmojiPicker from "emoji-picker-react";
 import CommentItem from "./CommentItem";
 import { countComments } from "../utils/commentUtils";
 
 import { authFetchResponse } from "../utils/authFetch";
+import PublicPostShareSheet from "./PublicPostShareSheet";
 
 const PostViewerModal = ({
   isOpen,
@@ -40,6 +41,7 @@ const PostViewerModal = ({
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [rotation, setRotation] = useState(0);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [shareSheetOpen, setShareSheetOpen] = useState(false);
   const textareaRef = useRef(null);
   const emojiPickerRef = useRef(null);
 
@@ -366,6 +368,16 @@ const PostViewerModal = ({
                     <span className="flex items-center gap-2 px-4 py-2 rounded-full bg-gray-200 text-gray-700">
                       <FaCommentDots size={18} /> {comments.length}
                     </span>
+                    {String(post?.privacy || "").toLowerCase() === "public" ? (
+                      <button
+                        type="button"
+                        onClick={() => setShareSheetOpen(true)}
+                        className="flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition"
+                      >
+                        <FiShare2 size={18} />
+                        <span>Share</span>
+                      </button>
+                    ) : null}
                   </div>
                 </div>
 
@@ -510,6 +522,12 @@ const PostViewerModal = ({
           </motion.div>
         )}
       </AnimatePresence>
+
+      <PublicPostShareSheet
+        isOpen={shareSheetOpen}
+        post={post}
+        onClose={() => setShareSheetOpen(false)}
+      />
     </AnimatePresence>
     
   );

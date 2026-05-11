@@ -58,7 +58,7 @@ const messageMap: Record<PaymentStage, string> = {
     'We could not verify the payment yet. If money was deducted, the backend webhook and retry flow will continue to reconcile it.',
 };
 
-const APP_URL_SCHEME = String(import.meta.env.VITE_APP_URL_SCHEME || 'com.example.app').trim();
+const APP_URL_SCHEME = String(import.meta.env.VITE_APP_URL_SCHEME || 'com.familyss.app').trim();
 
 const buildNativeReturnUrl = ({
   cartId,
