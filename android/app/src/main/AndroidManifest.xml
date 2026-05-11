@@ -37,7 +37,7 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data
                     android:scheme="https"
-                    android:host="ectoplasmatic-spongily-davin.ngrok-free.dev"
+                    android:host="familyss.com"
                     android:pathPrefix="/p/" />
             </intent-filter>
 
@@ -47,7 +47,7 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data
                     android:scheme="https"
-                    android:host="ectoplasmatic-spongily-davin.ngrok-free.dev"
+                    android:host="familyss.com"
                     android:pathPrefix="/g/" />
             </intent-filter>
 
