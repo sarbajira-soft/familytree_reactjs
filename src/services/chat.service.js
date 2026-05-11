@@ -2,6 +2,7 @@ import { authFetchResponse } from '../utils/authFetch';
 import {
   CHAT_API_ENDPOINTS,
   CHAT_LIMITS,
+  CONVERSATION_STATES,
   MESSAGE_TYPES,
   ROOM_TYPES,
 } from '../constants/chat.constants';
@@ -217,6 +218,21 @@ const normalizeConversation = (conversation = {}) => ({
   id: Number(conversation?.id || 0),
   familyCode: conversation?.familyCode || '',
   type: conversation?.type || 'direct',
+  conversationType:
+    conversation?.conversationType ||
+    (String(conversation?.type || '').trim().toLowerCase() === 'direct'
+      ? 'direct'
+      : conversation?.conversationState === CONVERSATION_STATES.ARCHIVED
+        ? 'archived'
+        : 'family'),
+  conversationState: conversation?.conversationState || CONVERSATION_STATES.ACTIVE,
+  canSend:
+    typeof conversation?.canSend === 'boolean'
+      ? conversation.canSend
+      : true,
+  availabilityReason: conversation?.availabilityReason || null,
+  canPin: Boolean(conversation?.canPin),
+  isFamilyCanonical: Boolean(conversation?.isFamilyCanonical),
   createdAt: conversation?.createdAt || null,
   updatedAt: conversation?.updatedAt || null,
   participants: Array.isArray(conversation?.participants)
@@ -253,6 +269,7 @@ const normalizeConversation = (conversation = {}) => ({
   memberCount: Number(conversation?.memberCount || 0),
   eventId: Number(conversation?.eventId || 0) || null,
   pinnedMessage: conversation?.pinnedMessage || null,
+  counterpartyStatus: conversation?.counterpartyStatus || null,
 });
 
 export const getChatFamilies = async () => {
@@ -532,6 +549,8 @@ export const getMessagePreviewText = (message) => {
       return 'Voice message';
     case MESSAGE_TYPES.SYSTEM:
       return 'System message';
+    case MESSAGE_TYPES.TOMBSTONE:
+      return 'Message unavailable';
     default:
       return message?.mediaUrl ? 'Attachment' : 'No messages yet';
   }
@@ -546,9 +565,8 @@ export const createEventRoom = async (familyCode, eventId) => {
     method: 'POST',
     body: JSON.stringify({
       familyCode: normalizedFamilyCode,
-      roomName: 'Event Discussion',
-      roomType: ROOM_TYPES.EVENT,
       eventId,
+      roomType: ROOM_TYPES.EVENT,
     }),
   });
   const json = await parseJson(response);
