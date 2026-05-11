@@ -6,7 +6,7 @@ const MessageBubble = ({ message, isSent, currentUserId, onReply, onDelete, onRe
   if (!message) return null;
 
   const isSystem = message.messageType === MESSAGE_TYPES.SYSTEM;
-  const isDeleted = message.isDeleted;
+  const isDeleted = message.isDeleted || message.messageType === MESSAGE_TYPES.TOMBSTONE;
   const isRead = !!message.readAt;
   const canDel = isSent && !isDeleted && (Date.now() - new Date(message.createdAt).getTime()) <= CHAT_LIMITS.DELETE_WINDOW_MS;
 
@@ -42,7 +42,9 @@ const MessageBubble = ({ message, isSent, currentUserId, onReply, onDelete, onRe
         )}
 
         {isDeleted ? (
-          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>🚫 <em>This message was deleted</em></span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            🚫 <em>{message.messageType === MESSAGE_TYPES.TOMBSTONE ? 'This message is unavailable' : 'This message was deleted'}</em>
+          </span>
         ) : message.messageType === MESSAGE_TYPES.IMAGE ? (
           <div>
             {message.mediaUrl && (

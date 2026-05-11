@@ -2,6 +2,7 @@ import { authFetchResponse } from '../utils/authFetch';
 import {
   CHAT_API_ENDPOINTS,
   CHAT_LIMITS,
+  CONVERSATION_STATES,
   MESSAGE_TYPES,
   ROOM_TYPES,
 } from '../constants/chat.constants';
@@ -12,6 +13,9 @@ const API_BASE_URL = String(import.meta.env.VITE_API_BASE_URL || '').replace(/\/
 
 const normalizeFamilyCode = (familyCode) =>
   String(familyCode || '').trim().toUpperCase();
+
+const normalizeMembershipType = (value) =>
+  String(value || 'member').trim().toLowerCase();
 
 const resolveChatAssetUrl = (value = '') => {
   const raw = String(value || '').trim();
@@ -89,6 +93,46 @@ const normalizeParticipant = (participant) => ({
   ),
 });
 
+const getChatMemberPreferenceScore = (member = {}, familyCode = '') => {
+  const normalizedFamilyCode = normalizeFamilyCode(familyCode);
+  const memberTypeRank = {
+    member: 0,
+    associated: 1,
+    linked: 2,
+  };
+  const membershipType = String(member?.membershipType || 'member').trim().toLowerCase();
+  const sourceFamilyPenalty =
+    normalizeFamilyCode(member?.sourceFamilyCode) === normalizedFamilyCode ? 0 : 10;
+  const rolePenalty = member?.isFamilyAdmin ? -1 : 0;
+
+  return (memberTypeRank[membershipType] ?? 20) + sourceFamilyPenalty + rolePenalty;
+};
+
+const dedupeFamilyMembersForChat = (members = [], familyCode = '') => {
+  const uniqueMembers = new Map();
+
+  members.forEach((member) => {
+    const userId = Number(member?.userId || 0);
+    if (!userId) {
+      return;
+    }
+
+    const existingMember = uniqueMembers.get(userId);
+    if (!existingMember) {
+      uniqueMembers.set(userId, member);
+      return;
+    }
+
+    if (
+      getChatMemberPreferenceScore(member, familyCode) <
+      getChatMemberPreferenceScore(existingMember, familyCode)
+    ) {
+      uniqueMembers.set(userId, member);
+    }
+  });
+
+  return Array.from(uniqueMembers.values());
+};
 const normalizeFamilyMember = (member = {}, familyCode = '') => {
   const user = member?.user || {};
   const profile = user?.userProfile || {};
@@ -109,7 +153,10 @@ const normalizeFamilyMember = (member = {}, familyCode = '') => {
     profileUrl: resolveChatAssetUrl(user?.profileImage || profile?.profile || ''),
     familyRole: member?.familyRole || 'Member',
     isFamilyAdmin: Boolean(member?.isFamilyAdmin),
+    isAppUser: Boolean(user?.isAppUser),
+    userStatus: Number(user?.status || 0),
     membershipType: member?.membershipType || 'member',
+    isNotInTree: Boolean(member?.isNotInTree),
     familyCode: normalizeFamilyCode(member?.familyCode || familyCode),
     sourceFamilyCode: normalizeFamilyCode(
       member?.sourceFamilyCode || profile?.familyCode || member?.familyCode || familyCode,
@@ -121,10 +168,71 @@ const normalizeFamilyMember = (member = {}, familyCode = '') => {
   };
 };
 
+export const getChatMemberBadges = (member = {}) => {
+  const membershipType = normalizeMembershipType(member?.membershipType);
+  const badges = [];
+
+  if (membershipType === 'associated') {
+    badges.push({
+      key: 'associated',
+      label: 'A',
+      title: 'Associated member',
+      className: 'chat-member-chip--associated',
+    });
+  }
+
+  if (membershipType === 'linked') {
+    badges.push({
+      key: 'linked',
+      label: 'L',
+      title: 'Linked member',
+      className: 'chat-member-chip--linked',
+    });
+  }
+
+  if (membershipType === 'member' && Boolean(member?.isNotInTree)) {
+    badges.push({
+      key: 'not-in-tree',
+      label: 'MNT',
+      title: 'Member not in tree',
+      className: 'chat-member-chip--not-in-tree',
+    });
+  }
+
+  return badges;
+};
+
+export const getChatMemberMetaText = (member = {}) => {
+  const metadata = [member?.familyRole || 'Family member'];
+  const sourceFamilyCode = normalizeFamilyCode(member?.sourceFamilyCode);
+  const familyCode = normalizeFamilyCode(member?.familyCode);
+
+  if (sourceFamilyCode && sourceFamilyCode !== familyCode) {
+    metadata.push(sourceFamilyCode);
+  }
+
+  return metadata.join(' · ');
+};
+
 const normalizeConversation = (conversation = {}) => ({
   id: Number(conversation?.id || 0),
   familyCode: conversation?.familyCode || '',
   type: conversation?.type || 'direct',
+  conversationType:
+    conversation?.conversationType ||
+    (String(conversation?.type || '').trim().toLowerCase() === 'direct'
+      ? 'direct'
+      : conversation?.conversationState === CONVERSATION_STATES.ARCHIVED
+        ? 'archived'
+        : 'family'),
+  conversationState: conversation?.conversationState || CONVERSATION_STATES.ACTIVE,
+  canSend:
+    typeof conversation?.canSend === 'boolean'
+      ? conversation.canSend
+      : true,
+  availabilityReason: conversation?.availabilityReason || null,
+  canPin: Boolean(conversation?.canPin),
+  isFamilyCanonical: Boolean(conversation?.isFamilyCanonical),
   createdAt: conversation?.createdAt || null,
   updatedAt: conversation?.updatedAt || null,
   participants: Array.isArray(conversation?.participants)
@@ -161,6 +269,7 @@ const normalizeConversation = (conversation = {}) => ({
   memberCount: Number(conversation?.memberCount || 0),
   eventId: Number(conversation?.eventId || 0) || null,
   pinnedMessage: conversation?.pinnedMessage || null,
+  counterpartyStatus: conversation?.counterpartyStatus || null,
 });
 
 export const getChatFamilies = async () => {
@@ -247,13 +356,15 @@ export const getFamilyMembersForChat = async (familyCode) => {
     },
   );
   const json = await parseJson(response);
-  const members = getNestedArray(json, 'data')
-    .map((member) => normalizeFamilyMember(member, normalizedFamilyCode))
-    .filter(
-      (member) =>
-        member.userId > 0 &&
-        member.sourceFamilyCode === normalizedFamilyCode,
-    );
+  const members = dedupeFamilyMembersForChat(
+    getNestedArray(json, 'data')
+      .map((member) => normalizeFamilyMember(member, normalizedFamilyCode))
+      .filter(
+        (member) =>
+          member.userId > 0 && member.isAppUser && Number(member.userStatus || 0) === 1,
+      ),
+    normalizedFamilyCode,
+  );
 
   return {
     members,
@@ -438,6 +549,8 @@ export const getMessagePreviewText = (message) => {
       return 'Voice message';
     case MESSAGE_TYPES.SYSTEM:
       return 'System message';
+    case MESSAGE_TYPES.TOMBSTONE:
+      return 'Message unavailable';
     default:
       return message?.mediaUrl ? 'Attachment' : 'No messages yet';
   }
@@ -452,9 +565,8 @@ export const createEventRoom = async (familyCode, eventId) => {
     method: 'POST',
     body: JSON.stringify({
       familyCode: normalizedFamilyCode,
-      roomName: 'Event Discussion',
-      roomType: ROOM_TYPES.EVENT,
       eventId,
+      roomType: ROOM_TYPES.EVENT,
     }),
   });
   const json = await parseJson(response);

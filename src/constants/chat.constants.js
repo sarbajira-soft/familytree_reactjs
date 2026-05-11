@@ -36,6 +36,7 @@ export const MESSAGE_TYPES = {
   IMAGE: 'image',
   VOICE: 'voice',
   SYSTEM: 'system',
+  TOMBSTONE: 'tombstone',
 };
 
 export const ROOM_TYPES = {
@@ -48,6 +49,26 @@ export const ROOM_TYPES = {
 export const CONVERSATION_TYPES = {
   DIRECT: 'direct',
   GROUP: 'group',
+};
+
+export const CONVERSATION_STATES = {
+  ACTIVE: 'active',
+  READ_ONLY: 'read_only',
+  REVOKED: 'revoked',
+  ARCHIVED: 'archived',
+};
+
+export const CONVERSATION_AVAILABILITY_REASONS = {
+  ACCOUNT_PENDING_DELETION: 'account_pending_deletion',
+  ACCOUNT_SUSPENDED: 'account_suspended',
+  ACCOUNT_UNAVAILABLE: 'account_unavailable',
+  ANNOUNCEMENT_ADMIN_ONLY: 'announcement_admin_only',
+  FAMILY_CONNECTION_LOST: 'family_connection_lost',
+  PARTICIPANT_BLOCKED: 'participant_blocked',
+  PARTICIPANT_PENDING_DELETION: 'participant_pending_deletion',
+  PARTICIPANT_SUSPENDED: 'participant_suspended',
+  PARTICIPANT_UNAVAILABLE: 'participant_unavailable',
+  ROOM_ARCHIVED: 'room_archived',
 };
 
 export const CHAT_LIMITS = {

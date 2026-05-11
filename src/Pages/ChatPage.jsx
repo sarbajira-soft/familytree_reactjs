@@ -40,9 +40,11 @@ import VoiceRecorder from '../Components/Chat/VoiceRecorder';
 import ReportMessageModal from '../Components/Chat/ReportMessageModal';
 import ChatRoomMembersModal from '../Components/Chat/ChatRoomMembersModal';
 import ChatPickerModal from '../Components/Chat/ChatPickerModal';
+import ChatStateBanner from '../Components/Chat/ChatStateBanner';
 import {
   CHAT_LIMITS,
   CHAT_SOCKET_EVENTS,
+  CONVERSATION_STATES,
   CONVERSATION_TYPES,
   MESSAGE_TYPES,
 } from '../constants/chat.constants';
@@ -54,6 +56,8 @@ import {
   deleteMessage as deleteMsg,
   deleteRoomConversation,
   formatDateSeparator,
+  getChatMemberBadges,
+  getChatMemberMetaText,
   formatFullTime,
   formatMessageTime,
   getConversation,
@@ -83,7 +87,9 @@ import {
   getCachedMessages,
   getCachedRooms,
   markCachedConversationRead,
+  markCachedMessageFailed,
   removeCachedConversation,
+  replaceCachedMessage,
   upsertCachedMessage,
 } from '../utils/chatCache';
 import '../Components/Chat/chat.css';
@@ -93,13 +99,136 @@ const normalizeFamilyCode = (value) =>
 
 const toConversationType = (conversation) =>
   conversation?.type === CONVERSATION_TYPES.GROUP ||
-  conversation?.roomId ||
-  conversation?.roomType
+    conversation?.roomId ||
+    conversation?.roomType
     ? CONVERSATION_TYPES.GROUP
     : CONVERSATION_TYPES.DIRECT;
 
 const isSameConversation = (left, right) =>
   Number(left || 0) === Number(right || 0);
+
+const isUnavailableConversationError = (error) => {
+  const status = Number(error?.status || 0);
+  return status === 403 || status === 404;
+};
+
+const getMessageReplyPreview = (message) => {
+  const messageId = Number(message?.id || 0);
+  if (!messageId) {
+    return null;
+  }
+
+  return {
+    id: messageId,
+    content: message?.content || '',
+    senderName: message?.senderName || '',
+  };
+};
+
+const getMessageReplyId = (message) => Number(message?.replyTo?.id || message?.replyToId || 0) || null;
+
+const createOptimisticTextMessage = ({
+  id,
+  conversationId,
+  senderId,
+  senderName,
+  senderAvatar,
+  content,
+  createdAt,
+  replyTo,
+}) => ({
+  id: Number(id || 0),
+  conversationId: Number(conversationId || 0),
+  senderId: Number(senderId || 0),
+  senderName: senderName || 'You',
+  senderAvatar: senderAvatar || '',
+  content,
+  createdAt,
+  updatedAt: createdAt,
+  messageType: MESSAGE_TYPES.TEXT,
+  mediaUrl: '',
+  isDeleted: false,
+  deletedAt: null,
+  readAt: null,
+  replyTo: replyTo || null,
+  sendStatus: 'sending',
+});
+
+const getComposerAttachmentKind = (file) => {
+  const mimeType = String(file?.type || '').toLowerCase();
+  if (mimeType.startsWith('audio/')) {
+    return MESSAGE_TYPES.VOICE;
+  }
+  if (mimeType.startsWith('image/')) {
+    return MESSAGE_TYPES.IMAGE;
+  }
+  return 'attachment';
+};
+
+const createComposerAttachmentDraft = (file) => {
+  if (!file) {
+    return null;
+  }
+
+  const previewKind = getComposerAttachmentKind(file);
+  return {
+    file,
+    name: String(file?.name || 'Attachment'),
+    size: Number(file?.size || 0),
+    mimeType: String(file?.type || ''),
+    previewKind,
+    previewUrl:
+      previewKind === MESSAGE_TYPES.IMAGE || previewKind === MESSAGE_TYPES.VOICE
+        ? URL.createObjectURL(file)
+        : '',
+  };
+};
+
+const revokeObjectUrl = (value) => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  const objectUrl = String(value || '');
+  if (objectUrl.startsWith('blob:')) {
+    window.URL.revokeObjectURL(objectUrl);
+  }
+};
+
+const createOptimisticMediaMessage = ({
+  id,
+  conversationId,
+  senderId,
+  senderName,
+  senderAvatar,
+  content,
+  createdAt,
+  replyTo,
+  messageType,
+  mediaUrl,
+  mediaMimeType,
+  mediaSize,
+  attachmentName,
+}) => ({
+  id: Number(id || 0),
+  conversationId: Number(conversationId || 0),
+  senderId: Number(senderId || 0),
+  senderName: senderName || 'You',
+  senderAvatar: senderAvatar || '',
+  content,
+  createdAt,
+  updatedAt: createdAt,
+  messageType: messageType || MESSAGE_TYPES.IMAGE,
+  mediaUrl: mediaUrl || '',
+  mediaMimeType: mediaMimeType || '',
+  mediaSize: Number(mediaSize || 0),
+  attachmentName: attachmentName || '',
+  isDeleted: false,
+  deletedAt: null,
+  readAt: null,
+  replyTo: replyTo || null,
+  sendStatus: 'sending',
+});
 
 const resizeComposer = (element) => {
   if (!element) return;
@@ -111,11 +240,11 @@ const markMessageDeleted = (messages = [], messageId) =>
   (Array.isArray(messages) ? messages : []).map((message) =>
     Number(message?.id || 0) === Number(messageId || 0)
       ? {
-          ...message,
-          content: null,
-          isDeleted: true,
-          deletedAt: message?.deletedAt || new Date().toISOString(),
-        }
+        ...message,
+        content: null,
+        isDeleted: true,
+        deletedAt: message?.deletedAt || new Date().toISOString(),
+      }
       : message,
   );
 
@@ -202,9 +331,8 @@ const renderHighlightedText = (text, query, isActive = false) => {
 
     fragments.push(
       <mark
-        className={`chat-search-highlight${
-          isActive ? ' chat-search-highlight--active' : ''
-        }`}
+        className={`chat-search-highlight${isActive ? ' chat-search-highlight--active' : ''
+          }`}
         key={`mark-${fragmentKey}`}
       >
         {content.slice(matchIndex, matchIndex + normalizedNeedle.length)}
@@ -257,7 +385,7 @@ const getRoomTypeLabel = (roomType) => {
     case 'custom':
       return 'Custom room';
     default:
-      return 'Family room';
+      return 'Group room';
   }
 };
 
@@ -265,12 +393,16 @@ const getConversationInfoDescription = (conversation, familyName) => {
   const roomType = String(conversation?.roomType || '').trim().toLowerCase();
   const resolvedFamilyName = familyName || 'this family';
 
+  if (conversation?.conversationType === 'archived') {
+    return `Archived room history preserved for ${resolvedFamilyName}. New messages are disabled.`;
+  }
+
   if (roomType === 'announcements') {
     return `Announcements for ${resolvedFamilyName}. Only family admins can post here.`;
   }
 
   if (roomType === 'general') {
-    return `Open family conversation for everyone in ${resolvedFamilyName}.`;
+    return `General room for everyone in ${resolvedFamilyName}.`;
   }
 
   if (roomType === 'event') {
@@ -282,6 +414,26 @@ const getConversationInfoDescription = (conversation, familyName) => {
   }
 
   return `Direct conversation inside ${resolvedFamilyName}.`;
+};
+
+const getRoomDisplayName = (conversation = {}) => {
+  const roomName = String(conversation?.roomName || '').trim();
+  if (roomName) {
+    return roomName;
+  }
+
+  switch (String(conversation?.roomType || '').trim().toLowerCase()) {
+    case 'general':
+      return 'General';
+    case 'announcements':
+      return 'Announcements';
+    case 'event':
+      return 'Event';
+    case 'custom':
+      return 'Custom room';
+    default:
+      return 'Room';
+  }
 };
 
 const EMOJI_PICKER_CATEGORIES = [
@@ -300,8 +452,12 @@ const getReceiptState = (message) => {
     return null;
   }
 
+  if (message?.sendStatus === 'failed') {
+    return 'failed';
+  }
+
   if (message?.sendStatus === 'sending') {
-    return 'sent';
+    return 'sending';
   }
 
   if (message?.readAt) {
@@ -328,6 +484,17 @@ const ChatPage = () => {
   } = useChat();
 
   const currentUserId = userInfo?.userId || 0;
+  const currentUserDisplayName = useMemo(
+    () =>
+      [userInfo?.firstName, userInfo?.lastName].filter(Boolean).join(' ').trim() ||
+      String(userInfo?.name || '').trim() ||
+      'You',
+    [userInfo],
+  );
+  const currentUserAvatarUrl = useMemo(
+    () => String(userInfo?.profileUrl || userInfo?.profile || '').trim(),
+    [userInfo],
+  );
   const hasFamilyScope = Boolean(activeFamilyCode);
   const routeFamilyCode = normalizeFamilyCode(searchParams.get('familyCode'));
   const routeConversationIdNumber = Number(routeConversationId || 0) || null;
@@ -335,14 +502,17 @@ const ChatPage = () => {
   const [activeTab, setActiveTab] = useState('messages');
   const [conversations, setConversations] = useState([]);
   const [rooms, setRooms] = useState([]);
-  const [listLoading, setListLoading] = useState(true);
+  const [messagesListLoading, setMessagesListLoading] = useState(true);
+  const [roomsListLoading, setRoomsListLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState(null);
+  const [resolvedConversationId, setResolvedConversationId] = useState(null);
   const [selectedType, setSelectedType] = useState(CONVERSATION_TYPES.DIRECT);
   const [conversation, setConversation] = useState(null);
   const [messages, setMessages] = useState([]);
   const [chatLoading, setChatLoading] = useState(false);
   const [replyTo, setReplyTo] = useState(null);
+  const [attachmentDraft, setAttachmentDraft] = useState(null);
   const [reportMsg, setReportMsg] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [text, setText] = useState('');
@@ -350,7 +520,6 @@ const ChatPage = () => {
   const [isMobile, setIsMobile] = useState(
     typeof window !== 'undefined' ? window.innerWidth < 768 : false,
   );
-  const [sendingMessage, setSendingMessage] = useState(false);
   const [sendingMedia, setSendingMedia] = useState(false);
   const [typingUserIds, setTypingUserIds] = useState([]);
   const [familyMembers, setFamilyMembers] = useState([]);
@@ -373,6 +542,13 @@ const ChatPage = () => {
   const [createRoomSubmitting, setCreateRoomSubmitting] = useState(false);
   const [createRoomName, setCreateRoomName] = useState('');
   const [createRoomMemberIds, setCreateRoomMemberIds] = useState([]);
+  const [roomNameEditorOpen, setRoomNameEditorOpen] = useState(false);
+  const [roomNameDraft, setRoomNameDraft] = useState('');
+  const [roomNameError, setRoomNameError] = useState('');
+  const [roomNameSubmitting, setRoomNameSubmitting] = useState(false);
+  const listLoading = activeTab === 'messages' ? messagesListLoading : roomsListLoading;
+  const hasAttachmentDraft = Boolean(attachmentDraft?.file);
+  const hasComposerText = Boolean(String(text || '').trim());
 
   const messagesEndRef = useRef(null);
   const menuRef = useRef(null);
@@ -390,9 +566,11 @@ const ChatPage = () => {
   const localTypingRef = useRef(false);
   const localTypingTimeoutRef = useRef(null);
   const remoteTypingTimeoutsRef = useRef(new Map());
-  const sendingMessageRef = useRef(false);
   const sendingMediaRef = useRef(false);
   const messageNodeRefs = useRef(new Map());
+  const optimisticMessageIdRef = useRef(-1);
+  const pendingTextMessagesRef = useRef(new Map());
+  const pendingMediaMessagesRef = useRef(new Map());
 
   useEffect(() => {
     selectedConversationRef.current = Number(selectedId || 0) || null;
@@ -407,6 +585,7 @@ const ChatPage = () => {
     setRoomMembersOpen(false);
     setSelectedRoomMemberIds([]);
     setRoomMembersError('');
+    setAttachmentDraft(null);
     setNewConversationOpen(false);
     setNewConversationError('');
     setNewConversationSubmitting(false);
@@ -416,8 +595,19 @@ const ChatPage = () => {
     setCreateRoomSubmitting(false);
     setCreateRoomName('');
     setCreateRoomMemberIds([]);
+    setRoomNameEditorOpen(false);
+    setRoomNameDraft('');
+    setRoomNameError('');
+    setRoomNameSubmitting(false);
     familyMembersFamilyCodeRef.current = '';
   }, [activeFamilyCode]);
+
+  useEffect(
+    () => () => {
+      revokeObjectUrl(attachmentDraft?.previewUrl);
+    },
+    [attachmentDraft?.previewUrl],
+  );
 
   useEffect(() => {
     conversationRef.current = conversation;
@@ -500,6 +690,35 @@ const ChatPage = () => {
     [familyMembers],
   );
 
+  useEffect(() => {
+    if (!hasFamilyScope) {
+      return;
+    }
+
+    let timeoutId = null;
+    let idleCallbackId = null;
+    const warmFamilyMembers = () => {
+      loadFamilyMembers().catch((error) => {
+        console.error('Failed to preload family members for chat:', error);
+      });
+    };
+
+    if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+      idleCallbackId = window.requestIdleCallback(warmFamilyMembers, { timeout: 1500 });
+    } else {
+      timeoutId = window.setTimeout(warmFamilyMembers, 900);
+    }
+
+    return () => {
+      if (idleCallbackId !== null && typeof window.cancelIdleCallback === 'function') {
+        window.cancelIdleCallback(idleCallbackId);
+      }
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [activeFamilyCode, hasFamilyScope, loadFamilyMembers]);
+
   const resolveConversationFamilyCode = useCallback(
     (conversationId, fallbackFamilyCode = '') => {
       const cachedConversation = getCachedConversation(conversationId);
@@ -572,15 +791,21 @@ const ChatPage = () => {
     stopLocalTyping();
     clearRemoteTyping();
     setSelectedId(null);
+    setResolvedConversationId(null);
     setSelectedType(CONVERSATION_TYPES.DIRECT);
     setConversation(null);
     setMessages([]);
     setReplyTo(null);
+    setAttachmentDraft(null);
     setMenuOpen(false);
     setReportMsg(null);
     setInfoPanelOpen(false);
     setShowComposerPicker(false);
     setText('');
+    setRoomNameEditorOpen(false);
+    setRoomNameDraft('');
+    setRoomNameError('');
+    setRoomNameSubmitting(false);
   }, [activeFamilyCode, clearRemoteTyping, stopLocalTyping]);
 
   const clearOpenConversation = useCallback(
@@ -588,10 +813,12 @@ const ChatPage = () => {
       stopLocalTyping();
       clearRemoteTyping();
       setSelectedId(null);
+      setResolvedConversationId(null);
       setSelectedType(CONVERSATION_TYPES.DIRECT);
       setConversation(null);
       setMessages([]);
       setReplyTo(null);
+      setAttachmentDraft(null);
       setMenuOpen(false);
       setReportMsg(null);
       setInfoPanelOpen(false);
@@ -600,6 +827,10 @@ const ChatPage = () => {
       setRoomMembersOpen(false);
       setSelectedRoomMemberIds([]);
       setRoomMembersError('');
+      setRoomNameEditorOpen(false);
+      setRoomNameDraft('');
+      setRoomNameError('');
+      setRoomNameSubmitting(false);
       setMessageSearchOpen(false);
       setMessageSearchQuery('');
       setActiveMessageSearchIndex(-1);
@@ -620,7 +851,8 @@ const ChatPage = () => {
     if (!hasFamilyScope) {
       setConversations([]);
       setRooms([]);
-      setListLoading(false);
+      setMessagesListLoading(false);
+      setRoomsListLoading(false);
       return () => {
         isCancelled = true;
       };
@@ -628,20 +860,18 @@ const ChatPage = () => {
 
     const cachedConversations = getCachedConversations(activeFamilyCode);
     const cachedRooms = getCachedRooms(activeFamilyCode);
-    if (cachedConversations.length > 0 || cachedRooms.length > 0) {
+    if (cachedConversations.length > 0) {
       setConversations(cachedConversations);
-      setRooms(cachedRooms);
-      setListLoading(false);
-    } else {
-      setListLoading(true);
     }
+    if (cachedRooms.length > 0) {
+      setRooms(cachedRooms);
+    }
+    setMessagesListLoading(cachedConversations.length === 0);
+    setRoomsListLoading(cachedRooms.length === 0);
 
     (async () => {
       try {
-        const [conversationResponse, roomResponse] = await Promise.all([
-          getConversations(activeFamilyCode),
-          getRooms(activeFamilyCode),
-        ]);
+        const conversationResponse = await getConversations(activeFamilyCode);
 
         if (isCancelled) return;
 
@@ -651,18 +881,37 @@ const ChatPage = () => {
             conversationResponse?.conversations || [],
           ),
         );
+      } catch (error) {
+        if (!isCancelled) {
+          console.error('Chat conversations load failed:', error);
+          if (cachedConversations.length === 0) {
+            setConversations([]);
+          }
+        }
+      } finally {
+        if (!isCancelled) {
+          setMessagesListLoading(false);
+        }
+      }
+    })();
+
+    (async () => {
+      try {
+        const roomResponse = await getRooms(activeFamilyCode);
+
+        if (isCancelled) return;
+
         setRooms(cacheRooms(activeFamilyCode, roomResponse?.rooms || []));
       } catch (error) {
         if (!isCancelled) {
-          console.error('Chat list load failed:', error);
-          if (cachedConversations.length === 0 && cachedRooms.length === 0) {
-            setConversations([]);
+          console.error('Chat rooms load failed:', error);
+          if (cachedRooms.length === 0) {
             setRooms([]);
           }
         }
       } finally {
         if (!isCancelled) {
-          setListLoading(false);
+          setRoomsListLoading(false);
         }
       }
     })();
@@ -757,6 +1006,257 @@ const ChatPage = () => {
     [resolveConversationFamilyCode, syncListsFromCache],
   );
 
+  const replaceConversationMessageUpdate = useCallback(
+    (conversationId, targetMessageId, message, options = {}) => {
+      const targetConversationId = Number(conversationId || 0);
+      const optimisticMessageId = Number(targetMessageId || 0);
+      if (!targetConversationId || !optimisticMessageId || !message) {
+        return [];
+      }
+
+      const nextMessages = replaceCachedMessage(
+        targetConversationId,
+        optimisticMessageId,
+        message,
+      );
+      const resolvedFamilyCode = resolveConversationFamilyCode(
+        targetConversationId,
+        options?.familyCode,
+      );
+      const cachedConversation = getCachedConversation(targetConversationId);
+
+      if (resolvedFamilyCode) {
+        const nextUnreadCount = options?.clearUnread
+          ? 0
+          : typeof options?.unreadCount === 'number'
+            ? Number(options.unreadCount)
+            : Number(cachedConversation?.unreadCount || 0);
+
+        cacheConversationMessage(
+          resolvedFamilyCode,
+          targetConversationId,
+          message,
+          options?.clearUnread
+            ? { clearUnread: true }
+            : { unreadCount: nextUnreadCount },
+        );
+
+        if (normalizeFamilyCode(resolvedFamilyCode) === activeFamilyCodeRef.current) {
+          syncListsFromCache(resolvedFamilyCode);
+        }
+      }
+
+      if (isSameConversation(targetConversationId, selectedConversationRef.current)) {
+        setMessages(nextMessages);
+        const latestConversation = getCachedConversation(targetConversationId);
+        if (latestConversation) {
+          setConversation(latestConversation);
+        }
+      }
+
+      return nextMessages;
+    },
+    [resolveConversationFamilyCode, syncListsFromCache],
+  );
+
+  const applyConversationMessageFailure = useCallback(
+    (conversationId, messageId, options = {}) => {
+      const targetConversationId = Number(conversationId || 0);
+      const failedMessageId = Number(messageId || 0);
+      if (!targetConversationId || !failedMessageId) {
+        return [];
+      }
+
+      const nextMessages = markCachedMessageFailed(targetConversationId, failedMessageId);
+      const failedMessage = nextMessages.find(
+        (message) => Number(message?.id || 0) === failedMessageId,
+      );
+      const resolvedFamilyCode = resolveConversationFamilyCode(
+        targetConversationId,
+        options?.familyCode,
+      );
+      const cachedConversation = getCachedConversation(targetConversationId);
+
+      if (resolvedFamilyCode && failedMessage) {
+        const nextUnreadCount = options?.clearUnread
+          ? 0
+          : typeof options?.unreadCount === 'number'
+            ? Number(options.unreadCount)
+            : Number(cachedConversation?.unreadCount || 0);
+
+        cacheConversationMessage(
+          resolvedFamilyCode,
+          targetConversationId,
+          failedMessage,
+          options?.clearUnread
+            ? { clearUnread: true }
+            : { unreadCount: nextUnreadCount },
+        );
+
+        if (normalizeFamilyCode(resolvedFamilyCode) === activeFamilyCodeRef.current) {
+          syncListsFromCache(resolvedFamilyCode);
+        }
+      }
+
+      if (isSameConversation(targetConversationId, selectedConversationRef.current)) {
+        setMessages(nextMessages);
+        const latestConversation = getCachedConversation(targetConversationId);
+        if (latestConversation) {
+          setConversation(latestConversation);
+        }
+      }
+
+      return nextMessages;
+    },
+    [resolveConversationFamilyCode, syncListsFromCache],
+  );
+
+  const queuePendingTextMessage = useCallback((conversationId, entry = {}) => {
+    const targetConversationId = Number(conversationId || 0);
+    const tempId = Number(entry?.tempId || 0);
+    if (!targetConversationId || !tempId) {
+      return;
+    }
+
+    const currentEntries = pendingTextMessagesRef.current.get(targetConversationId) || [];
+    pendingTextMessagesRef.current.set(targetConversationId, [...currentEntries, entry]);
+  }, []);
+
+  const removePendingTextMessage = useCallback((conversationId, tempId) => {
+    const targetConversationId = Number(conversationId || 0);
+    const optimisticMessageId = Number(tempId || 0);
+    if (!targetConversationId || !optimisticMessageId) {
+      return null;
+    }
+
+    const currentEntries = pendingTextMessagesRef.current.get(targetConversationId) || [];
+    const matchingIndex = currentEntries.findIndex(
+      (entry) => Number(entry?.tempId || 0) === optimisticMessageId,
+    );
+    if (matchingIndex < 0) {
+      return null;
+    }
+
+    const nextEntries = [...currentEntries];
+    const [matchingEntry] = nextEntries.splice(matchingIndex, 1);
+
+    if (nextEntries.length > 0) {
+      pendingTextMessagesRef.current.set(targetConversationId, nextEntries);
+    } else {
+      pendingTextMessagesRef.current.delete(targetConversationId);
+    }
+
+    return matchingEntry || null;
+  }, []);
+
+  const shiftMatchingPendingTextMessage = useCallback((conversationId, message = {}) => {
+    const targetConversationId = Number(conversationId || 0);
+    if (!targetConversationId) {
+      return null;
+    }
+
+    const currentEntries = pendingTextMessagesRef.current.get(targetConversationId) || [];
+    if (currentEntries.length === 0) {
+      return null;
+    }
+
+    const targetContent = String(message?.content || '').trim();
+    const targetReplyId = getMessageReplyId(message);
+    const matchingIndex = currentEntries.findIndex(
+      (entry) =>
+        String(entry?.content || '').trim() === targetContent &&
+        Number(entry?.replyToId || 0) === Number(targetReplyId || 0),
+    );
+    if (matchingIndex < 0) {
+      return null;
+    }
+
+    const nextEntries = [...currentEntries];
+    const [matchingEntry] = nextEntries.splice(matchingIndex, 1);
+
+    if (nextEntries.length > 0) {
+      pendingTextMessagesRef.current.set(targetConversationId, nextEntries);
+    } else {
+      pendingTextMessagesRef.current.delete(targetConversationId);
+    }
+
+    return matchingEntry || null;
+  }, []);
+
+  const queuePendingMediaMessage = useCallback((conversationId, entry = {}) => {
+    const targetConversationId = Number(conversationId || 0);
+    const tempId = Number(entry?.tempId || 0);
+    if (!targetConversationId || !tempId) {
+      return;
+    }
+
+    const currentEntries = pendingMediaMessagesRef.current.get(targetConversationId) || [];
+    pendingMediaMessagesRef.current.set(targetConversationId, [...currentEntries, entry]);
+  }, []);
+
+  const removePendingMediaMessage = useCallback((conversationId, tempId) => {
+    const targetConversationId = Number(conversationId || 0);
+    const optimisticMessageId = Number(tempId || 0);
+    if (!targetConversationId || !optimisticMessageId) {
+      return null;
+    }
+
+    const currentEntries = pendingMediaMessagesRef.current.get(targetConversationId) || [];
+    const matchingIndex = currentEntries.findIndex(
+      (entry) => Number(entry?.tempId || 0) === optimisticMessageId,
+    );
+    if (matchingIndex < 0) {
+      return null;
+    }
+
+    const nextEntries = [...currentEntries];
+    const [matchingEntry] = nextEntries.splice(matchingIndex, 1);
+
+    if (nextEntries.length > 0) {
+      pendingMediaMessagesRef.current.set(targetConversationId, nextEntries);
+    } else {
+      pendingMediaMessagesRef.current.delete(targetConversationId);
+    }
+
+    return matchingEntry || null;
+  }, []);
+
+  const shiftMatchingPendingMediaMessage = useCallback((conversationId, message = {}) => {
+    const targetConversationId = Number(conversationId || 0);
+    if (!targetConversationId) {
+      return null;
+    }
+
+    const currentEntries = pendingMediaMessagesRef.current.get(targetConversationId) || [];
+    if (currentEntries.length === 0) {
+      return null;
+    }
+
+    const targetContent = String(message?.content || '').trim();
+    const targetReplyId = getMessageReplyId(message);
+    const targetMessageType = String(message?.messageType || '').trim().toLowerCase();
+    const matchingIndex = currentEntries.findIndex(
+      (entry) =>
+        String(entry?.content || '').trim() === targetContent &&
+        Number(entry?.replyToId || 0) === Number(targetReplyId || 0) &&
+        String(entry?.messageType || '').trim().toLowerCase() === targetMessageType,
+    );
+    if (matchingIndex < 0) {
+      return null;
+    }
+
+    const nextEntries = [...currentEntries];
+    const [matchingEntry] = nextEntries.splice(matchingIndex, 1);
+
+    if (nextEntries.length > 0) {
+      pendingMediaMessagesRef.current.set(targetConversationId, nextEntries);
+    } else {
+      pendingMediaMessagesRef.current.delete(targetConversationId);
+    }
+
+    return matchingEntry || null;
+  }, []);
+
   const refreshConversationFromServer = useCallback(
     async (payload = {}) => {
       const conversationId = Number(payload?.conversationId || payload?.id || 0);
@@ -790,9 +1290,11 @@ const ChatPage = () => {
       openRequestIdRef.current = requestId;
 
       setSelectedId(targetConversationId);
+      setResolvedConversationId(null);
       setSelectedType(conversationType);
       setChatLoading(true);
       setReplyTo(null);
+      setAttachmentDraft(null);
       setText('');
       setMenuOpen(false);
       setReportMsg(null);
@@ -803,6 +1305,10 @@ const ChatPage = () => {
       setRoomMembersOpen(false);
       setSelectedRoomMemberIds([]);
       setRoomMembersError('');
+      setRoomNameEditorOpen(false);
+      setRoomNameDraft('');
+      setRoomNameError('');
+      setRoomNameSubmitting(false);
       stopLocalTyping();
       clearRemoteTyping();
 
@@ -825,29 +1331,47 @@ const ChatPage = () => {
       }
 
       try {
-        const [conversationResponse, messageResponse] = await Promise.all([
-          getConversation(targetConversationId, familyCode),
-          getMessages(targetConversationId, null, currentUserId, familyCode),
-        ]);
+        const conversationPromise = getConversation(targetConversationId, familyCode);
+        const messagePromise = getMessages(
+          targetConversationId,
+          null,
+          currentUserId,
+          familyCode,
+        );
+        const conversationResponse = await conversationPromise;
 
         if (openRequestIdRef.current !== requestId) {
           return;
         }
 
         const nextConversation = cacheConversation(conversationResponse);
+        setConversation(nextConversation);
+        setSelectedType(toConversationType(nextConversation));
+        setResolvedConversationId(targetConversationId);
+
+        const messageResponse = await messagePromise;
+
+        if (openRequestIdRef.current !== requestId) {
+          return;
+        }
+
         const nextMessages = cacheMessages(
           targetConversationId,
           messageResponse?.messages || [],
         );
 
-        setConversation(nextConversation);
-        setSelectedType(toConversationType(nextConversation));
         setMessages(nextMessages);
         syncListsFromCache(familyCode);
         await markConversationReadNow(targetConversationId, { suppressErrors: true });
       } catch (error) {
         if (openRequestIdRef.current === requestId) {
           console.error('Failed to open conversation:', error);
+          setResolvedConversationId(null);
+          if (isUnavailableConversationError(error)) {
+            removeCachedConversation(targetConversationId, familyCode);
+            syncListsFromCache(familyCode);
+            clearOpenConversation();
+          }
         }
       } finally {
         if (openRequestIdRef.current === requestId) {
@@ -856,12 +1380,24 @@ const ChatPage = () => {
       }
     },
     [
+      clearOpenConversation,
       clearRemoteTyping,
       currentUserId,
       markConversationReadNow,
       stopLocalTyping,
       syncListsFromCache,
     ],
+  );
+
+  const sendMediaRef = useRef(null);
+
+  const safeSendMedia = useCallback(
+    (file, options = {}) => {
+      if (typeof sendMediaRef.current === 'function') {
+        return sendMediaRef.current(file, options);
+      }
+    },
+    [],
   );
 
   useEffect(() => {
@@ -903,11 +1439,27 @@ const ChatPage = () => {
   ]);
 
   useEffect(() => {
-    if (!selectedId || !activeFamilyCode) {
+    const normalizedActiveFamilyCode = normalizeFamilyCode(activeFamilyCode);
+    if (!selectedId || !resolvedConversationId || !normalizedActiveFamilyCode) {
       return undefined;
     }
 
-    joinConversation(selectedId, activeFamilyCode);
+    if (!isSameConversation(selectedId, resolvedConversationId)) {
+      return undefined;
+    }
+
+    const selectedConversationFamilyCode = normalizeFamilyCode(
+      conversation?.familyCode || getCachedConversation(selectedId)?.familyCode || '',
+    );
+
+    if (
+      selectedConversationFamilyCode &&
+      selectedConversationFamilyCode !== normalizedActiveFamilyCode
+    ) {
+      return undefined;
+    }
+
+    joinConversation(selectedId, normalizedActiveFamilyCode);
 
     return () => {
       leaveConversation(selectedId);
@@ -917,8 +1469,10 @@ const ChatPage = () => {
   }, [
     activeFamilyCode,
     clearRemoteTyping,
+    conversation?.familyCode,
     joinConversation,
     leaveConversation,
+    resolvedConversationId,
     selectedId,
     stopLocalTyping,
   ]);
@@ -962,12 +1516,44 @@ const ChatPage = () => {
       const nextUnreadCount = shouldClearUnread
         ? 0
         : Number(cachedConversation?.unreadCount || 0) + 1;
+      const matchingPendingMessage = sentByCurrentUser
+        ? shiftMatchingPendingTextMessage(conversationId, payload)
+        : null;
+      const matchingPendingMediaMessage =
+        sentByCurrentUser && !matchingPendingMessage
+          ? shiftMatchingPendingMediaMessage(conversationId, payload)
+          : null;
 
-      applyConversationMessageUpdate(conversationId, payload, {
-        familyCode: cachedConversation?.familyCode,
-        clearUnread: shouldClearUnread,
-        unreadCount: nextUnreadCount,
-      });
+      if (matchingPendingMessage?.tempId) {
+        replaceConversationMessageUpdate(
+          conversationId,
+          matchingPendingMessage.tempId,
+          payload,
+          {
+            familyCode: cachedConversation?.familyCode,
+            clearUnread: shouldClearUnread,
+            unreadCount: nextUnreadCount,
+          },
+        );
+      } else if (matchingPendingMediaMessage?.tempId) {
+        revokeObjectUrl(matchingPendingMediaMessage.previewUrl);
+        replaceConversationMessageUpdate(
+          conversationId,
+          matchingPendingMediaMessage.tempId,
+          payload,
+          {
+            familyCode: cachedConversation?.familyCode,
+            clearUnread: shouldClearUnread,
+            unreadCount: nextUnreadCount,
+          },
+        );
+      } else {
+        applyConversationMessageUpdate(conversationId, payload, {
+          familyCode: cachedConversation?.familyCode,
+          clearUnread: shouldClearUnread,
+          unreadCount: nextUnreadCount,
+        });
+      }
 
       if (isActiveConversation && !sentByCurrentUser) {
         window.setTimeout(() => {
@@ -1141,9 +1727,12 @@ const ChatPage = () => {
     clearOpenConversation,
     currentUserId,
     markConversationReadNow,
+    replaceConversationMessageUpdate,
     refreshConversationFromServer,
     routeConversationIdNumber,
     socket,
+    shiftMatchingPendingMediaMessage,
+    shiftMatchingPendingTextMessage,
     syncListsFromCache,
   ]);
 
@@ -1230,73 +1819,141 @@ const ChatPage = () => {
     [insertComposerText],
   );
 
-  const handleSend = useCallback(async () => {
+  const handleSend = useCallback(() => {
     const trimmedText = String(text || '').trim();
-    if (
-      !trimmedText ||
-      !selectedId ||
-      !activeFamilyCode ||
-      sendingMessageRef.current
-    ) {
-      return;
-    }
+    const targetConversationId = Number(selectedId || 0);
+    const familyCodeAtSend = activeFamilyCode;
+    if (hasAttachmentDraft && attachmentDraft?.file) {
+      void safeSendMedia(attachmentDraft.file, {
+        content: trimmedText,
+        draft: attachmentDraft,
+      });
+    } else {
+      const replyPreview = getMessageReplyPreview(replyTo);
+      const optimisticMessageId = optimisticMessageIdRef.current;
+      if (
+        !trimmedText ||
+        !targetConversationId ||
+        !familyCodeAtSend ||
+        conversation?.canSend === false
+      ) {
+        return;
+      }
 
-    stopLocalTyping();
-    sendingMessageRef.current = true;
-    setSendingMessage(true);
+      optimisticMessageIdRef.current -= 1;
+      stopLocalTyping();
+      queuePendingTextMessage(targetConversationId, {
+        tempId: optimisticMessageId,
+        content: trimmedText,
+        replyToId: replyPreview?.id || null,
+      });
 
-    try {
-      const nextMessage = await sendTextMessage(
-        Number(selectedId),
-        activeFamilyCode,
-        trimmedText,
+      applyConversationMessageUpdate(
+        targetConversationId,
+        createOptimisticTextMessage({
+          id: optimisticMessageId,
+          conversationId: targetConversationId,
+          senderId: currentUserId,
+          senderName: currentUserDisplayName,
+          senderAvatar: currentUserAvatarUrl,
+          content: trimmedText,
+          createdAt: new Date().toISOString(),
+          replyTo: replyPreview,
+        }),
         {
-          replyTo,
+          familyCode: familyCodeAtSend,
+          clearUnread: true,
         },
       );
 
-      const enrichedMessage = replyTo
-        ? {
-            ...nextMessage,
-            replyTo: nextMessage?.replyTo || {
-              id: replyTo.id,
-              content: replyTo.content,
-              senderName: replyTo.senderName,
-            },
-          }
-        : nextMessage;
-
-      applyConversationMessageUpdate(selectedId, enrichedMessage, {
-        familyCode: activeFamilyCode,
-        clearUnread: true,
-      });
       setText('');
       setReplyTo(null);
       if (inputRef.current) {
         resizeComposer(inputRef.current);
         inputRef.current.focus();
       }
-    } catch (error) {
-      console.error('Failed to send message:', error);
-    } finally {
-      sendingMessageRef.current = false;
-      setSendingMessage(false);
+
+      void (async () => {
+        try {
+          const nextMessage = await sendTextMessage(
+            targetConversationId,
+            familyCodeAtSend,
+            trimmedText,
+            {
+              replyTo,
+            },
+          );
+          if (!nextMessage || !Number(nextMessage?.id || 0)) {
+            throw new Error('Message send did not return a valid message payload');
+          }
+
+          const enrichedMessage = replyPreview
+            ? {
+                ...nextMessage,
+                replyTo: nextMessage?.replyTo || replyPreview,
+              }
+            : nextMessage;
+          const pendingMessage = removePendingTextMessage(
+            targetConversationId,
+            optimisticMessageId,
+          );
+
+          if (pendingMessage) {
+            replaceConversationMessageUpdate(
+              targetConversationId,
+              optimisticMessageId,
+              enrichedMessage,
+              {
+                familyCode: familyCodeAtSend,
+                clearUnread: true,
+              },
+            );
+          } else {
+            applyConversationMessageUpdate(targetConversationId, enrichedMessage, {
+              familyCode: familyCodeAtSend,
+              clearUnread: true,
+            });
+          }
+        } catch (error) {
+          removePendingTextMessage(targetConversationId, optimisticMessageId);
+          applyConversationMessageFailure(targetConversationId, optimisticMessageId, {
+            familyCode: familyCodeAtSend,
+            clearUnread: true,
+          });
+          console.error('Failed to send message:', error);
+        }
+      })();
     }
   }, [
     activeFamilyCode,
+    applyConversationMessageFailure,
     applyConversationMessageUpdate,
+    conversation?.canSend,
+    currentUserAvatarUrl,
+    currentUserDisplayName,
+    currentUserId,
+    queuePendingTextMessage,
+    removePendingTextMessage,
+    replaceConversationMessageUpdate,
     replyTo,
     selectedId,
+    safeSendMedia,
     stopLocalTyping,
     text,
+    attachmentDraft,
+    hasAttachmentDraft,
   ]);
 
   const sendMedia = useCallback(
     async (file, options = {}) => {
+      const targetConversationId = Number(selectedId || 0);
+      const familyCodeAtSend = activeFamilyCode;
+      let optimisticMessageId = 0;
       if (
         !file ||
-        !selectedId ||
-        !activeFamilyCode ||
+        !targetConversationId ||
+        !familyCodeAtSend ||
+        conversation?.canSend === false ||
         sendingMediaRef.current
       ) {
         return;
@@ -1311,9 +1968,55 @@ const ChatPage = () => {
           typeof options?.content === 'string'
             ? String(options.content).trim()
             : String(text || '').trim();
+        const replyPreview = getMessageReplyPreview(replyTo);
+        optimisticMessageId = optimisticMessageIdRef.current;
+        const messageType = getComposerAttachmentKind(file);
+        const localMediaUrl =
+          messageType === MESSAGE_TYPES.IMAGE || messageType === MESSAGE_TYPES.VOICE
+            ? URL.createObjectURL(file)
+            : '';
+
+        optimisticMessageIdRef.current -= 1;
+        queuePendingMediaMessage(targetConversationId, {
+          tempId: optimisticMessageId,
+          previewUrl: localMediaUrl,
+          content: messageContent,
+          replyToId: replyPreview?.id || null,
+          messageType,
+        });
+        applyConversationMessageUpdate(
+          targetConversationId,
+          createOptimisticMediaMessage({
+            id: optimisticMessageId,
+            conversationId: targetConversationId,
+            senderId: currentUserId,
+            senderName: currentUserDisplayName,
+            senderAvatar: currentUserAvatarUrl,
+            content: messageContent || null,
+            createdAt: new Date().toISOString(),
+            replyTo: replyPreview,
+            messageType,
+            mediaUrl: localMediaUrl,
+            mediaMimeType: file?.type || '',
+            mediaSize: Number(file?.size || 0),
+            attachmentName: file?.name || '',
+          }),
+          {
+            familyCode: familyCodeAtSend,
+            clearUnread: true,
+          },
+        );
+        setText('');
+        setReplyTo(null);
+        setAttachmentDraft(null);
+        if (inputRef.current) {
+          resizeComposer(inputRef.current);
+          inputRef.current.focus();
+        }
+
         const mediaMessage = await sendMediaMessage(
-          Number(selectedId),
-          activeFamilyCode,
+          targetConversationId,
+          familyCodeAtSend,
           file,
           {
             content: messageContent || undefined,
@@ -1323,26 +2026,50 @@ const ChatPage = () => {
 
         const enrichedMessage = replyTo
           ? {
-              ...mediaMessage,
-              replyTo: mediaMessage?.replyTo || {
-                id: replyTo.id,
-                content: replyTo.content,
-                senderName: replyTo.senderName,
-              },
-            }
+            ...mediaMessage,
+            replyTo: mediaMessage?.replyTo || {
+              id: replyTo.id,
+              content: replyTo.content,
+              senderName: replyTo.senderName,
+            },
+          }
           : mediaMessage;
 
-        applyConversationMessageUpdate(selectedId, enrichedMessage, {
-          familyCode: activeFamilyCode,
-          clearUnread: true,
-        });
-        setText('');
-        setReplyTo(null);
-        if (inputRef.current) {
-          resizeComposer(inputRef.current);
-          inputRef.current.focus();
+        const pendingMessage = removePendingMediaMessage(
+          targetConversationId,
+          optimisticMessageId,
+        );
+        if (pendingMessage?.previewUrl) {
+          revokeObjectUrl(pendingMessage.previewUrl);
+        }
+
+        if (pendingMessage) {
+          replaceConversationMessageUpdate(
+            targetConversationId,
+            optimisticMessageId,
+            enrichedMessage,
+            {
+              familyCode: familyCodeAtSend,
+              clearUnread: true,
+            },
+          );
+        } else {
+          applyConversationMessageUpdate(targetConversationId, enrichedMessage, {
+            familyCode: familyCodeAtSend,
+            clearUnread: true,
+          });
         }
       } catch (error) {
+        const failedPendingMessage = removePendingMediaMessage(
+          targetConversationId,
+          optimisticMessageId,
+        );
+        if (failedPendingMessage?.tempId) {
+          applyConversationMessageFailure(targetConversationId, failedPendingMessage.tempId, {
+            familyCode: familyCodeAtSend,
+            clearUnread: true,
+          });
+        }
         console.error('Failed to send media:', error);
       } finally {
         sendingMediaRef.current = false;
@@ -1351,7 +2078,15 @@ const ChatPage = () => {
     },
     [
       activeFamilyCode,
+      applyConversationMessageFailure,
       applyConversationMessageUpdate,
+      conversation?.canSend,
+      currentUserAvatarUrl,
+      currentUserDisplayName,
+      currentUserId,
+      queuePendingMediaMessage,
+      removePendingMediaMessage,
+      replaceConversationMessageUpdate,
       replyTo,
       selectedId,
       stopLocalTyping,
@@ -1359,14 +2094,29 @@ const ChatPage = () => {
     ],
   );
 
+  useEffect(() => {
+    sendMediaRef.current = sendMedia;
+  }, [sendMedia]);
+
+  const handleStageAttachment = useCallback((file) => {
+    if (!file) {
+      return;
+    }
+
+    setShowComposerPicker(false);
+    setAttachmentDraft(createComposerAttachmentDraft(file));
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, []);
+
   const handleFileChange = useCallback(
     async (event) => {
       const [file] = Array.from(event.target.files || []);
       event.target.value = '';
-      setShowComposerPicker(false);
-      await sendMedia(file);
+      handleStageAttachment(file);
     },
-    [sendMedia],
+    [handleStageAttachment],
   );
 
   const handleDelete = useCallback(
@@ -1600,21 +2350,50 @@ const ChatPage = () => {
     clearOpenConversation,
   ]);
 
-  const handleRenameRoom = useCallback(async () => {
+  const handleRenameRoom = useCallback(() => {
     if (!conversation?.roomId || !activeFamilyCode) {
       return;
     }
 
-    const nextRoomName = window.prompt(
-      'Enter a room name',
-      String(conversation?.roomName || '').trim(),
-    );
-    const normalizedRoomName = String(nextRoomName || '').trim();
-    if (!normalizedRoomName || normalizedRoomName === String(conversation?.roomName || '').trim()) {
-      setMenuOpen(false);
+    setMenuOpen(false);
+    setInfoPanelOpen(false);
+    setRoomNameDraft(String(conversation?.roomName || '').trim());
+    setRoomNameError('');
+    setRoomNameEditorOpen(true);
+  }, [
+    activeFamilyCode,
+    conversation?.roomId,
+    conversation?.roomName,
+  ]);
+
+  const handleCloseRoomNameEditor = useCallback(() => {
+    if (roomNameSubmitting) {
       return;
     }
 
+    setRoomNameEditorOpen(false);
+    setRoomNameDraft('');
+    setRoomNameError('');
+  }, [roomNameSubmitting]);
+
+  const handleSubmitRoomName = useCallback(async () => {
+    if (!conversation?.roomId || !activeFamilyCode) {
+      return;
+    }
+
+    const normalizedRoomName = String(roomNameDraft || '').trim();
+    if (!normalizedRoomName) {
+      setRoomNameError('Room name is required.');
+      return;
+    }
+
+    if (normalizedRoomName === String(conversation?.roomName || '').trim()) {
+      handleCloseRoomNameEditor();
+      return;
+    }
+
+    setRoomNameSubmitting(true);
+    setRoomNameError('');
     try {
       const nextConversation = await updateRoomConversation(
         conversation.roomId,
@@ -1622,17 +2401,21 @@ const ChatPage = () => {
         { roomName: normalizedRoomName },
       );
       applyConversationRefresh(nextConversation);
+      setRoomNameEditorOpen(false);
+      setRoomNameDraft('');
     } catch (error) {
       console.error('Failed to rename room:', error);
-      window.alert(error?.message || 'Failed to rename this room');
+      setRoomNameError(error?.message || 'Failed to rename this room');
     } finally {
-      setMenuOpen(false);
+      setRoomNameSubmitting(false);
     }
   }, [
     activeFamilyCode,
     applyConversationRefresh,
     conversation?.roomId,
     conversation?.roomName,
+    handleCloseRoomNameEditor,
+    roomNameDraft,
   ]);
 
   const handleRemoveRoomPhoto = useCallback(async () => {
@@ -1842,7 +2625,7 @@ const ChatPage = () => {
 
   const handleCreateRoom = useCallback(async () => {
     const normalizedRoomName = String(createRoomName || '').trim();
-    if (!activeFamilyCode || !normalizedRoomName) {
+    if (!activeFamilyCode || !normalizedRoomName || createRoomMemberIds.length === 0) {
       return;
     }
 
@@ -1878,6 +2661,10 @@ const ChatPage = () => {
 
   const handleComposerKeyDown = useCallback(
     (event) => {
+      if (event.nativeEvent?.isComposing) {
+        return;
+      }
+
       if (event.key === 'Enter' && !event.shiftKey) {
         event.preventDefault();
         handleSend();
@@ -1892,7 +2679,7 @@ const ChatPage = () => {
   }, []);
 
   const handleToggleComposerPicker = useCallback(() => {
-    if (!selectedId || chatLoading || sendingMessageRef.current || sendingMediaRef.current) {
+    if (!selectedId || chatLoading || sendingMediaRef.current) {
       return;
     }
 
@@ -1944,20 +2731,37 @@ const ChatPage = () => {
   const filteredConversations = useMemo(() => {
     const query = search.toLowerCase();
     return conversations.filter((conversationItem) => {
+      const shouldSurfaceConversation =
+        conversationItem?.conversationState !== CONVERSATION_STATES.REVOKED ||
+        Number(conversationItem?.unreadCount || 0) > 0;
+      if (!shouldSurfaceConversation) {
+        return false;
+      }
       if (!query) return true;
       const participant = conversationItem?.participants?.[0] || {};
-      const fullName = `${participant.firstName || ''} ${participant.lastName || ''}`
-        .trim()
-        .toLowerCase();
+      const fullName = (
+        `${participant.firstName || ''} ${participant.lastName || ''}`.trim() ||
+        participant?.name ||
+        ''
+      ).toLowerCase();
       return fullName.includes(query);
     });
   }, [conversations, search]);
 
   const filteredRooms = useMemo(() => {
     const query = search.toLowerCase();
-    return rooms.filter((room) =>
-      !query || String(room?.roomName || '').toLowerCase().includes(query),
-    );
+    return rooms.filter((room) => {
+      const shouldSurfaceConversation =
+        ![CONVERSATION_STATES.REVOKED, CONVERSATION_STATES.ARCHIVED].includes(
+          room?.conversationState,
+        ) ||
+        Number(room?.unreadCount || 0) > 0;
+      if (!shouldSurfaceConversation) {
+        return false;
+      }
+
+      return !query || getRoomDisplayName(room).toLowerCase().includes(query);
+    });
   }, [rooms, search]);
 
   const messageSearchMatches = useMemo(() => {
@@ -1968,7 +2772,12 @@ const ChatPage = () => {
 
     return messages
       .filter((message) => {
-        if (!message || message?.isDeleted || message?.messageType === MESSAGE_TYPES.SYSTEM) {
+        if (
+          !message ||
+          message?.isDeleted ||
+          message?.messageType === MESSAGE_TYPES.SYSTEM ||
+          message?.messageType === MESSAGE_TYPES.TOMBSTONE
+        ) {
           return false;
         }
 
@@ -2080,6 +2889,15 @@ const ChatPage = () => {
   }, [conversation, typingUserIds]);
 
   const isGroup = selectedType === CONVERSATION_TYPES.GROUP;
+  const familyMemberMap = useMemo(
+    () =>
+      new Map(
+        familyMembers
+          .map((member) => [Number(member?.userId || 0), member])
+          .filter(([memberId]) => memberId > 0),
+      ),
+    [familyMembers],
+  );
   const currentRoomMembers = useMemo(() => {
     const roomMembers = Array.isArray(conversation?.roomMembers)
       ? conversation.roomMembers
@@ -2088,29 +2906,32 @@ const ChatPage = () => {
       return [];
     }
 
-    const familyMemberMap = new Map(
-      (Array.isArray(familyMembers) ? familyMembers : []).map((member) => [
-        Number(member?.userId || 0),
-        member,
-      ]),
-    );
-
-    return roomMembers.map((member) => {
-      const memberId = Number(member?.userId || 0);
-      const familyMember = familyMemberMap.get(memberId);
-      return {
-        ...member,
-        ...(familyMember || {}),
-        userId: memberId,
-        profileUrl: familyMember?.profileUrl || member?.profileUrl || '',
-        name:
-          familyMember?.name ||
-          member?.name ||
-          `${member?.firstName || ''} ${member?.lastName || ''}`.trim() ||
-          'Family Member',
-      };
-    });
-  }, [conversation?.roomMembers, familyMembers]);
+    return roomMembers
+      .map((member) => {
+        const memberId = Number(member?.userId || 0);
+        const familyMember = familyMemberMap.get(memberId);
+        return {
+          ...member,
+          ...(familyMember || {}),
+          userId: memberId,
+          familyCode:
+            familyMember?.familyCode ||
+            normalizeFamilyCode(conversation?.familyCode || activeFamilyCode),
+          sourceFamilyCode:
+            familyMember?.sourceFamilyCode ||
+            normalizeFamilyCode(conversation?.familyCode || activeFamilyCode),
+          membershipType: familyMember?.membershipType || 'member',
+          isNotInTree: Boolean(familyMember?.isNotInTree),
+          profileUrl: familyMember?.profileUrl || member?.profileUrl || '',
+          name:
+            familyMember?.name ||
+            member?.name ||
+            `${member?.firstName || ''} ${member?.lastName || ''}`.trim() ||
+            'Family Member',
+        };
+      })
+      .filter(Boolean);
+  }, [activeFamilyCode, conversation?.familyCode, conversation?.roomMembers, familyMemberMap]);
   const currentRoomMemberIds = useMemo(
     () =>
       new Set(
@@ -2142,37 +2963,57 @@ const ChatPage = () => {
       ) || null,
     [activeFamilyCode, families],
   );
-  const currentFamilyIsAdmin = Boolean(activeFamily?.isAdmin);
   const activeParticipant = conversation?.participants?.[0] || {};
   const selectedContactMember = useMemo(
-    () =>
-      familyMembers.find(
-        (member) =>
-          Number(member?.userId || 0) === Number(activeParticipant?.userId || 0),
-      ) || null,
-    [activeParticipant?.userId, familyMembers],
+    () => familyMemberMap.get(Number(activeParticipant?.userId || 0)) || null,
+    [activeParticipant?.userId, familyMemberMap],
   );
-  const roomMemberCount = Number(conversation?.memberCount || currentRoomMembers.length || 0);
+  const familyMembersLoadedForScope =
+    familyMembersFamilyCodeRef.current === normalizeFamilyCode(activeFamilyCode);
+  const roomMemberCount = familyMembersLoadedForScope
+    ? currentRoomMembers.length
+    : Number(conversation?.memberCount || currentRoomMembers.length || 0);
   const canManageRoom = Boolean(isGroup && conversation?.canManageRoom);
   const canManageRoomMembers =
     canManageRoom &&
     !['general', 'announcements'].includes(String(conversation?.roomType || '').toLowerCase());
   const canLeaveRoom = Boolean(isGroup && conversation?.canLeaveRoom);
+  const roomDisplayName = getRoomDisplayName(conversation);
+  const roomTypeLabel = getRoomTypeLabel(conversation?.roomType);
   const headerName = isGroup
-    ? conversation?.roomName || 'Group'
+    ? roomDisplayName
     : `${activeParticipant.firstName || ''} ${activeParticipant.lastName || ''}`.trim() ||
-      'Chat';
+    activeParticipant?.name ||
+    'Chat';
+  const directChatBadges = isGroup ? [] : getChatMemberBadges(selectedContactMember || {});
   const headerInitials = getInitials(
     activeParticipant.firstName,
     activeParticipant.lastName,
   );
   const roomAvatarUrl = conversation?.roomAvatarUrl || '';
   const headerStatusLabel = isGroup
-    ? `${roomMemberCount} member${roomMemberCount === 1 ? '' : 's'}`
-    : isChatConnected
-      ? 'Online now'
-      : 'Connecting...';
-  const showHeaderOnline = !isGroup && isChatConnected;
+    ? conversation?.conversationState === CONVERSATION_STATES.ACTIVE
+      ? `${roomMemberCount} member${roomMemberCount === 1 ? '' : 's'}`
+      : conversation?.conversationState === CONVERSATION_STATES.READ_ONLY
+        ? 'Read-only chat'
+        : conversation?.conversationState === CONVERSATION_STATES.REVOKED
+          ? 'Chat unavailable'
+          : conversation?.conversationState === CONVERSATION_STATES.ARCHIVED
+            ? 'Archived chat'
+            : roomTypeLabel
+    : conversation?.conversationState === CONVERSATION_STATES.READ_ONLY
+      ? 'Read-only chat'
+      : conversation?.conversationState === CONVERSATION_STATES.REVOKED
+        ? 'Chat unavailable'
+        : conversation?.conversationState === CONVERSATION_STATES.ARCHIVED
+          ? 'Archived chat'
+          : isChatConnected
+            ? 'Online now'
+            : 'Connecting...';
+  const showHeaderOnline =
+    !isGroup &&
+    isChatConnected &&
+    conversation?.conversationState === CONVERSATION_STATES.ACTIVE;
   const sharedMediaCount = useMemo(
     () =>
       messages.filter(
@@ -2187,17 +3028,18 @@ const ChatPage = () => {
   );
   const infoCreatedAtLabel = formatInfoDateTime(conversation?.createdAt);
   const infoFamilyLabel = activeFamily?.familyName || activeFamilyCode || 'Family chat';
-  const roomTypeLabel = getRoomTypeLabel(conversation?.roomType);
   const infoPrimaryMeta = isGroup
     ? `${roomTypeLabel} in ${infoFamilyLabel}`
-    : `${selectedContactMember?.familyRole || 'Family member'} in ${infoFamilyLabel}`;
+    : `${getChatMemberMetaText(selectedContactMember || {})} in ${infoFamilyLabel}`;
   const showDesktopInfoPanel = Boolean(infoPanelOpen && !isMobile && selectedId);
   const showMobileInfoPanel = Boolean(infoPanelOpen && isMobile && selectedId);
 
   const showSidebar = !isMobile || !selectedId;
   const showChat = !isMobile || Boolean(selectedId);
   const isComposerDisabled =
-    !selectedId || chatLoading || sendingMessage || sendingMedia;
+    !selectedId || chatLoading || sendingMedia || conversation?.canSend === false;
+  const composerPlaceholder =
+    conversation?.canSend === false ? 'Messaging unavailable in this chat' : 'Type a message...';
 
   const renderInfoPanel = (mobile = false) => (
     <aside
@@ -2221,9 +3063,8 @@ const ChatPage = () => {
         <section className="chat-info-hero">
           <div className="chat-info-avatar-wrap">
             <div
-              className={`chat-info-avatar${
-                isGroup && !roomAvatarUrl ? ' chat-info-avatar--room' : ''
-              }`}
+              className={`chat-info-avatar${isGroup && !roomAvatarUrl ? ' chat-info-avatar--room' : ''
+                }`}
             >
               {isGroup ? (
                 roomAvatarUrl ? (
@@ -2252,14 +3093,13 @@ const ChatPage = () => {
           <h3 className="chat-info-title">{headerName}</h3>
           <p className="chat-info-subtitle">
             {isGroup
-              ? `Group · ${roomMemberCount} member${roomMemberCount === 1 ? '' : 's'}`
+              ? `${roomTypeLabel} · ${roomMemberCount} member${roomMemberCount === 1 ? '' : 's'}`
               : infoPrimaryMeta}
           </p>
 
           <div
-            className={`chat-info-hero-actions${
-              !isGroup ? ' chat-info-hero-actions--compact' : ''
-            }`}
+            className={`chat-info-hero-actions${!isGroup ? ' chat-info-hero-actions--compact' : ''
+              }`}
           >
             {isGroup ? (
               <button
@@ -2308,7 +3148,7 @@ const ChatPage = () => {
               </div>
               <div className="chat-info-row-body">
                 <div className="chat-info-row-title">Room name</div>
-                <div className="chat-info-row-text">{conversation?.roomName || 'Group'}</div>
+                <div className="chat-info-row-text">{roomDisplayName}</div>
               </div>
               {canManageRoom ? (
                 <button
@@ -2399,7 +3239,21 @@ const ChatPage = () => {
                   </div>
                   <div className="chat-info-member-chip-text">
                     <span>{member.name}</span>
-                    <small>{member.familyRole || 'Family member'}</small>
+                    <small>{getChatMemberMetaText(member)}</small>
+                    <div className="chat-member-chip-row chat-member-chip-row--compact">
+                      {member.isFamilyAdmin ? (
+                        <span className="chat-member-chip">Admin</span>
+                      ) : null}
+                      {getChatMemberBadges(member).map((badge) => (
+                        <span
+                          className={`chat-member-chip ${badge.className}`}
+                          key={`info-member-${member.userId}-${badge.key}`}
+                          title={badge.title}
+                        >
+                          {badge.label}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -2480,51 +3334,6 @@ const ChatPage = () => {
       {showSidebar && (
         <div className="chat-sidebar">
           <div className="chat-sidebar-search">
-            {families.length > 1 && (
-              <div style={{ marginBottom: 12 }}>
-                <label
-                  htmlFor="chat-family-scope"
-                  style={{
-                    display: 'block',
-                    marginBottom: 6,
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: '#6b7280',
-                  }}
-                >
-                  Family
-                </label>
-                <select
-                  id="chat-family-scope"
-                  value={activeFamilyCode}
-                  onChange={(event) =>
-                    setActiveFamilyCode(
-                      normalizeFamilyCode(event.target.value),
-                    )
-                  }
-                  style={{
-                    width: '100%',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: 16,
-                    padding: '10px 12px',
-                    fontSize: 14,
-                    color: '#374151',
-                    background: '#fff',
-                    outline: 'none',
-                  }}
-                >
-                  {families.map((family) => {
-                    const familyCode = normalizeFamilyCode(family?.familyCode);
-                    return (
-                      <option key={familyCode} value={familyCode}>
-                        {family?.familyName || familyCode}
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
-            )}
-
             <div className="chat-search-box">
               <FiSearch size={14} color="#9ca3af" />
               <input
@@ -2538,76 +3347,83 @@ const ChatPage = () => {
             </div>
           </div>
 
-          <div className="chat-sidebar-tabs">
-            <button
-              className={`chat-pill${activeTab === 'messages' ? ' active' : ''}`}
-              onClick={() => setActiveTab('messages')}
-              type="button"
-            >
-              Messages {msgCount > 0 && <span className="chat-pill-badge">{msgCount}</span>}
-            </button>
-            <button
-              className={`chat-pill${activeTab === 'rooms' ? ' active' : ''}`}
-              onClick={() => setActiveTab('rooms')}
-              type="button"
-            >
-              Rooms {roomCount > 0 && <span className="chat-pill-badge">{roomCount}</span>}
-            </button>
-          </div>
+          <div className="chat-sidebar-toolbar">
+            <div className="chat-sidebar-tabs">
+              <button
+                className={`chat-pill${activeTab === 'messages' ? ' active' : ''}`}
+                onClick={() => setActiveTab('messages')}
+                type="button"
+              >
+                Messages {msgCount > 0 && <span className="chat-pill-badge">{msgCount}</span>}
+              </button>
+              <button
+                className={`chat-pill${activeTab === 'rooms' ? ' active' : ''}`}
+                onClick={() => setActiveTab('rooms')}
+                type="button"
+              >
+                Rooms {roomCount > 0 && <span className="chat-pill-badge">{roomCount}</span>}
+              </button>
+            </div>
 
-          {hasFamilyScope ? (
-            <div className="chat-sidebar-actions">
-              {activeTab === 'messages' ? (
+            {hasFamilyScope && (
+              activeTab === 'messages' ? (
                 <button
-                  className="chat-sidebar-action"
+                  className="chat-sidebar-action chat-sidebar-action--inline"
                   onClick={handleOpenNewConversation}
                   type="button"
                 >
                   <FiPlus size={14} />
                   New conversation
                 </button>
-              ) : currentFamilyIsAdmin ? (
+              ) : (
                 <button
-                  className="chat-sidebar-action"
+                  className="chat-sidebar-action chat-sidebar-action--inline"
                   onClick={handleOpenCreateRoom}
                   type="button"
                 >
                   <FiPlus size={14} />
                   Create room
                 </button>
-              ) : (
-                <span className="chat-sidebar-note">
-                  Only family admins can create rooms.
-                </span>
-              )}
+              )
+            )}
+          </div>
+
+          {hasFamilyScope && activeTab === 'rooms' ? (
+            <div className="chat-sidebar-note-row">
+              <span className="chat-sidebar-note">
+                Custom rooms can include linked, associated, and not-in-tree app users.
+              </span>
             </div>
           ) : null}
 
           <div className="chat-sidebar-list custom-scrollbar">
             {listLoading ? (
-              <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}>
-                <div
-                  className="animate-spin"
-                  style={{
-                    width: 24,
-                    height: 24,
-                    border: '3px solid #e5e7eb',
-                    borderTopColor: '#f97316',
-                    borderRadius: '50%',
-                  }}
-                />
+              <div className="chat-list-loader" aria-label="Loading chat list">
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <div className="chat-list-loader__item" key={`chat-list-loader-${index}`}>
+                    <div className="chat-list-loader__avatar shimmer-block" />
+                    <div className="chat-list-loader__body">
+                      <div className="chat-list-loader__line shimmer-block" />
+                      <div className="chat-list-loader__line chat-list-loader__line--short shimmer-block" />
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : !hasFamilyScope ? (
               <div className="chat-empty">
                 <FiUsers size={40} />
-                <p>No family chat available</p>
+                <p>No rooms available</p>
               </div>
             ) : activeTab === 'messages' ? (
               filteredConversations.length > 0 ? (
                 filteredConversations.map((conversationItem) => {
                   const participant = conversationItem?.participants?.[0] || {};
+                  const participantMember =
+                    familyMemberMap.get(Number(participant?.userId || 0)) || null;
+                  const participantBadges = getChatMemberBadges(participantMember || {});
                   const fullName =
                     `${participant.firstName || ''} ${participant.lastName || ''}`.trim() ||
+                    participant?.name ||
                     'Unknown';
                   const initials = getInitials(
                     participant.firstName,
@@ -2633,11 +3449,21 @@ const ChatPage = () => {
                       </div>
                       <div className="chat-li-body">
                         <div className="chat-li-top">
-                          <span className="chat-li-name">{fullName}</span>
+                          <div className="chat-li-name-row">
+                            <span className="chat-li-name">{fullName}</span>
+                            {participantBadges.map((badge) => (
+                              <span
+                                className={`chat-member-chip ${badge.className}`}
+                                key={`${conversationItem.id}-${badge.key}`}
+                                title={badge.title}
+                              >
+                                {badge.label}
+                              </span>
+                            ))}
+                          </div>
                           <span
-                            className={`chat-li-time${
-                              conversationItem.unreadCount ? ' unread' : ''
-                            }`}
+                            className={`chat-li-time${conversationItem.unreadCount ? ' unread' : ''
+                              }`}
                           >
                             {formatMessageTime(conversationItem?.lastMessage?.createdAt)}
                           </span>
@@ -2663,6 +3489,7 @@ const ChatPage = () => {
             ) : filteredRooms.length > 0 ? (
               filteredRooms.map((room) => {
                 const isActive = isSameConversation(selectedId, room?.id);
+                const roomDisplayLabel = getRoomDisplayName(room);
                 return (
                   <div
                     key={room.id}
@@ -2670,9 +3497,8 @@ const ChatPage = () => {
                     onClick={() => openChat(room.id, CONVERSATION_TYPES.GROUP)}
                   >
                     <div
-                      className={`chat-avatar${
-                        room?.roomAvatarUrl ? '' : ' chat-avatar--room'
-                      }`}
+                      className={`chat-avatar${room?.roomAvatarUrl ? '' : ' chat-avatar--room'
+                        }`}
                     >
                       {room?.roomAvatarUrl ? (
                         <img src={room.roomAvatarUrl} alt={room.roomName || 'Room'} />
@@ -2682,7 +3508,7 @@ const ChatPage = () => {
                     </div>
                     <div className="chat-li-body">
                       <div className="chat-li-top">
-                        <span className="chat-li-name">{room.roomName}</span>
+                        <span className="chat-li-name">{roomDisplayLabel}</span>
                         <span
                           className={`chat-li-time${room.unreadCount ? ' unread' : ''}`}
                         >
@@ -2702,7 +3528,7 @@ const ChatPage = () => {
             ) : (
               <div className="chat-empty">
                 <FiUsers size={40} />
-                <p>No rooms</p>
+                <p>No rooms yet</p>
               </div>
             )}
           </div>
@@ -2714,20 +3540,29 @@ const ChatPage = () => {
           {!selectedId ? (
             <div className="chat-placeholder">
               <div className="chat-placeholder-icon">💬</div>
-              <h2>{hasFamilyScope ? 'Select a chat' : 'Family chat is unavailable'}</h2>
+              <h2>
+                {hasFamilyScope ? 'Start with your family circle' : 'Family chat is unavailable'}
+              </h2>
+              <p>
+                {hasFamilyScope
+                  ? 'Choose a conversation to share updates, memories, and support together.'
+                  : 'Switch to an available family to open your chat space.'}
+              </p>
             </div>
           ) : chatLoading ? (
-            <div className="chat-placeholder">
-              <div
-                className="animate-spin"
-                style={{
-                  width: 30,
-                  height: 30,
-                  border: '3px solid #e5e7eb',
-                  borderTopColor: '#f97316',
-                  borderRadius: '50%',
-                }}
-              />
+            <div className="chat-thread-loader" aria-label="Loading conversation">
+              <div className="chat-thread-loader__header">
+                <div className="chat-thread-loader__avatar shimmer-block" />
+                <div className="chat-thread-loader__meta">
+                  <div className="chat-thread-loader__line shimmer-block" />
+                  <div className="chat-thread-loader__line chat-thread-loader__line--short shimmer-block" />
+                </div>
+              </div>
+              <div className="chat-thread-loader__messages">
+                <div className="chat-thread-loader__bubble shimmer-block" />
+                <div className="chat-thread-loader__bubble chat-thread-loader__bubble--sent shimmer-block" />
+                <div className="chat-thread-loader__bubble chat-thread-loader__bubble--wide shimmer-block" />
+              </div>
             </div>
           ) : (
             <>
@@ -2748,9 +3583,8 @@ const ChatPage = () => {
                   type="button"
                 >
                   <div
-                    className={`chat-avatar${
-                      isGroup && !roomAvatarUrl ? ' chat-avatar--room' : ''
-                    }`}
+                    className={`chat-avatar${isGroup && !roomAvatarUrl ? ' chat-avatar--room' : ''
+                      }`}
                     style={{ width: 36, height: 36, fontSize: 12 }}
                   >
                     {isGroup ? (
@@ -2773,7 +3607,16 @@ const ChatPage = () => {
 
                   <div className="chat-header-info">
                     <div className="chat-header-name">
-                      {headerName}
+                      <span className="chat-header-name-text">{headerName}</span>
+                      {directChatBadges.map((badge) => (
+                        <span
+                          className={`chat-member-chip ${badge.className}`}
+                          key={`header-${badge.key}`}
+                          title={badge.title}
+                        >
+                          {badge.label}
+                        </span>
+                      ))}
                       <span className="chat-header-badge">
                         {isChatConnected ? 'Active' : 'Offline'}
                       </span>
@@ -2945,9 +3788,8 @@ const ChatPage = () => {
               ) : null}
 
               <div
-                className={`chat-body-shell${
-                  showDesktopInfoPanel ? ' chat-body-shell--with-info' : ''
-                }`}
+                className={`chat-body-shell${showDesktopInfoPanel ? ' chat-body-shell--with-info' : ''
+                  }`}
               >
                 <div className="chat-thread-pane">
                   <div className="chat-messages-wrap">
@@ -2967,22 +3809,34 @@ const ChatPage = () => {
                         const isSent =
                           Number(message?.senderId || 0) === Number(currentUserId || 0);
                         const isDeleted = Boolean(message?.isDeleted);
+                        const isTombstone =
+                          message?.messageType === MESSAGE_TYPES.TOMBSTONE;
+                        const isUnavailableMessage = isDeleted || isTombstone;
                         const isSearchMatch = messageSearchMatchIds.has(messageId);
                         const isActiveSearchMatch =
                           isSearchMatch && Number(activeMessageSearchId || 0) === messageId;
                         const receiptState = isSent ? getReceiptState(message) : null;
-                        const receiptGlyph = receiptState === 'sent' ? '✓' : '✓✓';
+                        const receiptGlyph =
+                          receiptState === 'failed'
+                            ? '!'
+                            : receiptState === 'sending' || receiptState === 'sent'
+                              ? '✓'
+                              : '✓✓';
                         const receiptLabel =
-                          receiptState === 'seen'
-                            ? 'Seen'
-                            : receiptState === 'delivered'
-                              ? 'Delivered'
-                              : 'Sent';
+                          receiptState === 'failed'
+                            ? 'Failed to send'
+                            : receiptState === 'sending'
+                              ? 'Sending'
+                              : receiptState === 'seen'
+                                ? 'Seen'
+                                : receiptState === 'delivered'
+                                  ? 'Delivered'
+                                  : 'Sent';
                         const canDelete =
                           isSent &&
-                          !isDeleted &&
+                          !isUnavailableMessage &&
                           Date.now() - new Date(message?.createdAt).getTime() <=
-                            CHAT_LIMITS.DELETE_WINDOW_MS;
+                          CHAT_LIMITS.DELETE_WINDOW_MS;
                         const senderInitials = getInitials(
                           String(message?.senderName || '').split(' ')[0],
                           String(message?.senderName || '').split(' ')[1],
@@ -3018,9 +3872,8 @@ const ChatPage = () => {
                             tabIndex={isSearchMatch ? -1 : undefined}
                           >
                             <div
-                              className={`msg-row ${
-                                isSent ? 'msg-row--sent' : 'msg-row--received'
-                              }${isActiveSearchMatch ? ' msg-row--search-active' : ''}`}
+                              className={`msg-row ${isSent ? 'msg-row--sent' : 'msg-row--received'
+                                }${isActiveSearchMatch ? ' msg-row--search-active' : ''}`}
                             >
                               {!isSent && (
                                 <div className="msg-avatar-sm">
@@ -3035,21 +3888,18 @@ const ChatPage = () => {
                                 </div>
                               )}
                               <div
-                                className={`msg-bubble ${
-                                  isSent
+                                className={`msg-bubble ${isSent
                                     ? 'msg-bubble--sent'
                                     : 'msg-bubble--received'
-                                }${isDeleted ? ' msg-bubble--deleted' : ''}${
-                                  isSearchMatch ? ' msg-bubble--search-match' : ''
-                                }${isActiveSearchMatch ? ' msg-bubble--search-active' : ''}`}
+                                  }${isUnavailableMessage ? ' msg-bubble--deleted' : ''}${isSearchMatch ? ' msg-bubble--search-match' : ''
+                                  }${isActiveSearchMatch ? ' msg-bubble--search-active' : ''}`}
                               >
-                                {!isDeleted && (
+                                {!isUnavailableMessage && (
                                   <div
-                                    className={`msg-actions ${
-                                      isSent
+                                    className={`msg-actions ${isSent
                                         ? 'msg-actions--sent'
                                         : 'msg-actions--received'
-                                    }`}
+                                      }`}
                                   >
                                     <button
                                       className="msg-action-btn"
@@ -3085,10 +3935,10 @@ const ChatPage = () => {
                                   </div>
                                 )}
 
-                                {!isSent && isGroup && !isDeleted && (
+                                {!isSent && isGroup && !isUnavailableMessage && (
                                   <div className="msg-sender">{message.senderName}</div>
                                 )}
-                                {message.replyTo && !isDeleted && (
+                                {message.replyTo && !isUnavailableMessage && (
                                   <div className="msg-reply-bar">
                                     <div className="msg-reply-bar-name">
                                       {message.replyTo.senderName || 'Reply'}
@@ -3103,9 +3953,9 @@ const ChatPage = () => {
                                   </div>
                                 )}
 
-                                {isDeleted ? (
+                                {isUnavailableMessage ? (
                                   <span>
-                                    🚫 <em>Message deleted</em>
+                                    🚫 <em>{isTombstone ? 'Message unavailable' : 'Message deleted'}</em>
                                   </span>
                                 ) : message.mediaUrl ? (
                                   message.messageType === MESSAGE_TYPES.VOICE ? (
@@ -3191,7 +4041,57 @@ const ChatPage = () => {
                     </div>
                   </div>
 
+                  <ChatStateBanner
+                    availabilityReason={conversation?.availabilityReason}
+                    conversationState={conversation?.conversationState}
+                  />
+
                   <div className="chat-composer" ref={composerRef}>
+                    {attachmentDraft && (
+                      <div className="chat-attachment-preview">
+                        <div className="chat-attachment-preview__media">
+                          {attachmentDraft.previewKind === MESSAGE_TYPES.IMAGE ? (
+                            <img
+                              src={attachmentDraft.previewUrl}
+                              alt={attachmentDraft.name || 'Selected image'}
+                              className="chat-attachment-preview__image"
+                            />
+                          ) : attachmentDraft.previewKind === MESSAGE_TYPES.VOICE ? (
+                            <audio
+                              controls
+                              src={attachmentDraft.previewUrl}
+                              preload="metadata"
+                              className="chat-attachment-preview__audio"
+                            />
+                          ) : (
+                            <div className="chat-attachment-preview__fileicon">
+                              <FiPaperclip size={18} />
+                            </div>
+                          )}
+                        </div>
+                        <div className="chat-attachment-preview__meta">
+                          <div className="chat-attachment-preview__title">
+                            {attachmentDraft.previewKind === MESSAGE_TYPES.VOICE
+                              ? 'Voice message preview'
+                              : attachmentDraft.previewKind === MESSAGE_TYPES.IMAGE
+                                ? 'Image preview'
+                                : 'Attachment preview'}
+                          </div>
+                          <div className="chat-attachment-preview__name">
+                            {attachmentDraft.name}
+                          </div>
+                        </div>
+                        <button
+                          className="chat-attachment-preview__close"
+                          onClick={() => setAttachmentDraft(null)}
+                          type="button"
+                          aria-label="Remove attachment"
+                        >
+                          <FiX size={14} />
+                        </button>
+                      </div>
+                    )}
+
                     {replyTo && (
                       <div className="chat-reply-bar">
                         <div style={{ flex: 1, minWidth: 0 }}>
@@ -3245,9 +4145,8 @@ const ChatPage = () => {
 
                     <div className="chat-input-bar">
                       <button
-                        className={`chat-input-attach${
-                          showComposerPicker ? ' chat-input-attach--active' : ''
-                        }`}
+                        className={`chat-input-attach${showComposerPicker ? ' chat-input-attach--active' : ''
+                          }`}
                         onClick={handleToggleComposerPicker}
                         title="Emoji"
                         type="button"
@@ -3269,7 +4168,7 @@ const ChatPage = () => {
                       <textarea
                         ref={inputRef}
                         className="chat-input-field"
-                        placeholder="Type a message..."
+                        placeholder={composerPlaceholder}
                         value={text}
                         onBlur={stopLocalTyping}
                         onChange={handleTextChange}
@@ -3278,19 +4177,20 @@ const ChatPage = () => {
                         disabled={isComposerDisabled}
                       />
 
-                      {text.trim() ? (
+                      {hasComposerText || hasAttachmentDraft ? (
                         <button
                           className="chat-send-btn"
                           onClick={handleSend}
                           disabled={isComposerDisabled}
                           type="button"
+                          title={hasAttachmentDraft ? 'Send attachment' : 'Send message'}
                         >
                           <FiSend size={16} />
                         </button>
                       ) : (
                         <VoiceRecorder
                           disabled={isComposerDisabled}
-                          onRecorded={sendMedia}
+                          onRecorded={handleStageAttachment}
                           className="chat-send-btn"
                           iconSize={18}
                         />
@@ -3344,7 +4244,7 @@ const ChatPage = () => {
       <ChatPickerModal
         isOpen={newConversationOpen}
         title="New conversation"
-        subtitle="Choose a family member to start a direct chat."
+        subtitle="Choose a Familyss app user from your family circle to start a direct chat."
         members={availableDirectMembers}
         selectedIds={newConversationMemberId ? [Number(newConversationMemberId)] : []}
         onToggleMember={(member) => {
@@ -3363,8 +4263,9 @@ const ChatPage = () => {
         isSubmitting={newConversationSubmitting}
         selectionMode="single"
         error={newConversationError}
-        emptyStateTitle="No family members available"
-        emptyStateSubtitle="Approved or associated members will appear here."
+        emptyStateTitle="No family app users available"
+        emptyStateSubtitle="Associated and linked Familyss users will appear here when available."
+        searchPlaceholder="Search family app users"
         submitDisabled={!newConversationMemberId}
         disableMember={(member) =>
           Boolean(
@@ -3387,7 +4288,7 @@ const ChatPage = () => {
       <ChatPickerModal
         isOpen={createRoomOpen}
         title="Create room"
-        subtitle="Pick a room name and choose the members you want to include."
+        subtitle="Pick a room name and choose the Familyss app users you want to include."
         members={availableDirectMembers}
         selectedIds={createRoomMemberIds}
         onToggleMember={handleToggleCreateRoomMember}
@@ -3401,30 +4302,119 @@ const ChatPage = () => {
         submitLabel="Create room"
         isSubmitting={createRoomSubmitting}
         error={createRoomError}
-        emptyStateTitle="No family members available"
-        emptyStateSubtitle="Approved or associated members will appear here."
-        submitDisabled={!String(createRoomName || '').trim()}
-        topContent={
-          <div className="chat-form-group">
-            <label className="chat-form-label" htmlFor="chat-create-room-name">
-              Room name
-            </label>
-            <input
-              id="chat-create-room-name"
-              className="chat-form-input"
-              type="text"
-              value={createRoomName}
-              onChange={(event) => setCreateRoomName(event.target.value)}
-              placeholder="Enter room name"
-              maxLength={100}
-            />
+        emptyStateTitle="No family app users available"
+        emptyStateSubtitle="Associated and linked Familyss users will appear here when available."
+        searchPlaceholder="Search family app users"
+        submitDisabled={!String(createRoomName || '').trim() || createRoomMemberIds.length === 0}
+        topContent={(
+          <>
+            <div className="chat-form-group">
+              <label className="chat-form-label" htmlFor="chat-create-room-name">
+                Room name
+              </label>
+              <input
+                id="chat-create-room-name"
+                className="chat-form-input"
+                type="text"
+                value={createRoomName}
+                onChange={(event) => {
+                  setCreateRoomName(event.target.value);
+                  if (createRoomError) {
+                    setCreateRoomError('');
+                  }
+                }}
+                placeholder="Enter room name"
+                maxLength={100}
+                autoFocus
+              />
+            </div>
             <p className="chat-helper-text">
               You will be added automatically even if you do not select yourself.
             </p>
-          </div>
-        }
+            {!String(createRoomName || '').trim() ? (
+              <p className="chat-helper-text chat-helper-text--warning">
+                Enter a room name to enable Create room.
+              </p>
+            ) : null}
+            {createRoomMemberIds.length === 0 ? (
+              <p className="chat-helper-text chat-helper-text--warning">
+                Select at least one member to create a room.
+              </p>
+            ) : null}
+          </>
+        )}
       />
 
+      {roomNameEditorOpen ? (
+        <div className="chat-modal-overlay" role="presentation">
+          <div
+            className="chat-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Edit room name"
+          >
+            <div className="chat-modal-header">
+              <div>
+                <h3>Edit room name</h3>
+                <p>Choose a clear family room name that everyone will recognize.</p>
+              </div>
+              <button
+                type="button"
+                className="chat-modal-close"
+                onClick={handleCloseRoomNameEditor}
+                aria-label="Close"
+                disabled={roomNameSubmitting}
+              >
+                <FiX size={18} />
+              </button>
+            </div>
+
+            <div className="chat-modal-top-content">
+              <div className="chat-form-group">
+                <label className="chat-form-label" htmlFor="chat-room-name-editor">
+                  Room name
+                </label>
+                <input
+                  id="chat-room-name-editor"
+                  className="chat-form-input"
+                  type="text"
+                  value={roomNameDraft}
+                  onChange={(event) => {
+                    setRoomNameDraft(event.target.value);
+                    if (roomNameError) {
+                      setRoomNameError('');
+                    }
+                  }}
+                  placeholder="Enter room name"
+                  maxLength={100}
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            {roomNameError ? <div className="chat-modal-error">{roomNameError}</div> : null}
+
+            <div className="chat-modal-actions">
+              <button
+                type="button"
+                className="chat-modal-btn chat-modal-btn--secondary"
+                onClick={handleCloseRoomNameEditor}
+                disabled={roomNameSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="chat-modal-btn chat-modal-btn--primary"
+                onClick={handleSubmitRoomName}
+                disabled={roomNameSubmitting}
+              >
+                {roomNameSubmitting ? 'Saving...' : 'Save room name'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <ChatRoomMembersModal
         isOpen={roomMembersOpen}
         roomName={conversation?.roomName || 'Room members'}

@@ -5,7 +5,11 @@ import {
   FiUser,
   FiX,
 } from 'react-icons/fi';
-import { getInitials } from '../../services/chat.service';
+import {
+  getChatMemberBadges,
+  getChatMemberMetaText,
+  getInitials,
+} from '../../services/chat.service';
 
 const ChatPickerModal = ({
   isOpen,
@@ -26,6 +30,7 @@ const ChatPickerModal = ({
   submitDisabled = false,
   disableMember = null,
   getMemberNote = null,
+  searchPlaceholder = 'Search family app users',
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -47,6 +52,7 @@ const ChatPickerModal = ({
         member?.familyRole,
         member?.firstName,
         member?.lastName,
+        member?.sourceFamilyCode,
       ]
         .filter(Boolean)
         .join(' ')
@@ -95,7 +101,7 @@ const ChatPickerModal = ({
             type="text"
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
-            placeholder="Search members"
+            placeholder={searchPlaceholder}
           />
         </label>
 
@@ -111,6 +117,7 @@ const ChatPickerModal = ({
               const note = typeof getMemberNote === 'function'
                 ? getMemberNote(member)
                 : '';
+              const badges = getChatMemberBadges(member);
 
               return (
                 <button
@@ -138,8 +145,17 @@ const ChatPickerModal = ({
                       {member.isFamilyAdmin ? (
                         <span className="chat-member-chip">Admin</span>
                       ) : null}
+                      {badges.map((badge) => (
+                        <span
+                          className={`chat-member-chip ${badge.className}`}
+                          key={`${member.userId}-${badge.key}`}
+                          title={badge.title}
+                        >
+                          {badge.label}
+                        </span>
+                      ))}
                     </div>
-                    <div className="chat-member-role">{member.familyRole || 'Family member'}</div>
+                    <div className="chat-member-role">{getChatMemberMetaText(member)}</div>
                     {note ? <div className="chat-member-note">{note}</div> : null}
                   </div>
 
