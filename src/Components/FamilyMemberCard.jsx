@@ -792,6 +792,10 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
   }) => {
     const memberUserId = Number(member?.userId || member?.user?.id || 0);
     const chatStateKey = String(memberUserId || '');
+    const canViewProfile =
+      !disabled &&
+      Boolean(member?.user?.isAppUser) &&
+      memberUserId > 0;
     const canStartChat =
       !disabled &&
       !deletedMemberIds.has(member.memberId) &&
@@ -806,6 +810,7 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
         onClick={() => {
         if (
           !deletedMemberIds.has(member.memberId) &&
+          canViewProfile &&
           currentUserIsFamilyAdmin &&
           !member?.blockStatus?.isBlockedByMe &&
           !disabled
@@ -963,22 +968,24 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                     <FiTrash2 size={16} />
                   </button>
                 )}
-                <button
-                  onClick={(e) => handleViewMember(member.userId, e)}
-                  disabled={deletedMemberIds.has(member.memberId) || viewLoadingStates[member.userId]}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all border font-semibold text-sm ${viewLoadingStates[member.userId]
-                      ? 'bg-primary-50 text-primary-400 border-primary-100 cursor-not-allowed'
-                      : 'bg-white dark:bg-slate-900 text-primary-600 border-primary-200 hover:bg-primary-50 hover:border-primary-300 hover:shadow-sm'
-                    } tooltip`}
-                  title="View Profile"
-                >
-                  {viewLoadingStates[member.userId] ? (
-                    <FiLoader size={16} className="animate-spin" />
-                  ) : (
-                    <FiEye size={16} />
-                  )}
-                </button>
               </>
+            )}
+            {canViewProfile && (
+              <button
+                onClick={(e) => handleViewMember(member.userId, e)}
+                disabled={deletedMemberIds.has(member.memberId) || viewLoadingStates[member.userId]}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all border font-semibold text-sm ${viewLoadingStates[member.userId]
+                    ? 'bg-primary-50 text-primary-400 border-primary-100 cursor-not-allowed'
+                    : 'bg-white dark:bg-slate-900 text-primary-600 border-primary-200 hover:bg-primary-50 hover:border-primary-300 hover:shadow-sm'
+                  } tooltip`}
+                title="View Profile"
+              >
+                {viewLoadingStates[member.userId] ? (
+                  <FiLoader size={16} className="animate-spin" />
+                ) : (
+                  <FiEye size={16} />
+                )}
+              </button>
             )}
             {disabled && (
               <span className="text-xs text-emerald-600 font-medium bg-emerald-50 px-2 py-1 rounded">
