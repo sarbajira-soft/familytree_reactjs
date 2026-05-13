@@ -5,42 +5,16 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import EmojiPicker, {
-  Categories,
-  EmojiStyle,
-  Theme,
-} from 'emoji-picker-react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import {
-  FiAlertTriangle,
-  FiArrowLeft,
-  FiCamera,
-  FiChevronDown,
-  FiChevronUp,
-  FiCornerUpLeft,
-  FiEdit2,
-  FiLogOut,
-  FiMessageCircle,
-  FiMoreVertical,
-  FiPaperclip,
-  FiPlus,
-  FiSearch,
-  FiSend,
-  FiSmile,
-  FiTrash2,
-  FiUsers,
-  FiVolume2,
-  FiVolumeX,
-  FiX,
-} from 'react-icons/fi';
+import { FiX } from 'react-icons/fi';
 import { useUser } from '../Contexts/UserContext';
 import { useChat } from '../Contexts/ChatContext';
-import TypingIndicator from '../Components/Chat/TypingIndicator';
-import VoiceRecorder from '../Components/Chat/VoiceRecorder';
+import ChatConversationPane from '../Components/Chat/ChatConversationPane';
+import ChatInfoPanel from '../Components/Chat/ChatInfoPanel';
+import ChatSidebar from '../Components/Chat/ChatSidebar';
 import ReportMessageModal from '../Components/Chat/ReportMessageModal';
 import ChatRoomMembersModal from '../Components/Chat/ChatRoomMembersModal';
 import ChatPickerModal from '../Components/Chat/ChatPickerModal';
-import ChatStateBanner from '../Components/Chat/ChatStateBanner';
 import {
   CHAT_LIMITS,
   CHAT_SOCKET_EVENTS,
@@ -58,15 +32,11 @@ import {
   formatDateSeparator,
   getChatMemberBadges,
   getChatMemberMetaText,
-  formatFullTime,
-  formatMessageTime,
   getConversation,
   getConversations,
   getFamilyMembersForChat,
   getInitials,
-  getMessagePreviewText,
   getMessages,
-  getRoomIcon,
   getRooms,
   leaveRoomConversation,
   markConversationRead,
@@ -92,380 +62,28 @@ import {
   replaceCachedMessage,
   upsertCachedMessage,
 } from '../utils/chatCache';
+import {
+  applyReadReceipt,
+  buildTypingUserLabel,
+  createComposerAttachmentDraft,
+  createOptimisticMediaMessage,
+  createOptimisticTextMessage,
+  formatInfoDateTime,
+  getConversationInfoDescription,
+  getMessageReplyId,
+  getMessageReplyPreview,
+  getMessageSearchText,
+  getReceiptState,
+  getRoomDisplayName,
+  getRoomTypeLabel,
+  isSameConversation,
+  isUnavailableConversationError,
+  normalizeFamilyCode,
+  resizeComposer,
+  revokeObjectUrl,
+  toConversationType,
+} from '../Components/Chat/chatPage.utils';
 import '../Components/Chat/chat.css';
-
-const normalizeFamilyCode = (value) =>
-  String(value || '').trim().toUpperCase();
-
-const toConversationType = (conversation) =>
-  conversation?.type === CONVERSATION_TYPES.GROUP ||
-    conversation?.roomId ||
-    conversation?.roomType
-    ? CONVERSATION_TYPES.GROUP
-    : CONVERSATION_TYPES.DIRECT;
-
-const isSameConversation = (left, right) =>
-  Number(left || 0) === Number(right || 0);
-
-const isUnavailableConversationError = (error) => {
-  const status = Number(error?.status || 0);
-  return status === 403 || status === 404;
-};
-
-const getMessageReplyPreview = (message) => {
-  const messageId = Number(message?.id || 0);
-  if (!messageId) {
-    return null;
-  }
-
-  return {
-    id: messageId,
-    content: message?.content || '',
-    senderName: message?.senderName || '',
-  };
-};
-
-const getMessageReplyId = (message) => Number(message?.replyTo?.id || message?.replyToId || 0) || null;
-
-const createOptimisticTextMessage = ({
-  id,
-  conversationId,
-  senderId,
-  senderName,
-  senderAvatar,
-  content,
-  createdAt,
-  replyTo,
-}) => ({
-  id: Number(id || 0),
-  conversationId: Number(conversationId || 0),
-  senderId: Number(senderId || 0),
-  senderName: senderName || 'You',
-  senderAvatar: senderAvatar || '',
-  content,
-  createdAt,
-  updatedAt: createdAt,
-  messageType: MESSAGE_TYPES.TEXT,
-  mediaUrl: '',
-  isDeleted: false,
-  deletedAt: null,
-  readAt: null,
-  replyTo: replyTo || null,
-  sendStatus: 'sending',
-});
-
-const getComposerAttachmentKind = (file) => {
-  const mimeType = String(file?.type || '').toLowerCase();
-  if (mimeType.startsWith('audio/')) {
-    return MESSAGE_TYPES.VOICE;
-  }
-  if (mimeType.startsWith('image/')) {
-    return MESSAGE_TYPES.IMAGE;
-  }
-  return 'attachment';
-};
-
-const createComposerAttachmentDraft = (file) => {
-  if (!file) {
-    return null;
-  }
-
-  const previewKind = getComposerAttachmentKind(file);
-  return {
-    file,
-    name: String(file?.name || 'Attachment'),
-    size: Number(file?.size || 0),
-    mimeType: String(file?.type || ''),
-    previewKind,
-    previewUrl:
-      previewKind === MESSAGE_TYPES.IMAGE || previewKind === MESSAGE_TYPES.VOICE
-        ? URL.createObjectURL(file)
-        : '',
-  };
-};
-
-const revokeObjectUrl = (value) => {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  const objectUrl = String(value || '');
-  if (objectUrl.startsWith('blob:')) {
-    window.URL.revokeObjectURL(objectUrl);
-  }
-};
-
-const createOptimisticMediaMessage = ({
-  id,
-  conversationId,
-  senderId,
-  senderName,
-  senderAvatar,
-  content,
-  createdAt,
-  replyTo,
-  messageType,
-  mediaUrl,
-  mediaMimeType,
-  mediaSize,
-  attachmentName,
-}) => ({
-  id: Number(id || 0),
-  conversationId: Number(conversationId || 0),
-  senderId: Number(senderId || 0),
-  senderName: senderName || 'You',
-  senderAvatar: senderAvatar || '',
-  content,
-  createdAt,
-  updatedAt: createdAt,
-  messageType: messageType || MESSAGE_TYPES.IMAGE,
-  mediaUrl: mediaUrl || '',
-  mediaMimeType: mediaMimeType || '',
-  mediaSize: Number(mediaSize || 0),
-  attachmentName: attachmentName || '',
-  isDeleted: false,
-  deletedAt: null,
-  readAt: null,
-  replyTo: replyTo || null,
-  sendStatus: 'sending',
-});
-
-const resizeComposer = (element) => {
-  if (!element) return;
-  element.style.height = 'auto';
-  element.style.height = `${Math.min(element.scrollHeight, 100)}px`;
-};
-
-const markMessageDeleted = (messages = [], messageId) =>
-  (Array.isArray(messages) ? messages : []).map((message) =>
-    Number(message?.id || 0) === Number(messageId || 0)
-      ? {
-        ...message,
-        content: null,
-        isDeleted: true,
-        deletedAt: message?.deletedAt || new Date().toISOString(),
-      }
-      : message,
-  );
-
-const applyReadReceipt = (messages = [], currentUserId, readerUserId, readAt) => {
-  if (Number(readerUserId || 0) === Number(currentUserId || 0)) {
-    return Array.isArray(messages) ? messages : [];
-  }
-
-  const readAtTs = new Date(readAt || 0).getTime();
-  return (Array.isArray(messages) ? messages : []).map((message) => {
-    const messageTs = new Date(message?.createdAt || 0).getTime();
-    if (
-      Number(message?.senderId || 0) === Number(currentUserId || 0) &&
-      messageTs <= readAtTs
-    ) {
-      return {
-        ...message,
-        readAt,
-      };
-    }
-
-    return message;
-  });
-};
-
-const buildTypingUserLabel = (names = []) => {
-  const uniqueNames = Array.from(
-    new Set(
-      names
-        .map((name) => String(name || '').trim())
-        .filter(Boolean),
-    ),
-  );
-
-  if (uniqueNames.length === 0) {
-    return 'Member';
-  }
-
-  if (uniqueNames.length === 1) {
-    return uniqueNames[0];
-  }
-
-  if (uniqueNames.length === 2) {
-    return `${uniqueNames[0]} and ${uniqueNames[1]}`;
-  }
-
-  return `${uniqueNames[0]} and ${uniqueNames.length - 1} others`;
-};
-
-const getMessageSearchText = (message = {}) =>
-  [message?.content, message?.replyTo?.content, message?.senderName]
-    .filter(Boolean)
-    .join(' ')
-    .toLowerCase();
-
-const renderHighlightedText = (text, query, isActive = false) => {
-  const content = String(text || '');
-  const needle = String(query || '').trim();
-  if (!content || !needle) {
-    return content;
-  }
-
-  const normalizedContent = content.toLowerCase();
-  const normalizedNeedle = needle.toLowerCase();
-  const firstMatchIndex = normalizedContent.indexOf(normalizedNeedle);
-  if (firstMatchIndex === -1) {
-    return content;
-  }
-
-  const fragments = [];
-  let cursor = 0;
-  let matchIndex = firstMatchIndex;
-  let fragmentKey = 0;
-
-  while (matchIndex !== -1) {
-    if (matchIndex > cursor) {
-      fragments.push(
-        <React.Fragment key={`text-${fragmentKey}`}>
-          {content.slice(cursor, matchIndex)}
-        </React.Fragment>,
-      );
-      fragmentKey += 1;
-    }
-
-    fragments.push(
-      <mark
-        className={`chat-search-highlight${isActive ? ' chat-search-highlight--active' : ''
-          }`}
-        key={`mark-${fragmentKey}`}
-      >
-        {content.slice(matchIndex, matchIndex + normalizedNeedle.length)}
-      </mark>,
-    );
-    fragmentKey += 1;
-    cursor = matchIndex + normalizedNeedle.length;
-    matchIndex = normalizedContent.indexOf(normalizedNeedle, cursor);
-  }
-
-  if (cursor < content.length) {
-    fragments.push(
-      <React.Fragment key={`text-${fragmentKey}`}>
-        {content.slice(cursor)}
-      </React.Fragment>,
-    );
-  }
-
-  return fragments;
-};
-
-const formatInfoDateTime = (value) => {
-  if (!value) {
-    return 'Not available yet';
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return 'Not available yet';
-  }
-
-  return date.toLocaleString('en-IN', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  });
-};
-
-const getRoomTypeLabel = (roomType) => {
-  switch (String(roomType || '').trim().toLowerCase()) {
-    case 'general':
-      return 'General room';
-    case 'announcements':
-      return 'Announcements room';
-    case 'event':
-      return 'Event room';
-    case 'custom':
-      return 'Custom room';
-    default:
-      return 'Group room';
-  }
-};
-
-const getConversationInfoDescription = (conversation, familyName) => {
-  const roomType = String(conversation?.roomType || '').trim().toLowerCase();
-  const resolvedFamilyName = familyName || 'this family';
-
-  if (conversation?.conversationType === 'archived') {
-    return `Archived room history preserved for ${resolvedFamilyName}. New messages are disabled.`;
-  }
-
-  if (roomType === 'announcements') {
-    return `Announcements for ${resolvedFamilyName}. Only family admins can post here.`;
-  }
-
-  if (roomType === 'general') {
-    return `General room for everyone in ${resolvedFamilyName}.`;
-  }
-
-  if (roomType === 'event') {
-    return `Event discussion room inside ${resolvedFamilyName}.`;
-  }
-
-  if (roomType === 'custom') {
-    return `Private room created for selected members in ${resolvedFamilyName}.`;
-  }
-
-  return `Direct conversation inside ${resolvedFamilyName}.`;
-};
-
-const getRoomDisplayName = (conversation = {}) => {
-  const roomName = String(conversation?.roomName || '').trim();
-  if (roomName) {
-    return roomName;
-  }
-
-  switch (String(conversation?.roomType || '').trim().toLowerCase()) {
-    case 'general':
-      return 'General';
-    case 'announcements':
-      return 'Announcements';
-    case 'event':
-      return 'Event';
-    case 'custom':
-      return 'Custom room';
-    default:
-      return 'Room';
-  }
-};
-
-const EMOJI_PICKER_CATEGORIES = [
-  Categories.SMILEYS_PEOPLE,
-  Categories.ANIMALS_NATURE,
-  Categories.FOOD_DRINK,
-  Categories.TRAVEL_PLACES,
-  Categories.ACTIVITIES,
-  Categories.OBJECTS,
-  Categories.SYMBOLS,
-  Categories.FLAGS,
-];
-
-const getReceiptState = (message) => {
-  if (!message || message?.isDeleted) {
-    return null;
-  }
-
-  if (message?.sendStatus === 'failed') {
-    return 'failed';
-  }
-
-  if (message?.sendStatus === 'sending') {
-    return 'sending';
-  }
-
-  if (message?.readAt) {
-    return 'seen';
-  }
-
-  return 'delivered';
-};
 
 const ChatPage = () => {
   const navigate = useNavigate();
@@ -3040,1198 +2658,166 @@ const ChatPage = () => {
     !selectedId || chatLoading || sendingMedia || conversation?.canSend === false;
   const composerPlaceholder =
     conversation?.canSend === false ? 'Messaging unavailable in this chat' : 'Type a message...';
-
-  const renderInfoPanel = (mobile = false) => (
-    <aside
-      className={`chat-info-panel${mobile ? ' chat-info-panel--mobile' : ''}`}
-      role="dialog"
-      aria-label={infoPanelTitle}
-    >
-      <div className="chat-info-panel-header">
-        <button
-          className="chat-info-panel-close"
-          onClick={handleCloseInfoPanel}
-          type="button"
-          aria-label="Close info panel"
-        >
-          <FiX size={18} />
-        </button>
-        <h3>{infoPanelTitle}</h3>
-      </div>
-
-      <div className="chat-info-panel-scroll custom-scrollbar">
-        <section className="chat-info-hero">
-          <div className="chat-info-avatar-wrap">
-            <div
-              className={`chat-info-avatar${isGroup && !roomAvatarUrl ? ' chat-info-avatar--room' : ''
-                }`}
-            >
-              {isGroup ? (
-                roomAvatarUrl ? (
-                  <img src={roomAvatarUrl} alt={headerName} />
-                ) : (
-                  getRoomIcon(conversation?.roomType)
-                )
-              ) : activeParticipant.profileUrl ? (
-                <img src={activeParticipant.profileUrl} alt={headerName} />
-              ) : (
-                headerInitials
-              )}
-            </div>
-            {canManageRoom ? (
-              <button
-                className="chat-info-avatar-edit"
-                onClick={handleOpenRoomPhotoPicker}
-                type="button"
-                aria-label="Change room photo"
-              >
-                <FiCamera size={15} />
-              </button>
-            ) : null}
-          </div>
-
-          <h3 className="chat-info-title">{headerName}</h3>
-          <p className="chat-info-subtitle">
-            {isGroup
-              ? `${roomTypeLabel} · ${roomMemberCount} member${roomMemberCount === 1 ? '' : 's'}`
-              : infoPrimaryMeta}
-          </p>
-
-          <div
-            className={`chat-info-hero-actions${!isGroup ? ' chat-info-hero-actions--compact' : ''
-              }`}
-          >
-            {isGroup ? (
-              <button
-                className="chat-info-hero-btn"
-                onClick={handleOpenRoomMembers}
-                type="button"
-              >
-                <FiUsers size={18} />
-                <span>{canManageRoomMembers ? 'Add members' : 'View members'}</span>
-              </button>
-            ) : (
-              <button
-                className="chat-info-hero-btn"
-                onClick={handleInfoPanelSearch}
-                type="button"
-              >
-                <FiSearch size={18} />
-                <span>Search</span>
-              </button>
-            )}
-
-            <button
-              className="chat-info-hero-btn"
-              onClick={isGroup ? handleInfoPanelSearch : handleMute}
-              type="button"
-            >
-              {isGroup ? <FiSearch size={18} /> : conversation?.isMuted ? <FiVolume2 size={18} /> : <FiVolumeX size={18} />}
-              <span>
-                {isGroup
-                  ? 'Search'
-                  : conversation?.isMuted
-                    ? 'Unmute'
-                    : 'Mute'}
-              </span>
-            </button>
-          </div>
-        </section>
-
-        <section className="chat-info-section">
-          <div className="chat-info-section-heading">Overview</div>
-
-          {isGroup ? (
-            <div className="chat-info-row">
-              <div className="chat-info-row-icon">
-                <FiEdit2 size={16} />
-              </div>
-              <div className="chat-info-row-body">
-                <div className="chat-info-row-title">Room name</div>
-                <div className="chat-info-row-text">{roomDisplayName}</div>
-              </div>
-              {canManageRoom ? (
-                <button
-                  className="chat-info-row-btn"
-                  onClick={handleRenameRoom}
-                  type="button"
-                >
-                  Edit
-                </button>
-              ) : null}
-            </div>
-          ) : (
-            <div className="chat-info-row">
-              <div className="chat-info-row-icon">
-                <FiUsers size={16} />
-              </div>
-              <div className="chat-info-row-body">
-                <div className="chat-info-row-title">Family</div>
-                <div className="chat-info-row-text">{infoFamilyLabel}</div>
-              </div>
-            </div>
-          )}
-
-          <div className="chat-info-row">
-            <div className="chat-info-row-icon">
-              <FiMessageCircle size={16} />
-            </div>
-            <div className="chat-info-row-body">
-              <div className="chat-info-row-title">
-                {isGroup ? 'About this room' : 'About this chat'}
-              </div>
-              <div className="chat-info-row-text">{infoPanelDescription}</div>
-            </div>
-          </div>
-
-          <div className="chat-info-row">
-            <div className="chat-info-row-icon">
-              <FiCamera size={16} />
-            </div>
-            <div className="chat-info-row-body">
-              <div className="chat-info-row-title">Shared media</div>
-              <div className="chat-info-row-text">
-                {sharedMediaCount} item{sharedMediaCount === 1 ? '' : 's'} in the loaded chat
-              </div>
-            </div>
-          </div>
-
-          <div className="chat-info-row">
-            <div className="chat-info-row-icon">
-              {conversation?.isMuted ? <FiVolumeX size={16} /> : <FiVolume2 size={16} />}
-            </div>
-            <div className="chat-info-row-body">
-              <div className="chat-info-row-title">Notifications</div>
-              <div className="chat-info-row-text">
-                {conversation?.isMuted ? 'Muted for this chat' : 'Notifications are active'}
-              </div>
-            </div>
-            <button className="chat-info-row-btn" onClick={handleMute} type="button">
-              {conversation?.isMuted ? 'Unmute' : 'Mute'}
-            </button>
-          </div>
-
-          <div className="chat-info-row">
-            <div className="chat-info-row-icon">
-              <FiUsers size={16} />
-            </div>
-            <div className="chat-info-row-body">
-              <div className="chat-info-row-title">
-                {isGroup ? 'Created' : 'Conversation started'}
-              </div>
-              <div className="chat-info-row-text">{infoCreatedAtLabel}</div>
-            </div>
-          </div>
-        </section>
-
-        {isGroup ? (
-          <section className="chat-info-section">
-            <div className="chat-info-section-heading">Members</div>
-            <div className="chat-info-members-preview">
-              {currentRoomMembers.slice(0, 5).map((member) => (
-                <div className="chat-info-member-chip" key={`info-member-${member.userId}`}>
-                  <div className="chat-info-member-chip-avatar">
-                    {member.profileUrl ? (
-                      <img src={member.profileUrl} alt={member.name} />
-                    ) : (
-                      getInitials(member.firstName, member.lastName)
-                    )}
-                  </div>
-                  <div className="chat-info-member-chip-text">
-                    <span>{member.name}</span>
-                    <small>{getChatMemberMetaText(member)}</small>
-                    <div className="chat-member-chip-row chat-member-chip-row--compact">
-                      {member.isFamilyAdmin ? (
-                        <span className="chat-member-chip">Admin</span>
-                      ) : null}
-                      {getChatMemberBadges(member).map((badge) => (
-                        <span
-                          className={`chat-member-chip ${badge.className}`}
-                          key={`info-member-${member.userId}-${badge.key}`}
-                          title={badge.title}
-                        >
-                          {badge.label}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <button
-              className="chat-info-wide-action"
-              onClick={handleOpenRoomMembers}
-              type="button"
-            >
-              <FiUsers size={16} />
-              {canManageRoomMembers ? 'Manage members' : 'View members'}
-            </button>
-          </section>
-        ) : null}
-
-        <section className="chat-info-section">
-          <div className="chat-info-section-heading">Actions</div>
-
-          <button
-            className="chat-info-action-row"
-            onClick={handleInfoPanelSearch}
-            type="button"
-          >
-            <FiSearch size={17} />
-            <span>Search in chat</span>
-          </button>
-
-          {canManageRoom ? (
-            <button
-              className="chat-info-action-row"
-              onClick={handleOpenRoomPhotoPicker}
-              type="button"
-            >
-              <FiCamera size={17} />
-              <span>Change room photo</span>
-            </button>
-          ) : null}
-
-          {canLeaveRoom ? (
-            <button
-              className="chat-info-action-row chat-info-action-row--danger"
-              onClick={handleLeaveRoom}
-              type="button"
-            >
-              <FiLogOut size={17} />
-              <span>Leave room</span>
-            </button>
-          ) : null}
-
-          {canManageRoomMembers ? (
-            <button
-              className="chat-info-action-row chat-info-action-row--danger"
-              onClick={handleDeleteRoom}
-              type="button"
-            >
-              <FiTrash2 size={17} />
-              <span>Delete room</span>
-            </button>
-          ) : null}
-
-          {!isGroup ? (
-            <button
-              className="chat-info-action-row chat-info-action-row--danger"
-              onClick={handleDeleteConversation}
-              type="button"
-            >
-              <FiTrash2 size={17} />
-              <span>Delete chat</span>
-            </button>
-          ) : null}
-        </section>
-      </div>
-    </aside>
-  );
+  const infoPanelProps = {
+    canLeaveRoom,
+    canManageRoom,
+    canManageRoomMembers,
+    conversation,
+    currentRoomMembers,
+    handleCloseInfoPanel,
+    handleDeleteConversation,
+    handleDeleteRoom,
+    handleInfoPanelSearch,
+    handleLeaveRoom,
+    handleMute,
+    handleOpenRoomMembers,
+    handleOpenRoomPhotoPicker,
+    handleRenameRoom,
+    headerInitials,
+    headerName,
+    infoCreatedAtLabel,
+    infoFamilyLabel,
+    infoPanelDescription,
+    infoPanelTitle,
+    infoPrimaryMeta,
+    isGroup,
+    roomAvatarUrl,
+    roomDisplayName,
+    roomMemberCount,
+    roomTypeLabel,
+    sharedMediaCount,
+    activeParticipant,
+  };
+  const desktopInfoPanel = <ChatInfoPanel {...infoPanelProps} />;
+  const mobileInfoPanel = <ChatInfoPanel {...infoPanelProps} mobile />;
 
   return (
     <div className="chat-split" id="chat-page">
-      {showSidebar && (
-        <div className="chat-sidebar">
-          <div className="chat-sidebar-search">
-            <div className="chat-search-box">
-              <FiSearch size={14} color="#9ca3af" />
-              <input
-                ref={searchInputRef}
-                type="text"
-                placeholder="Search chats"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                className="chat-search-input"
-              />
-            </div>
-          </div>
+      {showSidebar ? (
+        <ChatSidebar
+          activeTab={activeTab}
+          familyMemberMap={familyMemberMap}
+          filteredConversations={filteredConversations}
+          filteredRooms={filteredRooms}
+          hasFamilyScope={hasFamilyScope}
+          listLoading={listLoading}
+          msgCount={msgCount}
+          onCreateRoom={handleOpenCreateRoom}
+          onNewConversation={handleOpenNewConversation}
+          onOpenConversation={openChat}
+          onSearchChange={setSearch}
+          onTabChange={setActiveTab}
+          roomCount={roomCount}
+          search={search}
+          searchInputRef={searchInputRef}
+          selectedId={selectedId}
+        />
+      ) : null}
 
-          <div className="chat-sidebar-toolbar">
-            <div className="chat-sidebar-tabs">
-              <button
-                className={`chat-pill${activeTab === 'messages' ? ' active' : ''}`}
-                onClick={() => setActiveTab('messages')}
-                type="button"
-              >
-                Messages {msgCount > 0 && <span className="chat-pill-badge">{msgCount}</span>}
-              </button>
-              <button
-                className={`chat-pill${activeTab === 'rooms' ? ' active' : ''}`}
-                onClick={() => setActiveTab('rooms')}
-                type="button"
-              >
-                Rooms {roomCount > 0 && <span className="chat-pill-badge">{roomCount}</span>}
-              </button>
-            </div>
-
-            {hasFamilyScope && (
-              activeTab === 'messages' ? (
-                <button
-                  className="chat-sidebar-action chat-sidebar-action--inline"
-                  onClick={handleOpenNewConversation}
-                  type="button"
-                >
-                  <FiPlus size={14} />
-                  New conversation
-                </button>
-              ) : (
-                <button
-                  className="chat-sidebar-action chat-sidebar-action--inline"
-                  onClick={handleOpenCreateRoom}
-                  type="button"
-                >
-                  <FiPlus size={14} />
-                  Create room
-                </button>
-              )
-            )}
-          </div>
-
-          {hasFamilyScope && activeTab === 'rooms' ? (
-            <div className="chat-sidebar-note-row">
-              <span className="chat-sidebar-note">
-                Custom rooms can include linked, associated, and not-in-tree app users.
-              </span>
-            </div>
-          ) : null}
-
-          <div className="chat-sidebar-list custom-scrollbar">
-            {listLoading ? (
-              <div className="chat-list-loader" aria-label="Loading chat list">
-                {Array.from({ length: 4 }).map((_, index) => (
-                  <div className="chat-list-loader__item" key={`chat-list-loader-${index}`}>
-                    <div className="chat-list-loader__avatar shimmer-block" />
-                    <div className="chat-list-loader__body">
-                      <div className="chat-list-loader__line shimmer-block" />
-                      <div className="chat-list-loader__line chat-list-loader__line--short shimmer-block" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : !hasFamilyScope ? (
-              <div className="chat-empty">
-                <FiUsers size={40} />
-                <p>No rooms available</p>
-              </div>
-            ) : activeTab === 'messages' ? (
-              filteredConversations.length > 0 ? (
-                filteredConversations.map((conversationItem) => {
-                  const participant = conversationItem?.participants?.[0] || {};
-                  const participantMember =
-                    familyMemberMap.get(Number(participant?.userId || 0)) || null;
-                  const participantBadges = getChatMemberBadges(participantMember || {});
-                  const fullName =
-                    `${participant.firstName || ''} ${participant.lastName || ''}`.trim() ||
-                    participant?.name ||
-                    'Unknown';
-                  const initials = getInitials(
-                    participant.firstName,
-                    participant.lastName,
-                  );
-                  const isActive = isSameConversation(selectedId, conversationItem?.id);
-
-                  return (
-                    <div
-                      key={conversationItem.id}
-                      className={`chat-li${isActive ? ' active' : ''}`}
-                      onClick={() =>
-                        openChat(conversationItem.id, CONVERSATION_TYPES.DIRECT)
-                      }
-                    >
-                      <div className="chat-avatar">
-                        {participant.profileUrl ? (
-                          <img src={participant.profileUrl} alt="" />
-                        ) : (
-                          initials
-                        )}
-                        <div className="chat-avatar-online" />
-                      </div>
-                      <div className="chat-li-body">
-                        <div className="chat-li-top">
-                          <div className="chat-li-name-row">
-                            <span className="chat-li-name">{fullName}</span>
-                            {participantBadges.map((badge) => (
-                              <span
-                                className={`chat-member-chip ${badge.className}`}
-                                key={`${conversationItem.id}-${badge.key}`}
-                                title={badge.title}
-                              >
-                                {badge.label}
-                              </span>
-                            ))}
-                          </div>
-                          <span
-                            className={`chat-li-time${conversationItem.unreadCount ? ' unread' : ''
-                              }`}
-                          >
-                            {formatMessageTime(conversationItem?.lastMessage?.createdAt)}
-                          </span>
-                        </div>
-                        <div className="chat-li-preview">
-                          {getMessagePreviewText(conversationItem?.lastMessage)}
-                        </div>
-                      </div>
-                      {conversationItem.unreadCount > 0 && (
-                        <span className="chat-li-badge">
-                          {conversationItem.unreadCount}
-                        </span>
-                      )}
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="chat-empty">
-                  <FiMessageCircle size={40} />
-                  <p>No conversations</p>
-                </div>
-              )
-            ) : filteredRooms.length > 0 ? (
-              filteredRooms.map((room) => {
-                const isActive = isSameConversation(selectedId, room?.id);
-                const roomDisplayLabel = getRoomDisplayName(room);
-                return (
-                  <div
-                    key={room.id}
-                    className={`chat-li${isActive ? ' active' : ''}`}
-                    onClick={() => openChat(room.id, CONVERSATION_TYPES.GROUP)}
-                  >
-                    <div
-                      className={`chat-avatar${room?.roomAvatarUrl ? '' : ' chat-avatar--room'
-                        }`}
-                    >
-                      {room?.roomAvatarUrl ? (
-                        <img src={room.roomAvatarUrl} alt={room.roomName || 'Room'} />
-                      ) : (
-                        getRoomIcon(room.roomType)
-                      )}
-                    </div>
-                    <div className="chat-li-body">
-                      <div className="chat-li-top">
-                        <span className="chat-li-name">{roomDisplayLabel}</span>
-                        <span
-                          className={`chat-li-time${room.unreadCount ? ' unread' : ''}`}
-                        >
-                          {formatMessageTime(room?.lastMessage?.createdAt)}
-                        </span>
-                      </div>
-                      <div className="chat-li-preview">
-                        {getMessagePreviewText(room?.lastMessage)}
-                      </div>
-                    </div>
-                    {room.unreadCount > 0 && (
-                      <span className="chat-li-badge">{room.unreadCount}</span>
-                    )}
-                  </div>
-                );
-              })
-            ) : (
-              <div className="chat-empty">
-                <FiUsers size={40} />
-                <p>No rooms yet</p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {showChat && (
+      {showChat ? (
         <div className="chat-main">
-          {!selectedId ? (
-            <div className="chat-placeholder">
-              <div className="chat-placeholder-icon">💬</div>
-              <h2>
-                {hasFamilyScope ? 'Start with your family circle' : 'Family chat is unavailable'}
-              </h2>
-              <p>
-                {hasFamilyScope
-                  ? 'Choose a conversation to share updates, memories, and support together.'
-                  : 'Switch to an available family to open your chat space.'}
-              </p>
-            </div>
-          ) : chatLoading ? (
-            <div className="chat-thread-loader" aria-label="Loading conversation">
-              <div className="chat-thread-loader__header">
-                <div className="chat-thread-loader__avatar shimmer-block" />
-                <div className="chat-thread-loader__meta">
-                  <div className="chat-thread-loader__line shimmer-block" />
-                  <div className="chat-thread-loader__line chat-thread-loader__line--short shimmer-block" />
-                </div>
-              </div>
-              <div className="chat-thread-loader__messages">
-                <div className="chat-thread-loader__bubble shimmer-block" />
-                <div className="chat-thread-loader__bubble chat-thread-loader__bubble--sent shimmer-block" />
-                <div className="chat-thread-loader__bubble chat-thread-loader__bubble--wide shimmer-block" />
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="chat-header">
-                {isMobile && (
-                  <button
-                    className="chat-header-back"
-                    onClick={handleBack}
-                    type="button"
-                  >
-                    <FiArrowLeft size={20} />
-                  </button>
-                )}
-
-                <button
-                  className="chat-header-identity"
-                  onClick={handleOpenInfoPanel}
-                  type="button"
-                >
-                  <div
-                    className={`chat-avatar${isGroup && !roomAvatarUrl ? ' chat-avatar--room' : ''
-                      }`}
-                    style={{ width: 36, height: 36, fontSize: 12 }}
-                  >
-                    {isGroup ? (
-                      roomAvatarUrl ? (
-                        <img src={roomAvatarUrl} alt={headerName} />
-                      ) : (
-                        getRoomIcon(conversation?.roomType)
-                      )
-                    ) : (
-                      <>
-                        {activeParticipant.profileUrl ? (
-                          <img src={activeParticipant.profileUrl} alt={headerName} />
-                        ) : (
-                          headerInitials
-                        )}
-                      </>
-                    )}
-                    {showHeaderOnline ? <div className="chat-avatar-online" /> : null}
-                  </div>
-
-                  <div className="chat-header-info">
-                    <div className="chat-header-name">
-                      <span className="chat-header-name-text">{headerName}</span>
-                      {directChatBadges.map((badge) => (
-                        <span
-                          className={`chat-member-chip ${badge.className}`}
-                          key={`header-${badge.key}`}
-                          title={badge.title}
-                        >
-                          {badge.label}
-                        </span>
-                      ))}
-                      <span className="chat-header-badge">
-                        {isChatConnected ? 'Active' : 'Offline'}
-                      </span>
-                    </div>
-                    <div className={`chat-header-status ${showHeaderOnline ? 'online' : ''}`}>
-                      {headerStatusLabel}
-                    </div>
-                  </div>
-                </button>
-
-                <div className="chat-header-actions" ref={menuRef}>
-                  <button
-                    className="chat-header-btn"
-                    onClick={handleHeaderSearch}
-                    type="button"
-                  >
-                    <FiSearch size={16} />
-                  </button>
-                  <button
-                    className="chat-header-btn"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      setMenuOpen((current) => !current);
-                    }}
-                    type="button"
-                  >
-                    <FiMoreVertical size={16} />
-                  </button>
-                  {menuOpen && (
-                    <div className="chat-dropdown">
-                      {isGroup ? (
-                        <button
-                          onClick={handleOpenRoomMembers}
-                          className="chat-dropdown-item"
-                          type="button"
-                        >
-                          <FiUsers size={14} />{' '}
-                          {canManageRoomMembers ? 'Manage members' : 'View members'}
-                        </button>
-                      ) : null}
-                      {canManageRoom ? (
-                        <button
-                          onClick={handleRenameRoom}
-                          className="chat-dropdown-item"
-                          type="button"
-                        >
-                          <FiEdit2 size={14} /> Edit room name
-                        </button>
-                      ) : null}
-                      {canManageRoom ? (
-                        <button
-                          onClick={handleOpenRoomPhotoPicker}
-                          className="chat-dropdown-item"
-                          type="button"
-                          disabled={roomPhotoUploading}
-                        >
-                          <FiCamera size={14} />{' '}
-                          {roomPhotoUploading ? 'Uploading photo...' : 'Change room photo'}
-                        </button>
-                      ) : null}
-                      {canManageRoom && roomAvatarUrl ? (
-                        <button
-                          onClick={handleRemoveRoomPhoto}
-                          className="chat-dropdown-item"
-                          type="button"
-                        >
-                          <FiCamera size={14} /> Remove room photo
-                        </button>
-                      ) : null}
-                      <button
-                        onClick={handleMute}
-                        className="chat-dropdown-item"
-                        type="button"
-                      >
-                        {conversation?.isMuted ? (
-                          <>
-                            <FiVolume2 size={14} /> Unmute
-                          </>
-                        ) : (
-                          <>
-                            <FiVolumeX size={14} /> Mute
-                          </>
-                        )}
-                      </button>
-                      {canLeaveRoom ? (
-                        <button
-                          onClick={handleLeaveRoom}
-                          className="chat-dropdown-item"
-                          type="button"
-                          disabled={leavingRoom}
-                        >
-                          <FiLogOut size={14} /> {leavingRoom ? 'Leaving room...' : 'Leave room'}
-                        </button>
-                      ) : null}
-                      {canManageRoomMembers ? (
-                        <button
-                          onClick={handleDeleteRoom}
-                          className="chat-dropdown-item"
-                          type="button"
-                        >
-                          <FiTrash2 size={14} /> Delete room
-                        </button>
-                      ) : null}
-                      {!isGroup ? (
-                        <button
-                          onClick={handleDeleteConversation}
-                          className="chat-dropdown-item"
-                          type="button"
-                        >
-                          <FiTrash2 size={14} /> Delete chat
-                        </button>
-                      ) : null}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {messageSearchOpen ? (
-                <div className="chat-header-searchbar">
-                  <label className="chat-header-searchfield">
-                    <FiSearch size={16} />
-                    <input
-                      ref={messageSearchInputRef}
-                      type="text"
-                      value={messageSearchQuery}
-                      onChange={(event) => setMessageSearchQuery(event.target.value)}
-                      onKeyDown={handleMessageSearchKeyDown}
-                      placeholder="Search in this chat"
-                    />
-                  </label>
-                  <div className="chat-header-searchmeta">
-                    <span className="chat-header-searchcount">
-                      {messageSearchMatches.length > 0 && activeMessageSearchIndex >= 0
-                        ? `${activeMessageSearchIndex + 1}/${messageSearchMatches.length}`
-                        : `0/${messageSearchMatches.length}`}
-                    </span>
-                    <button
-                      className="chat-header-searchnav"
-                      onClick={() => handleCycleMessageSearch(-1)}
-                      type="button"
-                      disabled={messageSearchMatches.length === 0}
-                      aria-label="Previous result"
-                    >
-                      <FiChevronUp size={15} />
-                    </button>
-                    <button
-                      className="chat-header-searchnav"
-                      onClick={() => handleCycleMessageSearch(1)}
-                      type="button"
-                      disabled={messageSearchMatches.length === 0}
-                      aria-label="Next result"
-                    >
-                      <FiChevronDown size={15} />
-                    </button>
-                    <button
-                      className="chat-header-searchclose"
-                      onClick={() => {
-                        setMessageSearchOpen(false);
-                        setMessageSearchQuery('');
-                        setActiveMessageSearchIndex(-1);
-                      }}
-                      type="button"
-                      aria-label="Close message search"
-                    >
-                      <FiX size={15} />
-                    </button>
-                  </div>
-                </div>
-              ) : null}
-
-              <div
-                className={`chat-body-shell${showDesktopInfoPanel ? ' chat-body-shell--with-info' : ''
-                  }`}
-              >
-                <div className="chat-thread-pane">
-                  <div className="chat-messages-wrap">
-                    <div className="chat-messages-bg" />
-                    <div className="chat-messages custom-scrollbar">
-                      {groupedMessages.map((item) => {
-                        if (item.type === 'date') {
-                          return (
-                            <div className="chat-date-sep" key={item.key}>
-                              <span>{item.label}</span>
-                            </div>
-                          );
-                        }
-
-                        const message = item.data;
-                        const messageId = Number(message?.id || 0);
-                        const isSent =
-                          Number(message?.senderId || 0) === Number(currentUserId || 0);
-                        const isDeleted = Boolean(message?.isDeleted);
-                        const isTombstone =
-                          message?.messageType === MESSAGE_TYPES.TOMBSTONE;
-                        const isUnavailableMessage = isDeleted || isTombstone;
-                        const isSearchMatch = messageSearchMatchIds.has(messageId);
-                        const isActiveSearchMatch =
-                          isSearchMatch && Number(activeMessageSearchId || 0) === messageId;
-                        const receiptState = isSent ? getReceiptState(message) : null;
-                        const receiptGlyph =
-                          receiptState === 'failed'
-                            ? '!'
-                            : receiptState === 'sending' || receiptState === 'sent'
-                              ? '✓'
-                              : '✓✓';
-                        const receiptLabel =
-                          receiptState === 'failed'
-                            ? 'Failed to send'
-                            : receiptState === 'sending'
-                              ? 'Sending'
-                              : receiptState === 'seen'
-                                ? 'Seen'
-                                : receiptState === 'delivered'
-                                  ? 'Delivered'
-                                  : 'Sent';
-                        const canDelete =
-                          isSent &&
-                          !isUnavailableMessage &&
-                          Date.now() - new Date(message?.createdAt).getTime() <=
-                          CHAT_LIMITS.DELETE_WINDOW_MS;
-                        const senderInitials = getInitials(
-                          String(message?.senderName || '').split(' ')[0],
-                          String(message?.senderName || '').split(' ')[1],
-                        );
-
-                        if (message?.messageType === MESSAGE_TYPES.SYSTEM) {
-                          return (
-                            <div
-                              className="msg-row"
-                              key={item.key}
-                              style={{ justifyContent: 'center' }}
-                            >
-                              <div className="msg-bubble msg-bubble--system">
-                                <span>{message.content}</span>
-                              </div>
-                            </div>
-                          );
-                        }
-
-                        return (
-                          <div
-                            key={item.key}
-                            ref={(node) => {
-                              if (node && messageId) {
-                                messageNodeRefs.current.set(messageId, node);
-                                return;
-                              }
-
-                              if (messageId) {
-                                messageNodeRefs.current.delete(messageId);
-                              }
-                            }}
-                            tabIndex={isSearchMatch ? -1 : undefined}
-                          >
-                            <div
-                              className={`msg-row ${isSent ? 'msg-row--sent' : 'msg-row--received'
-                                }${isActiveSearchMatch ? ' msg-row--search-active' : ''}`}
-                            >
-                              {!isSent && (
-                                <div className="msg-avatar-sm">
-                                  {message?.senderAvatar ? (
-                                    <img
-                                      src={message.senderAvatar}
-                                      alt={message.senderName || 'Member'}
-                                    />
-                                  ) : (
-                                    senderInitials
-                                  )}
-                                </div>
-                              )}
-                              <div
-                                className={`msg-bubble ${isSent
-                                    ? 'msg-bubble--sent'
-                                    : 'msg-bubble--received'
-                                  }${isUnavailableMessage ? ' msg-bubble--deleted' : ''}${isSearchMatch ? ' msg-bubble--search-match' : ''
-                                  }${isActiveSearchMatch ? ' msg-bubble--search-active' : ''}`}
-                              >
-                                {!isUnavailableMessage && (
-                                  <div
-                                    className={`msg-actions ${isSent
-                                        ? 'msg-actions--sent'
-                                        : 'msg-actions--received'
-                                      }`}
-                                  >
-                                    <button
-                                      className="msg-action-btn"
-                                      onClick={() => setReplyTo(message)}
-                                      type="button"
-                                      aria-label="Reply to message"
-                                      title="Reply"
-                                    >
-                                      <FiCornerUpLeft />
-                                    </button>
-                                    {canDelete && (
-                                      <button
-                                        className="msg-action-btn"
-                                        onClick={() => handleDelete(message)}
-                                        type="button"
-                                        aria-label="Delete message"
-                                        title="Delete"
-                                      >
-                                        <FiTrash2 />
-                                      </button>
-                                    )}
-                                    {!isSent && (
-                                      <button
-                                        className="msg-action-btn"
-                                        onClick={() => setReportMsg(message)}
-                                        type="button"
-                                        aria-label="Report message"
-                                        title="Report"
-                                      >
-                                        <FiAlertTriangle />
-                                      </button>
-                                    )}
-                                  </div>
-                                )}
-
-                                {!isSent && isGroup && !isUnavailableMessage && (
-                                  <div className="msg-sender">{message.senderName}</div>
-                                )}
-                                {message.replyTo && !isUnavailableMessage && (
-                                  <div className="msg-reply-bar">
-                                    <div className="msg-reply-bar-name">
-                                      {message.replyTo.senderName || 'Reply'}
-                                    </div>
-                                    <div className="msg-reply-bar-text">
-                                      {renderHighlightedText(
-                                        message.replyTo.content?.slice(0, 60),
-                                        messageSearchQuery,
-                                        isActiveSearchMatch,
-                                      )}
-                                    </div>
-                                  </div>
-                                )}
-
-                                {isUnavailableMessage ? (
-                                  <span>
-                                    🚫 <em>{isTombstone ? 'Message unavailable' : 'Message deleted'}</em>
-                                  </span>
-                                ) : message.mediaUrl ? (
-                                  message.messageType === MESSAGE_TYPES.VOICE ? (
-                                    <audio
-                                      controls
-                                      src={message.mediaUrl}
-                                      preload="metadata"
-                                    />
-                                  ) : message.messageType === MESSAGE_TYPES.IMAGE ? (
-                                    <div className="msg-media-block">
-                                      <a
-                                        href={message.mediaUrl}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="msg-media-link"
-                                      >
-                                        <img
-                                          src={message.mediaUrl}
-                                          alt={message.content || 'Shared image'}
-                                          className="msg-media-image"
-                                        />
-                                      </a>
-                                      {message.content ? (
-                                        <div className="msg-media-caption">
-                                          {renderHighlightedText(
-                                            message.content,
-                                            messageSearchQuery,
-                                            isActiveSearchMatch,
-                                          )}
-                                        </div>
-                                      ) : null}
-                                    </div>
-                                  ) : (
-                                    <a
-                                      href={message.mediaUrl}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                      style={{ color: 'inherit', textDecoration: 'underline' }}
-                                    >
-                                      {renderHighlightedText(
-                                        message.content || 'Open attachment',
-                                        messageSearchQuery,
-                                        isActiveSearchMatch,
-                                      )}
-                                    </a>
-                                  )
-                                ) : (
-                                  <span>
-                                    {renderHighlightedText(
-                                      message.content,
-                                      messageSearchQuery,
-                                      isActiveSearchMatch,
-                                    )}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-
-                            <div
-                              className={`msg-time-row ${isSent ? 'msg-row--sent' : ''}`}
-                              style={isSent ? undefined : { paddingLeft: 38 }}
-                            >
-                              {formatFullTime(message.createdAt)}
-                              {isSent && receiptState && (
-                                <span
-                                  className={`msg-receipt msg-receipt--${receiptState}`}
-                                  title={receiptLabel}
-                                  aria-label={receiptLabel}
-                                >
-                                  {receiptGlyph}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-
-                      {typingUserIds.length > 0 && (
-                        <TypingIndicator userName={typingLabel} />
-                      )}
-
-                      <div ref={messagesEndRef} />
-                    </div>
-                  </div>
-
-                  <ChatStateBanner
-                    availabilityReason={conversation?.availabilityReason}
-                    conversationState={conversation?.conversationState}
-                  />
-
-                  <div className="chat-composer" ref={composerRef}>
-                    {attachmentDraft && (
-                      <div className="chat-attachment-preview">
-                        <div className="chat-attachment-preview__media">
-                          {attachmentDraft.previewKind === MESSAGE_TYPES.IMAGE ? (
-                            <img
-                              src={attachmentDraft.previewUrl}
-                              alt={attachmentDraft.name || 'Selected image'}
-                              className="chat-attachment-preview__image"
-                            />
-                          ) : attachmentDraft.previewKind === MESSAGE_TYPES.VOICE ? (
-                            <audio
-                              controls
-                              src={attachmentDraft.previewUrl}
-                              preload="metadata"
-                              className="chat-attachment-preview__audio"
-                            />
-                          ) : (
-                            <div className="chat-attachment-preview__fileicon">
-                              <FiPaperclip size={18} />
-                            </div>
-                          )}
-                        </div>
-                        <div className="chat-attachment-preview__meta">
-                          <div className="chat-attachment-preview__title">
-                            {attachmentDraft.previewKind === MESSAGE_TYPES.VOICE
-                              ? 'Voice message preview'
-                              : attachmentDraft.previewKind === MESSAGE_TYPES.IMAGE
-                                ? 'Image preview'
-                                : 'Attachment preview'}
-                          </div>
-                          <div className="chat-attachment-preview__name">
-                            {attachmentDraft.name}
-                          </div>
-                        </div>
-                        <button
-                          className="chat-attachment-preview__close"
-                          onClick={() => setAttachmentDraft(null)}
-                          type="button"
-                          aria-label="Remove attachment"
-                        >
-                          <FiX size={14} />
-                        </button>
-                      </div>
-                    )}
-
-                    {replyTo && (
-                      <div className="chat-reply-bar">
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div className="chat-reply-bar-name">
-                            {replyTo.senderName || 'Reply'}
-                          </div>
-                          <div className="chat-reply-bar-text">
-                            {replyTo.content?.slice(0, 50)}
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => setReplyTo(null)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            cursor: 'pointer',
-                            padding: 4,
-                            color: '#9ca3af',
-                          }}
-                          type="button"
-                        >
-                          <FiX size={14} />
-                        </button>
-                      </div>
-                    )}
-
-                    {showComposerPicker && (
-                      <div
-                        className="chat-composer-picker"
-                        role="dialog"
-                        aria-label="Emoji picker"
-                      >
-                        <div className="chat-composer-emoji-panel">
-                          <EmojiPicker
-                            className="chat-emoji-picker"
-                            onEmojiClick={handleEmojiSelect}
-                            width="100%"
-                            height={365}
-                            autoFocusSearch={false}
-                            previewConfig={{ showPreview: false }}
-                            searchPlaceholder="Search emoji"
-                            skinTonesDisabled
-                            lazyLoadEmojis
-                            emojiStyle={EmojiStyle.NATIVE}
-                            theme={Theme.LIGHT}
-                            categories={EMOJI_PICKER_CATEGORIES}
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="chat-input-bar">
-                      <button
-                        className={`chat-input-attach${showComposerPicker ? ' chat-input-attach--active' : ''
-                          }`}
-                        onClick={handleToggleComposerPicker}
-                        title="Emoji"
-                        type="button"
-                        disabled={isComposerDisabled}
-                        aria-expanded={showComposerPicker}
-                      >
-                        <FiSmile size={20} />
-                      </button>
-                      <button
-                        className="chat-input-attach"
-                        onClick={handleOpenAttachmentPicker}
-                        title="Attach"
-                        type="button"
-                        disabled={isComposerDisabled}
-                      >
-                        <FiPaperclip size={18} />
-                      </button>
-
-                      <textarea
-                        ref={inputRef}
-                        className="chat-input-field"
-                        placeholder={composerPlaceholder}
-                        value={text}
-                        onBlur={stopLocalTyping}
-                        onChange={handleTextChange}
-                        onKeyDown={handleComposerKeyDown}
-                        rows={1}
-                        disabled={isComposerDisabled}
-                      />
-
-                      {hasComposerText || hasAttachmentDraft ? (
-                        <button
-                          className="chat-send-btn"
-                          onClick={handleSend}
-                          disabled={isComposerDisabled}
-                          type="button"
-                          title={hasAttachmentDraft ? 'Send attachment' : 'Send message'}
-                        >
-                          <FiSend size={16} />
-                        </button>
-                      ) : (
-                        <VoiceRecorder
-                          disabled={isComposerDisabled}
-                          onRecorded={handleStageAttachment}
-                          className="chat-send-btn"
-                          iconSize={18}
-                        />
-                      )}
-
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/*,audio/*"
-                        onChange={handleFileChange}
-                        style={{ display: 'none' }}
-                      />
-                      <input
-                        ref={roomPhotoInputRef}
-                        type="file"
-                        accept="image/*"
-                        onChange={handleRoomPhotoChange}
-                        style={{ display: 'none' }}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {showDesktopInfoPanel ? renderInfoPanel() : null}
-              </div>
-
-              {showMobileInfoPanel ? (
-                <div
-                  className="chat-info-overlay"
-                  onClick={handleCloseInfoPanel}
-                  role="presentation"
-                >
-                  <div onClick={(event) => event.stopPropagation()} role="presentation">
-                    {renderInfoPanel(true)}
-                  </div>
-                </div>
-              ) : null}
-            </>
-          )}
+          <ChatConversationPane
+            chatLoading={chatLoading}
+            composer={{
+              attachmentDraft,
+              fileInputRef,
+              hasAttachmentDraft,
+              hasText: hasComposerText,
+              inputRef,
+              isDisabled: isComposerDisabled,
+              onClearAttachment: () => setAttachmentDraft(null),
+              onClearReply: () => setReplyTo(null),
+              onEmojiSelect: handleEmojiSelect,
+              onFileChange: handleFileChange,
+              onKeyDown: handleComposerKeyDown,
+              onOpenAttachmentPicker: handleOpenAttachmentPicker,
+              onRoomPhotoChange: handleRoomPhotoChange,
+              onSend: handleSend,
+              onStageAttachment: handleStageAttachment,
+              onTextBlur: stopLocalTyping,
+              onTextChange: handleTextChange,
+              onTogglePicker: handleToggleComposerPicker,
+              placeholder: composerPlaceholder,
+              ref: composerRef,
+              replyTo,
+              roomPhotoInputRef,
+              showPicker: showComposerPicker,
+              text,
+            }}
+            conversation={conversation}
+            directChatBadges={directChatBadges}
+            header={{
+              activeParticipant,
+              hasFamilyScope,
+              initials: headerInitials,
+              name: headerName,
+              onBack: handleBack,
+              onHeaderSearch: handleHeaderSearch,
+              onOpenInfoPanel: handleOpenInfoPanel,
+              roomAvatarUrl,
+              showOnline: showHeaderOnline,
+              statusLabel: headerStatusLabel,
+            }}
+            infoPanel={{
+              desktopNode: desktopInfoPanel,
+              mobileNode: mobileInfoPanel,
+              onOverlayClose: handleCloseInfoPanel,
+              showDesktop: showDesktopInfoPanel,
+              showMobile: showMobileInfoPanel,
+            }}
+            isChatConnected={isChatConnected}
+            isGroup={isGroup}
+            isMobile={isMobile}
+            menu={{
+              canLeaveRoom,
+              canManageRoom,
+              canManageRoomMembers,
+              leavingRoom,
+              onDeleteConversation: handleDeleteConversation,
+              onDeleteRoom: handleDeleteRoom,
+              onLeaveRoom: handleLeaveRoom,
+              onMute: handleMute,
+              onOpenRoomMembers: handleOpenRoomMembers,
+              onOpenRoomPhotoPicker: handleOpenRoomPhotoPicker,
+              onRemoveRoomPhoto: handleRemoveRoomPhoto,
+              onRenameRoom: handleRenameRoom,
+              onToggle: () => setMenuOpen((current) => !current),
+              open: menuOpen,
+              ref: menuRef,
+              roomPhotoUploading,
+            }}
+            messageSearch={{
+              activeIndex: activeMessageSearchIndex,
+              inputRef: messageSearchInputRef,
+              onClose: () => {
+                setMessageSearchOpen(false);
+                setMessageSearchQuery('');
+                setActiveMessageSearchIndex(-1);
+              },
+              onCycle: handleCycleMessageSearch,
+              onKeyDown: handleMessageSearchKeyDown,
+              onQueryChange: setMessageSearchQuery,
+              open: messageSearchOpen,
+              query: messageSearchQuery,
+              total: messageSearchMatches.length,
+            }}
+            messagesPane={{
+              activeSearchId: activeMessageSearchId,
+              currentUserId,
+              endRef: messagesEndRef,
+              groupedMessages,
+              matchIds: messageSearchMatchIds,
+              nodeRefs: messageNodeRefs,
+              onDeleteMessage: handleDelete,
+              onReply: setReplyTo,
+              onReportMessage: setReportMsg,
+              typingLabel,
+              typingUserIds,
+            }}
+            selectedId={selectedId}
+          />
         </div>
-      )}
+      ) : null}
 
       {reportMsg && (
         <ReportMessageModal
