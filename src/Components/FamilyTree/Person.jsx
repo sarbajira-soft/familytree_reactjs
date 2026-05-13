@@ -374,8 +374,27 @@ function renderNavigationIcons({ showLinkedTreeIcon, showAssociatedTreeIcon, per
 }
 
 // Extracted render helper: radial menu and action buttons
-function renderRadialMenu({ effectiveViewOnly, memberCount, canShowMoreActionsButton, handleMenuToggle, isMenuOpen, menuRef, canShowBlockAction, personUserId, isBlocked, person, handleBlockStatusChange, isUidCopied, handleCopyNodeUid, canShare, handleShareClick, handleRadialMenuClick }) {
-  if (effectiveViewOnly) return null;
+function renderRadialMenu({
+  effectiveViewOnly,
+  memberCount,
+  canShowMoreActionsButton,
+  handleMenuToggle,
+  isMenuOpen,
+  menuRef,
+  canShowBlockAction,
+  canViewProfileAction,
+  personUserId,
+  isBlocked,
+  person,
+  handleBlockStatusChange,
+  isUidCopied,
+  handleCopyNodeUid,
+  canShare,
+  handleShareClick,
+  handleRadialMenuClick,
+  handleViewProfileClick,
+}) {
+  if (!canShowMoreActionsButton && (effectiveViewOnly || !canShare)) return null;
   return (
     <div
       className="absolute flex flex-col items-center space-y-1 z-30"
@@ -398,6 +417,18 @@ function renderRadialMenu({ effectiveViewOnly, memberCount, canShowMoreActionsBu
               ref={menuRef}
               className="absolute right-0 mt-1 w-40 bg-white rounded-md shadow-lg border border-gray-200 z-20 dark:bg-slate-900 dark:border-slate-700"
             >
+              {canViewProfileAction && (
+                <div className="px-1 pt-1">
+                  <button
+                    type="button"
+                    className="w-full flex items-center gap-2 px-2 py-1.5 text-left text-xs text-sky-700 hover:bg-sky-50 rounded-md dark:text-sky-200 dark:hover:bg-slate-800"
+                    onClick={handleViewProfileClick}
+                  >
+                    <FiEye size={12} />
+                    <span>View profile</span>
+                  </button>
+                </div>
+              )}
               {canShowBlockAction && (
                 <div className="px-1 py-1">
                   <BlockButton
@@ -429,7 +460,7 @@ function renderRadialMenu({ effectiveViewOnly, memberCount, canShowMoreActionsBu
           )}
         </div>
       )}
-      {canShare && (
+      {!effectiveViewOnly && canShare && (
         <button
           onClick={handleShareClick}
           className="w-4 h-4 md:w-5 md:h-5 bg-white/90 hover:bg-white text-sky-600 hover:text-sky-700 rounded-full flex items-center justify-center shadow-md border border-cyan-300 dark:bg-slate-900/90 dark:hover:bg-slate-900 dark:text-sky-300 dark:hover:text-sky-200 dark:border-slate-700"
@@ -438,7 +469,8 @@ function renderRadialMenu({ effectiveViewOnly, memberCount, canShowMoreActionsBu
           <FiShare2 size={12} />
         </button>
       )}
-      <button
+      {!effectiveViewOnly && (
+        <button
           className="radial-menu-button w-4 h-4 md:w-5 md:h-5 bg-gradient-to-br from-cyan-500 to-sky-600 hover:from-cyan-600 hover:to-sky-700 text-white rounded-full flex items-center justify-center font-bold text-[9px] shadow-lg hover:shadow-xl border-2 border-white"
           onClick={handleRadialMenuClick}
           style={{ boxShadow: "0 4px 14px rgba(6, 182, 212, 0.45)", width: memberCount > 50 ? "12px" : "18px", height: memberCount > 50 ? "12px" : "18px" }}
@@ -446,6 +478,7 @@ function renderRadialMenu({ effectiveViewOnly, memberCount, canShowMoreActionsBu
         >
           +
         </button>
+      )}
     </div>
   );
 }
@@ -630,10 +663,31 @@ function computePersonFlags(person, userInfo, viewOnly, onClick, isRoot) {
     userInfo?.userId &&
     Number(personUserId) === Number(userInfo.userId)
   );
-  const canShowBlockAction = canShowAdminMenu && !isSelf && !isRoot;
-  const canShowMoreActionsButton = canShowAdminMenu && canShowBlockAction;
+  const canViewProfileAction = Boolean(
+    personUserId &&
+    person?.isAppUser &&
+    person?.nodeType !== "structural_dummy" &&
+    !person?.isStructuralDummy
+  );
+  const canShowBlockAction = Boolean(
+    personUserId &&
+    person?.isAppUser &&
+    !isSelf &&
+    person?.nodeType !== "structural_dummy" &&
+    !person?.isStructuralDummy
+  );
+  const canShowMoreActionsButton = canViewProfileAction || canShowBlockAction;
   const isDeleted = !!person?.isDeleted;
-  return { effectiveViewOnly, personUserId, canShare, canShowAdminMenu, canShowBlockAction, canShowMoreActionsButton, isDeleted };
+  return {
+    effectiveViewOnly,
+    personUserId,
+    canShare,
+    canShowAdminMenu,
+    canShowBlockAction,
+    canShowMoreActionsButton,
+    canViewProfileAction,
+    isDeleted,
+  };
 }
 
 const Person = ({
@@ -662,7 +716,15 @@ const Person = ({
   const { code } = useParams();
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { effectiveViewOnly, personUserId, canShare, canShowBlockAction, canShowMoreActionsButton, isDeleted } = useMemo(
+  const {
+    effectiveViewOnly,
+    personUserId,
+    canShare,
+    canShowBlockAction,
+    canShowMoreActionsButton,
+    canViewProfileAction,
+    isDeleted,
+  } = useMemo(
     () => computePersonFlags(person, userInfo, viewOnly, onClick, isRoot),
     [person, userInfo, viewOnly, onClick, isRoot],
   );
@@ -675,7 +737,8 @@ const Person = ({
   const isBlocked = Boolean(blockStatus?.isBlockedByMe);
   const menuRef = useRef(null);
 
-  const handleBlockStatusChange = (nextStatus) => {
+  const handleBlockStatusChange = (nextStatusOrUserId, maybeNextStatus) => {
+    const nextStatus = maybeNextStatus || nextStatusOrUserId;
     if (!nextStatus) return;
     setBlockStatus((prev) => ({ ...prev, ...nextStatus }));
   };
@@ -751,6 +814,21 @@ const Person = ({
   const handleRadialMenuClick = (e) => { e.stopPropagation(); onClick(person.id); };
   const handleShareClick = (e) => { e.stopPropagation(); shareInviteLink(currentFamilyCode); };
   const handleMenuToggle = (e) => { e.stopPropagation(); setIsMenuOpen((prev) => !prev); };
+  const handleViewProfileClick = (e) => {
+    e.stopPropagation();
+    setIsMenuOpen(false);
+
+    if (!personUserId) {
+      return;
+    }
+
+    if (Number(personUserId) === Number(userInfo?.userId || 0)) {
+      navigate("/myprofile");
+      return;
+    }
+
+    navigate(`/user/${personUserId}`);
+  };
 
   const { linkedTargetFamilyCode, associatedTargetFamilyCode, showLinkedTreeIcon, showAssociatedTreeIcon } = useMemo(
     () => computeNavigationTargets(person, code, userInfo),
@@ -792,7 +870,26 @@ const Person = ({
       >
         {renderNavigationIcons({ showLinkedTreeIcon, showAssociatedTreeIcon, person, handleViewPersonLinkedFamily, handleViewPersonBirthFamily })}
         {isBlocked && <div className="absolute top-1 right-8 z-20"><BlockedBadge /></div>}
-        {renderRadialMenu({ effectiveViewOnly, memberCount, canShowMoreActionsButton, handleMenuToggle, isMenuOpen, menuRef, canShowBlockAction, personUserId, isBlocked, person, handleBlockStatusChange, isUidCopied, handleCopyNodeUid, canShare, handleShareClick, handleRadialMenuClick })}
+        {renderRadialMenu({
+          effectiveViewOnly,
+          memberCount,
+          canShowMoreActionsButton,
+          handleMenuToggle,
+          isMenuOpen,
+          menuRef,
+          canShowBlockAction,
+          canViewProfileAction,
+          personUserId,
+          isBlocked,
+          person,
+          handleBlockStatusChange,
+          isUidCopied,
+          handleCopyNodeUid,
+          canShare,
+          handleShareClick,
+          handleRadialMenuClick,
+          handleViewProfileClick,
+        })}
         {renderProfilePicture({ profileSize, isRoot, isNew, isHighlighted, isSelected, effectiveViewOnly, person })}
         {renderCardContent({ profileSize, person, fontSizeDetails, fontSizeName, fontSizeRelationship, isSelected, isNew, effectiveViewOnly, isHighlighted, language, tree, currentUserId, relationshipText, isEditingLabel, isViewingBirthFamily, viewOnly, handleEditLabelClick, editLabelValue, setEditLabelValue, handleSaveLabel, handleCancelEdit })}
       </div>
