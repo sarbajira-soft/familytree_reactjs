@@ -24,11 +24,15 @@ import {
 } from '../constants/chat.constants';
 import {
   addMembersToRoom,
+  addMembersToRoomSocket,
   createConversation,
   createRoomConversation,
   deleteConversation as deleteConversationRequest,
+  deleteConversationSocket,
   deleteMessage as deleteMsg,
+  deleteMessageSocket,
   deleteRoomConversation,
+  deleteRoomConversationSocket,
   formatDateSeparator,
   getChatMemberBadges,
   getChatMemberMetaText,
@@ -39,11 +43,15 @@ import {
   getMessages,
   getRooms,
   leaveRoomConversation,
+  leaveRoomConversationSocket,
   markConversationRead,
+  markConversationReadSocket as markConversationReadSocketRequest,
   removeMemberFromRoom,
+  removeMemberFromRoomSocket,
   sendMediaMessage,
-  sendTextMessage,
+  sendTextMessageSocket,
   toggleMute,
+  toggleMuteSocket,
   updateRoomConversation,
 } from '../services/chat.service';
 import {
@@ -63,16 +71,19 @@ import {
   upsertCachedMessage,
 } from '../utils/chatCache';
 import {
+  applyDeliveryReceipt,
   applyReadReceipt,
   buildTypingUserLabel,
   createComposerAttachmentDraft,
   createOptimisticMediaMessage,
   createOptimisticTextMessage,
   formatInfoDateTime,
+  getComposerAttachmentKind,
   getConversationInfoDescription,
   getMessageReplyId,
   getMessageReplyPreview,
   getMessageSearchText,
+  markMessageDeleted,
   getReceiptState,
   getRoomDisplayName,
   getRoomTypeLabel,
@@ -85,6 +96,9 @@ import {
 } from '../Components/Chat/chatPage.utils';
 import '../Components/Chat/chat.css';
 
+const TEXT_SEND_MAX_RETRIES = 3;
+const TEXT_SEND_RETRY_BASE_DELAY_MS = 350;
+
 const ChatPage = () => {
   const navigate = useNavigate();
   const { conversationId: routeConversationId } = useParams();
@@ -94,6 +108,7 @@ const ChatPage = () => {
     activeFamilyCode,
     families,
     isChatConnected,
+    joinFamilyRoom,
     joinConversation,
     leaveConversation,
     emitTyping,
@@ -140,6 +155,7 @@ const ChatPage = () => {
   );
   const [sendingMedia, setSendingMedia] = useState(false);
   const [typingUserIds, setTypingUserIds] = useState([]);
+  const [presenceByUserId, setPresenceByUserId] = useState({});
   const [familyMembers, setFamilyMembers] = useState([]);
   const [roomMembersOpen, setRoomMembersOpen] = useState(false);
   const [selectedRoomMemberIds, setSelectedRoomMemberIds] = useState([]);
@@ -187,8 +203,14 @@ const ChatPage = () => {
   const sendingMediaRef = useRef(false);
   const messageNodeRefs = useRef(new Map());
   const optimisticMessageIdRef = useRef(-1);
+  const composerDraftVersionRef = useRef(0);
+  const lastSubmittedDraftKeyRef = useRef('');
   const pendingTextMessagesRef = useRef(new Map());
   const pendingMediaMessagesRef = useRef(new Map());
+  const chatSocketRef = useRef(socket);
+  const chatSocketReadyRef = useRef(Boolean(socket?.connected) && Boolean(isChatConnected));
+  const textSendQueueRef = useRef([]);
+  const textSendProcessingRef = useRef(false);
 
   useEffect(() => {
     selectedConversationRef.current = Number(selectedId || 0) || null;
@@ -196,6 +218,15 @@ const ChatPage = () => {
 
   useEffect(() => {
     activeFamilyCodeRef.current = normalizeFamilyCode(activeFamilyCode);
+  }, [activeFamilyCode]);
+
+  useEffect(() => {
+    chatSocketRef.current = socket;
+    chatSocketReadyRef.current = Boolean(socket?.connected) && Boolean(isChatConnected);
+  }, [isChatConnected, socket]);
+
+  useEffect(() => {
+    setPresenceByUserId({});
   }, [activeFamilyCode]);
 
   useEffect(() => {
@@ -548,7 +579,14 @@ const ChatPage = () => {
       }
 
       try {
-        const result = await markConversationRead(targetConversationId, familyCode);
+        const result =
+          socket && isChatConnected
+            ? await markConversationReadSocketRequest(
+                socket,
+                targetConversationId,
+                familyCode,
+              )
+            : await markConversationRead(targetConversationId, familyCode);
         if (result?.familyCode) {
           markCachedConversationRead(result.familyCode, targetConversationId);
           if (
@@ -573,7 +611,7 @@ const ChatPage = () => {
         return null;
       }
     },
-    [syncListsFromCache],
+    [isChatConnected, socket, syncListsFromCache],
   );
 
   const applyConversationMessageUpdate = useCallback(
@@ -729,6 +767,30 @@ const ChatPage = () => {
     [resolveConversationFamilyCode, syncListsFromCache],
   );
 
+  const applyConversationDeliveryUpdate = useCallback((conversationId, messageId, deliveredAt) => {
+    const targetConversationId = Number(conversationId || 0);
+    const targetMessageId = Number(messageId || 0);
+    if (!targetConversationId || !targetMessageId || !deliveredAt) {
+      return [];
+    }
+
+    const currentMessages = getCachedMessages(targetConversationId);
+    if (currentMessages.length === 0) {
+      return [];
+    }
+
+    const nextMessages = cacheMessages(
+      targetConversationId,
+      applyDeliveryReceipt(currentMessages, targetMessageId, deliveredAt),
+    );
+
+    if (isSameConversation(targetConversationId, selectedConversationRef.current)) {
+      setMessages(nextMessages);
+    }
+
+    return nextMessages;
+  }, []);
+
   const queuePendingTextMessage = useCallback((conversationId, entry = {}) => {
     const targetConversationId = Number(conversationId || 0);
     const tempId = Number(entry?.tempId || 0);
@@ -780,10 +842,19 @@ const ChatPage = () => {
 
     const targetContent = String(message?.content || '').trim();
     const targetReplyId = getMessageReplyId(message);
+    const targetClientRequestId = String(message?.clientRequestId || '').trim();
     const matchingIndex = currentEntries.findIndex(
-      (entry) =>
-        String(entry?.content || '').trim() === targetContent &&
-        Number(entry?.replyToId || 0) === Number(targetReplyId || 0),
+      (entry) => {
+        const entryClientRequestId = String(entry?.clientRequestId || '').trim();
+        if (targetClientRequestId && entryClientRequestId) {
+          return entryClientRequestId === targetClientRequestId;
+        }
+
+        return (
+          String(entry?.content || '').trim() === targetContent &&
+          Number(entry?.replyToId || 0) === Number(targetReplyId || 0)
+        );
+      },
     );
     if (matchingIndex < 0) {
       return null;
@@ -800,6 +871,159 @@ const ChatPage = () => {
 
     return matchingEntry || null;
   }, []);
+
+  const findOptimisticMessageIdByClientRequestId = useCallback(
+    (conversationId, clientRequestId) => {
+      const targetConversationId = Number(conversationId || 0);
+      const normalizedClientRequestId = String(clientRequestId || '').trim();
+      if (!targetConversationId || !normalizedClientRequestId) {
+        return null;
+      }
+
+      const matchingMessage = getCachedMessages(targetConversationId).find((message) => {
+        const messageId = Number(message?.id || 0);
+        if (messageId >= 0) {
+          return false;
+        }
+
+        return (
+          String(message?.clientRequestId || '').trim() === normalizedClientRequestId
+        );
+      });
+
+      return matchingMessage ? Number(matchingMessage.id || 0) : null;
+    },
+    [],
+  );
+
+  const waitForTextSendRetry = useCallback(
+    (attemptCount) =>
+      new Promise((resolve) => {
+        window.setTimeout(
+          resolve,
+          Math.max(1, Number(attemptCount || 1)) * TEXT_SEND_RETRY_BASE_DELAY_MS,
+        );
+      }),
+    [],
+  );
+
+  const processTextSendQueue = useCallback(async () => {
+    if (textSendProcessingRef.current) {
+      return;
+    }
+
+    textSendProcessingRef.current = true;
+    try {
+      while (textSendQueueRef.current.length > 0) {
+        const currentEntry = textSendQueueRef.current[0];
+        const activeSocket = chatSocketRef.current;
+        if (!activeSocket || !chatSocketReadyRef.current || !activeSocket.connected) {
+          break;
+        }
+
+        try {
+          const nextMessage = await sendTextMessageSocket(
+            activeSocket,
+            currentEntry.conversationId,
+            currentEntry.familyCode,
+            currentEntry.content,
+            {
+              clientRequestId: currentEntry.clientRequestId,
+              replyToId: currentEntry.replyToId,
+            },
+          );
+          if (!nextMessage || !Number(nextMessage?.id || 0)) {
+            throw new Error('Message send did not return a valid message payload');
+          }
+
+          const enrichedMessage = currentEntry.replyPreview
+            ? {
+                ...nextMessage,
+                replyTo: nextMessage?.replyTo || currentEntry.replyPreview,
+              }
+            : nextMessage;
+          const pendingMessage = removePendingTextMessage(
+            currentEntry.conversationId,
+            currentEntry.tempId,
+          );
+          const fallbackOptimisticMessageId = findOptimisticMessageIdByClientRequestId(
+            currentEntry.conversationId,
+            currentEntry.clientRequestId,
+          );
+
+          if (pendingMessage?.tempId) {
+            replaceConversationMessageUpdate(
+              currentEntry.conversationId,
+              currentEntry.tempId,
+              enrichedMessage,
+              {
+                familyCode: currentEntry.familyCode,
+                clearUnread: true,
+              },
+            );
+          } else if (fallbackOptimisticMessageId) {
+            replaceConversationMessageUpdate(
+              currentEntry.conversationId,
+              fallbackOptimisticMessageId,
+              enrichedMessage,
+              {
+                familyCode: currentEntry.familyCode,
+                clearUnread: true,
+              },
+            );
+          } else {
+            applyConversationMessageUpdate(currentEntry.conversationId, enrichedMessage, {
+              familyCode: currentEntry.familyCode,
+              clearUnread: true,
+            });
+          }
+
+          textSendQueueRef.current.shift();
+        } catch (error) {
+          currentEntry.attemptCount = Number(currentEntry.attemptCount || 0) + 1;
+          const status = Number(error?.status || 0);
+          const shouldRetry =
+            currentEntry.attemptCount < TEXT_SEND_MAX_RETRIES &&
+            ![400, 403, 404].includes(status);
+
+          if (shouldRetry) {
+            await waitForTextSendRetry(currentEntry.attemptCount);
+            continue;
+          }
+
+          textSendQueueRef.current.shift();
+          const failedPendingMessage = removePendingTextMessage(
+            currentEntry.conversationId,
+            currentEntry.tempId,
+          );
+          const failedMessageId =
+            failedPendingMessage?.tempId ||
+            findOptimisticMessageIdByClientRequestId(
+              currentEntry.conversationId,
+              currentEntry.clientRequestId,
+            );
+
+          if (failedMessageId) {
+            applyConversationMessageFailure(currentEntry.conversationId, failedMessageId, {
+              familyCode: currentEntry.familyCode,
+              clearUnread: true,
+            });
+          }
+
+          console.error('Failed to send message:', error);
+        }
+      }
+    } finally {
+      textSendProcessingRef.current = false;
+    }
+  }, [
+    applyConversationMessageFailure,
+    applyConversationMessageUpdate,
+    findOptimisticMessageIdByClientRequestId,
+    removePendingTextMessage,
+    replaceConversationMessageUpdate,
+    waitForTextSendRetry,
+  ]);
 
   const queuePendingMediaMessage = useCallback((conversationId, entry = {}) => {
     const targetConversationId = Number(conversationId || 0);
@@ -1137,8 +1361,15 @@ const ChatPage = () => {
       const matchingPendingMessage = sentByCurrentUser
         ? shiftMatchingPendingTextMessage(conversationId, payload)
         : null;
-      const matchingPendingMediaMessage =
+      const matchingOptimisticMessageId =
         sentByCurrentUser && !matchingPendingMessage
+          ? findOptimisticMessageIdByClientRequestId(
+              conversationId,
+              payload?.clientRequestId,
+            )
+          : null;
+      const matchingPendingMediaMessage =
+        sentByCurrentUser && !matchingPendingMessage && !matchingOptimisticMessageId
           ? shiftMatchingPendingMediaMessage(conversationId, payload)
           : null;
 
@@ -1146,6 +1377,17 @@ const ChatPage = () => {
         replaceConversationMessageUpdate(
           conversationId,
           matchingPendingMessage.tempId,
+          payload,
+          {
+            familyCode: cachedConversation?.familyCode,
+            clearUnread: shouldClearUnread,
+            unreadCount: nextUnreadCount,
+          },
+        );
+      } else if (matchingOptimisticMessageId) {
+        replaceConversationMessageUpdate(
+          conversationId,
+          matchingOptimisticMessageId,
           payload,
           {
             familyCode: cachedConversation?.familyCode,
@@ -1290,6 +1532,65 @@ const ChatPage = () => {
       }
     };
 
+    const handleMessageDelivered = (payload = {}) => {
+      const conversationId = Number(payload?.conversationId || 0);
+      const messageId = Number(payload?.messageId || 0);
+      if (!conversationId || !messageId || !payload?.deliveredAt) {
+        return;
+      }
+
+      applyConversationDeliveryUpdate(
+        conversationId,
+        messageId,
+        payload.deliveredAt,
+      );
+    };
+
+    const handlePresenceSnapshot = (payload = {}) => {
+      const payloadFamilyCode = normalizeFamilyCode(payload?.familyCode);
+      if (
+        payloadFamilyCode &&
+        payloadFamilyCode !== activeFamilyCodeRef.current
+      ) {
+        return;
+      }
+
+      const nextPresenceByUserId = {};
+      (Array.isArray(payload?.presences) ? payload.presences : []).forEach((entry) => {
+        const userId = Number(entry?.userId || 0);
+        if (!userId) {
+          return;
+        }
+
+        nextPresenceByUserId[userId] = {
+          isOnline: Boolean(entry?.isOnline),
+          lastSeenAt: entry?.lastSeenAt || null,
+        };
+      });
+
+      setPresenceByUserId(nextPresenceByUserId);
+    };
+
+    const handlePresenceUpdated = (payload = {}) => {
+      const payloadFamilyCode = normalizeFamilyCode(payload?.familyCode);
+      const userId = Number(payload?.userId || 0);
+      if (
+        !userId ||
+        (payloadFamilyCode &&
+          payloadFamilyCode !== activeFamilyCodeRef.current)
+      ) {
+        return;
+      }
+
+      setPresenceByUserId((current) => ({
+        ...current,
+        [userId]: {
+          isOnline: Boolean(payload?.isOnline),
+          lastSeenAt: payload?.lastSeenAt || null,
+        },
+      }));
+    };
+
     const handleRoomMembershipChange = (payload = {}) => {
       refreshConversationFromServer(payload);
     };
@@ -1325,25 +1626,33 @@ const ChatPage = () => {
     socket.on(CHAT_SOCKET_EVENTS.MESSAGE_DELETED, handleMessageDeleted);
     socket.on(CHAT_SOCKET_EVENTS.TYPING, handleTyping);
     socket.on(CHAT_SOCKET_EVENTS.READ_RECEIPT, handleReadReceipt);
+    socket.on(CHAT_SOCKET_EVENTS.MESSAGE_DELIVERED, handleMessageDelivered);
     socket.on(CHAT_SOCKET_EVENTS.MEMBER_JOINED, handleRoomMembershipChange);
     socket.on(CHAT_SOCKET_EVENTS.MEMBER_REMOVED, handleRoomMembershipChange);
     socket.on(CHAT_SOCKET_EVENTS.ROOM_UPDATED, handleRoomUpdated);
     socket.on(CHAT_SOCKET_EVENTS.CONVERSATION_REMOVED, handleConversationRemoved);
+    socket.on(CHAT_SOCKET_EVENTS.PRESENCE_SNAPSHOT, handlePresenceSnapshot);
+    socket.on(CHAT_SOCKET_EVENTS.PRESENCE_UPDATED, handlePresenceUpdated);
 
     return () => {
       socket.off(CHAT_SOCKET_EVENTS.NEW_MESSAGE, handleNewMessage);
       socket.off(CHAT_SOCKET_EVENTS.MESSAGE_DELETED, handleMessageDeleted);
       socket.off(CHAT_SOCKET_EVENTS.TYPING, handleTyping);
       socket.off(CHAT_SOCKET_EVENTS.READ_RECEIPT, handleReadReceipt);
+      socket.off(CHAT_SOCKET_EVENTS.MESSAGE_DELIVERED, handleMessageDelivered);
       socket.off(CHAT_SOCKET_EVENTS.MEMBER_JOINED, handleRoomMembershipChange);
       socket.off(CHAT_SOCKET_EVENTS.MEMBER_REMOVED, handleRoomMembershipChange);
       socket.off(CHAT_SOCKET_EVENTS.ROOM_UPDATED, handleRoomUpdated);
       socket.off(CHAT_SOCKET_EVENTS.CONVERSATION_REMOVED, handleConversationRemoved);
+      socket.off(CHAT_SOCKET_EVENTS.PRESENCE_SNAPSHOT, handlePresenceSnapshot);
+      socket.off(CHAT_SOCKET_EVENTS.PRESENCE_UPDATED, handlePresenceUpdated);
     };
   }, [
+    applyConversationDeliveryUpdate,
     applyConversationMessageUpdate,
     clearOpenConversation,
     currentUserId,
+    findOptimisticMessageIdByClientRequestId,
     markConversationReadNow,
     replaceConversationMessageUpdate,
     refreshConversationFromServer,
@@ -1353,6 +1662,23 @@ const ChatPage = () => {
     shiftMatchingPendingTextMessage,
     syncListsFromCache,
   ]);
+
+  useEffect(() => {
+    const familyCode = normalizeFamilyCode(activeFamilyCode);
+    if (!socket || !isChatConnected || !familyCode) {
+      return;
+    }
+
+    joinFamilyRoom(familyCode);
+  }, [activeFamilyCode, isChatConnected, joinFamilyRoom, socket]);
+
+  useEffect(() => {
+    if (!socket || !isChatConnected) {
+      return;
+    }
+
+    void processTextSendQueue();
+  }, [isChatConnected, processTextSendQueue, socket]);
 
   const handleTypingActivity = useCallback(() => {
     const conversationId = selectedConversationRef.current;
@@ -1382,6 +1708,7 @@ const ChatPage = () => {
   const handleTextChange = useCallback(
     (event) => {
       const nextText = event.target.value;
+      composerDraftVersionRef.current += 1;
       setText(nextText);
       resizeComposer(event.target);
 
@@ -1408,6 +1735,7 @@ const ChatPage = () => {
         selectionEnd,
       )}`;
 
+      composerDraftVersionRef.current += 1;
       setText(nextText);
 
       window.requestAnimationFrame(() => {
@@ -1449,6 +1777,9 @@ const ChatPage = () => {
     } else {
       const replyPreview = getMessageReplyPreview(replyTo);
       const optimisticMessageId = optimisticMessageIdRef.current;
+      const clientRequestId = `send-message:${targetConversationId}:${Date.now()}:${Math.random()
+        .toString(36)
+        .slice(2, 10)}`;
       if (
         !trimmedText ||
         !targetConversationId ||
@@ -1458,10 +1789,21 @@ const ChatPage = () => {
         return;
       }
 
+      const currentDraftKey = [
+        targetConversationId,
+        composerDraftVersionRef.current,
+        Number(replyPreview?.id || 0),
+      ].join(':');
+      if (lastSubmittedDraftKeyRef.current === currentDraftKey) {
+        return;
+      }
+      lastSubmittedDraftKeyRef.current = currentDraftKey;
+
       optimisticMessageIdRef.current -= 1;
       stopLocalTyping();
       queuePendingTextMessage(targetConversationId, {
         tempId: optimisticMessageId,
+        clientRequestId,
         content: trimmedText,
         replyToId: replyPreview?.id || null,
       });
@@ -1471,6 +1813,7 @@ const ChatPage = () => {
         createOptimisticTextMessage({
           id: optimisticMessageId,
           conversationId: targetConversationId,
+          clientRequestId,
           senderId: currentUserId,
           senderName: currentUserDisplayName,
           senderAvatar: currentUserAvatarUrl,
@@ -1491,68 +1834,27 @@ const ChatPage = () => {
         inputRef.current.focus();
       }
 
-      void (async () => {
-        try {
-          const nextMessage = await sendTextMessage(
-            targetConversationId,
-            familyCodeAtSend,
-            trimmedText,
-            {
-              replyTo,
-            },
-          );
-          if (!nextMessage || !Number(nextMessage?.id || 0)) {
-            throw new Error('Message send did not return a valid message payload');
-          }
-
-          const enrichedMessage = replyPreview
-            ? {
-                ...nextMessage,
-                replyTo: nextMessage?.replyTo || replyPreview,
-              }
-            : nextMessage;
-          const pendingMessage = removePendingTextMessage(
-            targetConversationId,
-            optimisticMessageId,
-          );
-
-          if (pendingMessage) {
-            replaceConversationMessageUpdate(
-              targetConversationId,
-              optimisticMessageId,
-              enrichedMessage,
-              {
-                familyCode: familyCodeAtSend,
-                clearUnread: true,
-              },
-            );
-          } else {
-            applyConversationMessageUpdate(targetConversationId, enrichedMessage, {
-              familyCode: familyCodeAtSend,
-              clearUnread: true,
-            });
-          }
-        } catch (error) {
-          removePendingTextMessage(targetConversationId, optimisticMessageId);
-          applyConversationMessageFailure(targetConversationId, optimisticMessageId, {
-            familyCode: familyCodeAtSend,
-            clearUnread: true,
-          });
-          console.error('Failed to send message:', error);
-        }
-      })();
+      textSendQueueRef.current.push({
+        attemptCount: 0,
+        clientRequestId,
+        content: trimmedText,
+        conversationId: targetConversationId,
+        familyCode: familyCodeAtSend,
+        replyPreview,
+        replyToId: replyPreview?.id || null,
+        tempId: optimisticMessageId,
+      });
+      void processTextSendQueue();
     }
   }, [
     activeFamilyCode,
-    applyConversationMessageFailure,
     applyConversationMessageUpdate,
     conversation?.canSend,
     currentUserAvatarUrl,
     currentUserDisplayName,
     currentUserId,
+    processTextSendQueue,
     queuePendingTextMessage,
-    removePendingTextMessage,
-    replaceConversationMessageUpdate,
     replyTo,
     selectedId,
     safeSendMedia,
@@ -1743,7 +2045,11 @@ const ChatPage = () => {
       if (!window.confirm('Delete this message?')) return;
 
       try {
-        await deleteMsg(message.id, activeFamilyCode);
+        if (socket && isChatConnected) {
+          await deleteMessageSocket(socket, message.id, activeFamilyCode);
+        } else {
+          await deleteMsg(message.id, activeFamilyCode);
+        }
 
         const nextMessages = cacheMessages(
           Number(selectedId || 0),
@@ -1770,18 +2076,26 @@ const ChatPage = () => {
         console.error('Failed to delete message:', error);
       }
     },
-    [activeFamilyCode, selectedId, syncListsFromCache],
+    [activeFamilyCode, isChatConnected, selectedId, socket, syncListsFromCache],
   );
 
   const handleMute = useCallback(async () => {
     if (!conversation || !activeFamilyCode) return;
 
     try {
-      const result = await toggleMute(
-        conversation.id,
-        activeFamilyCode,
-        conversation.isMuted,
-      );
+      const result =
+        socket && isChatConnected
+          ? await toggleMuteSocket(
+              socket,
+              conversation.id,
+              activeFamilyCode,
+              conversation.isMuted,
+            )
+          : await toggleMute(
+              conversation.id,
+              activeFamilyCode,
+              conversation.isMuted,
+            );
 
       const nextConversation = cacheConversation({
         ...conversation,
@@ -1794,7 +2108,7 @@ const ChatPage = () => {
     } finally {
       setMenuOpen(false);
     }
-  }, [activeFamilyCode, conversation, syncListsFromCache]);
+  }, [activeFamilyCode, conversation, isChatConnected, socket, syncListsFromCache]);
 
   const handleOpenRoomMembers = useCallback(async () => {
     if (!conversation?.roomId || !activeFamilyCodeRef.current) {
@@ -1838,11 +2152,19 @@ const ChatPage = () => {
     setRoomMembersError('');
 
     try {
-      const nextConversation = await addMembersToRoom(
-        conversation.roomId,
-        activeFamilyCode,
-        selectedRoomMemberIds,
-      );
+      const nextConversation =
+        socket && isChatConnected
+          ? await addMembersToRoomSocket(
+              socket,
+              conversation.roomId,
+              activeFamilyCode,
+              selectedRoomMemberIds,
+            )
+          : await addMembersToRoom(
+              conversation.roomId,
+              activeFamilyCode,
+              selectedRoomMemberIds,
+            );
       applyConversationRefresh(nextConversation);
       setSelectedRoomMemberIds([]);
     } catch (error) {
@@ -1855,7 +2177,9 @@ const ChatPage = () => {
     activeFamilyCode,
     applyConversationRefresh,
     conversation?.roomId,
+    isChatConnected,
     selectedRoomMemberIds,
+    socket,
   ]);
 
   const handleRemoveRoomMember = useCallback(
@@ -1873,11 +2197,19 @@ const ChatPage = () => {
       setRoomMembersError('');
 
       try {
-        const nextConversation = await removeMemberFromRoom(
-          conversation.roomId,
-          activeFamilyCode,
-          member.userId,
-        );
+        const nextConversation =
+          socket && isChatConnected
+            ? await removeMemberFromRoomSocket(
+                socket,
+                conversation.roomId,
+                activeFamilyCode,
+                member.userId,
+              )
+            : await removeMemberFromRoom(
+                conversation.roomId,
+                activeFamilyCode,
+                member.userId,
+              );
         applyConversationRefresh(nextConversation);
       } catch (error) {
         console.error('Failed to remove room member:', error);
@@ -1886,7 +2218,7 @@ const ChatPage = () => {
         setRoomMembersSubmitting(false);
       }
     },
-    [activeFamilyCode, applyConversationRefresh, conversation?.roomId],
+    [activeFamilyCode, applyConversationRefresh, conversation?.roomId, isChatConnected, socket],
   );
 
   const handleOpenRoomPhotoPicker = useCallback(() => {
@@ -1946,7 +2278,11 @@ const ChatPage = () => {
     setSelectedRoomMemberIds([]);
 
     try {
-      await leaveRoomConversation(conversation.roomId, activeFamilyCode);
+      if (socket && isChatConnected) {
+        await leaveRoomConversationSocket(socket, conversation.roomId, activeFamilyCode);
+      } else {
+        await leaveRoomConversation(conversation.roomId, activeFamilyCode);
+      }
       removeCachedConversation(selectedId, activeFamilyCode);
 
       const roomResponse = await getRooms(activeFamilyCode);
@@ -1964,8 +2300,10 @@ const ChatPage = () => {
     activeFamilyCode,
     conversation?.roomId,
     conversation?.roomName,
+    isChatConnected,
     selectedId,
     clearOpenConversation,
+    socket,
   ]);
 
   const handleRenameRoom = useCallback(() => {
@@ -2071,7 +2409,11 @@ const ChatPage = () => {
     }
 
     try {
-      await deleteConversationRequest(selectedId, activeFamilyCode);
+      if (socket && isChatConnected) {
+        await deleteConversationSocket(socket, selectedId, activeFamilyCode);
+      } else {
+        await deleteConversationRequest(selectedId, activeFamilyCode);
+      }
       removeCachedConversation(selectedId, activeFamilyCode);
       const conversationResponse = await getConversations(activeFamilyCode);
       setConversations(
@@ -2084,7 +2426,7 @@ const ChatPage = () => {
     } finally {
       setMenuOpen(false);
     }
-  }, [activeFamilyCode, clearOpenConversation, selectedId]);
+  }, [activeFamilyCode, clearOpenConversation, isChatConnected, selectedId, socket]);
 
   const handleDeleteRoom = useCallback(async () => {
     if (!conversation?.roomId || !activeFamilyCode || !selectedId) {
@@ -2097,7 +2439,11 @@ const ChatPage = () => {
     }
 
     try {
-      await deleteRoomConversation(conversation.roomId, activeFamilyCode);
+      if (socket && isChatConnected) {
+        await deleteRoomConversationSocket(socket, conversation.roomId, activeFamilyCode);
+      } else {
+        await deleteRoomConversation(conversation.roomId, activeFamilyCode);
+      }
       removeCachedConversation(selectedId, activeFamilyCode);
       const roomResponse = await getRooms(activeFamilyCode);
       setRooms(cacheRooms(activeFamilyCode, roomResponse?.rooms || []));
@@ -2113,7 +2459,9 @@ const ChatPage = () => {
     clearOpenConversation,
     conversation?.roomId,
     conversation?.roomName,
+    isChatConnected,
     selectedId,
+    socket,
   ]);
 
   const handleCycleMessageSearch = useCallback(
@@ -2582,6 +2930,11 @@ const ChatPage = () => {
     [activeFamilyCode, families],
   );
   const activeParticipant = conversation?.participants?.[0] || {};
+  const activeParticipantPresence =
+    presenceByUserId[Number(activeParticipant?.userId || 0)] || {
+      isOnline: Boolean(activeParticipant?.isOnline),
+      lastSeenAt: activeParticipant?.lastSeenAt || null,
+    };
   const selectedContactMember = useMemo(
     () => familyMemberMap.get(Number(activeParticipant?.userId || 0)) || null,
     [activeParticipant?.userId, familyMemberMap],
@@ -2625,13 +2978,22 @@ const ChatPage = () => {
         ? 'Chat unavailable'
         : conversation?.conversationState === CONVERSATION_STATES.ARCHIVED
           ? 'Archived chat'
-          : isChatConnected
+          : activeParticipantPresence?.isOnline
             ? 'Online now'
-            : 'Connecting...';
+            : activeParticipantPresence?.lastSeenAt
+              ? `Last seen ${formatInfoDateTime(activeParticipantPresence.lastSeenAt)}`
+              : 'Offline';
   const showHeaderOnline =
     !isGroup &&
-    isChatConnected &&
+    activeParticipantPresence?.isOnline &&
     conversation?.conversationState === CONVERSATION_STATES.ACTIVE;
+  const headerBadgeLabel = isGroup
+    ? isChatConnected
+      ? 'Live'
+      : 'Offline'
+    : activeParticipantPresence?.isOnline
+      ? 'Online'
+      : 'Offline';
   const sharedMediaCount = useMemo(
     () =>
       messages.filter(
@@ -2655,9 +3017,18 @@ const ChatPage = () => {
   const showSidebar = !isMobile || !selectedId;
   const showChat = !isMobile || Boolean(selectedId);
   const isComposerDisabled =
-    !selectedId || chatLoading || sendingMedia || conversation?.canSend === false;
+    !selectedId ||
+    !socket ||
+    !isChatConnected ||
+    chatLoading ||
+    sendingMedia ||
+    conversation?.canSend === false;
   const composerPlaceholder =
-    conversation?.canSend === false ? 'Messaging unavailable in this chat' : 'Type a message...';
+    !socket || !isChatConnected
+      ? 'Connecting to chat...'
+      : conversation?.canSend === false
+        ? 'Messaging unavailable in this chat'
+        : 'Type a message...';
   const infoPanelProps = {
     canLeaveRoom,
     canManageRoom,
@@ -2707,6 +3078,7 @@ const ChatPage = () => {
           onOpenConversation={openChat}
           onSearchChange={setSearch}
           onTabChange={setActiveTab}
+          presenceByUserId={presenceByUserId}
           roomCount={roomCount}
           search={search}
           searchInputRef={searchInputRef}
@@ -2752,6 +3124,7 @@ const ChatPage = () => {
               initials: headerInitials,
               name: headerName,
               onBack: handleBack,
+              badgeLabel: headerBadgeLabel,
               onHeaderSearch: handleHeaderSearch,
               onOpenInfoPanel: handleOpenInfoPanel,
               roomAvatarUrl,

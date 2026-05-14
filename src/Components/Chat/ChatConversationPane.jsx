@@ -133,7 +133,7 @@ const ChatConversationPane = ({
                 </span>
               ))}
               <span className="chat-header-badge">
-                {isChatConnected ? 'Active' : 'Offline'}
+                {header.badgeLabel || (isChatConnected ? 'Active' : 'Offline')}
               </span>
             </div>
             <div className={`chat-header-status ${header.showOnline ? 'online' : ''}`}>

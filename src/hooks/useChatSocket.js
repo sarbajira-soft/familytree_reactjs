@@ -23,7 +23,7 @@ export const useChatSocket = (userInfo, handlers = {}) => {
       auth: {
         token,
       },
-      transports: ['websocket', 'polling'],
+      transports: ['websocket'],
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionAttempts: 5,
@@ -33,6 +33,12 @@ export const useChatSocket = (userInfo, handlers = {}) => {
     setSocket(nextSocket);
 
     nextSocket.on('connect', () => {
+      setIsConnected(false);
+    });
+
+    // The namespace transport can connect before the backend finishes auth.
+    // We only mark chat as ready after the gateway confirms the session.
+    nextSocket.on('connected', () => {
       setIsConnected(true);
     });
 
@@ -50,6 +56,7 @@ export const useChatSocket = (userInfo, handlers = {}) => {
     }
 
     return () => {
+      nextSocket.off('connected');
       nextSocket.disconnect();
       socketRef.current = null;
       setSocket(null);

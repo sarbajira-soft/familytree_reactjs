@@ -23,6 +23,7 @@ const ChatSidebar = ({
   onOpenConversation,
   onSearchChange,
   onTabChange,
+  presenceByUserId,
   roomCount,
   search,
   searchInputRef,
@@ -125,6 +126,12 @@ const ChatSidebar = ({
               participant.lastName,
             );
             const isActive = isSameConversation(selectedId, conversationItem?.id);
+            const participantPresence =
+              presenceByUserId?.[Number(participant?.userId || 0)] || {};
+            const isParticipantOnline =
+              typeof participantPresence?.isOnline === 'boolean'
+                ? participantPresence.isOnline
+                : Boolean(participant?.isOnline);
 
             return (
               <div
@@ -140,7 +147,7 @@ const ChatSidebar = ({
                   ) : (
                     initials
                   )}
-                  <div className="chat-avatar-online" />
+                  {isParticipantOnline ? <div className="chat-avatar-online" /> : null}
                 </div>
                 <div className="chat-li-body">
                   <div className="chat-li-top">
