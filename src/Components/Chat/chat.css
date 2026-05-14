@@ -131,7 +131,6 @@ html.dark .chat-header-name { color:#f1f5f9; }
 .chat-header-badge { font-size:10px; font-weight:700; background:#2563eb; color:#fff; padding:2px 8px; border-radius:999px; text-transform:uppercase; letter-spacing:.5px; }
 .chat-header-status { font-size:12px; color:#9ca3af; display:flex; align-items:center; gap:4px; }
 .chat-header-status.online { color:#22c55e; }
-.chat-header-status.online::before { content:''; width:6px; height:6px; border-radius:50%; background:#22c55e; }
 .chat-header-actions { display:flex; gap:2px; position:relative; z-index:25; }
 .chat-header-btn { background:none; border:none; padding:8px; cursor:pointer; color:#6b7280; border-radius:50%; display:flex; }
 .chat-header-btn:hover { background:#eff6ff; color:#2563eb; }

@@ -2,6 +2,7 @@ import { authFetchResponse } from '../utils/authFetch';
 import {
   CHAT_API_ENDPOINTS,
   CHAT_LIMITS,
+  CHAT_SOCKET_EVENTS,
   CONVERSATION_STATES,
   MESSAGE_TYPES,
   ROOM_TYPES,
@@ -10,6 +11,7 @@ import {
 const minute = 60 * 1000;
 const hour = 60 * minute;
 const API_BASE_URL = String(import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+const CHAT_SOCKET_ACK_TIMEOUT_MS = 10000;
 
 const normalizeFamilyCode = (familyCode) =>
   String(familyCode || '').trim().toUpperCase();
@@ -67,6 +69,202 @@ const parseJson = async (response) => {
   }
 };
 
+const createSocketRequestError = (message, status = 500) => {
+  const error = new Error(message);
+  error.status = Number(status || 500);
+  return error;
+};
+
+const normalizeSocketActionLabel = (value = '') =>
+  String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\b(a|an|the)\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const unwrapSocketGatewayResponse = (response, fallbackEventName = '') => {
+  if (
+    response &&
+    typeof response === 'object' &&
+    typeof response?.event === 'string' &&
+    Object.prototype.hasOwnProperty.call(response, 'data')
+  ) {
+    return {
+      eventName: String(response.event || '').trim(),
+      payload: response.data,
+    };
+  }
+
+  return {
+    eventName: fallbackEventName,
+    payload: response,
+  };
+};
+
+export const emitChatSocketEvent = async (
+  socket,
+  eventName,
+  successEventName,
+  payload,
+  actionLabel = 'complete chat action',
+  matcher = null,
+  fallbackSuccessEventNames = [],
+) => {
+  if (!socket?.connected) {
+    throw createSocketRequestError('Chat socket is not connected', 503);
+  }
+
+  return new Promise((resolve, reject) => {
+    const clientRequestId =
+      String(payload?.clientRequestId || '').trim() ||
+      `${eventName}:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`;
+    const payloadWithRequestId = {
+      ...(payload || {}),
+      clientRequestId,
+    };
+    const normalizedActionLabel = normalizeSocketActionLabel(actionLabel);
+    const matchesPayload =
+      typeof matcher === 'function' ? matcher : () => true;
+    const normalizedFallbackSuccessEventNames = Array.from(
+      new Set(
+        (Array.isArray(fallbackSuccessEventNames)
+          ? fallbackSuccessEventNames
+          : [fallbackSuccessEventNames]
+        )
+          .map((name) => String(name || '').trim())
+          .filter(Boolean),
+      ),
+    );
+    const fallbackSuccessHandlers = new Map();
+    let settled = false;
+
+    const resolveIfMatchingSuccess = (
+      response,
+      expectedEventName = successEventName,
+      options = {},
+    ) => {
+      const requireClientRequestId = Boolean(options?.requireClientRequestId);
+      const { eventName, payload } = unwrapSocketGatewayResponse(
+        response,
+        expectedEventName,
+      );
+      if (eventName && eventName !== expectedEventName) {
+        return false;
+      }
+      if (
+        requireClientRequestId &&
+        String(payload?.clientRequestId || '').trim() !== clientRequestId
+      ) {
+        return false;
+      }
+      if (
+        payload?.clientRequestId &&
+        String(payload.clientRequestId) !== clientRequestId
+      ) {
+        return false;
+      }
+      if (!matchesPayload(payload)) {
+        return false;
+      }
+
+      settled = true;
+      cleanup();
+      resolve(payload);
+      return true;
+    };
+
+    const rejectIfMatchingError = (response) => {
+      const { eventName, payload } = unwrapSocketGatewayResponse(
+        response,
+        CHAT_SOCKET_EVENTS.CHAT_ERROR,
+      );
+      if (eventName && eventName !== CHAT_SOCKET_EVENTS.CHAT_ERROR) {
+        return false;
+      }
+      const errorClientRequestId = String(payload?.clientRequestId || '').trim();
+      if (errorClientRequestId) {
+        if (errorClientRequestId !== clientRequestId) {
+          return false;
+        }
+      } else {
+        const errorAction = normalizeSocketActionLabel(payload?.action);
+        if (errorAction && errorAction !== normalizedActionLabel) {
+          return false;
+        }
+      }
+
+      settled = true;
+      cleanup();
+      reject(
+        createSocketRequestError(
+          payload?.message || `Unable to ${actionLabel}`,
+          payload?.status || 500,
+        ),
+      );
+      return true;
+    };
+
+    const cleanup = () => {
+      clearTimeout(timeoutId);
+      socket.off(successEventName, handleSuccess);
+      socket.off(CHAT_SOCKET_EVENTS.CHAT_ERROR, handleError);
+      fallbackSuccessHandlers.forEach((handler, fallbackEventName) => {
+        socket.off(fallbackEventName, handler);
+      });
+    };
+
+    const handleSuccess = (response) => {
+      resolveIfMatchingSuccess(response);
+    };
+
+    const createFallbackSuccessHandler = (fallbackEventName) => (response) => {
+      resolveIfMatchingSuccess(response, fallbackEventName, {
+        requireClientRequestId: true,
+      });
+    };
+
+    const handleError = (response) => {
+      rejectIfMatchingError(response);
+    };
+
+    const handleAck = (response) => {
+      if (settled) {
+        return;
+      }
+
+      if (rejectIfMatchingError(response)) {
+        return;
+      }
+
+      resolveIfMatchingSuccess(response);
+    };
+
+    const timeoutId = setTimeout(() => {
+      if (settled) {
+        return;
+      }
+
+      cleanup();
+      reject(
+        createSocketRequestError(
+          `Chat socket timed out while trying to ${actionLabel}`,
+          504,
+        ),
+      );
+    }, CHAT_SOCKET_ACK_TIMEOUT_MS);
+
+    socket.on(successEventName, handleSuccess);
+    socket.on(CHAT_SOCKET_EVENTS.CHAT_ERROR, handleError);
+    normalizedFallbackSuccessEventNames.forEach((fallbackEventName) => {
+      const handler = createFallbackSuccessHandler(fallbackEventName);
+      fallbackSuccessHandlers.set(fallbackEventName, handler);
+      socket.on(fallbackEventName, handler);
+    });
+    socket.emit(eventName, payloadWithRequestId, handleAck);
+  });
+};
+
 const getNestedArray = (payload, key) => {
   if (Array.isArray(payload?.[key])) {
     return payload[key];
@@ -91,6 +289,8 @@ const normalizeParticipant = (participant) => ({
   profileUrl: resolveChatAssetUrl(
     participant?.profileUrl || participant?.profileImage || '',
   ),
+  isOnline: Boolean(participant?.isOnline),
+  lastSeenAt: participant?.lastSeenAt || null,
 });
 
 const getChatMemberPreferenceScore = (member = {}, familyCode = '') => {
@@ -272,6 +472,8 @@ const normalizeConversation = (conversation = {}) => ({
   counterpartyStatus: conversation?.counterpartyStatus || null,
 });
 
+const normalizeMessageResponse = (payload) => payload?.data || payload || null;
+
 export const getChatFamilies = async () => {
   const response = await authFetchResponse(CHAT_API_ENDPOINTS.families, {
     method: 'GET',
@@ -421,7 +623,37 @@ export const sendTextMessage = async (conversationId, familyCode, content, optio
       mentionedUserIds: options?.mentionedUserIds || [],
     }),
   });
-  return parseJson(response);
+  const json = await parseJson(response);
+  return normalizeMessageResponse(json);
+};
+
+export const sendTextMessageSocket = async (
+  socket,
+  conversationId,
+  familyCode,
+  content,
+  options = {},
+) => {
+  const normalizedFamilyCode = requireFamilyCode(
+    familyCode,
+    'send a message',
+  );
+  return emitChatSocketEvent(
+    socket,
+    CHAT_SOCKET_EVENTS.SEND_MESSAGE,
+    'message-sent',
+    {
+      conversationId: Number(conversationId),
+      familyCode: normalizedFamilyCode,
+      content,
+      clientRequestId: options?.clientRequestId || undefined,
+      replyToId: options?.replyTo?.id || options?.replyToId || null,
+      mentionedUserIds: options?.mentionedUserIds || [],
+    },
+    'send a message',
+    (response) => Number(response?.conversationId || 0) === Number(conversationId || 0),
+    [CHAT_SOCKET_EVENTS.NEW_MESSAGE],
+  );
 };
 
 export const sendMediaMessage = async (conversationId, familyCode, file, options = {}) => {
@@ -446,7 +678,8 @@ export const sendMediaMessage = async (conversationId, familyCode, file, options
     method: 'POST',
     body: formData,
   });
-  return parseJson(response);
+  const json = await parseJson(response);
+  return normalizeMessageResponse(json);
 };
 
 export const markConversationRead = async (conversationId, familyCode, readAt = null) => {
@@ -464,6 +697,30 @@ export const markConversationRead = async (conversationId, familyCode, readAt = 
   return parseJson(response);
 };
 
+export const markConversationReadSocket = async (
+  socket,
+  conversationId,
+  familyCode,
+  readAt = null,
+) => {
+  const normalizedFamilyCode = requireFamilyCode(
+    familyCode,
+    'mark a conversation as read',
+  );
+  return emitChatSocketEvent(
+    socket,
+    CHAT_SOCKET_EVENTS.MARK_READ,
+    'marked-read',
+    {
+      conversationId: Number(conversationId),
+      familyCode: normalizedFamilyCode,
+      ...(readAt ? { readAt } : {}),
+    },
+    'mark a conversation as read',
+    (response) => Number(response?.conversationId || 0) === Number(conversationId || 0),
+  );
+};
+
 export const deleteMessage = async (messageId, familyCode) => {
   const normalizedFamilyCode = requireFamilyCode(
     familyCode,
@@ -476,6 +733,24 @@ export const deleteMessage = async (messageId, familyCode) => {
     },
   );
   return parseJson(response);
+};
+
+export const deleteMessageSocket = async (socket, messageId, familyCode) => {
+  const normalizedFamilyCode = requireFamilyCode(
+    familyCode,
+    'delete a message',
+  );
+  return emitChatSocketEvent(
+    socket,
+    CHAT_SOCKET_EVENTS.DELETE_MESSAGE,
+    'message-delete-confirmed',
+    {
+      messageId: Number(messageId),
+      familyCode: normalizedFamilyCode,
+    },
+    'delete a message',
+    (response) => Number(response?.messageId || 0) === Number(messageId || 0),
+  );
 };
 
 export const toggleMute = async (conversationId, familyCode, isMuted) => {
@@ -494,6 +769,25 @@ export const toggleMute = async (conversationId, familyCode, isMuted) => {
   return json?.data || json || { success: true, isMuted: !Boolean(isMuted) };
 };
 
+export const toggleMuteSocket = async (socket, conversationId, familyCode, isMuted) => {
+  const normalizedFamilyCode = requireFamilyCode(
+    familyCode,
+    'change mute settings',
+  );
+  return emitChatSocketEvent(
+    socket,
+    CHAT_SOCKET_EVENTS.TOGGLE_MUTE,
+    'mute-updated',
+    {
+      conversationId: Number(conversationId),
+      familyCode: normalizedFamilyCode,
+      isMuted: !Boolean(isMuted),
+    },
+    'change mute settings',
+    (response) => Number(response?.conversationId || 0) === Number(conversationId || 0),
+  );
+};
+
 export const deleteConversation = async (conversationId, familyCode) => {
   const normalizedFamilyCode = requireFamilyCode(
     familyCode,
@@ -506,6 +800,24 @@ export const deleteConversation = async (conversationId, familyCode) => {
     },
   );
   return parseJson(response);
+};
+
+export const deleteConversationSocket = async (socket, conversationId, familyCode) => {
+  const normalizedFamilyCode = requireFamilyCode(
+    familyCode,
+    'delete a conversation',
+  );
+  return emitChatSocketEvent(
+    socket,
+    CHAT_SOCKET_EVENTS.DELETE_CONVERSATION,
+    'conversation-delete-confirmed',
+    {
+      conversationId: Number(conversationId),
+      familyCode: normalizedFamilyCode,
+    },
+    'delete a conversation',
+    (response) => Number(response?.conversationId || 0) === Number(conversationId || 0),
+  );
 };
 
 export const reportMessage = async (messageId, familyCode, reason, description = '') => {
@@ -612,6 +924,26 @@ export const addMembersToRoom = async (roomId, familyCode, memberIds = []) => {
   return normalizeConversation(json?.data || json || {});
 };
 
+export const addMembersToRoomSocket = async (socket, roomId, familyCode, memberIds = []) => {
+  const normalizedFamilyCode = requireFamilyCode(
+    familyCode,
+    'add members to a room',
+  );
+  const response = await emitChatSocketEvent(
+    socket,
+    CHAT_SOCKET_EVENTS.ADD_ROOM_MEMBERS,
+    'room-members-added',
+    {
+      roomId: Number(roomId),
+      familyCode: normalizedFamilyCode,
+      memberIds,
+    },
+    'add members to a room',
+    (conversation) => Number(conversation?.roomId || 0) === Number(roomId || 0),
+  );
+  return normalizeConversation(response || {});
+};
+
 export const removeMemberFromRoom = async (roomId, familyCode, memberId) => {
   const normalizedFamilyCode = requireFamilyCode(
     familyCode,
@@ -625,6 +957,26 @@ export const removeMemberFromRoom = async (roomId, familyCode, memberId) => {
   );
   const json = await parseJson(response);
   return normalizeConversation(json?.data || json || {});
+};
+
+export const removeMemberFromRoomSocket = async (socket, roomId, familyCode, memberId) => {
+  const normalizedFamilyCode = requireFamilyCode(
+    familyCode,
+    'remove a member from a room',
+  );
+  const response = await emitChatSocketEvent(
+    socket,
+    CHAT_SOCKET_EVENTS.REMOVE_ROOM_MEMBER,
+    'room-member-removed',
+    {
+      roomId: Number(roomId),
+      familyCode: normalizedFamilyCode,
+      memberId: Number(memberId),
+    },
+    'remove a member from a room',
+    (conversation) => Number(conversation?.roomId || 0) === Number(roomId || 0),
+  );
+  return normalizeConversation(response || {});
 };
 
 export const updateRoomConversation = async (roomId, familyCode, options = {}) => {
@@ -667,6 +1019,24 @@ export const leaveRoomConversation = async (roomId, familyCode) => {
   return parseJson(response);
 };
 
+export const leaveRoomConversationSocket = async (socket, roomId, familyCode) => {
+  const normalizedFamilyCode = requireFamilyCode(
+    familyCode,
+    'leave a room',
+  );
+  return emitChatSocketEvent(
+    socket,
+    CHAT_SOCKET_EVENTS.LEAVE_ROOM,
+    'room-left',
+    {
+      roomId: Number(roomId),
+      familyCode: normalizedFamilyCode,
+    },
+    'leave a room',
+    (response) => Number(response?.roomId || 0) === Number(roomId || 0),
+  );
+};
+
 export const deleteRoomConversation = async (roomId, familyCode) => {
   const normalizedFamilyCode = requireFamilyCode(
     familyCode,
@@ -679,6 +1049,24 @@ export const deleteRoomConversation = async (roomId, familyCode) => {
     },
   );
   return parseJson(response);
+};
+
+export const deleteRoomConversationSocket = async (socket, roomId, familyCode) => {
+  const normalizedFamilyCode = requireFamilyCode(
+    familyCode,
+    'delete a room',
+  );
+  return emitChatSocketEvent(
+    socket,
+    CHAT_SOCKET_EVENTS.DELETE_ROOM,
+    'room-delete-confirmed',
+    {
+      roomId: Number(roomId),
+      familyCode: normalizedFamilyCode,
+    },
+    'delete a room',
+    (response) => Number(response?.roomId || 0) === Number(roomId || 0),
+  );
 };
 
 export const formatMessageTime = (dateStr) => {

@@ -10,6 +10,7 @@ import React, {
 import PropTypes from 'prop-types';
 import { useUser } from './UserContext';
 import { useChatSocket } from '../hooks/useChatSocket';
+import { CHAT_SOCKET_EVENTS } from '../constants/chat.constants';
 import {
   getChatFamilies,
   getUnreadChatCount,
@@ -29,6 +30,8 @@ const ChatContext = createContext({
   refreshFamilies: async () => {},
   socket: null,
   isChatConnected: false,
+  joinFamilyRoom: () => {},
+  leaveFamilyRoom: () => {},
   joinConversation: () => {},
   leaveConversation: () => {},
   emitTyping: () => {},
@@ -40,6 +43,7 @@ export const ChatProvider = ({ children }) => {
   const [unreadChatCount, setUnreadChatCount] = useState(0);
   const [families, setFamilies] = useState([]);
   const [activeFamilyCode, setActiveFamilyCode] = useState('');
+  const joinedFamilyCodeRef = useRef('');
   const previousUserIdRef = useRef(null);
 
   const handleUnreadCount = useCallback((payload) => {
@@ -141,7 +145,7 @@ export const ChatProvider = ({ children }) => {
   const joinConversation = useCallback(
     (conversationId, familyCode = activeFamilyCode) => {
       if (!socket || !conversationId || !familyCode) return;
-      socket.emit('join-conversation', {
+      socket.emit(CHAT_SOCKET_EVENTS.JOIN_CONVERSATION, {
         conversationId: Number(conversationId),
         familyCode,
       });
@@ -152,20 +156,65 @@ export const ChatProvider = ({ children }) => {
   const leaveConversation = useCallback(
     (conversationId) => {
       if (!socket || !conversationId) return;
-      socket.emit('leave-conversation', {
+      socket.emit(CHAT_SOCKET_EVENTS.LEAVE_CONVERSATION, {
         conversationId: Number(conversationId),
       });
     },
     [socket],
   );
 
+  const joinFamilyRoom = useCallback(
+    (familyCode = activeFamilyCode) => {
+      if (!socket || !familyCode) return;
+      socket.emit(CHAT_SOCKET_EVENTS.JOIN_FAMILY_ROOM, {
+        familyCode,
+      });
+    },
+    [activeFamilyCode, socket],
+  );
+
+  const leaveFamilyRoom = useCallback(
+    (familyCode = activeFamilyCode) => {
+      if (!socket || !familyCode) return;
+      socket.emit(CHAT_SOCKET_EVENTS.LEAVE_FAMILY_ROOM, {
+        familyCode,
+      });
+    },
+    [activeFamilyCode, socket],
+  );
+
+  useEffect(() => {
+    if (!socket || !isConnected) {
+      joinedFamilyCodeRef.current = '';
+      return undefined;
+    }
+
+    const normalizedFamilyCode = normalizeFamilyCode(activeFamilyCode);
+    if (!normalizedFamilyCode) {
+      return undefined;
+    }
+
+    joinFamilyRoom(normalizedFamilyCode);
+    joinedFamilyCodeRef.current = normalizedFamilyCode;
+
+    return () => {
+      leaveFamilyRoom(normalizedFamilyCode);
+      if (joinedFamilyCodeRef.current === normalizedFamilyCode) {
+        joinedFamilyCodeRef.current = '';
+      }
+    };
+  }, [activeFamilyCode, isConnected, joinFamilyRoom, leaveFamilyRoom, socket]);
+
   const emitTyping = useCallback(
     (conversationId, familyCode = activeFamilyCode, isTyping = true) => {
       if (!socket || !conversationId || !familyCode) return;
-      socket.emit(isTyping ? 'typing-start' : 'typing-stop', {
-        conversationId: Number(conversationId),
-        familyCode,
-      });
+      socket.emit(
+        isTyping ? CHAT_SOCKET_EVENTS.TYPING_START : CHAT_SOCKET_EVENTS.TYPING_STOP,
+        {
+          conversationId: Number(conversationId),
+          familyCode,
+        },
+      );
     },
     [activeFamilyCode, socket],
   );
@@ -173,7 +222,7 @@ export const ChatProvider = ({ children }) => {
   const markConversationReadSocket = useCallback(
     (conversationId, familyCode = activeFamilyCode, readAt = null) => {
       if (!socket || !conversationId || !familyCode) return;
-      socket.emit('mark-read', {
+      socket.emit(CHAT_SOCKET_EVENTS.MARK_READ, {
         conversationId: Number(conversationId),
         familyCode,
         ...(readAt ? { readAt } : {}),
@@ -192,6 +241,8 @@ export const ChatProvider = ({ children }) => {
       refreshFamilies,
       socket,
       isChatConnected: isConnected,
+      joinFamilyRoom,
+      leaveFamilyRoom,
       joinConversation,
       leaveConversation,
       emitTyping,
@@ -205,6 +256,8 @@ export const ChatProvider = ({ children }) => {
       refreshFamilies,
       socket,
       isConnected,
+      joinFamilyRoom,
+      leaveFamilyRoom,
       joinConversation,
       leaveConversation,
       emitTyping,

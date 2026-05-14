@@ -97,12 +97,21 @@ export const REPORT_REASONS = [
 
 export const CHAT_SOCKET_EVENTS = {
   // Client → Server
+  JOIN_FAMILY_ROOM: 'join-family-room',
+  LEAVE_FAMILY_ROOM: 'leave-family-room',
   JOIN_CONVERSATION: 'join-conversation',
   LEAVE_CONVERSATION: 'leave-conversation',
   SEND_MESSAGE: 'send-message',
   TYPING_START: 'typing-start',
   TYPING_STOP: 'typing-stop',
   MARK_READ: 'mark-read',
+  TOGGLE_MUTE: 'toggle-mute',
+  DELETE_MESSAGE: 'delete-message',
+  DELETE_CONVERSATION: 'delete-conversation',
+  ADD_ROOM_MEMBERS: 'add-room-members',
+  REMOVE_ROOM_MEMBER: 'remove-room-member',
+  LEAVE_ROOM: 'leave-room',
+  DELETE_ROOM: 'delete-room',
   // Server → Client
   NEW_MESSAGE: 'new-message',
   MESSAGE_DELETED: 'message-deleted',
@@ -114,5 +123,9 @@ export const CHAT_SOCKET_EVENTS = {
   MEMBER_REMOVED: 'member-removed',
   ROOM_UPDATED: 'room-updated',
   CONVERSATION_REMOVED: 'conversation-removed',
+  PRESENCE_SNAPSHOT: 'presence-snapshot',
+  PRESENCE_UPDATED: 'presence-updated',
+  MESSAGE_DELIVERED: 'message-delivered',
   UNREAD_CHAT_COUNT: 'unread-chat-count',
+  CHAT_ERROR: 'chat-error',
 };

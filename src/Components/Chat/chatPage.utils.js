@@ -42,6 +42,7 @@ export const getMessageReplyId = (message) =>
 export const createOptimisticTextMessage = ({
   id,
   conversationId,
+  clientRequestId,
   senderId,
   senderName,
   senderAvatar,
@@ -61,7 +62,9 @@ export const createOptimisticTextMessage = ({
   mediaUrl: '',
   isDeleted: false,
   deletedAt: null,
+  deliveredAt: null,
   readAt: null,
+  clientRequestId: clientRequestId || '',
   replyTo: replyTo || null,
   sendStatus: 'sending',
 });
@@ -137,6 +140,7 @@ export const createOptimisticMediaMessage = ({
   attachmentName: attachmentName || '',
   isDeleted: false,
   deletedAt: null,
+  deliveredAt: null,
   readAt: null,
   replyTo: replyTo || null,
   sendStatus: 'sending',
@@ -181,6 +185,16 @@ export const applyReadReceipt = (messages = [], currentUserId, readerUserId, rea
     return message;
   });
 };
+
+export const applyDeliveryReceipt = (messages = [], messageId, deliveredAt) =>
+  (Array.isArray(messages) ? messages : []).map((message) =>
+    Number(message?.id || 0) === Number(messageId || 0)
+      ? {
+          ...message,
+          deliveredAt: deliveredAt || message?.deliveredAt || null,
+        }
+      : message,
+  );
 
 export const buildTypingUserLabel = (names = []) => {
   const uniqueNames = Array.from(
@@ -381,5 +395,9 @@ export const getReceiptState = (message) => {
     return 'seen';
   }
 
-  return 'delivered';
+  if (message?.deliveredAt) {
+    return 'delivered';
+  }
+
+  return 'sent';
 };
