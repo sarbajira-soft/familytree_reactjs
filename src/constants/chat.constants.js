@@ -8,6 +8,7 @@ export const CHAT_API_ENDPOINTS = {
   unreadCount: '/chat/unread/count',
   conversations: '/chat/conversations',
   conversation: (id) => `/chat/conversations/${id}`,
+  hideConversation: (id) => `/chat/conversations/${id}/hide`,
   deleteConversation: (id, familyCode) =>
     `/chat/conversations/${id}?familyCode=${encodeURIComponent(familyCode)}`,
   conversationMessages: (id) => `/chat/conversations/${id}/messages`,
@@ -108,6 +109,7 @@ export const CHAT_SOCKET_EVENTS = {
   TOGGLE_MUTE: 'toggle-mute',
   DELETE_MESSAGE: 'delete-message',
   DELETE_CONVERSATION: 'delete-conversation',
+  HIDE_CONVERSATION: 'hide-conversation',
   ADD_ROOM_MEMBERS: 'add-room-members',
   REMOVE_ROOM_MEMBER: 'remove-room-member',
   LEAVE_ROOM: 'leave-room',
@@ -123,6 +125,7 @@ export const CHAT_SOCKET_EVENTS = {
   MEMBER_REMOVED: 'member-removed',
   ROOM_UPDATED: 'room-updated',
   CONVERSATION_REMOVED: 'conversation-removed',
+  CONVERSATION_HIDDEN: 'conversation-hidden',
   PRESENCE_SNAPSHOT: 'presence-snapshot',
   PRESENCE_UPDATED: 'presence-updated',
   MESSAGE_DELIVERED: 'message-delivered',

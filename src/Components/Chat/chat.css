@@ -897,6 +897,7 @@ html.dark .chat-attachment-preview__name { color:#cbd5e1; }
 /* Room management modals */
 .chat-modal-overlay { position:fixed; inset:0; background:rgba(15,23,42,.42); backdrop-filter:blur(4px); display:flex; align-items:center; justify-content:center; padding:20px; z-index:9998; }
 .chat-modal { width:min(100%, 560px); max-height:min(88vh, 760px); overflow:hidden; display:flex; flex-direction:column; background:#fff; border:1px solid #dbeafe; border-radius:24px; box-shadow:0 28px 80px rgba(15,23,42,.18); }
+.chat-modal--delete { max-height:min(88vh, 680px); }
 .chat-modal--wide { width:min(100%, 900px); }
 .chat-modal--members { width:min(100%, 720px); }
 .chat-modal--members-manage { width:min(100%, 760px); }
@@ -911,6 +912,35 @@ html.dark .chat-modal-header p { color:#94a3b8; }
 .chat-modal-close:hover { background:#dbeafe; }
 html.dark .chat-modal-close { background:#1e293b; color:#e2e8f0; }
 .chat-modal-top-content { padding:0 24px 8px; }
+.chat-delete-modal-content { display:flex; flex-direction:column; gap:14px; padding-bottom:16px; overflow-y:auto; }
+.chat-delete-modal-warning { display:flex; gap:12px; padding:16px 18px; background:#fff7ed; color:#9a3412; border:1px solid #fed7aa; border-radius:18px; }
+.chat-delete-modal-warning svg { flex-shrink:0; margin-top:2px; }
+.chat-delete-modal-warning strong { display:block; font-size:15px; color:#7c2d12; }
+.chat-delete-modal-warning p { margin:4px 0 0; font-size:13px; line-height:1.5; color:#9a3412; }
+.chat-delete-modal-options { display:flex; flex-direction:column; gap:12px; }
+.chat-delete-modal-option { padding:16px 18px; border:1px solid #dbeafe; border-radius:18px; background:#f8fbff; }
+.chat-delete-modal-option h4 { margin:0; font-size:15px; color:#1f2937; }
+.chat-delete-modal-option p { margin:6px 0 0; font-size:13px; line-height:1.5; color:#64748b; }
+.chat-delete-modal-option--danger { border-color:#fecdd3; background:#fff1f2; }
+.chat-delete-modal-option--danger h4 { color:#9f1239; }
+.chat-delete-modal-option--danger p { color:#9f1239; }
+.chat-delete-modal-actions { align-items:stretch; }
+.chat-delete-modal-actions .chat-modal-btn { flex:1 1 0; min-width:0; }
+.chat-delete-modal-actions--group {
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  align-items:stretch;
+}
+.chat-delete-modal-actions--group .chat-modal-btn {
+  min-height:54px;
+  padding:12px 16px;
+  line-height:1.35;
+  text-align:center;
+  white-space:normal;
+}
+.chat-delete-modal-actions--group .chat-modal-btn--danger {
+  grid-column:1 / -1;
+}
 .chat-form-group { display:flex; flex-direction:column; gap:8px; }
 .chat-form-label { font-size:13px; font-weight:700; color:#1f2937; }
 .chat-form-input { width:100%; min-height:44px; border:1px solid #cbd5e1; border-radius:14px; padding:10px 14px; font-size:14px; color:#1f2937; background:#fff; outline:none; }
@@ -921,6 +951,15 @@ html.dark .chat-form-label { color:#f8fafc; }
 html.dark .chat-form-input { background:#020617; border-color:#1e293b; color:#f8fafc; }
 html.dark .chat-helper-text { color:#94a3b8; }
 html.dark .chat-helper-text--warning { color:#fdba74; }
+html.dark .chat-delete-modal-warning { background:#3f1d12; border-color:#7c2d12; color:#fdba74; }
+html.dark .chat-delete-modal-warning strong { color:#fed7aa; }
+html.dark .chat-delete-modal-warning p { color:#fdba74; }
+html.dark .chat-delete-modal-option { background:#0b1220; border-color:#1e3a5f; }
+html.dark .chat-delete-modal-option h4 { color:#f8fafc; }
+html.dark .chat-delete-modal-option p { color:#94a3b8; }
+html.dark .chat-delete-modal-option--danger { background:#3f1724; border-color:#9f1239; }
+html.dark .chat-delete-modal-option--danger h4,
+html.dark .chat-delete-modal-option--danger p { color:#fecdd3; }
 .chat-modal-error { margin:0 24px 12px; padding:10px 12px; background:#fff1f2; color:#be123c; border:1px solid #fecdd3; border-radius:14px; font-size:13px; }
 .chat-room-members-summary { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:12px; padding:0 24px 14px; }
 .chat-room-members-stat {
@@ -1035,6 +1074,9 @@ html.dark .chat-modal-actions { border-top-color:#1e293b; }
 .chat-modal-btn--primary { background:#ff6a00; color:#fff; box-shadow:0 10px 18px rgba(255,106,0,.18); }
 .chat-modal-btn--primary:hover { background:#f05f00; }
 .chat-modal-btn--primary:disabled { background:#fdba74; color:#fff7ed; box-shadow:none; }
+.chat-modal-btn--danger { background:#e11d48; color:#fff; box-shadow:0 10px 18px rgba(225,29,72,.18); }
+.chat-modal-btn--danger:hover { background:#be123c; }
+.chat-modal-btn--danger:disabled { background:#fda4af; color:#fff1f2; box-shadow:none; }
 .chat-modal-btn:disabled,
 .chat-inline-action:disabled { opacity:.55; cursor:not-allowed; }
 
@@ -1100,10 +1142,16 @@ html.dark .report-modal h3 { color:#f1f5f9; }
   .chat-modal--wide,
   .chat-modal--members,
   .chat-modal--members-manage { width:100%; max-height:92vh; border-radius:24px 24px 18px 18px; }
+  .chat-modal--delete { max-height:calc(100dvh - 24px); }
   .chat-modal-header,
   .chat-modal-top-content,
   .chat-room-members-layout,
   .chat-modal-actions { padding-left:16px; padding-right:16px; }
+  .chat-delete-modal-warning,
+  .chat-delete-modal-option { padding:14px 15px; }
+  .chat-delete-modal-actions,
+  .chat-delete-modal-actions--group { grid-template-columns:1fr; }
+  .chat-delete-modal-actions .chat-modal-btn { width:100%; }
   .chat-room-members-summary { grid-template-columns:1fr; padding-left:16px; padding-right:16px; }
   .chat-member-search,
   .chat-modal-error { margin-left:16px; margin-right:16px; }

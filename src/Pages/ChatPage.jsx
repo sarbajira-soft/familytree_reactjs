@@ -7,9 +7,11 @@ import React, {
 } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { FiX } from 'react-icons/fi';
+import { toast } from 'react-toastify';
 import { useUser } from '../Contexts/UserContext';
 import { useChat } from '../Contexts/ChatContext';
 import ChatConversationPane from '../Components/Chat/ChatConversationPane';
+import ChatDeleteConversationModal from '../Components/Chat/ChatDeleteConversationModal';
 import ChatInfoPanel from '../Components/Chat/ChatInfoPanel';
 import ChatSidebar from '../Components/Chat/ChatSidebar';
 import ReportMessageModal from '../Components/Chat/ReportMessageModal';
@@ -27,8 +29,6 @@ import {
   addMembersToRoomSocket,
   createConversation,
   createRoomConversation,
-  deleteConversation as deleteConversationRequest,
-  deleteConversationSocket,
   deleteMessage as deleteMsg,
   deleteMessageSocket,
   deleteRoomConversation,
@@ -40,6 +40,8 @@ import {
   getConversations,
   getFamilyMembersForChat,
   getInitials,
+  hideConversation as hideConversationRequest,
+  hideConversationSocket,
   getMessages,
   getRooms,
   leaveRoomConversation,
@@ -163,6 +165,9 @@ const ChatPage = () => {
   const [roomMembersError, setRoomMembersError] = useState('');
   const [roomPhotoUploading, setRoomPhotoUploading] = useState(false);
   const [leavingRoom, setLeavingRoom] = useState(false);
+  const [deleteConversationOpen, setDeleteConversationOpen] = useState(false);
+  const [deleteConversationSubmitting, setDeleteConversationSubmitting] = useState(false);
+  const [deleteConversationError, setDeleteConversationError] = useState('');
   const [infoPanelOpen, setInfoPanelOpen] = useState(false);
   const [messageSearchOpen, setMessageSearchOpen] = useState(false);
   const [messageSearchQuery, setMessageSearchQuery] = useState('');
@@ -235,6 +240,9 @@ const ChatPage = () => {
     setSelectedRoomMemberIds([]);
     setRoomMembersError('');
     setAttachmentDraft(null);
+    setDeleteConversationOpen(false);
+    setDeleteConversationSubmitting(false);
+    setDeleteConversationError('');
     setNewConversationOpen(false);
     setNewConversationError('');
     setNewConversationSubmitting(false);
@@ -1348,6 +1356,7 @@ const ChatPage = () => {
       if (!conversationId) return;
 
       const cachedConversation = getCachedConversation(conversationId);
+      const hasCachedConversation = Boolean(cachedConversation);
       const isActiveConversation = isSameConversation(
         conversationId,
         selectedConversationRef.current,
@@ -1379,7 +1388,7 @@ const ChatPage = () => {
           matchingPendingMessage.tempId,
           payload,
           {
-            familyCode: cachedConversation?.familyCode,
+            familyCode: payload?.familyCode || cachedConversation?.familyCode,
             clearUnread: shouldClearUnread,
             unreadCount: nextUnreadCount,
           },
@@ -1390,7 +1399,7 @@ const ChatPage = () => {
           matchingOptimisticMessageId,
           payload,
           {
-            familyCode: cachedConversation?.familyCode,
+            familyCode: payload?.familyCode || cachedConversation?.familyCode,
             clearUnread: shouldClearUnread,
             unreadCount: nextUnreadCount,
           },
@@ -1402,17 +1411,21 @@ const ChatPage = () => {
           matchingPendingMediaMessage.tempId,
           payload,
           {
-            familyCode: cachedConversation?.familyCode,
+            familyCode: payload?.familyCode || cachedConversation?.familyCode,
             clearUnread: shouldClearUnread,
             unreadCount: nextUnreadCount,
           },
         );
       } else {
         applyConversationMessageUpdate(conversationId, payload, {
-          familyCode: cachedConversation?.familyCode,
+          familyCode: payload?.familyCode || cachedConversation?.familyCode,
           clearUnread: shouldClearUnread,
           unreadCount: nextUnreadCount,
         });
+      }
+
+      if (!hasCachedConversation) {
+        void refreshConversationFromServer(payload);
       }
 
       if (isActiveConversation && !sentByCurrentUser) {
@@ -1622,6 +1635,29 @@ const ChatPage = () => {
       }
     };
 
+    const handleConversationHidden = (payload = {}) => {
+      const conversationId = Number(payload?.conversationId || 0);
+      if (!conversationId) {
+        return;
+      }
+
+      removeCachedConversation(conversationId, payload?.familyCode);
+      if (
+        payload?.familyCode &&
+        normalizeFamilyCode(payload.familyCode) === activeFamilyCodeRef.current
+      ) {
+        syncListsFromCache(payload.familyCode);
+      }
+
+      if (isSameConversation(conversationId, selectedConversationRef.current)) {
+        clearOpenConversation({
+          navigateToList:
+            routeConversationIdNumber &&
+            isSameConversation(routeConversationIdNumber, conversationId),
+        });
+      }
+    };
+
     socket.on(CHAT_SOCKET_EVENTS.NEW_MESSAGE, handleNewMessage);
     socket.on(CHAT_SOCKET_EVENTS.MESSAGE_DELETED, handleMessageDeleted);
     socket.on(CHAT_SOCKET_EVENTS.TYPING, handleTyping);
@@ -1631,6 +1667,7 @@ const ChatPage = () => {
     socket.on(CHAT_SOCKET_EVENTS.MEMBER_REMOVED, handleRoomMembershipChange);
     socket.on(CHAT_SOCKET_EVENTS.ROOM_UPDATED, handleRoomUpdated);
     socket.on(CHAT_SOCKET_EVENTS.CONVERSATION_REMOVED, handleConversationRemoved);
+    socket.on(CHAT_SOCKET_EVENTS.CONVERSATION_HIDDEN, handleConversationHidden);
     socket.on(CHAT_SOCKET_EVENTS.PRESENCE_SNAPSHOT, handlePresenceSnapshot);
     socket.on(CHAT_SOCKET_EVENTS.PRESENCE_UPDATED, handlePresenceUpdated);
 
@@ -1644,6 +1681,7 @@ const ChatPage = () => {
       socket.off(CHAT_SOCKET_EVENTS.MEMBER_REMOVED, handleRoomMembershipChange);
       socket.off(CHAT_SOCKET_EVENTS.ROOM_UPDATED, handleRoomUpdated);
       socket.off(CHAT_SOCKET_EVENTS.CONVERSATION_REMOVED, handleConversationRemoved);
+      socket.off(CHAT_SOCKET_EVENTS.CONVERSATION_HIDDEN, handleConversationHidden);
       socket.off(CHAT_SOCKET_EVENTS.PRESENCE_SNAPSHOT, handlePresenceSnapshot);
       socket.off(CHAT_SOCKET_EVENTS.PRESENCE_UPDATED, handlePresenceUpdated);
     };
@@ -2261,49 +2299,89 @@ const ChatPage = () => {
     [activeFamilyCode, applyConversationRefresh, conversation?.roomId],
   );
 
-  const handleLeaveRoom = useCallback(async () => {
+  const handleCloseDeleteConversationModal = useCallback(() => {
+    if (deleteConversationSubmitting) {
+      return;
+    }
+
+    setDeleteConversationOpen(false);
+    setDeleteConversationError('');
+  }, [deleteConversationSubmitting]);
+
+  const handleOpenDeleteConversationModal = useCallback(() => {
+    if (!selectedId || !activeFamilyCode) {
+      return;
+    }
+
+    setDeleteConversationError('');
+    setDeleteConversationOpen(true);
+    setMenuOpen(false);
+  }, [activeFamilyCode, selectedId]);
+
+  const handleConfirmHideConversation = useCallback(async () => {
+    if (!selectedId || !activeFamilyCode) {
+      return;
+    }
+
+    const isGroupConversation =
+      Boolean(conversation?.roomId) || selectedType === CONVERSATION_TYPES.GROUP;
+
+    setDeleteConversationSubmitting(true);
+    setDeleteConversationError('');
+    setRoomMembersError('');
+
+    try {
+      if (socket && isChatConnected) {
+        await hideConversationSocket(socket, selectedId, activeFamilyCode);
+      } else {
+        await hideConversationRequest(selectedId, activeFamilyCode);
+      }
+
+      removeCachedConversation(selectedId, activeFamilyCode);
+      if (isGroupConversation) {
+        const roomResponse = await getRooms(activeFamilyCode);
+        setRooms(cacheRooms(activeFamilyCode, roomResponse?.rooms || []));
+      } else {
+        const conversationResponse = await getConversations(activeFamilyCode);
+        setConversations(
+          cacheConversations(activeFamilyCode, conversationResponse?.conversations || []),
+        );
+      }
+      clearOpenConversation();
+      setDeleteConversationOpen(false);
+      toast.success('Chat deleted successfully.');
+    } catch (error) {
+      console.error('Failed to delete conversation:', error);
+      const message = error?.message || 'Failed to delete this chat';
+      setDeleteConversationError(message);
+      toast.error(message);
+    } finally {
+      setDeleteConversationSubmitting(false);
+    }
+  }, [
+    activeFamilyCode,
+    clearOpenConversation,
+    conversation?.roomId,
+    isChatConnected,
+    selectedId,
+    selectedType,
+    socket,
+  ]);
+
+  const handleLeaveRoom = useCallback(() => {
     if (!conversation?.roomId || !activeFamilyCode || !selectedId) {
       return;
     }
 
-    const roomName = conversation?.roomName || 'this room';
-    if (!window.confirm(`Leave ${roomName}?`)) {
-      return;
-    }
-
-    setLeavingRoom(true);
-    setMenuOpen(false);
     setRoomMembersOpen(false);
     setRoomMembersError('');
     setSelectedRoomMemberIds([]);
-
-    try {
-      if (socket && isChatConnected) {
-        await leaveRoomConversationSocket(socket, conversation.roomId, activeFamilyCode);
-      } else {
-        await leaveRoomConversation(conversation.roomId, activeFamilyCode);
-      }
-      removeCachedConversation(selectedId, activeFamilyCode);
-
-      const roomResponse = await getRooms(activeFamilyCode);
-      setRooms(cacheRooms(activeFamilyCode, roomResponse?.rooms || []));
-      clearOpenConversation();
-    } catch (error) {
-      console.error('Failed to leave room:', error);
-      const message = error?.message || 'Failed to leave this room';
-      setRoomMembersError(message);
-      window.alert(message);
-    } finally {
-      setLeavingRoom(false);
-    }
+    handleOpenDeleteConversationModal();
   }, [
     activeFamilyCode,
     conversation?.roomId,
-    conversation?.roomName,
-    isChatConnected,
+    handleOpenDeleteConversationModal,
     selectedId,
-    clearOpenConversation,
-    socket,
   ]);
 
   const handleRenameRoom = useCallback(() => {
@@ -2399,34 +2477,55 @@ const ChatPage = () => {
     conversation?.roomId,
   ]);
 
-  const handleDeleteConversation = useCallback(async () => {
+  const handleDeleteConversation = useCallback(() => {
     if (!selectedId || !activeFamilyCode) {
       return;
     }
 
-    if (!window.confirm('Delete this complete chat?')) {
+    handleOpenDeleteConversationModal();
+  }, [activeFamilyCode, handleOpenDeleteConversationModal, selectedId]);
+
+  const handleConfirmDeleteAndLeaveGroup = useCallback(async () => {
+    if (!conversation?.roomId || !activeFamilyCode || !selectedId) {
       return;
     }
 
+    setLeavingRoom(true);
+    setDeleteConversationSubmitting(true);
+    setDeleteConversationError('');
+    setRoomMembersError('');
+
     try {
       if (socket && isChatConnected) {
-        await deleteConversationSocket(socket, selectedId, activeFamilyCode);
+        await leaveRoomConversationSocket(socket, conversation.roomId, activeFamilyCode);
       } else {
-        await deleteConversationRequest(selectedId, activeFamilyCode);
+        await leaveRoomConversation(conversation.roomId, activeFamilyCode);
       }
       removeCachedConversation(selectedId, activeFamilyCode);
-      const conversationResponse = await getConversations(activeFamilyCode);
-      setConversations(
-        cacheConversations(activeFamilyCode, conversationResponse?.conversations || []),
-      );
+
+      const roomResponse = await getRooms(activeFamilyCode);
+      setRooms(cacheRooms(activeFamilyCode, roomResponse?.rooms || []));
       clearOpenConversation();
+      setDeleteConversationOpen(false);
+      toast.success('You left the group successfully.');
     } catch (error) {
-      console.error('Failed to delete conversation:', error);
-      window.alert(error?.message || 'Failed to delete this chat');
+      console.error('Failed to leave room:', error);
+      const message = error?.message || 'Failed to leave this room';
+      setDeleteConversationError(message);
+      setRoomMembersError(message);
+      toast.error(message);
     } finally {
-      setMenuOpen(false);
+      setDeleteConversationSubmitting(false);
+      setLeavingRoom(false);
     }
-  }, [activeFamilyCode, clearOpenConversation, isChatConnected, selectedId, socket]);
+  }, [
+    activeFamilyCode,
+    clearOpenConversation,
+    conversation?.roomId,
+    isChatConnected,
+    selectedId,
+    socket,
+  ]);
 
   const handleDeleteRoom = useCallback(async () => {
     if (!conversation?.roomId || !activeFamilyCode || !selectedId) {
@@ -3199,6 +3298,18 @@ const ChatPage = () => {
           onClose={() => setReportMsg(null)}
         />
       )}
+
+      <ChatDeleteConversationModal
+        isOpen={deleteConversationOpen}
+        conversationName={isGroup ? roomDisplayName : headerName}
+        isGroup={isGroup}
+        canLeaveRoom={canLeaveRoom}
+        isSubmitting={deleteConversationSubmitting || leavingRoom}
+        error={deleteConversationError}
+        onClose={handleCloseDeleteConversationModal}
+        onDelete={handleConfirmHideConversation}
+        onDeleteAndLeave={handleConfirmDeleteAndLeaveGroup}
+      />
 
       <ChatPickerModal
         isOpen={newConversationOpen}

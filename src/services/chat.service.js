@@ -789,28 +789,51 @@ export const toggleMuteSocket = async (socket, conversationId, familyCode, isMut
 };
 
 export const deleteConversation = async (conversationId, familyCode) => {
+  return hideConversation(conversationId, familyCode);
+};
+
+export const hideConversation = async (conversationId, familyCode) => {
   const normalizedFamilyCode = requireFamilyCode(
     familyCode,
     'delete a conversation',
   );
-  const response = await authFetchResponse(
-    CHAT_API_ENDPOINTS.deleteConversation(conversationId, normalizedFamilyCode),
-    {
-      method: 'DELETE',
-    },
-  );
-  return parseJson(response);
+  const response = await authFetchResponse(CHAT_API_ENDPOINTS.hideConversation(conversationId), {
+    method: 'POST',
+    body: JSON.stringify({
+      familyCode: normalizedFamilyCode,
+    }),
+  });
+  const json = await parseJson(response);
+  return json?.data || json || { success: true };
 };
 
 export const deleteConversationSocket = async (socket, conversationId, familyCode) => {
+  return emitChatSocketEvent(
+    socket,
+    CHAT_SOCKET_EVENTS.DELETE_CONVERSATION,
+    'conversation-delete-confirmed',
+    {
+      conversationId: Number(conversationId),
+      familyCode: requireFamilyCode(
+        familyCode,
+        'delete a conversation',
+      ),
+    },
+    'delete a conversation',
+    (response) => Number(response?.conversationId || 0) === Number(conversationId || 0),
+    [CHAT_SOCKET_EVENTS.CONVERSATION_HIDDEN],
+  );
+};
+
+export const hideConversationSocket = async (socket, conversationId, familyCode) => {
   const normalizedFamilyCode = requireFamilyCode(
     familyCode,
     'delete a conversation',
   );
   return emitChatSocketEvent(
     socket,
-    CHAT_SOCKET_EVENTS.DELETE_CONVERSATION,
-    'conversation-delete-confirmed',
+    CHAT_SOCKET_EVENTS.HIDE_CONVERSATION,
+    CHAT_SOCKET_EVENTS.CONVERSATION_HIDDEN,
     {
       conversationId: Number(conversationId),
       familyCode: normalizedFamilyCode,
