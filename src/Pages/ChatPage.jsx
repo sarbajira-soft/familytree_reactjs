@@ -100,6 +100,13 @@ import '../Components/Chat/chat.css';
 
 const TEXT_SEND_MAX_RETRIES = 3;
 const TEXT_SEND_RETRY_BASE_DELAY_MS = 350;
+const DELETE_CHAT_ERROR_MESSAGE = "Couldn't delete the chat right now. Please try again.";
+const isSocketTimeoutError = (error) =>
+  Number(error?.status || 0) === 504 ||
+  String(error?.message || '')
+    .trim()
+    .toLowerCase()
+    .includes('chat socket timed out');
 
 const ChatPage = () => {
   const navigate = useNavigate();
@@ -2490,7 +2497,14 @@ const ChatPage = () => {
 
     try {
       if (socket && isChatConnected) {
-        await hideConversationSocket(socket, selectedId, activeFamilyCode);
+        try {
+          await hideConversationSocket(socket, selectedId, activeFamilyCode);
+        } catch (error) {
+          if (!isSocketTimeoutError(error)) {
+            throw error;
+          }
+          await hideConversationRequest(selectedId, activeFamilyCode);
+        }
       } else {
         await hideConversationRequest(selectedId, activeFamilyCode);
       }
@@ -2510,7 +2524,7 @@ const ChatPage = () => {
       toast.success('Chat deleted successfully.');
     } catch (error) {
       console.error('Failed to delete conversation:', error);
-      const message = error?.message || 'Failed to delete this chat';
+      const message = DELETE_CHAT_ERROR_MESSAGE;
       setDeleteConversationError(message);
       toast.error(message);
     } finally {
