@@ -35,7 +35,6 @@ const NotificationPanel = ({
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
   const [markingAllRead, setMarkingAllRead] = useState(false);
-  const [clearingNotifications, setClearingNotifications] = useState(false);
   const [processingRequest, setProcessingRequest] = useState(null);
   const [activeTab, setActiveTab] = useState("all"); // 'all', 'requests', 'other'
   const notificationTypes = {
@@ -237,34 +236,6 @@ const NotificationPanel = ({
       console.error("Failed to mark all notifications as read:", err);
     } finally {
       setMarkingAllRead(false);
-    }
-  };
-
-  const clearAllNotifications = async () => {
-    if (notifications.length === 0) {
-      return;
-    }
-
-    try {
-      setClearingNotifications(true);
-
-      await authFetchResponse("/notifications/clear-all", {
-        method: "DELETE",
-      });
-
-      setNotifications([]);
-
-      if (refetchUnreadCount) {
-        refetchUnreadCount();
-      }
-
-      if (onNotificationCountUpdate) {
-        onNotificationCountUpdate();
-      }
-    } catch (err) {
-      console.error("Failed to clear notifications:", err);
-    } finally {
-      setClearingNotifications(false);
     }
   };
 
@@ -639,27 +610,11 @@ const NotificationPanel = ({
               <div className="flex items-center gap-2">
                 <button
                   onClick={markAllAsRead}
-                  disabled={
-                    markingAllRead ||
-                    clearingNotifications ||
-                    unreadNotificationCount === 0
-                  }
+                  disabled={markingAllRead || unreadNotificationCount === 0}
                   className="rounded-full border border-blue-200 px-3 py-1 text-xs font-semibold text-blue-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                   type="button"
                 >
                   {markingAllRead ? "Marking..." : "Mark all read"}
-                </button>
-                <button
-                  onClick={clearAllNotifications}
-                  disabled={
-                    clearingNotifications ||
-                    markingAllRead ||
-                    notifications.length === 0
-                  }
-                  className="rounded-full border border-red-200 px-3 py-1 text-xs font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-                  type="button"
-                >
-                  {clearingNotifications ? "Clearing..." : "Clear notifications"}
                 </button>
               </div>
             </div>

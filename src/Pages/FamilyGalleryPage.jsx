@@ -476,14 +476,14 @@ const FamilyGalleryPage = () => {
                         <div className="flex items-center justify-between gap-3 text-sm text-gray-500">
                           {album.privacy === "family" ? (
                             <span
-                              className="flex items-center gap-1 rounded-full bg-primary-50 px-3 py-1 font-medium text-primary-600"
+                              className="flex items-center dark:bg-slate-900 gap-1 rounded-full bg-primary-50 px-3 py-1 font-medium text-primary-600"
                               title="Family Album"
                             >
                               <MdPeople size={16} /> 
                             </span>
                           ) : (
                             <span
-                              className="flex items-center gap-1 rounded-full bg-secondary-50 px-3 py-1 font-medium text-secondary-400"
+                              className="flex items-center gap-1 dark:bg-slate-900 rounded-full bg-secondary-50 px-3 py-1 font-medium text-secondary-400"
                               title="Public Album"
                             >
                               <MdPublic size={16} /> 

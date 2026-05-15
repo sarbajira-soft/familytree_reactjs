@@ -165,7 +165,7 @@ const ViewFamilyMemberModal = ({ isOpen, onClose, member, isLoading = false }) =
             <div className="flex-1 min-w-0">
               <h1 className="text-2xl font-bold mb-1 truncate">{normalized.fullName}</h1>
               <div className="flex items-center space-x-2 flex-wrap">
-                <span className={`px-3 py-1 rounded-full text-xs font-semibold border transition-smooth ${getRoleColor(normalized.roleName)}`}>
+                <span className={`px-3 py-1 rounded-full text-xs font-semibold border dark:text-white transition-smooth ${getRoleColor(normalized.roleName)}`}>
                   {normalized.roleName}
                 </span>
                 <span className="px-2 py-1 bg-white/20 rounded-full text-xs font-medium backdrop-blur-sm glass-effect">

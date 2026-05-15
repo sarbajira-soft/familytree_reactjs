@@ -245,7 +245,7 @@ const ChatInfoPanel = ({
                   )}
                 </div>
                 <div className="chat-info-member-chip-text">
-                  <span>{member.name}</span>
+                  <span className="chat-info-member-chip-name">{member.name}</span>
                   <small>{getChatMemberMetaText(member)}</small>
                   <div className="chat-member-chip-row chat-member-chip-row--compact">
                     {member.isFamilyAdmin ? (
@@ -253,7 +253,7 @@ const ChatInfoPanel = ({
                     ) : null}
                     {getChatMemberBadges(member).map((badge) => (
                       <span
-                        className={`chat-member-chip ${badge.className}`}
+                         className={`chat-member-chip ${badge.className}`}
                         key={`info-member-${member.userId}-${badge.key}`}
                         title={badge.title}
                       >
