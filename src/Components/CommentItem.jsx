@@ -169,7 +169,7 @@ const CommentItem = ({
               <textarea
                 value={editText}
                 onChange={(e) => setEditText(e.target.value)}
-                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-400 text-sm resize-none"
+                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-400 text-sm resize-none dark:text-white dark:bg-slate-800"
                 rows="2"
                 disabled={isLoading}
               />

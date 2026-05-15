@@ -511,7 +511,7 @@ const ChatConversationPane = ({
   disablePictureInPicture
   preload="metadata"
   src={message.mediaUrl}
-  className="max-w-full"
+  className="max-w-full dark:bg-slate-900 dark:text-white"
 />
                           ) : message.messageType === MESSAGE_TYPES.IMAGE ? (
                             <div className="msg-media-block">
@@ -609,7 +609,7 @@ const ChatConversationPane = ({
                       controls
                       src={composer.attachmentDraft.previewUrl}
                       preload="metadata"
-                      className="chat-attachment-preview__audio"
+                      className="chat-attachment-preview__audio dark:bg-slate-900 dark:text-white"
                        controlsList="nodownload noplaybackrate"
                     />
                   ) : (

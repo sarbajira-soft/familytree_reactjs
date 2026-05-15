@@ -425,7 +425,7 @@ html.dark .chat-info-member-chip { background:#0f172a; border-color:#1e293b; }
   flex-direction:column;
   gap:3px;
 }
-.chat-info-member-chip-text span {
+.chat-info-member-chip-name {
   font-size:14px;
   font-weight:700;
   color:#111827;
@@ -437,7 +437,7 @@ html.dark .chat-info-member-chip { background:#0f172a; border-color:#1e293b; }
   font-size:12px;
   color:#64748b;
 }
-html.dark .chat-info-member-chip-text span { color:#f8fafc; }
+html.dark .chat-info-member-chip-name { color:#f8fafc; }
 html.dark .chat-info-member-chip-text small { color:#94a3b8; }
 .chat-info-wide-action {
   width:100%;
@@ -1229,4 +1229,6 @@ html.dark .report-modal h3 { color:#f1f5f9; }
   .chat-info-panel-scroll {
     padding-bottom:12px;
   }
+
+  
 }
