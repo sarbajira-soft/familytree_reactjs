@@ -9,7 +9,7 @@ import {
   FiCalendar,
   FiMapPin,
   FiUsers,
-  FiPlusSquare,
+  FiPlusCircle,
   FiList,
   FiArrowRight,
   FiGlobe,
@@ -18,6 +18,7 @@ import {
   FiGift,
   FiHeart,
   FiMoreVertical,
+  FiClock,
 } from "react-icons/fi";
 
 import EventModal from "../Components/EventModal";
@@ -38,6 +39,27 @@ import {
 } from "../utils/eventValidation";
 
 const EVENTS_PAGE_SIZE = 20;
+
+const EVENT_FILTER_TABS = [
+  {
+    key: "upcoming",
+    label: "Upcoming",
+    longLabel: "Upcoming Events",
+    icon: FiClock,
+  },
+  {
+    key: "my-events",
+    label: "My",
+    longLabel: "My Events",
+    icon: FiList,
+  },
+  {
+    key: "all",
+    label: "All",
+    longLabel: "All Events",
+    icon: FiGlobe,
+  },
+];
 
 const getEventFeedEndpoint = (activeTab) => {
   if (activeTab === "upcoming") return "/events/upcoming";
@@ -392,6 +414,13 @@ const EventsPage = () => {
     }
   };
 
+  const getEventFilterButtonClassName = (tabKey) =>
+    `inline-flex min-w-0 items-center justify-center gap-2 rounded-full border px-4 py-2 text-[12px] font-semibold transition-all duration-200 md:px-5 md:py-2.5 md:text-[13px] ${
+      activeTab === tabKey
+        ? "border-[#F97316] bg-[#F97316] text-white shadow-[0_10px_18px_rgba(249,115,22,0.2)]"
+        : "border-[#2B7CD3] bg-[#2B7CD3] text-white shadow-[0_8px_18px_rgba(43,124,211,0.18)] hover:border-[#236AB4] hover:bg-[#236AB4]"
+    }`;
+
   const handleEditEventFromCard = async (event, e) => {
     e.stopPropagation();
     if (!event?.id) return;
@@ -480,142 +509,63 @@ const EventsPage = () => {
         </div>
       ) : (
         <div className="min-h-screen bg-gray-50 dark:bg-slate-950 pb-16">
-          <div className="max-w-7xl mx-auto px-4 py-8 md:px-6 lg:px-8 space-y-5">
-            {/* Header Section */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-              {/* Left Block - hidden on mobile to keep header compact */}
-              <div className="hidden sm:flex sm:flex-col w-full sm:w-auto">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-[#1976D2] rounded-lg flex items-center justify-center">
-                    <FiCalendar size={22} className="text-white" />
-                  </div>
-                  <h1 className="text-2xl sm:text-4xl font-extrabold text-[#1976D2]">
-                    Events
-                  </h1>
-                </div>
-
-                <p className="text-gray-600 dark:text-slate-300 mt-1 text-sm sm:text-lg">
-                  Create, manage and celebrate memorable moments
-                </p>
-
-                {/* Legend */}
-                {/* <div className="flex items-center gap-4 mt-3 text-xs sm:text-sm">
-                  <div className="flex items-center gap-1">
-                    <div className="w-2.5 h-2.5 bg-pink-500 rounded-full"></div>
-                    <span>Birthdays</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-2.5 h-2.5 bg-red-500 rounded-full"></div>
-                    <span>Anniversaries</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-2.5 h-2.5 bg-[#1976D2] rounded-full"></div>
-                    <span>Custom Events</span>
-                  </div>
-                </div> */}
-              </div>
-
-              {/* Right Button */}
+          <div className="max-w-7xl mx-auto px-4 py-8 md:px-6 lg:px-8 space-y-6">
+            <div className="space-y-3 lg:hidden">
               <button
                 onClick={handleCreateEventClick}
-                className="bg-gradient-to-r from-orange-500 to-orange-600 
-      text-white px-4 py-2 sm:px-8 sm:py-4 rounded-xl shadow-lg 
-      hover:opacity-90 transition duration-300 flex items-center gap-2 sm:gap-3 
-      text-sm sm:text-lg font-semibold w-full sm:w-auto justify-center"
+                className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-full bg-primary-600 px-6 py-3 text-[15px] font-semibold text-white shimmer-button"
               >
-                <FiPlusSquare size={20} /> Create Event
+                <FiPlusCircle size={18} /> Create Event
+              </button>
+
+              <div className="grid min-w-0 grid-cols-3 gap-3">
+                {EVENT_FILTER_TABS.map((tab) => {
+                  const TabIcon = tab.icon;
+
+                  return (
+                    <button
+                      key={tab.key}
+                      onClick={() => setActiveTab(tab.key)}
+                      className={getEventFilterButtonClassName(tab.key)}
+                    >
+                      <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center">
+                        <TabIcon size={15} />
+                      </span>
+                      <span className="whitespace-nowrap">{tab.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="hidden lg:flex lg:flex-row lg:items-center lg:gap-3">
+              <div className="flex min-w-0 flex-1 items-center gap-3">
+                {EVENT_FILTER_TABS.map((tab) => {
+                  const TabIcon = tab.icon;
+
+                  return (
+                    <button
+                      key={tab.key}
+                      onClick={() => setActiveTab(tab.key)}
+                      className={getEventFilterButtonClassName(tab.key)}
+                    >
+                      <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center">
+                        <TabIcon size={15} />
+                      </span>
+                      <span className="whitespace-nowrap">{tab.longLabel}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                onClick={handleCreateEventClick}
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-primary-600 px-6 py-3 text-[15px] font-semibold text-white shimmer-button"
+              >
+                <FiPlusCircle size={18} /> Create Event
               </button>
             </div>
 
-            {/* Filter Tabs – Responsive (Mobile vs Desktop) */}
-            <div className="flex justify-center w-full mt-1">
-              {/* Container */}
-              <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-md p-2 border border-gray-200 dark:border-slate-800 w-full">
-                {/* Desktop View (Old UI) */}
-                <div className="hidden md:flex items-center justify-center gap-4">
-                  {/* Upcoming */}
-                  <button
-                    onClick={() => setActiveTab("upcoming")}
-                    className={`flex items-center gap-2 py-3 px-6 rounded-xl font-semibold transition-all
-        ${activeTab === "upcoming"
-                        ? "bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg scale-105"
-                        : "bg-[#1976D2] text-white hover:bg-[#1565C0]"
-                      }`}
-                  >
-                    <FiCalendar size={18} />
-                    <span>Upcoming Events</span>
-                  </button>
-
-                  {/* My Events */}
-                  <button
-                    onClick={() => setActiveTab("my-events")}
-                    className={`flex items-center gap-2 py-3 px-6 rounded-xl font-semibold transition-all
-        ${activeTab === "my-events"
-                        ? "bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg scale-105"
-                        : "bg-[#1976D2] text-white hover:bg-[#1565C0]"
-                      }`}
-                  >
-                    <FiList size={18} />
-                    <span>My Events</span>
-                  </button>
-
-                  {/* All Events */}
-                  <button
-                    onClick={() => setActiveTab("all")}
-                    className={`flex items-center gap-2 py-3 px-6 rounded-xl font-semibold transition-all
-        ${activeTab === "all"
-                        ? "bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg scale-105"
-                        : "bg-[#1976D2] text-white hover:bg-[#1565C0]"
-                      }`}
-                  >
-                    <FiGlobe size={18} />
-                    <span>All Events</span>
-                  </button>
-                </div>
-
-                {/* Mobile View (Compact UI) */}
-                <div className="flex md:hidden items-center gap-2">
-                  {/* Upcoming */}
-                  <button
-                    onClick={() => setActiveTab("upcoming")}
-                    className={`flex-1 inline-flex items-center justify-center gap-1 py-1.5 px-1.5 text-[10px] rounded-full font-semibold transition-all
-        ${activeTab === "upcoming"
-                        ? "bg-orange-500 text-white shadow-md"
-                        : "bg-white text-[#1976D2] border border-[#1976D2]/30"
-                      }`}
-                  >
-                    <FiCalendar size={14} />
-                    <span className="whitespace-nowrap">Upcoming</span>
-                  </button>
-
-                  {/* My Events */}
-                  <button
-                    onClick={() => setActiveTab("my-events")}
-                    className={`flex-1 inline-flex items-center justify-center gap-1 py-1.5 px-1.5 text-[10px] rounded-full font-semibold transition-all
-        ${activeTab === "my-events"
-                        ? "bg-orange-500 text-white shadow-md"
-                        : "bg-white text-[#1976D2] border border-[#1976D2]/30"
-                      }`}
-                  >
-                    <FiList size={14} />
-                    <span className="whitespace-nowrap">My Events</span>
-                  </button>
-
-                  {/* All */}
-                  <button
-                    onClick={() => setActiveTab("all")}
-                    className={`flex-1 inline-flex items-center justify-center gap-1 py-1.5 px-1.5 text-[10px] rounded-full font-semibold transition-all
-        ${activeTab === "all"
-                        ? "bg-orange-500 text-white shadow-md"
-                        : "bg-white text-[#1976D2] border border-[#1976D2]/30"
-                      }`}
-                  >
-                    <FiGlobe size={14} />
-                    <span className="whitespace-nowrap">All</span>
-                  </button>
-                </div>
-              </div>
-            </div>
 
             {/* Events Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -624,7 +574,7 @@ const EventsPage = () => {
                   <EventsShimmer />
                 </div>
               ) : displayedEvents.length > 0 ? (
-                displayedEvents.map((event) => {
+                displayedEvents.map((event, index) => {
                   const eventStyle = getEventTypeStyle(event.eventType);
                   const EventIcon = eventStyle.icon;
                   const canReport =
@@ -635,9 +585,10 @@ const EventsPage = () => {
                   return (
                     <div
                       key={event.id}
-                      className={`group bg-white dark:bg-slate-900 rounded-2xl shadow-lg transition-all duration-300 border h-full flex flex-col ${eventStyle.borderColor
+                      style={{ animationDelay: `${index * 0.08}s` }}
+                      className={`group bg-white dark:bg-slate-900 rounded-2xl shadow-lg transition-all duration-300 border h-full flex flex-col stagger-item hover-lift scale-on-hover ${eventStyle.borderColor
                         } dark:border-slate-800 ${event.eventType === "custom"
-                          ? "cursor-pointer hover:shadow-xl transform hover:scale-105"
+                          ? "cursor-pointer hover:shadow-xl"
                           : "cursor-default"
                         }`}
                       onClick={
@@ -759,12 +710,6 @@ const EventsPage = () => {
                               </p>
                             </div>
                           </div>
-
-                          {/* {event.description && (
-                            <p className="text-gray-600 dark:text-slate-300 text-xs leading-relaxed line-clamp-2">
-                              {event.description}
-                            </p>
-                          )} */}
                         </div>
 
                         <div className="flex items-center justify-between pt-2 mt-auto border-t border-gray-100 dark:border-slate-800">
@@ -788,7 +733,7 @@ const EventsPage = () => {
                                     onClick={(e) =>
                                       handleEditEventFromCard(event, e)
                                     }
-                                    className="bg-unset p-1.5 text-gray-500 hover:text-[#1976D2] hover:bg-[#1976D2]/10 rounded-lg transition-all duration-200"
+                                    className="bg-unset p-1.5 text-gray-500 hover:text-[#1976D2] hover:bg-[#1976D2]/10 rounded-lg transition-all duration-200 magnetic-icon"
                                     title="Edit Event"
                                   >
                                     <FiEdit3 size={14} />
@@ -797,7 +742,7 @@ const EventsPage = () => {
                                     onClick={(e) =>
                                       handleDeleteEventFromCard(event, e)
                                     }
-                                    className="bg-unset p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-all duration-200"
+                                    className="bg-unset p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-all duration-200 magnetic-icon"
                                     title="Delete Event"
                                   >
                                     <FiTrash2 size={14} />
@@ -814,7 +759,7 @@ const EventsPage = () => {
                                 <button
                                   type="button"
                                   aria-label="Event actions"
-                                  className="bg-unset p-1.5 text-gray-500 dark:text-slate-300 hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-all duration-200"
+                                  className="bg-unset p-1.5 text-gray-500 dark:text-slate-300 hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-all duration-200 magnetic-icon"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setEventActionMenuEventId((prev) =>
@@ -861,7 +806,7 @@ const EventsPage = () => {
                   );
                 })
               ) : (
-                <div className="col-span-full text-center py-12 text-gray-500">
+                <div className="col-span-full flex min-h-[55vh] items-center justify-center text-center text-gray-500">
                   No events found
                 </div>
               )}
@@ -882,7 +827,6 @@ const EventsPage = () => {
           </div>
         </div>
       )}
-
       {/* Modals */}
       <EventModal
         isOpen={Boolean(eventModalMode)}
