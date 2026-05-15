@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import EmojiPicker, { EmojiStyle, Theme } from 'emoji-picker-react';
 import {
   FiAlertTriangle,
@@ -53,6 +53,8 @@ const ChatConversationPane = ({
   messagesPane,
   selectedId,
 }) => {
+
+  const [previewImage, setPreviewImage] = useState(null);
   if (!selectedId) {
     return (
       <div className="chat-placeholder">
@@ -70,23 +72,77 @@ const ChatConversationPane = ({
   }
 
   if (chatLoading) {
-    return (
-      <div className="chat-thread-loader" aria-label="Loading conversation">
-        <div className="chat-thread-loader__header">
-          <div className="chat-thread-loader__avatar shimmer-block" />
-          <div className="chat-thread-loader__meta">
-            <div className="chat-thread-loader__line shimmer-block" />
-            <div className="chat-thread-loader__line chat-thread-loader__line--short shimmer-block" />
-          </div>
-        </div>
-        <div className="chat-thread-loader__messages">
-          <div className="chat-thread-loader__bubble shimmer-block" />
-          <div className="chat-thread-loader__bubble chat-thread-loader__bubble--sent shimmer-block" />
-          <div className="chat-thread-loader__bubble chat-thread-loader__bubble--wide shimmer-block" />
+  return (
+    <div className="flex h-full flex-col bg-white dark:bg-slate-900">
+
+      {/* Header Skeleton */}
+      <div className="flex items-center gap-3 border-b border-gray-200 dark:border-slate-800 px-4 py-3">
+        <div className="h-11 w-11 animate-pulse rounded-full bg-gray-200 dark:bg-slate-700" />
+
+        <div className="flex-1">
+          <div className="h-4 w-32 animate-pulse rounded bg-gray-200 dark:bg-slate-700" />
+
+          <div className="mt-2 h-3 w-20 animate-pulse rounded bg-gray-100 dark:bg-slate-800" />
         </div>
       </div>
-    );
-  }
+
+      {/* Messages */}
+      <div className="flex-1 space-y-4 overflow-y-auto px-4 py-5">
+
+        {/* Left Message */}
+        <div className="flex items-end gap-2">
+          <div className="h-8 w-8 animate-pulse rounded-full bg-gray-200 dark:bg-slate-700" />
+
+          <div className="max-w-[70%]">
+            <div className="h-16 w-56 animate-pulse rounded-2xl rounded-bl-sm bg-gray-200 dark:bg-slate-700" />
+
+            <div className="mt-2 h-3 w-12 animate-pulse rounded bg-gray-100 dark:bg-slate-800" />
+          </div>
+        </div>
+
+        {/* Right Message */}
+        <div className="flex justify-end">
+          <div className="max-w-[70%]">
+            <div className="h-14 w-48 animate-pulse rounded-2xl rounded-br-sm bg-blue-100 dark:bg-slate-700" />
+
+            <div className="ml-auto mt-2 h-3 w-10 animate-pulse rounded bg-gray-100 dark:bg-slate-800" />
+          </div>
+        </div>
+
+        {/* Left Message */}
+        <div className="flex items-end gap-2">
+          <div className="h-8 w-8 animate-pulse rounded-full bg-gray-200 dark:bg-slate-700" />
+
+          <div className="max-w-[70%]">
+            <div className="h-20 w-64 animate-pulse rounded-2xl rounded-bl-sm bg-gray-200 dark:bg-slate-700" />
+
+            <div className="mt-2 h-3 w-16 animate-pulse rounded bg-gray-100 dark:bg-slate-800" />
+          </div>
+        </div>
+
+        {/* Right Message */}
+        <div className="flex justify-end">
+          <div className="max-w-[70%]">
+            <div className="h-12 w-40 animate-pulse rounded-2xl rounded-br-sm bg-blue-100 dark:bg-slate-700" />
+
+            <div className="ml-auto mt-2 h-3 w-10 animate-pulse rounded bg-gray-100 dark:bg-slate-800" />
+          </div>
+        </div>
+      </div>
+
+      {/* Composer Skeleton */}
+      <div className="border-t border-gray-200 dark:border-slate-800 px-4 py-3">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 animate-pulse rounded-full bg-gray-200 dark:bg-slate-700" />
+
+          <div className="h-11 flex-1 animate-pulse rounded-full bg-gray-200 dark:bg-slate-700" />
+
+          <div className="h-10 w-10 animate-pulse rounded-full bg-blue-100 dark:bg-slate-700" />
+        </div>
+      </div>
+    </div>
+  );
+}
 
   return (
     <>
@@ -288,7 +344,22 @@ const ChatConversationPane = ({
         <div className="chat-thread-pane">
           <div className="chat-messages-wrap">
             <div className="chat-messages-bg" />
-            <div className="chat-messages custom-scrollbar">
+            <div
+              className="chat-messages custom-scrollbar"
+              onScroll={messagesPane.onScroll}
+              ref={messagesPane.containerRef}
+            >
+              {messagesPane.isLoadingOlderMessages ? (
+                <div className="chat-history-loader" role="status" aria-live="polite">
+                  Loading older messages...
+                </div>
+              ) : messagesPane.hasResolvedHistory &&
+                !messagesPane.hasOlderMessages &&
+                messagesPane.groupedMessages.length > 0 ? (
+                <div className="chat-history-loader chat-history-loader--complete">
+                  Beginning of conversation
+                </div>
+              ) : null}
               {messagesPane.groupedMessages.map((item) => {
                 if (item.type === 'date') {
                   return (
@@ -406,17 +477,7 @@ const ChatConversationPane = ({
                                 <FiTrash2 />
                               </button>
                             )}
-                            {!isSent && (
-                              <button
-                                className="msg-action-btn"
-                                onClick={() => messagesPane.onReportMessage(message)}
-                                type="button"
-                                aria-label="Report message"
-                                title="Report"
-                              >
-                                <FiAlertTriangle />
-                              </button>
-                            )}
+                           
                           </div>
                         )}
 
@@ -444,21 +505,27 @@ const ChatConversationPane = ({
                           </span>
                         ) : message.mediaUrl ? (
                           message.messageType === MESSAGE_TYPES.VOICE ? (
-                            <audio controls src={message.mediaUrl} preload="metadata" />
+                            <audio
+  controls
+  controlsList="nodownload noplaybackrate"
+  disablePictureInPicture
+  preload="metadata"
+  src={message.mediaUrl}
+  className="max-w-full"
+/>
                           ) : message.messageType === MESSAGE_TYPES.IMAGE ? (
                             <div className="msg-media-block">
-                              <a
-                                href={message.mediaUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="msg-media-link"
-                              >
-                                <img
-                                  src={message.mediaUrl}
-                                  alt={message.content || 'Shared image'}
-                                  className="msg-media-image"
-                                />
-                              </a>
+                              <button
+  type="button"
+  className="msg-media-link"
+  onClick={() => setPreviewImage(message.mediaUrl)}
+>
+  <img
+    src={message.mediaUrl}
+    alt={message.content || 'Shared image'}
+    className="msg-media-image"
+  />
+</button>
                               {message.content ? (
                                 <div className="msg-media-caption">
                                   {renderHighlightedText(
@@ -543,6 +610,7 @@ const ChatConversationPane = ({
                       src={composer.attachmentDraft.previewUrl}
                       preload="metadata"
                       className="chat-attachment-preview__audio"
+                       controlsList="nodownload noplaybackrate"
                     />
                   ) : (
                     <div className="chat-attachment-preview__fileicon">
@@ -699,11 +767,65 @@ const ChatConversationPane = ({
 
       {infoPanel.showMobile ? (
         <div className="chat-info-overlay" onClick={infoPanel.onOverlayClose} role="presentation">
-          <div onClick={(event) => event.stopPropagation()} role="presentation">
+          <div
+            className="chat-info-overlay__panel"
+            onClick={(event) => event.stopPropagation()}
+            role="presentation"
+          >
             {infoPanel.mobileNode}
           </div>
         </div>
       ) : null}
+      {previewImage && (
+  <div
+    className="
+      absolute
+      inset-0
+      z-50
+      flex
+      items-center
+      justify-center
+      bg-black/60
+      backdrop-blur-sm
+      p-4
+    "
+    onClick={() => setPreviewImage(null)}
+  >
+    <div
+      onClick={(e) => e.stopPropagation()}
+    >
+      <button
+        type="button"
+        onClick={() => setPreviewImage(null)}
+        className="
+          absolute
+          right-3
+          top-3
+          z-10
+          rounded-full
+          bg-black/60
+          p-2
+          text-white
+          hover:bg-black/80
+        "
+      >
+        <FiX size={20} />
+      </button>
+
+      <img
+        src={previewImage}
+        alt="Preview"
+        className="
+          max-h-[80vh]
+          w-auto
+          max-w-full
+          rounded-xl
+          object-contain
+        "
+      />
+    </div>
+  </div>
+)}
     </>
   );
 };

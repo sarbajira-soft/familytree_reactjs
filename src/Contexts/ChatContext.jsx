@@ -15,7 +15,7 @@ import {
   getChatFamilies,
   getUnreadChatCount,
 } from '../services/chat.service';
-import { initializeChatPush } from '../services/chatPush.service';
+import { removeCurrentChatPushRegistration } from '../services/chatPush.service';
 import { clearChatCache } from '../utils/chatCache';
 
 const normalizeFamilyCode = (value) =>
@@ -128,18 +128,10 @@ export const ChatProvider = ({ children }) => {
       return undefined;
     }
 
-    let cleanup = async () => {};
-    initializeChatPush()
-      .then((fn) => {
-        cleanup = typeof fn === 'function' ? fn : async () => {};
-      })
+    removeCurrentChatPushRegistration()
       .catch((error) => {
-        console.warn('Chat push initialization failed:', error);
+        console.warn('Chat push cleanup failed:', error);
       });
-
-    return () => {
-      cleanup?.();
-    };
   }, [userInfo?.userId]);
 
   const joinConversation = useCallback(

@@ -25,18 +25,11 @@ if (hasMinimumConfig && self.firebase && !firebase.apps.length) {
   const messaging = firebase.messaging();
 
   messaging.onBackgroundMessage((payload) => {
-    const notification = payload?.notification || {};
     const data = payload?.data || {};
-    const title = notification.title || 'Familyss';
-    const body = notification.body || 'You have a new chat notification';
 
-    self.registration.showNotification(title, {
-      body,
-      icon: '/assets/family-logo.png',
-      badge: '/assets/favicon-familyss.png',
-      data,
-      tag: data?.conversationId ? `chat-${data.conversationId}` : 'chat-notification',
-    });
+    if (data?.conversationId || data?.roomId || data?.messageId) {
+      return;
+    }
   });
 }
 

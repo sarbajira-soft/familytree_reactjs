@@ -3685,7 +3685,7 @@ const FamilyTreePage = () => {
                     <button
                       type="button"
                       onClick={closeStructuralDummyDialog}
-                      className="rounded-full border border-white/20 bg-white dark:bg-slate-900/10 px-3 py-1 text-sm font-semibold text-white transition hover:bg-white dark:bg-slate-900/20"
+                      className="rounded-full border border-white/20  text-black dark:text-white dark:bg-slate-900/10 px-3 py-1 text-sm font-semibold text-white transition  dark:bg-slate-900/20"
                     >
                       Close
                     </button>
