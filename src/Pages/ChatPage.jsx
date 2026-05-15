@@ -145,6 +145,12 @@ const ChatPage = () => {
   const [selectedType, setSelectedType] = useState(CONVERSATION_TYPES.DIRECT);
   const [conversation, setConversation] = useState(null);
   const [messages, setMessages] = useState([]);
+  const [messagePagination, setMessagePagination] = useState({
+    nextCursor: null,
+    hasMore: false,
+    loadingOlder: false,
+    initialized: false,
+  });
   const [chatLoading, setChatLoading] = useState(false);
   const [replyTo, setReplyTo] = useState(null);
   const [attachmentDraft, setAttachmentDraft] = useState(null);
@@ -153,7 +159,7 @@ const ChatPage = () => {
   const [text, setText] = useState('');
   const [showComposerPicker, setShowComposerPicker] = useState(false);
   const [isMobile, setIsMobile] = useState(
-    typeof window !== 'undefined' ? window.innerWidth < 768 : false,
+    typeof window !== 'undefined' ? window.innerWidth < 1024 : false,
   );
   const [sendingMedia, setSendingMedia] = useState(false);
   const [typingUserIds, setTypingUserIds] = useState([]);
@@ -190,6 +196,7 @@ const ChatPage = () => {
   const hasComposerText = Boolean(String(text || '').trim());
 
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
   const menuRef = useRef(null);
   const composerRef = useRef(null);
   const inputRef = useRef(null);
@@ -216,6 +223,13 @@ const ChatPage = () => {
   const chatSocketReadyRef = useRef(Boolean(socket?.connected) && Boolean(isChatConnected));
   const textSendQueueRef = useRef([]);
   const textSendProcessingRef = useRef(false);
+  const messagesRef = useRef([]);
+  const previousSelectedIdRef = useRef(null);
+  const pendingOlderMessagesRestoreRef = useRef(null);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   useEffect(() => {
     selectedConversationRef.current = Number(selectedId || 0) || null;
@@ -272,7 +286,7 @@ const ChatPage = () => {
 
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
+      setIsMobile(window.innerWidth < 1024);
     };
 
     window.addEventListener('resize', handleResize);
@@ -469,11 +483,18 @@ const ChatPage = () => {
     (options = {}) => {
       stopLocalTyping();
       clearRemoteTyping();
+      pendingOlderMessagesRestoreRef.current = null;
       setSelectedId(null);
       setResolvedConversationId(null);
       setSelectedType(CONVERSATION_TYPES.DIRECT);
       setConversation(null);
       setMessages([]);
+      setMessagePagination({
+        nextCursor: null,
+        hasMore: false,
+        loadingOlder: false,
+        initialized: false,
+      });
       setReplyTo(null);
       setAttachmentDraft(null);
       setMenuOpen(false);
@@ -510,6 +531,12 @@ const ChatPage = () => {
       setRooms([]);
       setMessagesListLoading(false);
       setRoomsListLoading(false);
+      setMessagePagination({
+        nextCursor: null,
+        hasMore: false,
+        loadingOlder: false,
+        initialized: false,
+      });
       return () => {
         isCancelled = true;
       };
@@ -1138,10 +1165,17 @@ const ChatPage = () => {
 
       const requestId = openRequestIdRef.current + 1;
       openRequestIdRef.current = requestId;
+      pendingOlderMessagesRestoreRef.current = null;
 
       setSelectedId(targetConversationId);
       setResolvedConversationId(null);
       setSelectedType(conversationType);
+      setMessagePagination({
+        nextCursor: null,
+        hasMore: false,
+        loadingOlder: false,
+        initialized: false,
+      });
       setChatLoading(true);
       setReplyTo(null);
       setAttachmentDraft(null);
@@ -1211,6 +1245,12 @@ const ChatPage = () => {
         );
 
         setMessages(nextMessages);
+        setMessagePagination({
+          nextCursor: messageResponse?.nextCursor || null,
+          hasMore: Boolean(messageResponse?.hasMore),
+          loadingOlder: false,
+          initialized: true,
+        });
         syncListsFromCache(familyCode);
         await markConversationReadNow(targetConversationId, { suppressErrors: true });
       } catch (error) {
@@ -1238,6 +1278,76 @@ const ChatPage = () => {
       syncListsFromCache,
     ],
   );
+
+  const loadOlderMessages = useCallback(async () => {
+    const targetConversationId = Number(selectedConversationRef.current || 0);
+    const familyCode = activeFamilyCodeRef.current;
+    const nextCursor = messagePagination?.nextCursor || null;
+    if (
+      !targetConversationId ||
+      !familyCode ||
+      !nextCursor ||
+      !messagePagination?.hasMore ||
+      messagePagination?.loadingOlder ||
+      chatLoading
+    ) {
+      return;
+    }
+
+    const container = messagesContainerRef.current;
+    if (!container) {
+      return;
+    }
+
+      setMessagePagination((current) => ({
+        ...current,
+        loadingOlder: true,
+      }));
+
+    try {
+      const messageResponse = await getMessages(
+        targetConversationId,
+        nextCursor,
+        currentUserId,
+        familyCode,
+      );
+
+      if (!isSameConversation(targetConversationId, selectedConversationRef.current)) {
+        return;
+      }
+
+      pendingOlderMessagesRestoreRef.current = {
+        conversationId: targetConversationId,
+        previousScrollHeight: container.scrollHeight,
+        previousScrollTop: container.scrollTop,
+      };
+
+      const nextMessages = cacheMessages(targetConversationId, [
+        ...(messageResponse?.messages || []),
+        ...messagesRef.current,
+      ]);
+
+      setMessages(nextMessages);
+      setMessagePagination({
+        nextCursor: messageResponse?.nextCursor || null,
+        hasMore: Boolean(messageResponse?.hasMore),
+        loadingOlder: false,
+        initialized: true,
+      });
+    } catch (error) {
+      console.error('Failed to load older chat messages:', error);
+      setMessagePagination((current) => ({
+        ...current,
+        loadingOlder: false,
+      }));
+    }
+  }, [
+    chatLoading,
+    currentUserId,
+    messagePagination?.hasMore,
+    messagePagination?.loadingOlder,
+    messagePagination?.nextCursor,
+  ]);
 
   const sendMediaRef = useRef(null);
 
@@ -1328,8 +1438,56 @@ const ChatPage = () => {
   ]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const container = messagesContainerRef.current;
+    if (!container) {
+      return;
+    }
+
+    const pendingRestore = pendingOlderMessagesRestoreRef.current;
+    if (
+      pendingRestore &&
+      isSameConversation(pendingRestore.conversationId, selectedId)
+    ) {
+      const scrollDelta = container.scrollHeight - pendingRestore.previousScrollHeight;
+      container.scrollTop = Math.max(
+        0,
+        pendingRestore.previousScrollTop + scrollDelta,
+      );
+      pendingOlderMessagesRestoreRef.current = null;
+      previousSelectedIdRef.current = selectedId;
+      return;
+    }
+
+    const previousSelectedId = previousSelectedIdRef.current;
+    previousSelectedIdRef.current = selectedId;
+    if (!selectedId) {
+      return;
+    }
+
+    messagesEndRef.current?.scrollIntoView({
+      behavior:
+        previousSelectedId && isSameConversation(previousSelectedId, selectedId)
+          ? 'smooth'
+          : 'auto',
+    });
   }, [messages, selectedId, typingUserIds]);
+
+  const handleMessagesScroll = useCallback(
+    (event) => {
+      if (
+        event.currentTarget.scrollTop <= 80 &&
+        messagePagination.hasMore &&
+        !messagePagination.loadingOlder
+      ) {
+        loadOlderMessages();
+      }
+    },
+    [
+      loadOlderMessages,
+      messagePagination.hasMore,
+      messagePagination.loadingOlder,
+    ],
+  );
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -3274,13 +3432,18 @@ const ChatPage = () => {
               total: messageSearchMatches.length,
             }}
             messagesPane={{
+              containerRef: messagesContainerRef,
               activeSearchId: activeMessageSearchId,
               currentUserId,
               endRef: messagesEndRef,
               groupedMessages,
+              hasOlderMessages: messagePagination.hasMore,
+              hasResolvedHistory: messagePagination.initialized,
+              isLoadingOlderMessages: messagePagination.loadingOlder,
               matchIds: messageSearchMatchIds,
               nodeRefs: messageNodeRefs,
               onDeleteMessage: handleDelete,
+              onScroll: handleMessagesScroll,
               onReply: setReplyTo,
               onReportMessage: setReportMsg,
               typingLabel,

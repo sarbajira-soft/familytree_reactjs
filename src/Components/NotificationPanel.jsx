@@ -18,6 +18,7 @@ import { useNotificationSocket } from "../hooks/useNotificationSocket";
 import { useUser } from "../Contexts/UserContext";
 import { getToken } from "../utils/auth";
 import { authFetchResponse } from "../utils/authFetch";
+import { filterNonChatNotifications } from "../utils/chatNotificationFilter";
 
 const NotificationPanel = ({
   open,
@@ -33,6 +34,8 @@ const NotificationPanel = ({
 
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [markingAllRead, setMarkingAllRead] = useState(false);
+  const [clearingNotifications, setClearingNotifications] = useState(false);
   const [processingRequest, setProcessingRequest] = useState(null);
   const [activeTab, setActiveTab] = useState("all"); // 'all', 'requests', 'other'
   const notificationTypes = {
@@ -173,7 +176,7 @@ const NotificationPanel = ({
         );
       });
 
-      setNotifications(formatted);
+      setNotifications(filterNonChatNotifications(formatted));
     } catch (err) {
       console.error("Error fetching notifications:", err);
     } finally {
@@ -199,6 +202,72 @@ const NotificationPanel = ({
     }
   };
 
+  const markAllAsRead = async () => {
+    const unreadNotificationCount = notifications.filter(
+      (notification) => !notification.read,
+    ).length;
+
+    if (unreadNotificationCount === 0) {
+      return;
+    }
+
+    try {
+      setMarkingAllRead(true);
+
+      await authFetchResponse("/notifications/read-all", {
+        method: "POST",
+      });
+
+      setNotifications((prev) =>
+        prev.map((notification) =>
+          notification.read
+            ? notification
+            : { ...notification, read: true, readAt: new Date().toISOString() },
+        ),
+      );
+
+      if (refetchUnreadCount) {
+        refetchUnreadCount();
+      }
+
+      if (onNotificationCountUpdate) {
+        onNotificationCountUpdate();
+      }
+    } catch (err) {
+      console.error("Failed to mark all notifications as read:", err);
+    } finally {
+      setMarkingAllRead(false);
+    }
+  };
+
+  const clearAllNotifications = async () => {
+    if (notifications.length === 0) {
+      return;
+    }
+
+    try {
+      setClearingNotifications(true);
+
+      await authFetchResponse("/notifications/clear-all", {
+        method: "DELETE",
+      });
+
+      setNotifications([]);
+
+      if (refetchUnreadCount) {
+        refetchUnreadCount();
+      }
+
+      if (onNotificationCountUpdate) {
+        onNotificationCountUpdate();
+      }
+    } catch (err) {
+      console.error("Failed to clear notifications:", err);
+    } finally {
+      setClearingNotifications(false);
+    }
+  };
+
   // Sync WebSocket notifications with local state
 
   useEffect(() => {
@@ -210,7 +279,7 @@ const NotificationPanel = ({
 
       // WebSocket provides real-time notifications
 
-      setNotifications(wsNotifications);
+      setNotifications(filterNonChatNotifications(wsNotifications));
     }
   }, [wsNotifications]);
 
@@ -362,6 +431,9 @@ const NotificationPanel = ({
     ...timeFilteredAssociations,
     ...timeFilteredOthers,
   ];
+  const unreadNotificationCount = notifications.filter(
+    (notification) => !notification.read,
+  ).length;
 
   // Debug: Log the filtering results
 
@@ -556,6 +628,40 @@ const NotificationPanel = ({
               >
                 <FiX className="h-5 w-5" />
               </button>
+            </div>
+
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <p className="text-sm text-gray-500 dark:text-slate-400">
+                {unreadNotificationCount > 0
+                  ? `${unreadNotificationCount} unread notification${unreadNotificationCount === 1 ? "" : "s"}`
+                  : "All caught up"}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={markAllAsRead}
+                  disabled={
+                    markingAllRead ||
+                    clearingNotifications ||
+                    unreadNotificationCount === 0
+                  }
+                  className="rounded-full border border-blue-200 px-3 py-1 text-xs font-semibold text-blue-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                  type="button"
+                >
+                  {markingAllRead ? "Marking..." : "Mark all read"}
+                </button>
+                <button
+                  onClick={clearAllNotifications}
+                  disabled={
+                    clearingNotifications ||
+                    markingAllRead ||
+                    notifications.length === 0
+                  }
+                  className="rounded-full border border-red-200 px-3 py-1 text-xs font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                  type="button"
+                >
+                  {clearingNotifications ? "Clearing..." : "Clear notifications"}
+                </button>
+              </div>
             </div>
 
             {/* Tab Navigation - Uniform Green Style */}

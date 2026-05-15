@@ -507,6 +507,12 @@ html.dark .chat-info-action-row--danger {
   background:rgba(15,23,42,.42);
   backdrop-filter:blur(4px);
 }
+.chat-info-overlay__panel {
+  width:100%;
+  height:100%;
+  display:flex;
+  justify-content:flex-end;
+}
 
 /* Messages area */
 .chat-messages-wrap { flex:1; position:relative; overflow:hidden; min-height:0; }
@@ -515,6 +521,26 @@ html.dark .chat-messages-bg { background:#020617; }
 .chat-messages { position:relative; z-index:1; height:100%; overflow-y:auto; overscroll-behavior:contain; padding:16px 40px; display:flex; flex-direction:column; gap:1px; }
 .chat-messages::-webkit-scrollbar { width:5px; }
 .chat-messages::-webkit-scrollbar-thumb { background:rgba(0,0,0,.1); border-radius:4px; }
+.chat-history-loader {
+  align-self: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  background: rgba(255,255,255,.88);
+  border: 1px solid #dbeafe;
+  border-radius: 999px;
+  padding: 6px 12px;
+  margin: 4px 0 12px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.04);
+}
+html.dark .chat-history-loader {
+  background: #1e293b;
+  color: #94a3b8;
+  border-color: #334155;
+}
+.chat-history-loader--complete {
+  opacity: .82;
+}
 
 /* Date separator */
 .chat-date-sep { display:flex; justify-content:center; margin:16px 0 10px; }
@@ -1099,7 +1125,7 @@ html.dark .report-modal h3 { color:#f1f5f9; }
 .report-btn--submit:disabled { opacity:.4; cursor:not-allowed; }
 
 /* Responsive */
-@media (max-width:767px) {
+@media (max-width:1023px) {
   .chat-split { padding-bottom:calc(64px + var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px))); }
   .chat-sidebar { width:100%; min-width:0; max-width:100%; border-right:none; }
   .chat-main { width:100%; }
@@ -1159,9 +1185,21 @@ html.dark .report-modal h3 { color:#f1f5f9; }
   .chat-room-member-row,
   .chat-member-row { padding:11px 12px; }
   .chat-body-shell--with-info .chat-thread-pane { border-right:none; }
+  .chat-info-overlay {
+    padding:0;
+    align-items:stretch;
+    justify-content:stretch;
+  }
+  .chat-info-overlay__panel {
+    justify-content:stretch;
+  }
   .chat-info-panel--mobile {
-    width:min(100%, 420px);
-    border-radius:28px 0 0 28px;
+    width:100%;
+    max-width:none;
+    height:100%;
+    min-height:0;
+    border-radius:0;
+    box-shadow:none;
   }
   .chat-info-panel-header { padding:16px 18px 12px; }
   .chat-info-panel-header h3 { font-size:18px; }
@@ -1187,5 +1225,8 @@ html.dark .report-modal h3 { color:#f1f5f9; }
     width:36px;
     height:36px;
     border-radius:12px;
+  }
+  .chat-info-panel-scroll {
+    padding-bottom:12px;
   }
 }
