@@ -13,6 +13,22 @@ const VoiceRecorder = ({
   const chunksRef = useRef([]);
   const [isRecording, setIsRecording] = useState(false);
 
+  const getSupportedMimeType = () => {
+    if (typeof MediaRecorder === 'undefined') {
+      return '';
+    }
+
+    const candidates = [
+      'audio/webm;codecs=opus',
+      'audio/webm',
+      'audio/mp4',
+      'audio/ogg;codecs=opus',
+      'audio/ogg',
+    ];
+
+    return candidates.find((mimeType) => MediaRecorder.isTypeSupported(mimeType)) || '';
+  };
+
   const stopTracks = () => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
@@ -41,10 +57,10 @@ const VoiceRecorder = ({
       chunksRef.current = [];
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
-
-      const recorder = new MediaRecorder(stream, {
-        mimeType: MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : undefined,
-      });
+      const supportedMimeType = getSupportedMimeType();
+      const recorder = supportedMimeType
+        ? new MediaRecorder(stream, { mimeType: supportedMimeType })
+        : new MediaRecorder(stream);
 
       recorder.ondataavailable = (event) => {
         if (event.data?.size > 0) {
@@ -53,12 +69,19 @@ const VoiceRecorder = ({
       };
 
       recorder.onstop = () => {
+        const resolvedMimeType = String(
+          recorder.mimeType || chunksRef.current?.[0]?.type || 'audio/webm',
+        ).toLowerCase();
         const blob = new Blob(chunksRef.current, {
-          type: recorder.mimeType || 'audio/webm',
+          type: resolvedMimeType,
         });
-        const extension = blob.type.includes('mp4') ? 'mp4' : 'webm';
+        const extension = resolvedMimeType.includes('mp4')
+          ? 'mp4'
+          : resolvedMimeType.includes('ogg')
+            ? 'ogg'
+            : 'webm';
         const file = new File([blob], `voice-note-${Date.now()}.${extension}`, {
-          type: blob.type || 'audio/webm',
+          type: resolvedMimeType,
         });
         onRecorded?.(file);
         setIsRecording(false);

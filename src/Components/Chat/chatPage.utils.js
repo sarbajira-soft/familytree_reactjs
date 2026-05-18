@@ -1,6 +1,9 @@
 import React from 'react';
 import { Categories } from 'emoji-picker-react';
 import {
+  ALLOWED_AUDIO_TYPES,
+  ALLOWED_IMAGE_TYPES,
+  CHAT_LIMITS,
   CONVERSATION_TYPES,
   MESSAGE_TYPES,
 } from '../../constants/chat.constants';
@@ -78,6 +81,42 @@ export const getComposerAttachmentKind = (file) => {
     return MESSAGE_TYPES.IMAGE;
   }
   return 'attachment';
+};
+
+export const validateComposerAttachment = (file) => {
+  if (!file) {
+    return 'Please choose an image or voice note to send.';
+  }
+
+  const mimeType = String(file?.type || '').toLowerCase();
+  const isAllowedImage = ALLOWED_IMAGE_TYPES.includes(mimeType);
+  const isAllowedVoiceNote =
+    ALLOWED_AUDIO_TYPES.includes(mimeType) || mimeType.startsWith('audio/');
+
+  if (!isAllowedImage && !isAllowedVoiceNote) {
+    return 'Only images and voice notes are allowed in chat.';
+  }
+
+  if (Number(file?.size || 0) > CHAT_LIMITS.MAX_FILE_SIZE_BYTES) {
+    return `Media files must be ${CHAT_LIMITS.MAX_FILE_SIZE_MB} MB or smaller.`;
+  }
+
+  return '';
+};
+
+export const validateComposerText = (value, options = {}) => {
+  const trimmedText = String(value || '').trim();
+  const allowEmpty = Boolean(options?.allowEmpty);
+
+  if (!allowEmpty && !trimmedText) {
+    return 'Message content is required.';
+  }
+
+  if (trimmedText.length > CHAT_LIMITS.MAX_TEXT_LENGTH) {
+    return `Messages can be up to ${CHAT_LIMITS.MAX_TEXT_LENGTH} characters.`;
+  }
+
+  return '';
 };
 
 export const createComposerAttachmentDraft = (file) => {

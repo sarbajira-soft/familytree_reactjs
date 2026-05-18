@@ -74,6 +74,9 @@ const GalleryViewerModal = ({
   const [loadingMoreComments, setLoadingMoreComments] = useState(false);
   const [commentPage, setCommentPage] = useState(1);
   const [hasMoreComments, setHasMoreComments] = useState(false);
+  const [totalCommentCount, setTotalCommentCount] = useState(
+    Number(album?.commentCount ?? album?.comments ?? 0),
+  );
   const commentsRef = useRef(null);
   const carouselRef = useRef(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -164,6 +167,7 @@ const GalleryViewerModal = ({
       setGalleryDetail(nextGallery);
       setIsLiked(Boolean(nextGallery?.isLiked));
       setTotalLikes(Number(nextGallery?.likeCount ?? nextGallery?.likes ?? 0));
+      setTotalCommentCount(Number(nextGallery?.commentCount ?? nextGallery?.comments ?? 0));
     } catch (err) {
       console.error("Fetching gallery failed", err);
       setDetailError(err?.message || "Unable to load this gallery.");
@@ -245,6 +249,7 @@ const GalleryViewerModal = ({
     setDetailError("");
     setIsLiked(album.isLiked || false);
     setTotalLikes(album.likeCount ?? album.likes ?? 0);
+    setTotalCommentCount(Number(album?.commentCount ?? album?.comments ?? 0));
     setCommentRows([]);
     setCommentPage(1);
     setHasMoreComments(false);
@@ -309,6 +314,21 @@ const GalleryViewerModal = ({
   if (!album) {
     return null;
   }
+
+  const getRemovedCommentCount = (commentTree = [], targetCommentId) => {
+    for (const comment of commentTree) {
+      if (Number(comment?.id) === Number(targetCommentId)) {
+        return 1 + countComments(comment?.replies || []);
+      }
+
+      const nestedCount = getRemovedCommentCount(comment?.replies || [], targetCommentId);
+      if (nestedCount > 0) {
+        return nestedCount;
+      }
+    }
+
+    return 0;
+  };
 
   // Like API
   const toggleLike = async () => {
@@ -391,6 +411,7 @@ const GalleryViewerModal = ({
       }
       setNewComment("");
       setShowEmojiPicker(false);
+      setTotalCommentCount((prev) => prev + 1);
       await fetchComments(album.id, 1, true);
     } catch (err) {
       console.error("Post failed", err);
@@ -418,6 +439,7 @@ const GalleryViewerModal = ({
     fetchComments(album.id, 1, true);
   };
   const handleDeleteComment = async (commentId) => {
+    const removedCount = getRemovedCommentCount(comments, commentId) || 1;
     const res = await authFetchResponse(`/gallery/comment/${commentId}`, {
       method: "DELETE",
       skipThrow: true,
@@ -425,6 +447,7 @@ const GalleryViewerModal = ({
     if (!res.ok) {
       throw new Error("Unable to delete your comment.");
     }
+    setTotalCommentCount((prev) => Math.max(0, prev - removedCount));
     fetchComments(album.id, 1, true);
   };
   const handleReplyComment = async (parentCommentId, replyText) => {
@@ -443,6 +466,7 @@ const GalleryViewerModal = ({
     if (!res.ok) {
       throw new Error("Unable to post your reply.");
     }
+    setTotalCommentCount((prev) => prev + 1);
     fetchComments(album.id, 1, true);
   };
 
@@ -590,7 +614,7 @@ const GalleryViewerModal = ({
                       <span>{totalLikes}</span>
                     </button>
                     <span className="flex items-center gap-2 px-4 py-2 rounded-full bg-gray-200 text-gray-700">
-                      <FaCommentDots size={18} /> {countComments(comments)}
+                      <FaCommentDots size={18} /> {totalCommentCount}
                     </span>
                     {activeAlbum?.privacy === "public" ? (
                       <button
@@ -608,7 +632,7 @@ const GalleryViewerModal = ({
                 {/* Comments */}
                 <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
                   <h4 className="px-4 pt-4 pb-2 font-semibold text-base text-gray-800 flex-shrink-0">
-                    Comments ({countComments(comments)})
+                    Comments ({totalCommentCount})
                   </h4>
                   <div
                     ref={commentsRef}
@@ -642,7 +666,7 @@ const GalleryViewerModal = ({
                       <div className="mt-4 flex justify-center">
                         <button
                           type="button"
-                          onClick={() => fetchComments(album.id, commentPage + 1, false)}
+                          onClick={() => fetchComments(activeAlbum?.id || album.id, commentPage + 1, false)}
                           disabled={loadingMoreComments}
                           className="rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
                         >

@@ -1232,3 +1232,6 @@ html.dark .report-modal h3 { color:#f1f5f9; }
 
   
 }
+.dark audio {
+  color-scheme: dark;
+}
