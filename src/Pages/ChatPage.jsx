@@ -95,12 +95,22 @@ import {
   resizeComposer,
   revokeObjectUrl,
   toConversationType,
+  validateComposerAttachment,
+  validateComposerText,
 } from '../Components/Chat/chatPage.utils';
 import '../Components/Chat/chat.css';
 
 const TEXT_SEND_MAX_RETRIES = 3;
 const TEXT_SEND_RETRY_BASE_DELAY_MS = 350;
 const DELETE_CHAT_ERROR_MESSAGE = "Couldn't delete the chat right now. Please try again.";
+const DEFAULT_MESSAGE_SEND_ERROR = "Couldn't send the message. Please try again.";
+const getChatSendErrorMessage = (error, fallbackMessage = DEFAULT_MESSAGE_SEND_ERROR) => {
+  const responseMessage = String(
+    error?.response?.data?.message || error?.data?.message || error?.message || '',
+  ).trim();
+
+  return responseMessage || fallbackMessage;
+};
 const isSocketTimeoutError = (error) =>
   Number(error?.status || 0) === 504 ||
   String(error?.message || '')
@@ -1053,6 +1063,7 @@ const ChatPage = () => {
           }
 
           console.error('Failed to send message:', error);
+          toast.error(getChatSendErrorMessage(error));
         }
       }
     } finally {
@@ -1910,9 +1921,15 @@ const ChatPage = () => {
 
   const handleTextChange = useCallback(
     (event) => {
-      const nextText = event.target.value;
+      const nextText = String(event.target.value || '').slice(
+        0,
+        CHAT_LIMITS.MAX_TEXT_LENGTH,
+      );
       composerDraftVersionRef.current += 1;
       setText(nextText);
+      if (event.target.value !== nextText) {
+        event.target.value = nextText;
+      }
       resizeComposer(event.target);
 
       if (nextText.trim()) {
@@ -1934,9 +1951,13 @@ const ChatPage = () => {
       const input = inputRef.current;
       const selectionStart = input?.selectionStart ?? text.length;
       const selectionEnd = input?.selectionEnd ?? text.length;
-      const nextText = `${text.slice(0, selectionStart)}${nextValue}${text.slice(
-        selectionEnd,
-      )}`;
+      const nextText = `${text.slice(0, selectionStart)}${nextValue}${text.slice(selectionEnd)}`;
+      if (nextText.length > CHAT_LIMITS.MAX_TEXT_LENGTH) {
+        toast.error(
+          `Messages can be up to ${CHAT_LIMITS.MAX_TEXT_LENGTH} characters.`,
+        );
+        return;
+      }
 
       composerDraftVersionRef.current += 1;
       setText(nextText);
@@ -1973,6 +1994,18 @@ const ChatPage = () => {
     const targetConversationId = Number(selectedId || 0);
     const familyCodeAtSend = activeFamilyCode;
     if (hasAttachmentDraft && attachmentDraft?.file) {
+      const attachmentError = validateComposerAttachment(attachmentDraft.file);
+      if (attachmentError) {
+        toast.error(attachmentError);
+        return;
+      }
+
+      const captionError = validateComposerText(trimmedText, { allowEmpty: true });
+      if (captionError) {
+        toast.error(captionError);
+        return;
+      }
+
       void safeSendMedia(attachmentDraft.file, {
         content: trimmedText,
         draft: attachmentDraft,
@@ -1989,6 +2022,12 @@ const ChatPage = () => {
         !familyCodeAtSend ||
         conversation?.canSend === false
       ) {
+        return;
+      }
+
+      const messageError = validateComposerText(trimmedText);
+      if (messageError) {
+        toast.error(messageError);
         return;
       }
 
@@ -2091,13 +2130,30 @@ const ChatPage = () => {
           typeof options?.content === 'string'
             ? String(options.content).trim()
             : String(text || '').trim();
+        const attachmentError = validateComposerAttachment(file);
+        if (attachmentError) {
+          toast.error(attachmentError);
+          return;
+        }
+
+        const captionError = validateComposerText(messageContent, { allowEmpty: true });
+        if (captionError) {
+          toast.error(captionError);
+          return;
+        }
+
         const replyPreview = getMessageReplyPreview(replyTo);
         optimisticMessageId = optimisticMessageIdRef.current;
         const messageType = getComposerAttachmentKind(file);
-        const localMediaUrl =
-          messageType === MESSAGE_TYPES.IMAGE || messageType === MESSAGE_TYPES.VOICE
-            ? URL.createObjectURL(file)
-            : '';
+        if (
+          messageType !== MESSAGE_TYPES.IMAGE &&
+          messageType !== MESSAGE_TYPES.VOICE
+        ) {
+          toast.error('Only images and voice notes are allowed in chat.');
+          return;
+        }
+
+        const localMediaUrl = URL.createObjectURL(file);
 
         optimisticMessageIdRef.current -= 1;
         queuePendingMediaMessage(targetConversationId, {
@@ -2194,6 +2250,7 @@ const ChatPage = () => {
           });
         }
         console.error('Failed to send media:', error);
+        toast.error(getChatSendErrorMessage(error, "Couldn't send the image. Please try again."));
       } finally {
         sendingMediaRef.current = false;
         setSendingMedia(false);
@@ -2223,6 +2280,12 @@ const ChatPage = () => {
 
   const handleStageAttachment = useCallback((file) => {
     if (!file) {
+      return;
+    }
+
+    const validationMessage = validateComposerAttachment(file);
+    if (validationMessage) {
+      toast.error(validationMessage);
       return;
     }
 

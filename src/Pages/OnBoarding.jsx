@@ -1092,7 +1092,7 @@ const FamilySection = ({
           className={`w-full px-4 py-2.5 border rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 ${errors.fatherName
               ? "border-red-500 focus:ring-red-300"
               : "border-gray-300 focus:ring-[var(--color-primary)]"
-            }`}
+            } dark:text-white dark:bg-slate-800`}
         />
 
         {errors.fatherName && (
@@ -1119,7 +1119,7 @@ const FamilySection = ({
           className={`w-full px-4 py-2.5 border rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 ${errors.motherName
               ? "border-red-500 focus:ring-red-300"
               : "border-gray-300 focus:ring-[var(--color-primary)]"
-            }`}
+            } dark:text-white dark:bg-slate-800`}
         />
 
         {errors.motherName && (
@@ -1145,7 +1145,7 @@ const FamilySection = ({
           className={`w-full px-4 py-2.5 border rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 disabled:bg-gray-100 disabled:cursor-not-allowed ${errors.motherTongue
               ? "border-red-500 focus:ring-red-300"
               : "border-gray-300 focus:ring-[var(--color-primary)]"
-            }`}
+            } dark:text-white dark:bg-slate-800`}
         >
           <option value="">Select Mother Tongue</option>
 
@@ -1570,7 +1570,7 @@ const BasicSection = ({
           className={`w-full px-4 py-2.5 border rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 ${errors.firstName
               ? "border-red-500 focus:ring-red-300"
               : "border-gray-300 focus:ring-[var(--color-primary)]"
-            }`}
+            } dark:text-white dark:bg-slate-800`}
         />
 
         {errors.firstName && (
@@ -1599,7 +1599,7 @@ const BasicSection = ({
           className={`w-full px-4 py-2.5 border rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 ${errors.lastName
               ? "border-red-500 focus:ring-red-300"
               : "border-gray-300 focus:ring-[var(--color-primary)]"
-            }`}
+            } dark:text-white dark:bg-slate-800`}
         />
 
         {errors.lastName && (
@@ -1630,7 +1630,7 @@ const BasicSection = ({
             className={`w-full px-4 py-2.5 pr-16 border rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 ${errors.dob
                 ? "border-red-500 focus:ring-red-300"
                 : "border-gray-300 focus:ring-[var(--color-primary)]"
-              }`}
+              } dark:text-white dark:bg-slate-800`}
             placeholder="Select your date of birth"
           />
 
@@ -1735,7 +1735,7 @@ const BasicSection = ({
           value={calculateAge(formData.dob) || ""}
           readOnly
           placeholder="Age will be calculated automatically"
-          className="w-full px-4 py-2.5 border border-gray-300 rounded-md text-sm placeholder:text-sm bg-gray-50 text-gray-600 cursor-not-allowed focus:outline-none"
+          className="w-full px-4 py-2.5 border border-gray-300 rounded-md text-sm placeholder:text-sm bg-gray-50 text-gray-600 cursor-not-allowed focus:outline-none dark:text-white dark:bg-slate-800"
         />
       </div>
 
@@ -1758,7 +1758,7 @@ const BasicSection = ({
           className={`w-full px-4 py-2.5 border rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 ${errors.gender
               ? "border-red-500 focus:ring-red-300"
               : "border-gray-300 focus:ring-[var(--color-primary)]"
-            }`}
+            } dark:text-white dark:bg-slate-800 `}
         >
           <option value="">Select Gender</option>
 
@@ -1789,7 +1789,7 @@ const BasicSection = ({
           name="maritalStatus"
           value={formData.maritalStatus || ""}
           onChange={handleChange}
-          className="w-full px-4 py-2.5 border border-gray-300 rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+          className="w-full px-4 py-2.5 border border-gray-300 rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] dark:text-white dark:bg-slate-800"
         >
           <option value="">Select Status</option>
 
@@ -1817,7 +1817,7 @@ const BasicSection = ({
             value={formData.spouseName || ""}
             onChange={handleChange}
             placeholder="Enter spouse name"
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] dark:text-white dark:bg-slate-800"
           />
         </div>
       )}
@@ -1842,7 +1842,7 @@ const BasicSection = ({
               onChange={handleChange}
               min="1900-01-01"
               max="2100-12-31"
-              className="w-full px-4 py-2.5 pr-16 border border-gray-300 rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+              className="w-full px-4 py-2.5 pr-16 border border-gray-300 rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] dark:text-white dark:bg-slate-800"
               placeholder="Select marriage date"
             />
 
@@ -1963,7 +1963,7 @@ const BasicSection = ({
               });
             }}
             placeholder="Enter number of children"
-            className="w-full px-4 py-2.5 border border-gray-300 rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+            className="w-full px-4 py-2.5 border border-gray-300 rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]   dark:text-white dark:bg-slate-800"
           />
         </div>
       )}
@@ -1989,7 +1989,7 @@ const BasicSection = ({
                       [fieldName]: e.target.value,
                     }))
                   }
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] dark:text-white dark:bg-slate-800"
                 />
               );
             })}
@@ -2042,7 +2042,7 @@ const ContactSection = ({
       <div className="">
         <label
           htmlFor="contactNumber"
-          className="block text-sm font-medium text-gray-700 mb-1"
+          className="block text-sm font-medium text-gray-700 mb-1 dark:text-white dark:bg-slate-800"
         >
           Contact number <span className="text-red-500">*</span>
         </label>
@@ -2160,7 +2160,7 @@ const ContactSection = ({
           value={formData.hobbies}
           onChange={handleChange}
           placeholder="Playing football"
-          className="w-full px-4 py-2.5 border border-gray-300 rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+          className="w-full px-4 py-2.5 border border-gray-300 rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] dark:text-white dark:bg-slate-800"
         />
       </div>
 
@@ -2182,7 +2182,7 @@ const ContactSection = ({
           value={formData.likes}
           onChange={handleChange}
           placeholder="Watching movies in theatre"
-          className="w-full px-4 py-2.5 border border-gray-300 rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+          className="w-full px-4 py-2.5 border border-gray-300 rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] dark:text-white dark:bg-slate-800"
         />
       </div>
 
@@ -2204,7 +2204,7 @@ const ContactSection = ({
           onChange={handleChange}
           maxLength={50}
           placeholder="Loud music"
-          className="w-full px-4 py-2.5 border border-gray-300 rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+          className="w-full px-4 py-2.5 border border-gray-300 rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] dark:text-white dark:bg-slate-800"
         />
       </div>
 
@@ -2226,7 +2226,7 @@ const ContactSection = ({
           onChange={handleChange}
           placeholder="Biryani"
           maxLength={50}
-          className="w-full px-4 py-2.5 border border-gray-300 rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+          className="w-full px-4 py-2.5 border border-gray-300 rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] dark:text-white dark:bg-slate-800"
         />
       </div>
 
@@ -2251,7 +2251,7 @@ const ContactSection = ({
               className={`w-full px-4 py-2.5 border rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 ${errors.addressLine1
                   ? "border-red-500 focus:ring-red-300"
                   : "border-gray-300 focus:ring-[var(--color-primary)]"
-                }`}
+                } dark:text-white dark:bg-slate-800`}
             />
             {errors.addressLine1 && (
               <p className="text-red-500 text-xs mt-1">{errors.addressLine1}</p>
@@ -2268,7 +2268,7 @@ const ContactSection = ({
               value={formData.addressLine2}
               onChange={handleChange}
               placeholder="Address Line 2 (Area/Landmark) - Optional"
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] dark:text-white dark:bg-slate-800"
             />
           </div>
 
@@ -2285,7 +2285,7 @@ const ContactSection = ({
               className={`w-full px-4 py-2.5 border rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 ${errors.district
                   ? "border-red-500 focus:ring-red-300"
                   : "border-gray-300 focus:ring-[var(--color-primary)]"
-                }`}
+                } dark:text-white dark:bg-slate-800`}
             />
             {errors.district && (
               <p className="text-red-500 text-xs mt-1">{errors.district}</p>
@@ -2305,7 +2305,7 @@ const ContactSection = ({
               className={`w-full px-4 py-2.5 border rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 ${errors.state
                   ? "border-red-500 focus:ring-red-300"
                   : "border-gray-300 focus:ring-[var(--color-primary)]"
-                }`}
+                } dark:text-white dark:bg-slate-800`}
             />
             {errors.state && (
               <p className="text-red-500 text-xs mt-1">{errors.state}</p>
@@ -2328,7 +2328,7 @@ const ContactSection = ({
               className={`w-full px-4 py-2.5 border rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 ${errors.pincode
                   ? "border-red-500 focus:ring-red-300"
                   : "border-gray-300 focus:ring-[var(--color-primary)]"
-                }`}
+                }dark:text-white dark:bg-slate-800`}
             />
             {errors.pincode && (
               <p className="text-red-500 text-xs mt-1">{errors.pincode}</p>
@@ -2382,7 +2382,7 @@ const BioSection = ({ formData, handleChange }) => (
           placeholder="Share a short story from your life — a moment, a lesson, or a memory you'd like future generations to remember."
           rows="6"
           maxLength={250}
-          className="w-full px-4 py-2.5 border border-gray-300 rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] resize-none"
+          className="w-full px-4 py-2.5 border border-gray-300 rounded-md text-sm placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] resize-none dark:text-white dark:bg-slate-800"
         />
       </div>
 

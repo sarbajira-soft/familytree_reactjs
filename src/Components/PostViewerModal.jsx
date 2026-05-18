@@ -9,6 +9,8 @@ import { countComments } from "../utils/commentUtils";
 import { authFetchResponse } from "../utils/authFetch";
 import PublicPostShareSheet from "./PublicPostShareSheet";
 
+const COMMENTS_PAGE_SIZE = 10;
+
 const PostViewerModal = ({
   isOpen,
   onClose,
@@ -34,8 +36,13 @@ const PostViewerModal = ({
   const [likeCount, setLikeCount] = useState(post?.likes || 0);
   const [isLiked, setIsLiked] = useState(post?.isLiked || false);
   const [comments, setComments] = useState([]);
+  const [commentPage, setCommentPage] = useState(1);
+  const [hasMoreComments, setHasMoreComments] = useState(false);
+  const [totalCommentCount, setTotalCommentCount] = useState(post?.commentCount ?? post?.comments ?? 0);
   const [newComment, setNewComment] = useState("");
   const [isCommentLoading, setIsCommentLoading] = useState(false);
+  const [isCommentsFetching, setIsCommentsFetching] = useState(false);
+  const [loadingMoreComments, setLoadingMoreComments] = useState(false);
   const [isLikeLoading, setIsLikeLoading] = useState(false);
   const commentsRef = useRef(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -49,7 +56,11 @@ const PostViewerModal = ({
     if (isOpen && post) {
       setIsLiked(post.isLiked);
       setLikeCount(post.likes);
-      fetchComments();
+      setComments([]);
+      setCommentPage(1);
+      setHasMoreComments(false);
+      setTotalCommentCount(Number(post?.commentCount ?? post?.comments ?? 0));
+      fetchComments(1, true);
     }
   }, [isOpen, post]);
 
@@ -109,23 +120,82 @@ const PostViewerModal = ({
     };
   }, [showEmojiPicker]);
 
-  const fetchComments = async () => {
+  const mergePaginatedComments = (existingComments = [], incomingComments = []) => {
+    const merged = [...(Array.isArray(existingComments) ? existingComments : [])];
+
+    incomingComments.forEach((incomingComment) => {
+      const existingIndex = merged.findIndex(
+        (existingComment) => Number(existingComment?.id) === Number(incomingComment?.id),
+      );
+
+      if (existingIndex >= 0) {
+        merged[existingIndex] = incomingComment;
+      } else {
+        merged.push(incomingComment);
+      }
+    });
+
+    return merged;
+  };
+
+  const getRemovedCommentCount = (commentTree = [], targetCommentId) => {
+    for (const comment of commentTree) {
+      if (Number(comment?.id) === Number(targetCommentId)) {
+        return 1 + countComments(comment?.replies || []);
+      }
+
+      const nestedCount = getRemovedCommentCount(comment?.replies || [], targetCommentId);
+      if (nestedCount > 0) {
+        return nestedCount;
+      }
+    }
+
+    return 0;
+  };
+
+  const fetchComments = async (pageToLoad = 1, replace = true) => {
+    if (!post?.id) return;
+
+    if (replace) {
+      setIsCommentsFetching(true);
+    } else {
+      setLoadingMoreComments(true);
+    }
+
     try {
-      const response = await authFetchResponse(`/post/${post.id}/comments`, {
+      const response = await authFetchResponse(
+        `/post/${post.id}/comments?page=${pageToLoad}&limit=${COMMENTS_PAGE_SIZE}`,
+        {
         method: "GET",
         skipThrow: true,
-      });
+        },
+      );
       const data = await response.json();
       if (data?.comments) {
-        setComments(data.comments);
-        setTimeout(() => {
-          if (commentsRef.current) {
-            commentsRef.current.scrollTop = commentsRef.current.scrollHeight;
-          }
-        }, 100);
+        const nextComments = Array.isArray(data.comments) ? data.comments : [];
+        const resolvedPage = Number(data?.page || pageToLoad);
+        const resolvedLimit = Number(data?.limit || COMMENTS_PAGE_SIZE);
+        const totalRoots = Number(data?.total || 0);
+
+        setComments((prev) =>
+          replace ? nextComments : mergePaginatedComments(prev, nextComments)
+        );
+        setCommentPage(resolvedPage);
+        setHasMoreComments(resolvedPage * resolvedLimit < totalRoots);
+
+        if (replace) {
+          setTimeout(() => {
+            if (commentsRef.current) {
+              commentsRef.current.scrollTop = commentsRef.current.scrollHeight;
+            }
+          }, 100);
+        }
       }
     } catch (error) {
       console.error("Failed to fetch comments:", error);
+    } finally {
+      setIsCommentsFetching(false);
+      setLoadingMoreComments(false);
     }
   };
 
@@ -199,7 +269,8 @@ const PostViewerModal = ({
       if (response.ok) {
         setNewComment("");
         setShowEmojiPicker(false);
-        await fetchComments();
+        setTotalCommentCount((prev) => prev + 1);
+        await fetchComments(1, true);
       } else {
         const errorData = await response.json();
         console.error(
@@ -224,7 +295,7 @@ const PostViewerModal = ({
         body: JSON.stringify({ comment: newText }),
       });
       if (response.ok) {
-        await fetchComments();
+        await fetchComments(1, true);
       }
     } catch (error) {
       console.error("Failed to edit comment:", error);
@@ -234,12 +305,14 @@ const PostViewerModal = ({
 
   const handleDeleteComment = async (commentId) => {
     try {
+      const removedCount = getRemovedCommentCount(comments, commentId) || 1;
       const response = await authFetchResponse(`/post/comment/${commentId}`, {
         method: "DELETE",
         skipThrow: true,
       });
       if (response.ok) {
-        await fetchComments();
+        setTotalCommentCount((prev) => Math.max(0, prev - removedCount));
+        await fetchComments(1, true);
       }
     } catch (error) {
       console.error("Failed to delete comment:", error);
@@ -262,7 +335,8 @@ const PostViewerModal = ({
         }),
       });
       if (response.ok) {
-        await fetchComments();
+        setTotalCommentCount((prev) => prev + 1);
+        await fetchComments(1, true);
       }
     } catch (error) {
       console.error("Failed to reply to comment:", error);
@@ -366,7 +440,7 @@ const PostViewerModal = ({
                       <span>{likeCount}</span>
                     </button>
                     <span className="flex items-center gap-2 px-4 py-2 rounded-full bg-gray-200 text-gray-700">
-                      <FaCommentDots size={18} /> {comments.length}
+                      <FaCommentDots size={18} /> {totalCommentCount}
                     </span>
                     {String(post?.privacy || "").toLowerCase() === "public" ? (
                       <button
@@ -384,13 +458,17 @@ const PostViewerModal = ({
                 {/* Comments */}
                 <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
                   <h4 className="px-4 pt-4 pb-2 font-semibold text-base text-gray-800 flex-shrink-0">
-                    Comments ({countComments(comments)})
+                    Comments ({totalCommentCount})
                   </h4>
                   <div
                     ref={commentsRef}
                     className="flex-1 overflow-y-auto overflow-x-auto px-4 pb-4 custom-scrollbar no-scrollbar min-h-0 overscroll-contain"
                   >
-                    {comments.length > 0 ? (
+                    {isCommentsFetching ? (
+                      <div className="flex justify-center py-6 text-gray-500">
+                        Loading comments...
+                      </div>
+                    ) : comments.length > 0 ? (
                       <div className="min-w-max space-y-3">
                         {comments.map((comment, index) => (
                           <CommentItem
@@ -404,6 +482,18 @@ const PostViewerModal = ({
                             onReply={handleReplyComment}
                           />
                         ))}
+                        {hasMoreComments ? (
+                          <div className="flex justify-center pt-2">
+                            <button
+                              type="button"
+                              onClick={() => fetchComments(commentPage + 1, false)}
+                              disabled={loadingMoreComments}
+                              className="rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              {loadingMoreComments ? "Loading..." : "Load more comments"}
+                            </button>
+                          </div>
+                        ) : null}
                       </div>
                     ) : (
                       <p className="text-gray-500 italic p-3 bg-gray-100 rounded-lg text-center">

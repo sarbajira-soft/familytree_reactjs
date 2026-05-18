@@ -67,6 +67,19 @@ const getEventFeedEndpoint = (activeTab) => {
   return "/events";
 };
 
+const normalizeBooleanLike = (value) => {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  if (typeof value === "number") {
+    return value === 1;
+  }
+
+  const normalized = String(value ?? "").trim().toLowerCase();
+  return normalized === "true" || normalized === "1" || normalized === "yes";
+};
+
 const normalizeEventItem = (item, apiBaseUrl) => {
   const schedules = normalizeEventSchedulesInput(item);
   const fallbackNextSchedule = item?.nextEventDate
@@ -77,6 +90,16 @@ const normalizeEventItem = (item, apiBaseUrl) => {
         times: [],
       }
     : null;
+  const nextScheduleTimes = item?.nextSchedule?.startTime
+    ? [
+        {
+          startTime: item.nextSchedule.startTime,
+          endTime: item.nextSchedule.endTime || "",
+        },
+      ]
+    : Array.isArray(item?.nextSchedule?.times)
+      ? item.nextSchedule.times
+      : [];
   const nextSchedule = item?.nextSchedule
     ? {
         ...item.nextSchedule,
@@ -86,14 +109,11 @@ const normalizeEventItem = (item, apiBaseUrl) => {
           item.nextSchedule.title ||
           item.title ||
           item.eventTitle,
-        times: item.nextSchedule.startTime
-          ? [
-              {
-                startTime: item.nextSchedule.startTime,
-                endTime: item.nextSchedule.endTime || "",
-              },
-            ]
-          : item.nextSchedule.times || [],
+        isAllDay:
+          nextScheduleTimes.length > 0
+            ? false
+            : normalizeBooleanLike(item.nextSchedule.isAllDay),
+        times: nextScheduleTimes,
       }
     : getNextUpcomingSchedule(schedules) || fallbackNextSchedule;
   const primarySchedule = nextSchedule || schedules[0] || null;
