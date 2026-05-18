@@ -33,6 +33,7 @@ import useSeenBatch from "../hooks/useSeenBatch";
 const EMPTY_VTT_TRACK_SRC = "data:text/vtt,WEBVTT";
 const DEFAULT_AVATAR = "/assets/user.png";
 const FEED_BATCH_SIZE = 20;
+const COMMENTS_PAGE_SIZE = 10;
 
 const logger = console;
 
@@ -61,9 +62,12 @@ const PostPage = () => {
   const { userInfo } = useUser();
   const [postComments, setPostComments] = useState({});
   const [loadingComments, setLoadingComments] = useState(new Set());
+  const [loadingMoreComments, setLoadingMoreComments] = useState(new Set());
   const [postingComment, setPostingComment] = useState(new Set());
   const [newComment, setNewComment] = useState({});
   const [visibleComments, setVisibleComments] = useState({});
+  const [commentPages, setCommentPages] = useState({});
+  const [commentHasMore, setCommentHasMore] = useState({});
   const [showHeart, setShowHeart] = useState(null);
   const [editingCommentId, setEditingCommentId] = useState(null);
   const [editCommentText, setEditCommentText] = useState({});
@@ -378,6 +382,10 @@ const PostPage = () => {
     setHasMore(true);
     setFeedError(null);
     setPostComments({});
+    setLoadingComments(new Set());
+    setLoadingMoreComments(new Set());
+    setCommentPages({});
+    setCommentHasMore({});
     setVisibleComments({});
     fetchPosts({ cursorToLoad: null, replace: true });
   }, [activeFeed]);
@@ -653,7 +661,8 @@ const PostPage = () => {
   };
 
   const handlePostComment = async (postId) => {
-    const commentText = newComment[postId]?.trim();
+    const existingDraft = newComment[postId] || "";
+    const commentText = existingDraft.trim();
     if (!commentText) return;
 
     // 🟢 Optimistic temporary comment
@@ -686,13 +695,7 @@ const PostPage = () => {
       });
 
       if (newCommentData) {
-        // Replace temp comment with actual comment object from backend
-        setPostComments((prev) => ({
-          ...prev,
-          [postId]: prev[postId].map((c) =>
-            c.id === tempComment.id ? newCommentData : c
-          ),
-        }));
+        await loadCommentsForPost(postId, 1, true);
         setPosts((prevPosts) =>
           prevPosts.map((post) =>
             post.id === postId
@@ -700,7 +703,7 @@ const PostPage = () => {
                   ...post,
                   comments: Number.isFinite(Number(newCommentData?.commentCount))
                     ? Number(newCommentData.commentCount)
-                    : post.comments + 1,
+                    : Number(post.comments || 0) + 1,
                 }
               : post,
           ),
@@ -708,7 +711,7 @@ const PostPage = () => {
         setActiveEmojiPostId((prev) => (prev === postId ? null : prev));
       } else {
         logger.error("BLOCK OVERRIDE: Failed to post comment");
-        // Rollback
+        setNewComment((prev) => ({ ...prev, [postId]: existingDraft }));
         setPostComments((prev) => ({
           ...prev,
           [postId]: prev[postId].filter((c) => c.id !== tempComment.id),
@@ -716,7 +719,7 @@ const PostPage = () => {
       }
     } catch (err) {
       logger.error("BLOCK OVERRIDE: Error posting comment", err);
-      // Rollback
+      setNewComment((prev) => ({ ...prev, [postId]: existingDraft }));
       setPostComments((prev) => ({
         ...prev,
         [postId]: prev[postId].filter((c) => c.id !== tempComment.id),
@@ -750,15 +753,50 @@ const PostPage = () => {
     });
   };
 
-  const fetchComments = async (postId) => {
+  const mergePaginatedComments = (existingComments = [], incomingComments = []) => {
+    const merged = [...(Array.isArray(existingComments) ? existingComments : [])];
+
+    incomingComments.forEach((incomingComment) => {
+      const existingIndex = merged.findIndex(
+        (existingComment) => Number(existingComment?.id) === Number(incomingComment?.id),
+      );
+
+      if (existingIndex >= 0) {
+        merged[existingIndex] = incomingComment;
+      } else {
+        merged.push(incomingComment);
+      }
+    });
+
+    return merged;
+  };
+
+  const fetchComments = async (postId, pageToLoad = 1) => {
     try {
-      const data = await authFetch(`/post/${postId}/comments`, {
-        method: "GET",
-      });
-      return data?.comments || [];
+      const data = await authFetch(
+        `/post/${postId}/comments?page=${pageToLoad}&limit=${COMMENTS_PAGE_SIZE}`,
+        {
+          method: "GET",
+        },
+      );
+
+      const nextComments = Array.isArray(data?.comments) ? data.comments : [];
+      const resolvedPage = Number(data?.page || pageToLoad);
+      const resolvedLimit = Number(data?.limit || COMMENTS_PAGE_SIZE);
+      const totalRoots = Number(data?.total || 0);
+
+      return {
+        comments: nextComments,
+        page: resolvedPage,
+        hasMore: resolvedPage * resolvedLimit < totalRoots,
+      };
     } catch (error) {
       logger.error("BLOCK OVERRIDE: Failed to fetch comments", error);
-      return [];
+      return {
+        comments: [],
+        page: pageToLoad,
+        hasMore: false,
+      };
     }
   };
 
@@ -776,6 +814,47 @@ const PostPage = () => {
     return count;
   };
 
+  const getRemovedCommentCount = (commentTree = [], targetCommentId) => {
+    for (const comment of commentTree) {
+      if (Number(comment?.id) === Number(targetCommentId)) {
+        return 1 + countComments(comment?.replies || []);
+      }
+
+      const nestedCount = getRemovedCommentCount(comment?.replies || [], targetCommentId);
+      if (nestedCount > 0) {
+        return nestedCount;
+      }
+    }
+
+    return 0;
+  };
+
+  const loadCommentsForPost = async (postId, pageToLoad = 1, replace = true) => {
+    const setLoadingState = replace ? setLoadingComments : setLoadingMoreComments;
+    setLoadingState((prev) => new Set(prev).add(postId));
+
+    try {
+      const result = await fetchComments(postId, pageToLoad);
+
+      setPostComments((prev) => ({
+        ...prev,
+        [postId]: replace
+          ? result.comments
+          : mergePaginatedComments(prev[postId], result.comments),
+      }));
+      setCommentPages((prev) => ({ ...prev, [postId]: result.page }));
+      setCommentHasMore((prev) => ({ ...prev, [postId]: result.hasMore }));
+
+      return result.comments;
+    } finally {
+      setLoadingState((prev) => {
+        const updated = new Set(prev);
+        updated.delete(postId);
+        return updated;
+      });
+    }
+  };
+
   const handleEditCommentFromItem = async (commentId, postId, newText) => {
     const text = (newText || "").trim();
     if (!text) return;
@@ -785,21 +864,23 @@ const PostPage = () => {
       body: JSON.stringify({ comment: text }),
     });
 
-    const comments = await fetchComments(postId);
-    setPostComments((prev) => ({ ...prev, [postId]: comments }));
+    await loadCommentsForPost(postId, 1, true);
   };
 
   const handleDeleteCommentFromItem = async (commentId, postId) => {
+    const removedCount = getRemovedCommentCount(postComments[postId] || [], commentId) || 1;
+
     await authFetchResponse(`/post/comment/${commentId}`, {
       method: "DELETE",
       skipThrow: true,
     });
 
-    const comments = await fetchComments(postId);
-    setPostComments((prev) => ({ ...prev, [postId]: comments }));
+    await loadCommentsForPost(postId, 1, true);
     setPosts((prev) =>
       prev.map((p) =>
-        p.id === postId ? { ...p, comments: countComments(comments || []) } : p
+        p.id === postId
+          ? { ...p, comments: Math.max(0, Number(p.comments || 0) - removedCount) }
+          : p
       )
     );
   };
@@ -817,11 +898,12 @@ const PostPage = () => {
       }),
     });
 
-    const comments = await fetchComments(postId);
-    setPostComments((prev) => ({ ...prev, [postId]: comments }));
+    await loadCommentsForPost(postId, 1, true);
     setPosts((prevPosts) =>
       prevPosts.map((post) =>
-        post.id === postId ? { ...post, comments: countComments(comments || []) } : post,
+        post.id === postId
+          ? { ...post, comments: Number(post.comments || 0) + 1 }
+          : post,
       ),
     );
   };
@@ -872,41 +954,18 @@ const PostPage = () => {
       });
 
       if (response.ok) {
-        // Helper function to get all child comment IDs recursively
-        const getAllChildIds = (parentId, comments) => {
-          const childIds = [];
-          const children = comments.filter(
-            (c) => c.parentCommentId === parentId
-          );
-          children.forEach((child) => {
-            childIds.push(child.id, ...getAllChildIds(child.id, comments));
-          });
-          return childIds;
-        };
-
-        // Remove comment and all its children from state, and decrement displayed count.
-        setPostComments((prev) => {
-          const currentComments = prev[postId] || [];
-          const childIds = getAllChildIds(commentId, currentComments);
-          const idsToRemove = new Set([commentId, ...childIds]);
-          const removedCount = idsToRemove.size;
-
-          setPosts((prevPosts) =>
-            prevPosts.map((p) => {
-              if (p.id !== postId) return p;
-              const currentCount = Number(p.comments || 0);
-              return {
-                ...p,
-                comments: Math.max(0, currentCount - removedCount),
-              };
-            })
-          );
-
-          return {
-            ...prev,
-            [postId]: currentComments.filter((c) => !idsToRemove.has(c.id)),
-          };
-        });
+        const removedCount = getRemovedCommentCount(postComments[postId] || [], commentId) || 1;
+        await loadCommentsForPost(postId, 1, true);
+        setPosts((prevPosts) =>
+          prevPosts.map((p) =>
+            p.id === postId
+              ? {
+                  ...p,
+                  comments: Math.max(0, Number(p.comments || 0) - removedCount),
+                }
+              : p,
+          ),
+        );
       }
     } catch (error) {
       logger.error("BLOCK OVERRIDE: Failed to delete comment", error);
@@ -931,12 +990,11 @@ const PostPage = () => {
       });
 
       if (response.ok) {
-        const comments = await fetchComments(postId);
-        setPostComments((prev) => ({ ...prev, [postId]: comments }));
+        await loadCommentsForPost(postId, 1, true);
         setPosts((prevPosts) =>
           prevPosts.map((post) =>
             post.id === postId
-              ? { ...post, comments: countComments(comments || []) }
+              ? { ...post, comments: Number(post.comments || 0) + 1 }
               : post,
           ),
         );
@@ -951,30 +1009,23 @@ const PostPage = () => {
 
   const handleCommentClick = async (postId) => {
     const targetPost = posts.find((p) => p.id === postId);
+    const commentsLoaded = Object.prototype.hasOwnProperty.call(postComments, postId);
 
     // Toggle comments visibility if already loaded
-    if (targetPost.showComments && postComments[postId]) {
+    if (targetPost.showComments && commentsLoaded) {
       setPosts((prev) =>
         prev.map((p) => (p.id === postId ? { ...p, showComments: false } : p))
       );
       return;
     }
 
-    // Otherwise, fetch comments
-    setLoadingComments((prev) => new Set(prev).add(postId));
-
-    const comments = await fetchComments(postId);
-    setPostComments((prev) => ({ ...prev, [postId]: comments }));
-
     setPosts((prev) =>
       prev.map((p) => (p.id === postId ? { ...p, showComments: true } : p))
     );
 
-    setLoadingComments((prev) => {
-      const updated = new Set(prev);
-      updated.delete(postId);
-      return updated;
-    });
+    if (!commentsLoaded) {
+      await loadCommentsForPost(postId, 1, true);
+    }
   };
 
   const handleViewPost = (post) => {
@@ -1161,6 +1212,20 @@ const PostPage = () => {
               }
             />
           ))}
+          {commentHasMore[post.id] ? (
+            <div className="flex justify-center pt-2">
+              <button
+                type="button"
+                onClick={() =>
+                  loadCommentsForPost(post.id, (commentPages[post.id] || 1) + 1, false)
+                }
+                disabled={loadingMoreComments.has(post.id)}
+                className="rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {loadingMoreComments.has(post.id) ? "Loading..." : "Load more comments"}
+              </button>
+            </div>
+          ) : null}
         </div>
       );
     }
@@ -1514,7 +1579,7 @@ const PostPage = () => {
                         <h4 className="text-sm font-semibold text-gray-800 mt-3 mb-2 flex items-center gap-2 flex-shrink-0">
                           <FaCommentDots size={19} className="text-gray-600" />
                           Comments (
-                          {countComments(postComments[post.id] || [])}
+                          {Number(post.comments || 0)}
                           )
                         </h4>
 

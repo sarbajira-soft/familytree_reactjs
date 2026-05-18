@@ -490,6 +490,14 @@ const SharedGalleryView = ({ context }) => {
     });
   };
 
+  const handleOpenInApp = () => {
+    navigate('/login', {
+      state: {
+        from: `${location.pathname}${location.search || ''}`,
+      },
+    });
+  };
+
   const handleRegister = () => {
     closeAuthPrompt();
     navigate('/register', {
@@ -635,10 +643,10 @@ const SharedGalleryView = ({ context }) => {
             {canOpenInApp ? (
               <button
                 type="button"
-                onClick={() => window.location.assign(shareUrl)}
+                onClick={handleOpenInApp}
                 className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
               >
-                Open in App
+                Open in Familyss
                 <FiExternalLink size={16} />
               </button>
             ) : null}
