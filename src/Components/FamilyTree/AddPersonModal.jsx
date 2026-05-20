@@ -2873,6 +2873,7 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                     </label>
                                     <input
                                       type="text"
+                                      maxLength={50}
                                       name={`name_${form.index}`}
                                       defaultValue={
                                         action.type === "edit" && action.person
@@ -2880,17 +2881,24 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                           : ""
                                       }
                                       required
+                                      pattern="^[A-Za-z ]+$"
+                                      title="Only letters and spaces are allowed"
                                       style={{
                                         width: "100%",
                                         borderRadius: 12,
-                                        border:
-                                          "2px solid rgba(102, 126, 234, 0.2)",
+                                        border: "2px solid rgba(102, 126, 234, 0.2)",
                                         padding: "12px 16px",
-                                        background: isDark ? 'rgba(15, 23, 42, 0.6)' : 'rgba(255, 255, 255, 0.9)',
+                                        background: isDark
+                                          ? "rgba(15, 23, 42, 0.6)"
+                                          : "rgba(255, 255, 255, 0.9)",
+                                        color: isDark ? "#fff" : "#000",
                                         fontSize: 14,
                                         fontWeight: 500,
                                         transition: "all 0.3s ease",
                                         outline: "none",
+                                      }}
+                                      onChange={(e) => {
+                                        e.target.value = e.target.value.replace(/[^A-Za-z ]/g, "");
                                       }}
                                       onFocus={(e) => {
                                         e.target.style.borderColor = "#667eea";

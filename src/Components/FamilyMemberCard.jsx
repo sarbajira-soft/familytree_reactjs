@@ -1259,7 +1259,7 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
             <div className="px-1 pb-1">
               <div className="flex items-center gap-3 w-full">
                 {/* Desktop Tabs - Hidden on Mobile */}
-                <div className="hidden sm:flex min-w-0 items-center gap-2 overflow-x-auto scrollbar-hide">
+                <div className="hidden lg:flex min-w-0 items-center gap-2 flex-wrap">
                   {TABS.map((tab) => (
                     <button
                       key={tab.id}
@@ -1281,7 +1281,7 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
                 </div>
 
                 {/* Mobile Dropdown - Hidden on Desktop */}
-                <div className="sm:hidden flex-1 relative" ref={tabDropdownRef}>
+                <div className="lg:hidden flex-1 relative" ref={tabDropdownRef}>
                   <button
                     onClick={() => setIsTabDropdownOpen(!isTabDropdownOpen)}
                     className="w-full flex items-center justify-between gap-2 px-4 py-2.5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-sm font-semibold text-gray-700 dark:text-slate-300 shadow-sm"

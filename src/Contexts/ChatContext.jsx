@@ -15,7 +15,6 @@ import {
   getChatFamilies,
   getUnreadChatCount,
 } from '../services/chat.service';
-import { removeCurrentChatPushRegistration } from '../services/chatPush.service';
 import { clearChatCache } from '../utils/chatCache';
 
 const normalizeFamilyCode = (value) =>
@@ -122,17 +121,6 @@ export const ChatProvider = ({ children }) => {
     refreshUnreadCount();
     refreshFamilies();
   }, [refreshFamilies, refreshUnreadCount]);
-
-  useEffect(() => {
-    if (!userInfo?.userId) {
-      return undefined;
-    }
-
-    removeCurrentChatPushRegistration()
-      .catch((error) => {
-        console.warn('Chat push cleanup failed:', error);
-      });
-  }, [userInfo?.userId]);
 
   const joinConversation = useCallback(
     (conversationId, familyCode = activeFamilyCode) => {

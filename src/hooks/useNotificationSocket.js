@@ -93,14 +93,6 @@ export const useNotificationSocket = (userInfo) => {
       setNotifications((prev) => filterNonChatNotifications([notification, ...prev]));
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
 
-      if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification(notification.title, {
-          body: notification.message,
-          icon: '/logo.png',
-          tag: `notification-${notification.id}`,
-        });
-      }
-
       void fetchUnreadCount();
     });
 
@@ -146,10 +138,6 @@ export const useNotificationSocket = (userInfo) => {
     socket.on('error', (error) => {
       console.error('Notification WebSocket error:', error);
     });
-
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission().catch(() => {});
-    }
 
     return () => {
       socket.disconnect();

@@ -12,7 +12,10 @@ import {
 
 import { authFetchResponse } from '../utils/authFetch';
 import { hasFamilyAccessStatus } from '../utils/familyAccess';
-import { removeCurrentChatPushRegistration } from '../services/chatPush.service';
+import {
+  initializeChatPush,
+  removeCurrentChatPushRegistration,
+} from '../services/chatPush.service';
 
 const UserContext = createContext();
 
@@ -341,6 +344,33 @@ export const UserProvider = ({ children }) => {
   useEffect(() => {
     fetchUserDetails();
   }, [fetchUserDetails]);
+
+  useEffect(() => {
+    if (!userInfo?.userId) {
+      return undefined;
+    }
+
+    let isActive = true;
+    let cleanup;
+
+    initializeChatPush()
+      .then((dispose) => {
+        if (!isActive) {
+          return dispose?.();
+        }
+
+        cleanup = dispose;
+        return undefined;
+      })
+      .catch((error) => {
+        console.warn('Push initialization after login failed:', error);
+      });
+
+    return () => {
+      isActive = false;
+      cleanup?.();
+    };
+  }, [userInfo?.userId]);
 
   useEffect(() => {
     const MIN_REFRESH_INTERVAL_MS = 60 * 1000;
