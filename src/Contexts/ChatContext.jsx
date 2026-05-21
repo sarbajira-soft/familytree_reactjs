@@ -16,6 +16,10 @@ import {
   getUnreadChatCount,
 } from '../services/chat.service';
 import { clearChatCache } from '../utils/chatCache';
+import {
+  clearActivePushConversationId,
+  setActivePushConversationId,
+} from '../utils/pushDeviceState';
 
 const normalizeFamilyCode = (value) =>
   String(value || '').trim().toUpperCase();
@@ -123,12 +127,23 @@ export const ChatProvider = ({ children }) => {
   }, [refreshFamilies, refreshUnreadCount]);
 
   const joinConversation = useCallback(
-    (conversationId, familyCode = activeFamilyCode) => {
+    (conversationId, familyCode = activeFamilyCode, targetUserId = null) => {
       if (!socket || !conversationId || !familyCode) return;
+      const normalizedConversationId = Number(conversationId);
+      const normalizedTargetUserId = Number(targetUserId || 0) || null;
       socket.emit(CHAT_SOCKET_EVENTS.JOIN_CONVERSATION, {
-        conversationId: Number(conversationId),
+        conversationId: normalizedConversationId,
         familyCode,
       });
+      socket.emit(CHAT_SOCKET_EVENTS.ACTIVE_CONVERSATION, {
+        conversationId: normalizedConversationId,
+        targetUserId: normalizedTargetUserId,
+      });
+      socket.emit('chat_opened', {
+        conversationId: normalizedConversationId,
+        targetUserId: normalizedTargetUserId,
+      });
+      setActivePushConversationId(normalizedConversationId);
     },
     [activeFamilyCode, socket],
   );
@@ -136,12 +151,22 @@ export const ChatProvider = ({ children }) => {
   const leaveConversation = useCallback(
     (conversationId) => {
       if (!socket || !conversationId) return;
+      const normalizedConversationId = Number(conversationId);
       socket.emit(CHAT_SOCKET_EVENTS.LEAVE_CONVERSATION, {
-        conversationId: Number(conversationId),
+        conversationId: normalizedConversationId,
       });
+      socket.emit(CHAT_SOCKET_EVENTS.CLEAR_ACTIVE_CONVERSATION, {
+        conversationId: normalizedConversationId,
+      });
+      socket.emit('chat_closed', {
+        conversationId: normalizedConversationId,
+      });
+      clearActivePushConversationId(normalizedConversationId);
     },
     [socket],
   );
+
+  useEffect(() => () => clearActivePushConversationId(), []);
 
   const joinFamilyRoom = useCallback(
     (familyCode = activeFamilyCode) => {

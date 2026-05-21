@@ -1437,7 +1437,18 @@ const ChatPage = () => {
       return undefined;
     }
 
-    joinConversation(selectedId, normalizedActiveFamilyCode);
+    const activeChatTargetUserId =
+      selectedType === CONVERSATION_TYPES.DIRECT
+        ? Number(
+            conversation?.participants?.find(
+              (participant) =>
+                Number(participant?.userId || 0) > 0 &&
+                Number(participant?.userId || 0) !== Number(currentUserId || 0),
+            )?.userId || 0,
+          ) || null
+        : null;
+
+    joinConversation(selectedId, normalizedActiveFamilyCode, activeChatTargetUserId);
 
     return () => {
       leaveConversation(selectedId);
@@ -1448,10 +1459,13 @@ const ChatPage = () => {
     activeFamilyCode,
     clearRemoteTyping,
     conversation?.familyCode,
+    conversation?.participants,
+    currentUserId,
     joinConversation,
     leaveConversation,
     resolvedConversationId,
     selectedId,
+    selectedType,
     stopLocalTyping,
   ]);
 

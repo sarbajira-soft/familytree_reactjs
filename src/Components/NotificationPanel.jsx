@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import {
   FiBell,
@@ -14,11 +15,71 @@ import {
 } from "react-icons/fi";
 import { getNotificationType } from "../utils/notifications";
 import AssociationRequestItem from "./FamilyTree/AssociationRequestItem";
-import { useNotificationSocket } from "../hooks/useNotificationSocket";
-import { useUser } from "../Contexts/UserContext";
 import { getToken } from "../utils/auth";
 import { authFetchResponse } from "../utils/authFetch";
 import { filterNonChatNotifications } from "../utils/chatNotificationFilter";
+
+const normalizeNotification = (notification = {}) => {
+  const createdAt =
+    notification?.createdAt || notification?.time || new Date().toISOString();
+  const hasRead = typeof notification?.read === "boolean";
+  const hasIsRead = typeof notification?.isRead === "boolean";
+  const read = hasRead
+    ? notification.read
+    : hasIsRead
+      ? Boolean(notification.isRead)
+      : false;
+
+  return {
+    ...notification,
+    createdAt,
+    time: notification?.time || createdAt,
+    read,
+    isRead: hasIsRead ? Boolean(notification.isRead) : read,
+    data:
+      notification?.data && typeof notification.data === "object"
+        ? notification.data
+        : {},
+  };
+};
+
+const getNotificationTimestamp = (notification = {}) => {
+  const timestamp = new Date(
+    notification?.createdAt || notification?.time || 0,
+  ).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+};
+
+const mergeNotifications = (currentNotifications = [], incomingNotifications = []) => {
+  const mergedById = new Map();
+
+  [...(Array.isArray(currentNotifications) ? currentNotifications : []), ...(Array.isArray(incomingNotifications) ? incomingNotifications : [])]
+    .map((notification) => normalizeNotification(notification))
+    .forEach((notification) => {
+      const id = Number(notification?.id || 0);
+      if (!id) {
+        return;
+      }
+
+      const existing = mergedById.get(id) || {};
+      mergedById.set(id, {
+        ...existing,
+        ...notification,
+        data: {
+          ...(existing?.data && typeof existing.data === "object" ? existing.data : {}),
+          ...(notification?.data && typeof notification.data === "object"
+            ? notification.data
+            : {}),
+        },
+      });
+    });
+
+  return filterNonChatNotifications(
+    Array.from(mergedById.values()).sort(
+      (left, right) => getNotificationTimestamp(right) - getNotificationTimestamp(left),
+    ),
+  );
+};
 
 const NotificationPanel = ({
   open,
@@ -28,15 +89,19 @@ const NotificationPanel = ({
   wsNotifications,
   refetchUnreadCount,
 }) => {
-  const { userInfo } = useUser();
-
-  // const { isConnected, notifications: wsNotifications, refetchUnreadCount } = useNotificationSocket(userInfo);
-
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(false);
   const [markingAllRead, setMarkingAllRead] = useState(false);
   const [processingRequest, setProcessingRequest] = useState(null);
   const [activeTab, setActiveTab] = useState("all"); // 'all', 'requests', 'other'
+  const renderCountRef = useRef(0);
+  const wasOpenRef = useRef(false);
+
+  renderCountRef.current += 1;
+  console.debug(
+    `[NotificationPanel] render count=${renderCountRef.current} open=${open} wsNotifications=${Array.isArray(wsNotifications) ? wsNotifications.length : 0} localNotifications=${notifications.length}`,
+  );
   const notificationTypes = {
     request: { icon: <FiUser />, color: "from-blue-500 to-blue-300" },
     birthday: { icon: <FiGift />, color: "from-pink-500 to-pink-300" },
@@ -83,16 +148,61 @@ const NotificationPanel = ({
       icon: <FiUserPlus />,
       color: "from-purple-500 to-purple-300",
     },
+    EVENT_CREATED: {
+      icon: <FiCalendar />,
+      color: "from-violet-500 to-violet-300",
+    },
+    EVENT_REMINDER: {
+      icon: <FiCalendar />,
+      color: "from-fuchsia-500 to-fuchsia-300",
+    },
   };
 
-  const fetchNotifications = async (getAll = false) => {
+  const getNotificationTarget = (notification) => {
+    const data =
+      notification?.data && typeof notification.data === "object"
+        ? notification.data
+        : {};
+    const explicitTarget = String(
+      data?.path || data?.deepLink || data?.targetUrl || "",
+    ).trim();
+
+    if (explicitTarget) {
+      return explicitTarget;
+    }
+
+    switch (String(notification?.type || "").trim().toUpperCase()) {
+      case "FAMILY_JOIN_REQUEST":
+      case "FAMILY_ASSOCIATION_REQUEST":
+        return "/pending-request";
+      case "FAMILY_ASSOCIATION_ACCEPTED":
+      case "FAMILY_ASSOCIATION_REJECTED":
+        return "/linked-family-trees";
+      case "FAMILY_MEMBER_APPROVED":
+      case "FAMILY_JOIN_REJECTED":
+        return "/my-family";
+      case "EVENT_CREATED":
+      case "EVENT_REMINDER":
+        return "/events";
+      default:
+        return "/dashboard";
+    }
+  };
+
+  const fetchNotifications = useCallback(async (getAll = false, options = {}) => {
+    const { silent = false, reason = "manual-refresh" } = options;
     try {
-      setLoading(true);
+      if (!silent) {
+        setLoading(true);
+      }
 
       const baseUrl =
         import.meta.env.VITE_API_BASE_URL || "http://localhost:3001";
 
       const url = `${baseUrl}/notifications${getAll ? "?all=true" : ""}`;
+      console.debug(
+        `[NotificationPanel] fetch start reason=${reason} url=${url} open=${open}`,
+      );
 
       console.log("🔍 Fetching notifications from:", url);
 
@@ -122,27 +232,19 @@ const NotificationPanel = ({
         data?.length,
       );
 
-      const formatted = data.map((n) => ({
+      const formatted = (Array.isArray(data) ? data : []).map((n) => ({
         id: n.id,
-
         type: n.type, // Keep original case to handle both formats
-
         title: n.title,
-
         message: n.message,
-
         time: n.createdAt, // Keep the original ISO string for proper parsing
-
         read: n.isRead,
-
+        isRead: n.isRead,
+        readAt: n.readAt || null,
         status: n.status || "pending", // Include notification status
-
         data: n.data || {},
-
         createdAt: n.createdAt,
-
         triggeredBy: n.triggeredBy,
-
         triggeredByUser: n.triggeredByUser || null,
       }));
 
@@ -175,13 +277,18 @@ const NotificationPanel = ({
         );
       });
 
-      setNotifications(filterNonChatNotifications(formatted));
+      setNotifications((prev) => mergeNotifications(prev, formatted));
+      console.debug(
+        `[NotificationPanel] fetch success reason=${reason} count=${formatted.length}`,
+      );
     } catch (err) {
       console.error("Error fetching notifications:", err);
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
-  };
+  }, [open]);
 
   const markAsRead = async (id) => {
     try {
@@ -190,7 +297,11 @@ const NotificationPanel = ({
       });
 
       setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
+        prev.map((n) =>
+          n.id === id
+            ? { ...n, read: true, isRead: true, readAt: new Date().toISOString() }
+            : n,
+        ),
       );
 
       if (onNotificationCountUpdate) {
@@ -198,6 +309,22 @@ const NotificationPanel = ({
       }
     } catch (err) {
       console.error("Failed to mark as read:", err);
+    }
+  };
+
+  const handleNotificationOpen = async (notification) => {
+    if (!notification) {
+      return;
+    }
+
+    if (!notification.read) {
+      await markAsRead(notification.id);
+    }
+
+    const target = getNotificationTarget(notification);
+    if (target) {
+      navigate(target);
+      onClose?.();
     }
   };
 
@@ -221,7 +348,12 @@ const NotificationPanel = ({
         prev.map((notification) =>
           notification.read
             ? notification
-            : { ...notification, read: true, readAt: new Date().toISOString() },
+            : {
+                ...notification,
+                read: true,
+                isRead: true,
+                readAt: new Date().toISOString(),
+              },
         ),
       );
 
@@ -242,30 +374,34 @@ const NotificationPanel = ({
   // Sync WebSocket notifications with local state
 
   useEffect(() => {
+    console.debug(
+      `[NotificationPanel] wsNotifications effect triggered open=${open} count=${Array.isArray(wsNotifications) ? wsNotifications.length : 0}`,
+    );
     if (wsNotifications && wsNotifications.length > 0) {
       console.log(
         "🔄 WebSocket notifications updated:",
         wsNotifications.length,
       );
-
-      // WebSocket provides real-time notifications
-
-      setNotifications(filterNonChatNotifications(wsNotifications));
+      setNotifications((prev) => mergeNotifications(prev, wsNotifications));
     }
-  }, [wsNotifications]);
+  }, [open, wsNotifications]);
 
   useEffect(() => {
-    if (open) {
+    console.debug(
+      `[NotificationPanel] open effect triggered open=${open} previousOpen=${wasOpenRef.current}`,
+    );
+    if (open && !wasOpenRef.current) {
       // Fetch initial notifications only once when panel opens
 
-      fetchNotifications(true);
+      void fetchNotifications(true, { reason: "panel-open" });
 
       console.log(
         "✅ NotificationPanel opened - WebSocket active:",
         isConnected,
       );
     }
-  }, [open]);
+    wasOpenRef.current = open;
+  }, [fetchNotifications, isConnected, open]);
 
   if (!open) return null;
 
@@ -798,9 +934,7 @@ const NotificationPanel = ({
                             ? "bg-blue-50 dark:bg-slate-800"
                             : ""
                         }`}
-                        onClick={() =>
-                          !notification.read && markAsRead(notification.id)
-                        }
+                        onClick={() => void handleNotificationOpen(notification)}
                       >
                         <div className="flex items-start">
                           <div
@@ -953,9 +1087,7 @@ const NotificationPanel = ({
                             ? "bg-blue-50 dark:bg-slate-800"
                             : ""
                         }`}
-                        onClick={() =>
-                          !notification.read && markAsRead(notification.id)
-                        }
+                        onClick={() => void handleNotificationOpen(notification)}
                       >
                         <div className="flex items-start">
                           <div
@@ -1108,9 +1240,7 @@ const NotificationPanel = ({
                             ? "bg-blue-50 dark:bg-slate-800"
                             : ""
                         }`}
-                        onClick={() =>
-                          !notification.read && markAsRead(notification.id)
-                        }
+                        onClick={() => void handleNotificationOpen(notification)}
                       >
                         <div className="flex items-start">
                           <div
@@ -1165,7 +1295,7 @@ const NotificationPanel = ({
 
           <div className="border-t border-gray-200 p-4 text-center dark:border-slate-800">
             <button
-              onClick={() => fetchNotifications(true)}
+              onClick={() => fetchNotifications(true, { reason: "manual-refresh" })}
               style={{
                 fontSize: "14px",
 

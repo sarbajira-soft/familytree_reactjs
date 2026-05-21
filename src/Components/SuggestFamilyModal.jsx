@@ -1,24 +1,10 @@
 import React, { useState } from "react";
-import { useNavigate } from 'react-router-dom';
 import FamilyPreviewModal from "./FamilyPreviewModal";
 import {jwtDecode} from 'jwt-decode';
 import Swal from 'sweetalert2';
 
 import { getToken } from '../utils/auth';
 import { authFetchResponse } from '../utils/authFetch';
-
-// Helper to fetch user's first name from profile
-async function fetchUserFirstName(userId, accessToken) {
-  const res = await authFetchResponse(`/user/profile/${userId}`, {
-    method: 'GET',
-    skipThrow: true,
-    headers: {
-      accept: 'application/json',
-    },
-  });
-  const data = await res.json();
-  return data?.data?.userProfile?.firstName || '';
-}
 
 const SuggestFamilyModal = ({
   families,
@@ -27,48 +13,33 @@ const SuggestFamilyModal = ({
   onCreateNew,
   onJoinFamily,
 }) => {
-  const navigate = useNavigate();
   const [previewFamilyCode, setPreviewFamilyCode] = useState(null);
 
-  // Handler to send join request notification to family admins
   const handleJoinFamily = async (familyCode) => {
     try {
       const accessToken = getToken();
       let userId = null;
-      let firstName = '';
       if (accessToken) {
         const decoded = jwtDecode(accessToken);
         userId = decoded?.id || decoded?.userId || decoded?.sub;
-        // Fetch the user's first name from their profile
-        firstName = await fetchUserFirstName(userId, accessToken);
       }
       if (!userId) throw new Error('User ID not found');
-      // 1. Get admin user IDs for the family
-      const adminRes = await authFetchResponse(
-        `/notifications/${familyCode}/admins`,
-        {
-          method: 'GET',
-          skipThrow: true,
-          headers: {
-            accept: 'application/json',
-          },
-        }
-      );
-      const adminData = await adminRes.json();
-      const adminIds = adminData.data || [];
-      // 2. Send notification to admins
-      await authFetchResponse(`/notifications`, {
+
+      const response = await authFetchResponse(`/family/member/request-join`, {
         method: 'POST',
         skipThrow: true,
         body: JSON.stringify({
-          type: 'FAMILY_JOIN_REQUEST',
-          title: 'New Family Join Request',
-          message: `${firstName} has requested to join your family using the code ${familyCode}.`,
           familyCode,
-          referenceId: userId,
-          userIds: adminIds,
+          memberId: userId,
+          approveStatus: 'pending',
         }),
       });
+
+      const responseData = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(responseData?.message || 'Failed to send join request');
+      }
+
       await Swal.fire({
         icon: 'success',
         title: 'Join Request Sent',

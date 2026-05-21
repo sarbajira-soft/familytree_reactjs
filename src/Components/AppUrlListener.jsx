@@ -4,6 +4,25 @@ import { useNavigate } from 'react-router-dom';
 
 const SHARED_POST_PATH = /^\/p\/([^/?#]+)/i;
 const SHARED_GALLERY_PATH = /^\/g\/([^/?#]+)/i;
+const NOTIFICATION_HOST = 'notification';
+
+const normalizeTargetPath = (value) => {
+  const normalized = String(value || '').trim();
+  if (!normalized) {
+    return '';
+  }
+
+  if (/^https?:\/\//i.test(normalized)) {
+    try {
+      const parsed = new URL(normalized);
+      return `${parsed.pathname || ''}${parsed.search || ''}${parsed.hash || ''}`;
+    } catch {
+      return '';
+    }
+  }
+
+  return normalized.startsWith('/') ? normalized : `/${normalized}`;
+};
 
 const AppUrlListener = () => {
   const navigate = useNavigate();
@@ -19,10 +38,23 @@ const AppUrlListener = () => {
 
       try {
         const parsed = new URL(rawUrl);
+        const notificationTarget =
+          parsed.host === NOTIFICATION_HOST
+            ? normalizeTargetPath(
+                parsed.searchParams.get('target') ||
+                  parsed.searchParams.get('deepLink') ||
+                  '',
+              )
+            : '';
         const postMatch = parsed.pathname.match(SHARED_POST_PATH);
         const galleryMatch = parsed.pathname.match(SHARED_GALLERY_PATH);
         const postShareId = postMatch?.[1];
         const galleryShareId = galleryMatch?.[1];
+
+        if (notificationTarget) {
+          navigate(notificationTarget);
+          return;
+        }
 
         if (postShareId) {
           navigate(`/shared-post/${decodeURIComponent(postShareId)}`);

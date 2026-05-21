@@ -2,6 +2,8 @@ import { authFetchResponse } from '../utils/authFetch';
 import { getToken } from '../utils/auth';
 import { CHAT_API_ENDPOINTS } from '../constants/chat.constants';
 import {
+  getActivePushConversationId,
+  getOrCreatePushInstallationId,
   clearStoredPushDeviceState,
   getStoredPushDeviceState,
   setStoredPushDeviceState,
@@ -14,6 +16,8 @@ let webOnMessageUnsubscribe = null;
 let serviceWorkerMessageCleanup = null;
 let firebaseAppPromise = null;
 let webMessagingContextPromise = null;
+let pushRefreshCleanup = null;
+let pushRefreshIntervalId = null;
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 const FIREBASE_MESSAGING_SW_PATH = '/firebase-messaging-sw.js';
@@ -114,6 +118,66 @@ const navigateToPushTarget = (targetUrl) => {
   }
 };
 
+const isDocumentVisible = () =>
+  typeof document !== 'undefined' && document.visibilityState === 'visible';
+
+const getNotificationRuntimeData = (payload = {}) =>
+  payload?.data && typeof payload.data === 'object' ? payload.data : {};
+
+const shouldSuppressConversationPush = (data = {}) => {
+  const activeConversationId = getActivePushConversationId();
+  const payloadConversationId = Number(data?.conversationId || 0);
+
+  const shouldSuppress =
+    Number(activeConversationId || 0) > 0 &&
+    payloadConversationId > 0 &&
+    Number(activeConversationId) === payloadConversationId;
+
+  if (shouldSuppress) {
+    console.debug(
+      `[ChatPush] push suppressed because active conversation matches payload conversation=${payloadConversationId}`,
+    );
+  }
+
+  return shouldSuppress;
+};
+
+const showNativeForegroundNotification = async (notification) => {
+  const data = getNotificationRuntimeData(notification);
+  if (shouldSuppressConversationPush(data)) {
+    return;
+  }
+
+  try {
+    const { LocalNotifications } = await import('@capacitor/local-notifications');
+    let permissionStatus = await LocalNotifications.checkPermissions();
+    if (permissionStatus?.display === 'prompt') {
+      permissionStatus = await LocalNotifications.requestPermissions();
+    }
+
+    if (permissionStatus?.display !== 'granted') {
+      return;
+    }
+
+    await LocalNotifications.schedule({
+      notifications: [
+        {
+          id: Number(data?.notificationId || data?.messageId || Date.now()),
+          title: String(notification?.title || data?.title || 'FamilySS Notification').trim(),
+          body: String(notification?.body || data?.body || '').trim(),
+          extra: {
+            ...data,
+            targetUrl: resolvePushTarget(data),
+          },
+          smallIcon: 'ic_launcher_foreground',
+        },
+      ],
+    });
+  } catch (error) {
+    console.warn('Chat native foreground notification failed:', error);
+  }
+};
+
 const showBrowserNotification = ({ title, body, data = {} }) => {
   if (
     typeof window === 'undefined' ||
@@ -178,7 +242,24 @@ const ensureServiceWorkerMessageListener = () => {
   };
 };
 
+const clearPushRefreshLoop = async () => {
+  if (pushRefreshIntervalId) {
+    clearInterval(pushRefreshIntervalId);
+    pushRefreshIntervalId = null;
+  }
+
+  try {
+    await pushRefreshCleanup?.();
+  } catch (error) {
+    console.warn('Push refresh listener cleanup failed:', error);
+  } finally {
+    pushRefreshCleanup = null;
+  }
+};
+
 const cleanupRuntimePushListeners = async () => {
+  await clearPushRefreshLoop();
+
   try {
     if (typeof webOnMessageUnsubscribe === 'function') {
       webOnMessageUnsubscribe();
@@ -250,14 +331,12 @@ const getWebMessagingContext = async () => {
 
     const registration = await ensureFirebaseMessagingServiceWorker();
     const {
-      deleteToken,
       getMessaging,
       getToken: getMessagingToken,
       onMessage,
     } = await import('firebase/messaging');
 
     return {
-      deleteToken,
       getMessagingToken,
       messaging: getMessaging(firebaseApp),
       onMessage,
@@ -276,19 +355,47 @@ const registerToken = async (token, platform, deviceId = '') => {
     return;
   }
 
+  const normalizedToken = String(token || '').trim();
+  const normalizedPlatform = String(platform || '').trim().toLowerCase();
+  const normalizedDeviceId = String(deviceId || '').trim();
+  const storedState = getStoredPushDeviceState();
+  const previousToken = String(storedState?.token || '').trim();
+
+  if (
+    storedState?.token === normalizedToken &&
+    storedState?.platform === normalizedPlatform &&
+    storedState?.deviceId === normalizedDeviceId
+  ) {
+    return;
+  }
+
+  if (
+    previousToken &&
+    previousToken !== normalizedToken &&
+    storedState?.deviceId === normalizedDeviceId
+  ) {
+    console.info(
+      `Push token rotation detected for device ${normalizedDeviceId} on ${normalizedPlatform}`,
+    );
+  } else {
+    console.info(
+      `Registering push token for device ${normalizedDeviceId} on ${normalizedPlatform}`,
+    );
+  }
+
   await authFetchResponse(CHAT_API_ENDPOINTS.deviceTokens, {
     method: 'POST',
     body: JSON.stringify({
-      token,
-      platform,
-      deviceId,
+      token: normalizedToken,
+      platform: normalizedPlatform,
+      deviceId: normalizedDeviceId,
     }),
   });
 
   setStoredPushDeviceState({
-    token,
-    platform,
-    deviceId,
+    token: normalizedToken,
+    platform: normalizedPlatform,
+    deviceId: normalizedDeviceId,
   });
 };
 
@@ -323,10 +430,15 @@ export const initializeWebChatPush = async () => {
 
     if (!webOnMessageUnsubscribe) {
       webOnMessageUnsubscribe = context.onMessage(context.messaging, (payload) => {
+        const payloadData = getNotificationRuntimeData(payload);
+        if (!isDocumentVisible() || shouldSuppressConversationPush(payloadData)) {
+          return;
+        }
+
         showBrowserNotification({
-          title: payload?.notification?.title || payload?.data?.title,
-          body: payload?.notification?.body || payload?.data?.body,
-          data: payload?.data || {},
+          title: payloadData?.title,
+          body: payloadData?.body,
+          data: payloadData,
         });
       });
     }
@@ -337,7 +449,7 @@ export const initializeWebChatPush = async () => {
     });
 
     if (token) {
-      await registerToken(token, 'web', navigator.userAgent.slice(0, 180));
+      await registerToken(token, 'web', getOrCreatePushInstallationId());
     }
   })().catch((error) => {
     webPushPromise = null;
@@ -349,10 +461,12 @@ export const initializeWebChatPush = async () => {
 
 export const initializeNativeChatPush = async () => {
   try {
-    const [{ Capacitor }, { PushNotifications }] = await Promise.all([
+    const [{ Capacitor }, { PushNotifications }, localNotificationsModule] = await Promise.all([
       import('@capacitor/core'),
       import('@capacitor/push-notifications'),
+      import('@capacitor/local-notifications').catch(() => null),
     ]);
+    const LocalNotifications = localNotificationsModule?.LocalNotifications || null;
 
     if (!Capacitor?.isNativePlatform?.()) {
       return () => {};
@@ -375,7 +489,7 @@ export const initializeNativeChatPush = async () => {
       const registrationListener = await PushNotifications.addListener(
         'registration',
         async (token) => {
-          await registerToken(token?.value, 'android', 'capacitor-android');
+          await registerToken(token?.value, 'android', getOrCreatePushInstallationId());
         },
       );
       const registrationErrorListener = await PushNotifications.addListener(
@@ -386,12 +500,15 @@ export const initializeNativeChatPush = async () => {
       );
       const pushReceivedListener = await PushNotifications.addListener(
         'pushNotificationReceived',
-        (notification) => {
+        async (notification) => {
           window.dispatchEvent(
             new CustomEvent('familyss:push-received', {
               detail: notification,
             }),
           );
+          if (LocalNotifications) {
+            await showNativeForegroundNotification(notification);
+          }
         },
       );
       const actionPerformedListener = await PushNotifications.addListener(
@@ -401,6 +518,17 @@ export const initializeNativeChatPush = async () => {
           navigateToPushTarget(resolvePushTarget(data));
         },
       );
+      const localNotificationActionListener = LocalNotifications
+        ? await LocalNotifications.addListener(
+            'localNotificationActionPerformed',
+            (event) => {
+              const data = event?.notification?.extra || {};
+              navigateToPushTarget(
+                String(data?.targetUrl || '').trim() || resolvePushTarget(data),
+              );
+            },
+          )
+        : null;
 
       await PushNotifications.register();
 
@@ -409,6 +537,7 @@ export const initializeNativeChatPush = async () => {
         await registrationErrorListener?.remove?.();
         await pushReceivedListener?.remove?.();
         await actionPerformedListener?.remove?.();
+        await localNotificationActionListener?.remove?.();
       };
 
       return nativePushCleanup;
@@ -425,7 +554,7 @@ export const initializeNativeChatPush = async () => {
 };
 
 const unregisterDeviceTokenFromBackend = async (state, authToken) => {
-  if (!authToken || (!state?.token && !state?.deviceId) || !API_BASE_URL) {
+  if (!authToken || !state?.deviceId || !API_BASE_URL) {
     return;
   }
 
@@ -435,9 +564,7 @@ const unregisterDeviceTokenFromBackend = async (state, authToken) => {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${authToken}`,
     },
-    body: JSON.stringify(
-      state?.token ? { token: state.token } : { deviceId: state?.deviceId || '' },
-    ),
+    body: JSON.stringify({ deviceId: state?.deviceId || '' }),
   });
 };
 
@@ -453,28 +580,6 @@ export const removeCurrentChatPushRegistration = async () => {
     console.warn('Chat push backend cleanup failed:', error);
   }
 
-  try {
-    if (storedState?.platform === 'web') {
-      const context = await getWebMessagingContext();
-      if (context?.deleteToken && context?.messaging) {
-        await context.deleteToken(context.messaging);
-      }
-    }
-  } catch (error) {
-    console.warn('Chat web push token cleanup failed:', error);
-  }
-
-  try {
-    if (storedState?.platform === 'android') {
-      const { PushNotifications } = await import('@capacitor/push-notifications');
-      if (typeof PushNotifications?.unregister === 'function') {
-        await PushNotifications.unregister();
-      }
-    }
-  } catch (error) {
-    console.warn('Chat native push token cleanup failed:', error);
-  }
-
   await cleanupRuntimePushListeners();
 
   clearStoredPushDeviceState();
@@ -482,9 +587,113 @@ export const removeCurrentChatPushRegistration = async () => {
   webMessagingContextPromise = null;
 };
 
+export const refreshChatPushRegistration = async () => {
+  try {
+    const { Capacitor } = await import('@capacitor/core');
+    if (Capacitor?.isNativePlatform?.()) {
+      if (!nativePushPromise) {
+        await initializeNativeChatPush();
+      }
+      const { PushNotifications } = await import('@capacitor/push-notifications');
+      await PushNotifications.register();
+      return;
+    }
+
+    if (
+      typeof window === 'undefined' ||
+      !('Notification' in window) ||
+      Notification.permission !== 'granted'
+    ) {
+      return;
+    }
+
+    const context = await getWebMessagingContext();
+    if (!context?.messaging) {
+      return;
+    }
+
+    const token = await context.getMessagingToken(context.messaging, {
+      vapidKey: readFirebaseEnv(FIREBASE_ENV_KEYS.vapidKey),
+      serviceWorkerRegistration: context.serviceWorkerRegistration || undefined,
+    });
+
+    if (token) {
+      await registerToken(token, 'web', getOrCreatePushInstallationId());
+    }
+  } catch (error) {
+    console.warn('Chat push token refresh failed:', error);
+  }
+};
+
+const ensurePushRefreshLoop = async () => {
+  if (pushRefreshCleanup || pushRefreshIntervalId) {
+    return;
+  }
+
+  const refreshIfVisible = () => {
+    if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+      return;
+    }
+    void refreshChatPushRegistration();
+  };
+
+  const focusHandler = () => {
+    refreshIfVisible();
+  };
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('focus', focusHandler);
+  }
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', refreshIfVisible);
+  }
+
+  try {
+    const { App } = await import('@capacitor/app');
+    const appStateListener = await App.addListener('appStateChange', ({ isActive }) => {
+      if (isActive) {
+        void refreshChatPushRegistration();
+      }
+    });
+
+    pushRefreshCleanup = async () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('focus', focusHandler);
+      }
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', refreshIfVisible);
+      }
+      await appStateListener?.remove?.();
+      pushRefreshCleanup = null;
+    };
+  } catch {
+    pushRefreshCleanup = async () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('focus', focusHandler);
+      }
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', refreshIfVisible);
+      }
+      pushRefreshCleanup = null;
+    };
+  }
+
+  pushRefreshIntervalId = window.setInterval(() => {
+    refreshIfVisible();
+  }, 6 * 60 * 60 * 1000);
+};
+
 export const initializeChatPush = async () => {
-  const nativeCleanup = await initializeNativeChatPush();
-  await initializeWebChatPush();
+  const { Capacitor } = await import('@capacitor/core');
+  const nativeCleanup = Capacitor?.isNativePlatform?.()
+    ? await initializeNativeChatPush()
+    : null;
+
+  if (!Capacitor?.isNativePlatform?.()) {
+    await initializeWebChatPush();
+  }
+
+  await ensurePushRefreshLoop();
 
   return async () => {
     await nativeCleanup?.();

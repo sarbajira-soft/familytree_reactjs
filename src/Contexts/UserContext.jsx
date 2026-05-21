@@ -16,6 +16,8 @@ import {
   initializeChatPush,
   removeCurrentChatPushRegistration,
 } from '../services/chatPush.service';
+import { disconnectNotificationSocket } from '../hooks/useNotificationSocket';
+import { disconnectChatSocket } from '../hooks/useChatSocket';
 
 const UserContext = createContext();
 
@@ -40,16 +42,21 @@ export const UserProvider = ({ children }) => {
     initializeAuth();
   }, []);
 
-  const clearUserData = useCallback(async () => {
-    try {
-      await removeCurrentChatPushRegistration();
-    } catch (error) {
-      console.warn('Push cleanup during logout failed:', error);
-    }
+  const clearUserData = useCallback(() => {
+    disconnectNotificationSocket('logout');
+    disconnectChatSocket('logout');
 
+    const pushCleanupPromise = removeCurrentChatPushRegistration().catch((error) => {
+      console.warn('Push cleanup during logout failed:', error);
+    });
+
+    userInfoRef.current = null;
+    profileRefreshRef.current.inFlight = false;
     setUserInfo(null);
     setUserLoading(false);
     clearAuthData();
+
+    return pushCleanupPromise;
   }, []);
 
   const redirectToLogin = useCallback(() => {

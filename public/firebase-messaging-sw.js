@@ -63,9 +63,8 @@ if (hasMinimumConfig && self.firebase && !firebase.apps.length) {
 
   messaging.onBackgroundMessage((payload) => {
     const payloadData = payload?.data || {};
-    const notification = payload?.notification || {};
-    const title = String(notification.title || payloadData.title || 'FamilySS Notification').trim();
-    const body = String(notification.body || payloadData.body || '').trim();
+    const title = String(payloadData.title || 'FamilySS Notification').trim();
+    const body = String(payloadData.body || '').trim();
     const targetUrl = resolveTargetUrl(payloadData);
 
     self.registration.showNotification(title, {
