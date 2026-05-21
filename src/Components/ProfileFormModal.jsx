@@ -170,8 +170,12 @@ const ProfileFormModal = ({
   // Check if current user can edit account settings (role 2 or 3 - Admin/Superadmin)
   const canEditAccountSettings = userInfo && (userInfo.role === 2 || userInfo.role === 3);
 
+  // Family admins should not see the delete-profile action.
+  const isFamilyAdmin = userInfo?.role === 2;
+
   // Check if this is the current user's profile being edited
   const isCurrentUserProfile = mode === 'edit-profile' && userInfo && userInfo.userId === (formData.userId || userInfo.userId);
+  const canDeleteProfile = isCurrentUserProfile && !isFamilyAdmin;
 
   useEffect(() => {
     if (apiError && errorRef.current) {
@@ -2414,9 +2418,9 @@ const ProfileFormModal = ({
             </div>
 
             {/* Submit Button */}
-            <div className="flex justify-between items-center pt-4 gap-3">
+            <div className={`flex items-center pt-4 gap-3 ${canDeleteProfile ? 'justify-between' : 'justify-end'}`}>
               {/* Delete Profile Button - Only show for current user profile editing */}
-              {isCurrentUserProfile && (
+              {canDeleteProfile && (
                 <button
                   type="button"
                   onClick={handleDeleteProfile}

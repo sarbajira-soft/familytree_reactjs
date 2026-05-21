@@ -62,6 +62,38 @@ const ChatPickerModal = ({
     });
   }, [members, searchTerm]);
 
+  const groupedMembers = useMemo(() => {
+    const family = [];
+    const associated = [];
+    const linked = [];
+
+    filteredMembers.forEach((member) => {
+      const relationshipLabel = String(
+        member?.relationshipLabel || member?.membershipType || '',
+      )
+        .trim()
+        .toLowerCase();
+
+      if (relationshipLabel === 'family' || relationshipLabel === 'member') {
+        family.push(member);
+        return;
+      }
+
+      if (relationshipLabel === 'associated') {
+        associated.push(member);
+        return;
+      }
+
+      linked.push(member);
+    });
+
+    return [
+      { key: 'family', title: 'Your Family', members: family },
+      { key: 'associated', title: 'Associated', members: associated },
+      { key: 'linked', title: 'Linked', members: linked },
+    ].filter((section) => section.members.length > 0);
+  }, [filteredMembers]);
+
   if (!isOpen) {
     return null;
   }
@@ -124,7 +156,12 @@ const ChatPickerModal = ({
       {/* Members List */}
       <div className="flex-1 overflow-y-auto px-3 py-4 sm:px-4 custom-scrollbar">
         {filteredMembers.length > 0 ? (
-          filteredMembers.map((member) => {
+          groupedMembers.map((section) => (
+            <div key={section.key} className="mb-4 last:mb-0">
+              <div className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                {section.title}
+              </div>
+              {section.members.map((member) => {
             const isSelected = selectedIds.includes(Number(member?.userId || 0));
 
             const isDisabled =
@@ -139,87 +176,89 @@ const ChatPickerModal = ({
 
             const badges = getChatMemberBadges(member);
 
-            return (
-              <button
-                key={member.userId}
-                type="button"
-                disabled={isDisabled}
-                onClick={() => {
-                  if (!isDisabled) {
-                    onToggleMember?.(member);
-                  }
-                }}
-                className={`mb-2 flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left transition-all ${
-                  isSelected
-                    ? 'bg-blue-50 dark:bg-blue-500/10'
-                    : 'hover:bg-gray-100 dark:hover:bg-slate-800'
-                } ${isDisabled ? 'cursor-not-allowed opacity-50' : ''}`}
-              >
+                return (
+                  <button
+                    key={member.userId}
+                    type="button"
+                    disabled={isDisabled}
+                    onClick={() => {
+                      if (!isDisabled) {
+                        onToggleMember?.(member);
+                      }
+                    }}
+                    className={`mb-2 flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left transition-all ${
+                      isSelected
+                        ? 'bg-blue-50 dark:bg-blue-500/10'
+                        : 'hover:bg-gray-100 dark:hover:bg-slate-800'
+                    } ${isDisabled ? 'cursor-not-allowed opacity-50' : ''}`}
+                  >
                 {/* Avatar */}
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gray-200 text-sm font-semibold text-gray-700">
-                  {member.profileUrl ? (
-                    <img
-                      src={member.profileUrl}
-                      alt={member.name}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    getInitials(member.firstName, member.lastName) || (
-                      <FiUser size={16} />
-                    )
-                  )}
-                </div>
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gray-200 text-sm font-semibold text-gray-700">
+                      {member.profileUrl ? (
+                        <img
+                          src={member.profileUrl}
+                          alt={member.name}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        getInitials(member.firstName, member.lastName) || (
+                          <FiUser size={16} />
+                        )
+                      )}
+                    </div>
 
                 {/* Meta */}
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="truncate text-sm font-semibold text-gray-900 dark:text-white">
-                      {member.name}
-                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="truncate text-sm font-semibold text-gray-900 dark:text-white">
+                          {member.name}
+                        </span>
 
-                    {member.isFamilyAdmin ? (
-                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-600 dark:bg-slate-700 dark:text-gray-300">
-                        Admin
-                      </span>
-                    ) : null}
+                        {member.isFamilyAdmin ? (
+                          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-600 dark:bg-slate-700 dark:text-gray-300">
+                            Admin
+                          </span>
+                        ) : null}
 
-                    {badges.map((badge) => (
-                      <span
-                        key={`${member.userId}-${badge.key}`}
-                        title={badge.title}
-                        className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${badge.className}`}
-                      >
-                        {badge.label}
-                      </span>
-                    ))}
-                  </div>
+                        {badges.map((badge) => (
+                          <span
+                            key={`${member.userId}-${badge.key}`}
+                            title={badge.title}
+                            className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${badge.className}`}
+                          >
+                            {badge.label}
+                          </span>
+                        ))}
+                      </div>
 
-                  <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    {getChatMemberMetaText(member)}
-                  </div>
+                      <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        {getChatMemberMetaText(member)}
+                      </div>
 
-                  {note ? (
-                    <div className="mt-1 text-xs text-gray-400">
-                      {note}
+                      {note ? (
+                        <div className="mt-1 text-xs text-gray-400">
+                          {note}
+                        </div>
+                      ) : null}
                     </div>
-                  ) : null}
-                </div>
 
                 {/* Selection */}
-                <div className={`flex h-5 w-5 items-center justify-center rounded-full border ${
-                  isSelected
-                    ? 'border-blue-600 bg-blue-600 text-white'
-                    : 'border-gray-300'
-                }`}>
-                  {selectionMode === 'single' ? (
-                    <span className="h-2 w-2 rounded-full bg-white" />
-                  ) : (
-                    isSelected && <FiCheck size={12} />
-                  )}
-                </div>
-              </button>
-            );
-          })
+                    <div className={`flex h-5 w-5 items-center justify-center rounded-full border ${
+                      isSelected
+                        ? 'border-blue-600 bg-blue-600 text-white'
+                        : 'border-gray-300'
+                    }`}>
+                      {selectionMode === 'single' ? (
+                        <span className="h-2 w-2 rounded-full bg-white" />
+                      ) : (
+                        isSelected && <FiCheck size={12} />
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          ))
         ) : (
           <div className="flex flex-col items-center justify-center py-14 text-center">
             <p className="text-base font-semibold text-gray-700 dark:text-gray-200">

@@ -367,14 +367,6 @@ export const getConversationInfoDescription = (conversation, familyName) => {
     return `Archived room history preserved for ${resolvedFamilyName}. New messages are disabled.`;
   }
 
-  if (roomType === 'announcements') {
-    return `Announcements for ${resolvedFamilyName}. Only family admins can post here.`;
-  }
-
-  if (roomType === 'general') {
-    return `General room for everyone in ${resolvedFamilyName}.`;
-  }
-
   if (roomType === 'event') {
     return `Event discussion room inside ${resolvedFamilyName}.`;
   }
@@ -393,10 +385,6 @@ export const getRoomDisplayName = (conversation = {}) => {
   }
 
   switch (String(conversation?.roomType || '').trim().toLowerCase()) {
-    case 'general':
-      return 'General';
-    case 'announcements':
-      return 'Announcements';
     case 'event':
       return 'Event';
     case 'custom':

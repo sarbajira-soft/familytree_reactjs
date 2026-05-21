@@ -59,14 +59,8 @@ const ChatConversationPane = ({
     return (
       <div className="chat-placeholder">
         <div className="chat-placeholder-icon">Chat</div>
-        <h2>
-          {header.hasFamilyScope ? 'Start with your family circle' : 'Family chat is unavailable'}
-        </h2>
-        <p>
-          {header.hasFamilyScope
-            ? 'Choose a conversation to share updates, memories, and support together.'
-            : 'Switch to an available family to open your chat space.'}
-        </p>
+        <h2>Open a conversation</h2>
+        <p>Choose a message or room to continue your chat in one unified inbox.</p>
       </div>
     );
   }

@@ -4,7 +4,7 @@
  */
 
 export const CHAT_API_ENDPOINTS = {
-  families: '/chat/families',
+  contacts: '/chat/contacts',
   unreadCount: '/chat/unread/count',
   conversations: '/chat/conversations',
   conversation: (id) => `/chat/conversations/${id}`,
@@ -99,8 +99,6 @@ export const REPORT_REASONS = [
 
 export const CHAT_SOCKET_EVENTS = {
   // Client → Server
-  JOIN_FAMILY_ROOM: 'join-family-room',
-  LEAVE_FAMILY_ROOM: 'leave-family-room',
   JOIN_CONVERSATION: 'join-conversation',
   LEAVE_CONVERSATION: 'leave-conversation',
   SEND_MESSAGE: 'send-message',

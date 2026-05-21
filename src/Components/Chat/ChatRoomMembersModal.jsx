@@ -375,7 +375,7 @@ const ChatRoomMembersModal = ({
             </div>
 
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400 sm:text-sm">
-              Eligible users from this family scope
+              Eligible users from your reachable contacts
             </p>
           </div>
         ) : null}
