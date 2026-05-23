@@ -17,6 +17,9 @@ import ChatSidebar from '../Components/Chat/ChatSidebar';
 import ReportMessageModal from '../Components/Chat/ReportMessageModal';
 import ChatRoomMembersModal from '../Components/Chat/ChatRoomMembersModal';
 import ChatPickerModal from '../Components/Chat/ChatPickerModal';
+import ContentUnavailableState from '../Components/ContentUnavailableState';
+import GalleryViewerModal from '../Components/GalleryViewerModal';
+import PostViewerModal from '../Components/PostViewerModal';
 import {
   CHAT_LIMITS,
   CHAT_SOCKET_EVENTS,
@@ -98,6 +101,7 @@ import {
   validateComposerAttachment,
   validateComposerText,
 } from '../Components/Chat/chatPage.utils';
+import { authFetchResponse } from '../utils/authFetch';
 import '../Components/Chat/chat.css';
 
 const TEXT_SEND_MAX_RETRIES = 3;
@@ -117,6 +121,25 @@ const isSocketTimeoutError = (error) =>
     .trim()
     .toLowerCase()
     .includes('chat socket timed out');
+
+const mapSharedPostDetailToViewer = (payload = {}, sharePayload = null) => ({
+  id: Number(payload?.id || 0),
+  author: String(sharePayload?.creatorName || 'Familyss User').trim() || 'Familyss User',
+  authorId: payload?.createdBy || null,
+  avatar: '/assets/user.png',
+  caption: payload?.caption || '',
+  fullImageUrl: payload?.postImage || '',
+  postVideo: payload?.postVideo || '',
+  likes: Number(payload?.likeCount || 0),
+  comments: Number(payload?.commentCount || 0),
+  commentCount: Number(payload?.commentCount || 0),
+  isLiked: Boolean(payload?.isLiked),
+  createdBy: payload?.createdBy || null,
+  privacy: payload?.privacy || '',
+  publicShareId: payload?.publicShareId || null,
+  shareUrl: payload?.shareUrl || null,
+  time: payload?.createdAt ? new Date(payload.createdAt).toLocaleString() : '',
+});
 
 const ChatPage = () => {
   const navigate = useNavigate();
@@ -190,6 +213,9 @@ const ChatPage = () => {
   const [deleteConversationSubmitting, setDeleteConversationSubmitting] = useState(false);
   const [deleteConversationError, setDeleteConversationError] = useState('');
   const [infoPanelOpen, setInfoPanelOpen] = useState(false);
+  const [sharedPostViewer, setSharedPostViewer] = useState(null);
+  const [sharedGalleryViewer, setSharedGalleryViewer] = useState(null);
+  const [sharedUnavailable, setSharedUnavailable] = useState(null);
   const [messageSearchOpen, setMessageSearchOpen] = useState(false);
   const [messageSearchQuery, setMessageSearchQuery] = useState('');
   const [activeMessageSearchIndex, setActiveMessageSearchIndex] = useState(-1);
@@ -1998,6 +2024,53 @@ const ChatPage = () => {
     hasAttachmentDraft,
   ]);
 
+  const handleOpenSharedMessage = useCallback(async (message) => {
+    const sharePayload = message?.sharePayload || null;
+    const entityId = Number(sharePayload?.entityId || 0);
+    if (!entityId) {
+      return;
+    }
+
+    try {
+      if (message?.messageType === MESSAGE_TYPES.POST_SHARE) {
+        const response = await authFetchResponse(`/post/${entityId}`, {
+          method: 'GET',
+          skipThrow: true,
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload?.message || 'This post is unavailable right now.');
+        }
+        setSharedPostViewer(
+          mapSharedPostDetailToViewer(payload?.data || payload, sharePayload),
+        );
+        return;
+      }
+
+      if (message?.messageType === MESSAGE_TYPES.GALLERY_SHARE) {
+        setSharedGalleryViewer({
+          id: entityId,
+          title: sharePayload?.previewTitle || 'Gallery',
+          galleryTitle: sharePayload?.previewTitle || 'Gallery',
+          description: sharePayload?.previewText || '',
+          galleryDescription: sharePayload?.previewText || '',
+          coverPhoto: sharePayload?.previewMediaUrl || '',
+          coverImage: sharePayload?.previewMediaUrl || '',
+          photosCount: Number(sharePayload?.mediaCount || 0),
+          imageCount: Number(sharePayload?.mediaCount || 0),
+          author: sharePayload?.creatorName || 'Familyss User',
+        });
+      }
+    } catch (error) {
+      setSharedUnavailable({
+        title: 'This shared content is unavailable',
+        description:
+          error?.message ||
+          'The original post or gallery may have been removed, deleted, or is no longer available to you.',
+      });
+    }
+  }, []);
+
   const sendMedia = useCallback(
     async (file, options = {}) => {
       const targetConversationId = Number(selectedId || 0);
@@ -3447,6 +3520,7 @@ const ChatPage = () => {
               matchIds: messageSearchMatchIds,
               nodeRefs: messageNodeRefs,
               onDeleteMessage: handleDelete,
+              onOpenSharedMessage: handleOpenSharedMessage,
               onScroll: handleMessagesScroll,
               onReply: setReplyTo,
               onReportMessage: setReportMsg,
@@ -3477,6 +3551,46 @@ const ChatPage = () => {
         onDelete={handleConfirmHideConversation}
         onDeleteAndLeave={handleConfirmDeleteAndLeaveGroup}
       />
+
+      <PostViewerModal
+        isOpen={Boolean(sharedPostViewer)}
+        onClose={() => setSharedPostViewer(null)}
+        post={sharedPostViewer}
+        authToken={null}
+        currentUser={userInfo}
+      />
+
+      <GalleryViewerModal
+        isOpen={Boolean(sharedGalleryViewer)}
+        onClose={() => setSharedGalleryViewer(null)}
+        album={sharedGalleryViewer}
+        currentUser={userInfo}
+        authToken={null}
+      />
+
+      {sharedUnavailable ? (
+        <div
+          className="fixed inset-0 z-[95] bg-black/50 backdrop-blur-sm"
+          onClick={() => setSharedUnavailable(null)}
+          role="presentation"
+        >
+          <div className="h-full overflow-y-auto" onClick={(event) => event.stopPropagation()} role="presentation">
+            <ContentUnavailableState
+              title={sharedUnavailable.title}
+              description={sharedUnavailable.description}
+              action={(
+                <button
+                  type="button"
+                  onClick={() => setSharedUnavailable(null)}
+                  className="mt-6 rounded-full bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700"
+                >
+                  Close
+                </button>
+              )}
+            />
+          </div>
+        </div>
+      ) : null}
 
       <ChatPickerModal
         isOpen={newConversationOpen}

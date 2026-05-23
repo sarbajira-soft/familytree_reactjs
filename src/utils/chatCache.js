@@ -20,6 +20,10 @@ const cloneReply = (reply = null) => {
 const cloneMessage = (message = {}) => ({
   ...message,
   replyTo: cloneReply(message?.replyTo),
+  sharePayload:
+    message?.sharePayload && typeof message.sharePayload === 'object'
+      ? { ...message.sharePayload }
+      : message?.sharePayload ?? null,
 });
 
 const cloneMessages = (messages = []) =>

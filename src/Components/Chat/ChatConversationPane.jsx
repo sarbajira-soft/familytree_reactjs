@@ -23,6 +23,7 @@ import {
 import TypingIndicator from './TypingIndicator';
 import VoiceRecorder from './VoiceRecorder';
 import ChatStateBanner from './ChatStateBanner';
+import ChatSharedContentCard from './ChatSharedContentCard';
 import {
   CHAT_LIMITS,
   MESSAGE_TYPES,
@@ -497,6 +498,23 @@ const ChatConversationPane = ({
                           <span>
                             <em>{isTombstone ? 'Message unavailable' : 'Message deleted'}</em>
                           </span>
+                        ) : message.messageType === MESSAGE_TYPES.POST_SHARE ||
+                          message.messageType === MESSAGE_TYPES.GALLERY_SHARE ? (
+                          <div className="msg-share-block">
+                            {message.content ? (
+                              <div className="msg-share-caption">
+                                {renderHighlightedText(
+                                  message.content,
+                                  messageSearch.query,
+                                  isActiveSearchMatch,
+                                )}
+                              </div>
+                            ) : null}
+                            <ChatSharedContentCard
+                              message={message}
+                              onOpen={messagesPane.onOpenSharedMessage}
+                            />
+                          </div>
                         ) : message.mediaUrl ? (
                           message.messageType === MESSAGE_TYPES.VOICE ? (
                             <audio
