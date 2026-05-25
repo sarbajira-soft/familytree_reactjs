@@ -103,8 +103,6 @@ export const CHAT_SOCKET_EVENTS = {
   // Client → Server
   JOIN_CONVERSATION: 'join-conversation',
   LEAVE_CONVERSATION: 'leave-conversation',
-  ACTIVE_CONVERSATION: 'active-conversation',
-  CLEAR_ACTIVE_CONVERSATION: 'clear-active-conversation',
   SEND_MESSAGE: 'send-message',
   TYPING_START: 'typing-start',
   TYPING_STOP: 'typing-stop',

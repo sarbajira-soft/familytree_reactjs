@@ -14,11 +14,8 @@ import { CHAT_SOCKET_EVENTS } from '../constants/chat.constants';
 import {
   getUnreadChatCount,
 } from '../services/chat.service';
+import { removeCurrentChatPushRegistration } from '../services/chatPush.service';
 import { clearChatCache } from '../utils/chatCache';
-import {
-  clearActivePushConversationId,
-  setActivePushConversationId,
-} from '../utils/pushDeviceState';
 
 const ChatContext = createContext({
   unreadChatCount: 0,
@@ -35,11 +32,6 @@ export const ChatProvider = ({ children }) => {
   const { userInfo } = useUser();
   const [totalUnreadChatCount, setTotalUnreadChatCount] = useState(0);
   const previousUserIdRef = useRef(null);
-  const activeConversationStateRef = useRef({
-    conversationId: null,
-    familyCode: '',
-    targetUserId: null,
-  });
 
   const handleUnreadCount = useCallback((payload) => {
     setTotalUnreadChatCount(Number(payload?.totalCount ?? payload?.count ?? 0));
@@ -84,140 +76,36 @@ export const ChatProvider = ({ children }) => {
     [totalUnreadChatCount],
   );
 
+  useEffect(() => {
+    if (!userInfo?.userId) {
+      return undefined;
+    }
+
+    removeCurrentChatPushRegistration()
+      .catch((error) => {
+        console.warn('Chat push cleanup failed:', error);
+      });
+  }, [userInfo?.userId]);
+
   const joinConversation = useCallback(
-    (conversationId, familyCode = activeFamilyCode, targetUserId = null) => {
-      if (!socket || !socket.connected || !conversationId || !familyCode) return false;
-      const normalizedConversationId = Number(conversationId);
-      const normalizedFamilyCode = normalizeFamilyCode(familyCode);
-      const normalizedTargetUserId = Number(targetUserId || 0) || null;
-      const currentState = activeConversationStateRef.current;
-
-      if (
-        Number(currentState.conversationId || 0) === normalizedConversationId &&
-        normalizeFamilyCode(currentState.familyCode) === normalizedFamilyCode &&
-        Number(currentState.targetUserId || 0) === Number(normalizedTargetUserId || 0)
-      ) {
-        return false;
-      }
-
+    (conversationId) => {
+      if (!socket || !conversationId) return;
       socket.emit(CHAT_SOCKET_EVENTS.JOIN_CONVERSATION, {
-        conversationId: normalizedConversationId,
-        familyCode: normalizedFamilyCode,
+        conversationId: Number(conversationId),
       });
-      socket.emit('chat_opened', {
-        conversationId: normalizedConversationId,
-        targetUserId: normalizedTargetUserId,
-      });
-      activeConversationStateRef.current = {
-        conversationId: normalizedConversationId,
-        familyCode: normalizedFamilyCode,
-        targetUserId: normalizedTargetUserId,
-      };
-      setActivePushConversationId(normalizedConversationId);
-      return true;
     },
     [socket],
   );
 
   const leaveConversation = useCallback(
     (conversationId) => {
-      const normalizedConversationId = Number(conversationId || 0) || null;
-      const currentState = activeConversationStateRef.current;
-      const shouldEmitClose =
-        !!socket &&
-        !!socket.connected &&
-        !!normalizedConversationId &&
-        Number(currentState.conversationId || 0) === normalizedConversationId;
-
-      if (shouldEmitClose) {
-        socket.emit(CHAT_SOCKET_EVENTS.LEAVE_CONVERSATION, {
-          conversationId: normalizedConversationId,
-        });
-        socket.emit('chat_closed', {
-          conversationId: normalizedConversationId,
-        });
-      }
-
-      if (
-        !normalizedConversationId ||
-        Number(currentState.conversationId || 0) === normalizedConversationId
-      ) {
-        activeConversationStateRef.current = {
-          conversationId: null,
-          familyCode: '',
-          targetUserId: null,
-        };
-      }
-
-      if (!normalizedConversationId) {
-        clearActivePushConversationId();
-        return false;
-      }
-
-      clearActivePushConversationId(normalizedConversationId);
-      return shouldEmitClose;
+      if (!socket || !conversationId) return;
+      socket.emit(CHAT_SOCKET_EVENTS.LEAVE_CONVERSATION, {
+        conversationId: Number(conversationId),
+      });
     },
     [socket],
   );
-
-  useEffect(
-    () => () => {
-      activeConversationStateRef.current = {
-        conversationId: null,
-        familyCode: '',
-        targetUserId: null,
-      };
-      clearActivePushConversationId();
-    },
-    [],
-  );
-
-  const joinFamilyRoom = useCallback(
-    (familyCode = activeFamilyCode) => {
-      if (!socket || !familyCode) return;
-      socket.emit(CHAT_SOCKET_EVENTS.JOIN_FAMILY_ROOM, {
-        familyCode,
-      });
-    },
-    [activeFamilyCode, socket],
-  );
-
-  const leaveFamilyRoom = useCallback(
-    (familyCode = activeFamilyCode) => {
-      if (!socket || !familyCode) return;
-      socket.emit(CHAT_SOCKET_EVENTS.LEAVE_FAMILY_ROOM, {
-        familyCode,
-      });
-    },
-    [activeFamilyCode, socket],
-  );
-
-  useEffect(() => {
-    if (!socket || !isConnected) {
-      joinedFamilyCodeRef.current = '';
-      activeConversationStateRef.current = {
-        conversationId: null,
-        familyCode: '',
-        targetUserId: null,
-      };
-      return undefined;
-    }
-
-    const normalizedFamilyCode = normalizeFamilyCode(activeFamilyCode);
-    if (!normalizedFamilyCode) {
-      return undefined;
-    }
-
-    joinFamilyRoom(normalizedFamilyCode);
-    joinedFamilyCodeRef.current = normalizedFamilyCode;
-
-    return () => {
-      leaveFamilyRoom(normalizedFamilyCode);
-      if (joinedFamilyCodeRef.current === normalizedFamilyCode) {
-        joinedFamilyCodeRef.current = '';
-      }
-    };
-  }, [activeFamilyCode, isConnected, joinFamilyRoom, leaveFamilyRoom, socket]);
 
   const emitTyping = useCallback(
     (conversationId, familyCode, isTyping = true) => {

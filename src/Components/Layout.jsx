@@ -396,12 +396,7 @@ const LayoutContent = ({ noScroll = false }) => {
   const supportContactHref = useMemo(() => {
     return `mailto:${supportEmail}?subject=${encodeURIComponent("Support Request - Familyss")}`;
   }, [supportEmail]);
-  const {
-    isConnected,
-    unreadCount,
-    refetchUnreadCount,
-    notifications,
-  } =
+  const { isConnected, unreadCount, refetchUnreadCount, notifications } =
     useNotificationSocket(userInfo);
 
   // Responsive layout handling
