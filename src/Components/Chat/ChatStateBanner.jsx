@@ -24,11 +24,17 @@ const getBannerCopy = (conversationState, availabilityReason) => {
         title: 'Chat unavailable',
         description: 'This chat is unavailable because your account is no longer an active app user.',
       };
+    case CONVERSATION_AVAILABILITY_REASONS.ANNOUNCEMENT_ADMIN_ONLY:
+      return {
+        tone: 'info',
+        title: 'Read-only chat',
+        description: 'Only the family admin can post in announcements.',
+      };
     case CONVERSATION_AVAILABILITY_REASONS.FAMILY_CONNECTION_LOST:
       return {
         tone: 'warning',
         title: 'Read-only chat',
-        description: 'This chat is read-only because the direct relationship needed for it is no longer active.',
+        description: 'This chat is read-only because you are no longer in the same family scope.',
       };
     case CONVERSATION_AVAILABILITY_REASONS.PARTICIPANT_PENDING_DELETION:
       return {

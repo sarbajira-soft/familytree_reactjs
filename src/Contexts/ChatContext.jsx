@@ -12,6 +12,7 @@ import { useUser } from './UserContext';
 import { useChatSocket } from '../hooks/useChatSocket';
 import { CHAT_SOCKET_EVENTS } from '../constants/chat.constants';
 import {
+  getChatFamilies,
   getUnreadChatCount,
 } from '../services/chat.service';
 import { clearChatCache } from '../utils/chatCache';
@@ -20,11 +21,20 @@ import {
   setActivePushConversationId,
 } from '../utils/pushDeviceState';
 
+const normalizeFamilyCode = (value) =>
+  String(value || '').trim().toUpperCase();
+
 const ChatContext = createContext({
   unreadChatCount: 0,
+  families: [],
+  activeFamilyCode: '',
+  setActiveFamilyCode: () => {},
   refreshUnreadCount: async () => {},
+  refreshFamilies: async () => {},
   socket: null,
   isChatConnected: false,
+  joinFamilyRoom: () => {},
+  leaveFamilyRoom: () => {},
   joinConversation: () => {},
   leaveConversation: () => {},
   emitTyping: () => {},
@@ -33,7 +43,10 @@ const ChatContext = createContext({
 
 export const ChatProvider = ({ children }) => {
   const { userInfo } = useUser();
-  const [totalUnreadChatCount, setTotalUnreadChatCount] = useState(0);
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const [families, setFamilies] = useState([]);
+  const [activeFamilyCode, setActiveFamilyCode] = useState('');
+  const joinedFamilyCodeRef = useRef('');
   const previousUserIdRef = useRef(null);
   const activeConversationStateRef = useRef({
     conversationId: null,
@@ -42,7 +55,7 @@ export const ChatProvider = ({ children }) => {
   });
 
   const handleUnreadCount = useCallback((payload) => {
-    setTotalUnreadChatCount(Number(payload?.totalCount ?? payload?.count ?? 0));
+    setUnreadChatCount(Number(payload?.count || 0));
   }, []);
 
   const { socket, isConnected } = useChatSocket(userInfo, {
@@ -59,7 +72,9 @@ export const ChatProvider = ({ children }) => {
 
     if (!nextUserId) {
       clearChatCache();
-      setTotalUnreadChatCount(0);
+      setUnreadChatCount(0);
+      setFamilies([]);
+      setActiveFamilyCode('');
     }
 
     previousUserIdRef.current = nextUserId;
@@ -69,20 +84,52 @@ export const ChatProvider = ({ children }) => {
     if (!userInfo?.userId) return;
     try {
       const data = await getUnreadChatCount();
-      setTotalUnreadChatCount(Number(data?.totalCount ?? data?.count ?? 0));
+      setUnreadChatCount(Number(data?.count || 0));
     } catch (error) {
       console.warn('Chat unread count refresh failed:', error);
     }
   }, [userInfo?.userId]);
 
+  const refreshFamilies = useCallback(async () => {
+    if (!userInfo?.userId) {
+      setFamilies([]);
+      return;
+    }
+
+    try {
+      const data = await getChatFamilies();
+      const nextFamilies = Array.isArray(data?.families) ? data.families : [];
+      setFamilies(nextFamilies);
+
+      const preferredFamilyCode = normalizeFamilyCode(userInfo?.familyCode);
+      const availableCodes = nextFamilies
+        .map((family) => normalizeFamilyCode(family?.familyCode))
+        .filter(Boolean);
+
+      setActiveFamilyCode((current) => {
+        const currentCode = normalizeFamilyCode(current);
+
+        if (currentCode && availableCodes.includes(currentCode)) {
+          return currentCode;
+        }
+
+        if (preferredFamilyCode && availableCodes.includes(preferredFamilyCode)) {
+          return preferredFamilyCode;
+        }
+
+        return availableCodes[0] || '';
+      });
+    } catch (error) {
+      console.warn('Chat families refresh failed:', error);
+      setFamilies([]);
+      setActiveFamilyCode('');
+    }
+  }, [userInfo?.familyCode, userInfo?.userId]);
+
   useEffect(() => {
     refreshUnreadCount();
-  }, [refreshUnreadCount]);
-
-  const unreadChatCount = useMemo(
-    () => Number(totalUnreadChatCount || 0),
-    [totalUnreadChatCount],
-  );
+    refreshFamilies();
+  }, [refreshFamilies, refreshUnreadCount]);
 
   const joinConversation = useCallback(
     (conversationId, familyCode = activeFamilyCode, targetUserId = null) => {
@@ -116,7 +163,7 @@ export const ChatProvider = ({ children }) => {
       setActivePushConversationId(normalizedConversationId);
       return true;
     },
-    [socket],
+    [activeFamilyCode, socket],
   );
 
   const leaveConversation = useCallback(
@@ -220,7 +267,7 @@ export const ChatProvider = ({ children }) => {
   }, [activeFamilyCode, isConnected, joinFamilyRoom, leaveFamilyRoom, socket]);
 
   const emitTyping = useCallback(
-    (conversationId, familyCode, isTyping = true) => {
+    (conversationId, familyCode = activeFamilyCode, isTyping = true) => {
       if (!socket || !conversationId || !familyCode) return;
       socket.emit(
         isTyping ? CHAT_SOCKET_EVENTS.TYPING_START : CHAT_SOCKET_EVENTS.TYPING_STOP,
@@ -230,11 +277,11 @@ export const ChatProvider = ({ children }) => {
         },
       );
     },
-    [socket],
+    [activeFamilyCode, socket],
   );
 
   const markConversationReadSocket = useCallback(
-    (conversationId, familyCode, readAt = null) => {
+    (conversationId, familyCode = activeFamilyCode, readAt = null) => {
       if (!socket || !conversationId || !familyCode) return;
       socket.emit(CHAT_SOCKET_EVENTS.MARK_READ, {
         conversationId: Number(conversationId),
@@ -242,15 +289,21 @@ export const ChatProvider = ({ children }) => {
         ...(readAt ? { readAt } : {}),
       });
     },
-    [socket],
+    [activeFamilyCode, socket],
   );
 
   const value = useMemo(
     () => ({
       unreadChatCount,
+      families,
+      activeFamilyCode,
+      setActiveFamilyCode,
       refreshUnreadCount,
+      refreshFamilies,
       socket,
       isChatConnected: isConnected,
+      joinFamilyRoom,
+      leaveFamilyRoom,
       joinConversation,
       leaveConversation,
       emitTyping,
@@ -258,9 +311,14 @@ export const ChatProvider = ({ children }) => {
     }),
     [
       unreadChatCount,
+      families,
+      activeFamilyCode,
       refreshUnreadCount,
+      refreshFamilies,
       socket,
       isConnected,
+      joinFamilyRoom,
+      leaveFamilyRoom,
       joinConversation,
       leaveConversation,
       emitTyping,

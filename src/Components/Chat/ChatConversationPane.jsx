@@ -23,7 +23,6 @@ import {
 import TypingIndicator from './TypingIndicator';
 import VoiceRecorder from './VoiceRecorder';
 import ChatStateBanner from './ChatStateBanner';
-import ChatSharedContentCard from './ChatSharedContentCard';
 import {
   CHAT_LIMITS,
   MESSAGE_TYPES,
@@ -60,8 +59,14 @@ const ChatConversationPane = ({
     return (
       <div className="chat-placeholder">
         <div className="chat-placeholder-icon">Chat</div>
-        <h2>Open a conversation</h2>
-        <p>Choose a message or room to continue your chat in one unified inbox.</p>
+        <h2>
+          {header.hasFamilyScope ? 'Start with your family circle' : 'Family chat is unavailable'}
+        </h2>
+        <p>
+          {header.hasFamilyScope
+            ? 'Choose a conversation to share updates, memories, and support together.'
+            : 'Switch to an available family to open your chat space.'}
+        </p>
       </div>
     );
   }
@@ -498,23 +503,6 @@ const ChatConversationPane = ({
                           <span>
                             <em>{isTombstone ? 'Message unavailable' : 'Message deleted'}</em>
                           </span>
-                        ) : message.messageType === MESSAGE_TYPES.POST_SHARE ||
-                          message.messageType === MESSAGE_TYPES.GALLERY_SHARE ? (
-                          <div className="msg-share-block">
-                            {message.content ? (
-                              <div className="msg-share-caption">
-                                {renderHighlightedText(
-                                  message.content,
-                                  messageSearch.query,
-                                  isActiveSearchMatch,
-                                )}
-                              </div>
-                            ) : null}
-                            <ChatSharedContentCard
-                              message={message}
-                              onOpen={messagesPane.onOpenSharedMessage}
-                            />
-                          </div>
                         ) : message.mediaUrl ? (
                           message.messageType === MESSAGE_TYPES.VOICE ? (
                             <audio

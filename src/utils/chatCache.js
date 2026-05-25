@@ -1,7 +1,10 @@
-let conversationList = [];
-let roomList = [];
+const conversationListsByFamily = new Map();
+const roomListsByFamily = new Map();
 const conversationsById = new Map();
 const messagesByConversationId = new Map();
+
+const normalizeFamilyCode = (familyCode) =>
+  String(familyCode || '').trim().toUpperCase();
 
 const cloneParticipant = (participant = {}) => ({
   ...participant,
@@ -20,10 +23,6 @@ const cloneReply = (reply = null) => {
 const cloneMessage = (message = {}) => ({
   ...message,
   replyTo: cloneReply(message?.replyTo),
-  sharePayload:
-    message?.sharePayload && typeof message.sharePayload === 'object'
-      ? { ...message.sharePayload }
-      : message?.sharePayload ?? null,
 });
 
 const cloneMessages = (messages = []) =>
@@ -93,24 +92,7 @@ const mergeConversation = (current = {}, next = {}) => ({
     : cloneReply(current?.pinnedMessage),
 });
 
-const isRoomConversation = (conversation = {}) =>
-  Boolean(
-    conversation?.roomId ||
-      conversation?.roomType ||
-      String(conversation?.type || '').trim().toLowerCase() === 'group',
-  );
-
-const setConversationDetailInternal = (conversation = {}) => {
-  const conversationId = Number(conversation?.id || 0);
-  if (!conversationId) {
-    return;
-  }
-
-  const current = conversationsById.get(conversationId) || {};
-  conversationsById.set(conversationId, mergeConversation(current, conversation));
-};
-
-const upsertListEntry = (list = [], conversation = {}) => {
+const upsertConversationListEntry = (list = [], conversation = {}) => {
   const nextConversation = cloneConversation(conversation);
   const nextList = cloneConversations(list);
   const existingIndex = nextList.findIndex(
@@ -118,7 +100,10 @@ const upsertListEntry = (list = [], conversation = {}) => {
   );
 
   if (existingIndex >= 0) {
-    nextList[existingIndex] = mergeConversation(nextList[existingIndex], nextConversation);
+    nextList[existingIndex] = mergeConversation(
+      nextList[existingIndex],
+      nextConversation,
+    );
   } else {
     nextList.unshift(nextConversation);
   }
@@ -126,37 +111,49 @@ const upsertListEntry = (list = [], conversation = {}) => {
   return sortConversations(nextList);
 };
 
-const removeConversationFromList = (list = [], conversationId) =>
-  cloneConversations(list).filter(
-    (entry) => Number(entry?.id || 0) !== Number(conversationId || 0),
-  );
+const setConversationDetailInternal = (conversation = {}) => {
+  const conversationId = Number(conversation?.id || 0);
+  if (!conversationId) return;
 
-const setListForConversationType = (isRoom, conversations = []) => {
-  const nextList = sortConversations(cloneConversations(conversations));
-  if (isRoom) {
-    roomList = nextList;
-  } else {
-    conversationList = nextList;
-  }
-  nextList.forEach(setConversationDetailInternal);
-  return cloneConversations(nextList);
+  const current = conversationsById.get(conversationId) || {};
+  conversationsById.set(conversationId, mergeConversation(current, conversation));
 };
 
+const getListMap = (isRoom = false) =>
+  isRoom ? roomListsByFamily : conversationListsByFamily;
+
 export const clearChatCache = () => {
-  conversationList = [];
-  roomList = [];
+  conversationListsByFamily.clear();
+  roomListsByFamily.clear();
   conversationsById.clear();
   messagesByConversationId.clear();
 };
 
-export const getCachedConversations = () => cloneConversations(conversationList);
+export const getCachedConversations = (familyCode) => {
+  const key = normalizeFamilyCode(familyCode);
+  return cloneConversations(conversationListsByFamily.get(key) || []);
+};
 
-export const cacheConversations = (_familyCode, conversations = []) =>
-  setListForConversationType(false, conversations);
+export const cacheConversations = (familyCode, conversations = []) => {
+  const key = normalizeFamilyCode(familyCode);
+  const next = sortConversations(cloneConversations(conversations));
+  conversationListsByFamily.set(key, next);
+  next.forEach(setConversationDetailInternal);
+  return cloneConversations(next);
+};
 
-export const getCachedRooms = () => cloneConversations(roomList);
+export const getCachedRooms = (familyCode) => {
+  const key = normalizeFamilyCode(familyCode);
+  return cloneConversations(roomListsByFamily.get(key) || []);
+};
 
-export const cacheRooms = (_familyCode, rooms = []) => setListForConversationType(true, rooms);
+export const cacheRooms = (familyCode, rooms = []) => {
+  const key = normalizeFamilyCode(familyCode);
+  const next = sortConversations(cloneConversations(rooms));
+  roomListsByFamily.set(key, next);
+  next.forEach(setConversationDetailInternal);
+  return cloneConversations(next);
+};
 
 export const getCachedConversation = (conversationId) => {
   const key = Number(conversationId || 0);
@@ -171,39 +168,47 @@ export const cacheConversation = (conversation = {}) => {
     return null;
   }
 
-  const previousConversation = conversationsById.get(conversationId) || {};
-  const previousWasRoomConversation = isRoomConversation(previousConversation);
   setConversationDetailInternal(conversation);
   const mergedConversation = conversationsById.get(conversationId);
-  const nextIsRoomConversation = isRoomConversation(mergedConversation);
+  const familyCode = normalizeFamilyCode(mergedConversation?.familyCode);
+  const isRoomConversation = Boolean(
+    mergedConversation?.roomId || mergedConversation?.roomType || mergedConversation?.type === 'group',
+  );
 
-  if (nextIsRoomConversation) {
-    roomList = upsertListEntry(roomList, mergedConversation);
-    conversationList = removeConversationFromList(conversationList, conversationId);
-  } else {
-    conversationList = upsertListEntry(conversationList, mergedConversation);
-    roomList = removeConversationFromList(roomList, conversationId);
-  }
-
-  if (previousWasRoomConversation !== nextIsRoomConversation) {
-    if (previousWasRoomConversation) {
-      roomList = removeConversationFromList(roomList, conversationId);
-    } else {
-      conversationList = removeConversationFromList(conversationList, conversationId);
-    }
+  if (familyCode) {
+    const listMap = getListMap(isRoomConversation);
+    const currentList = listMap.get(familyCode) || [];
+    listMap.set(
+      familyCode,
+      upsertConversationListEntry(currentList, mergedConversation),
+    );
   }
 
   return cloneConversation(mergedConversation);
 };
 
-export const removeCachedConversation = (conversationId) => {
+export const removeCachedConversation = (conversationId, familyCode = '') => {
   const key = Number(conversationId || 0);
   if (!key) {
     return;
   }
 
-  conversationList = removeConversationFromList(conversationList, key);
-  roomList = removeConversationFromList(roomList, key);
+  const cachedConversation = conversationsById.get(key) || {};
+  const normalizedFamilyCode = normalizeFamilyCode(
+    familyCode || cachedConversation?.familyCode,
+  );
+
+  if (normalizedFamilyCode) {
+    const nextConversationList = cloneConversations(
+      conversationListsByFamily.get(normalizedFamilyCode) || [],
+    ).filter((entry) => Number(entry?.id || 0) !== key);
+    const nextRoomList = cloneConversations(
+      roomListsByFamily.get(normalizedFamilyCode) || [],
+    ).filter((entry) => Number(entry?.id || 0) !== key);
+    conversationListsByFamily.set(normalizedFamilyCode, nextConversationList);
+    roomListsByFamily.set(normalizedFamilyCode, nextRoomList);
+  }
+
   conversationsById.delete(key);
   messagesByConversationId.delete(key);
 };
@@ -298,49 +303,14 @@ export const cacheConversationMessage = (
 ) => {
   if (!message) return null;
 
-  const hydratedConversation =
-    options?.conversation && typeof options.conversation === 'object'
-      ? cloneConversation(options.conversation)
-      : null;
-  const existingConversation = getCachedConversation(conversationId);
-  const fallbackConversation =
-    existingConversation ||
-    hydratedConversation ||
-    (message?.type || message?.roomId || message?.roomType
-      ? {
-          id: Number(conversationId || 0),
-          familyCode: String(familyCode || '').trim().toUpperCase(),
-          type: message?.type || 'direct',
-          conversationType: message?.conversationType || null,
-          roomId: Number(message?.roomId || 0) || null,
-          roomType: message?.roomType || null,
-          roomName: message?.roomName || null,
-          roomAvatarUrl: message?.roomAvatarUrl || '',
-          relationshipLabel: message?.relationshipLabel || null,
-        }
-      : null);
-
-  if (!fallbackConversation) {
-    return null;
-  }
+  const conversation = getCachedConversation(conversationId) || {
+    id: Number(conversationId || 0),
+    familyCode: normalizeFamilyCode(familyCode),
+  };
 
   const nextConversation = {
-    ...fallbackConversation,
-    familyCode:
-      fallbackConversation.familyCode || String(familyCode || '').trim().toUpperCase(),
-    type: fallbackConversation?.type || message?.type || 'direct',
-    conversationType:
-      fallbackConversation?.conversationType || message?.conversationType || null,
-    roomId:
-      Number(fallbackConversation?.roomId || 0) ||
-      Number(message?.roomId || 0) ||
-      null,
-    roomType: fallbackConversation?.roomType || message?.roomType || null,
-    roomName: fallbackConversation?.roomName || message?.roomName || null,
-    roomAvatarUrl:
-      fallbackConversation?.roomAvatarUrl || message?.roomAvatarUrl || '',
-    relationshipLabel:
-      fallbackConversation?.relationshipLabel || message?.relationshipLabel || null,
+    ...conversation,
+    familyCode: conversation.familyCode || normalizeFamilyCode(familyCode),
     lastMessage: {
       id: Number(message?.id || 0),
       content: message?.content || '',
@@ -355,20 +325,19 @@ export const cacheConversationMessage = (
         ? Number(options.unreadCount)
         : options?.clearUnread
           ? 0
-          : Number(fallbackConversation?.unreadCount || 0),
+          : Number(conversation?.unreadCount || 0),
   };
 
   return cacheConversation(nextConversation);
 };
 
-export const markCachedConversationRead = (...args) => {
-  const conversationId =
-    args.length > 1 ? Number(args[1] || 0) : Number(args[0] || 0);
+export const markCachedConversationRead = (familyCode, conversationId) => {
   const conversation = getCachedConversation(conversationId);
   if (!conversation) return null;
 
   return cacheConversation({
     ...conversation,
+    familyCode: conversation.familyCode || normalizeFamilyCode(familyCode),
     unreadCount: 0,
   });
 };

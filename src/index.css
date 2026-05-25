@@ -9,17 +9,11 @@
     --color-error: 239, 68, 68;
     --app-bg: #ffffff;
     --app-text: #1f2937;
-    --app-scrollbar-size: 8px;
-    --app-scrollbar-thumb: rgba(100, 116, 139, 0.28);
-    --app-scrollbar-thumb-hover: rgba(71, 85, 105, 0.48);
-    --app-scrollbar-track: transparent;
   }
 
   html.dark {
     --app-bg: #0b1220;
     --app-text: #f9fafb;
-    --app-scrollbar-thumb: rgba(148, 163, 184, 0.22);
-    --app-scrollbar-thumb-hover: rgba(148, 163, 184, 0.42);
   }
 
   html {
@@ -32,8 +26,6 @@
     background-color: var(--app-bg);
     color: var(--app-text);
     font-size: 14px;
-    scrollbar-width: thin;
-    scrollbar-color: var(--app-scrollbar-thumb) var(--app-scrollbar-track);
   }
 
   input[type="text"],
@@ -441,72 +433,41 @@
 
 
 
-html {
-  scrollbar-width: thin;
-  scrollbar-color: var(--app-scrollbar-thumb) var(--app-scrollbar-track);
-}
-
-html::-webkit-scrollbar,
-body::-webkit-scrollbar,
-*::-webkit-scrollbar {
-  width: var(--app-scrollbar-size);
-  height: var(--app-scrollbar-size);
-}
-
-html::-webkit-scrollbar-track,
-body::-webkit-scrollbar-track,
-*::-webkit-scrollbar-track {
-  background: var(--app-scrollbar-track);
-}
-
-html::-webkit-scrollbar-thumb,
-body::-webkit-scrollbar-thumb,
-*::-webkit-scrollbar-thumb {
-  background: var(--app-scrollbar-thumb);
-  border-radius: 999px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
-}
-
-html::-webkit-scrollbar-thumb:hover,
-body::-webkit-scrollbar-thumb:hover,
-*::-webkit-scrollbar-thumb:hover {
-  background: var(--app-scrollbar-thumb-hover);
-  background-clip: padding-box;
-}
+/* Optional: Hide scrollbar entirely but keep functionality */
+/* If you want the scrollbar to *only* appear on hover, you'd need more complex JS/CSS or specific browser extensions,
+   but this makes it very discreet until scrolled. */
 
 .custom-scrollbar {
     overflow-y: auto;
     -ms-overflow-style: none; 
     scrollbar-width: thin; 
-    scrollbar-color: var(--app-scrollbar-thumb) var(--app-scrollbar-track);
 }
 
 /* Custom Scrollbar Styles for Webkit browsers (Chrome, Safari, Edge) */
 .custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 4px; /* Width of the scrollbar */
+  height: 4px; /* Height of the horizontal scrollbar */
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-  border-radius: 999px;
+  background: transparent; /* Transparent track */
+  border-radius: 10px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: var(--app-scrollbar-thumb);
-  border-radius: 999px;
+  background: #d1d5db; /* Light gray thumb */
+  border-radius: 10px;
   transition: background 0.2s ease;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: var(--app-scrollbar-thumb-hover);
+  background: #9ca3af; /* Darker gray on hover */
 }
 
 /* Custom Scrollbar Styles for Firefox */
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: var(--app-scrollbar-thumb) transparent;
+  scrollbar-color: #d1d5db transparent;
 }
 
 @keyframes scale-in {
@@ -1426,148 +1387,3 @@ html:not(.dark) .family-tree-person-modal .person-form-upgraded label,
 html:not(.dark) .family-tree-person-modal .form-group-upgraded label {
     color: #334155;
 }
-
-/* --- Micro-interactions --- */
-
-.hover-lift {
-  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.25s ease;
-}
-
-.hover-lift:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
-}
-
-.active-press {
-  transition: transform 0.1s ease;
-}
-
-.active-press:active {
-  transform: scale(0.96);
-}
-
-.btn-interaction {
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.btn-interaction:hover {
-  transform: translateY(-2px);
-  filter: brightness(1.1);
-}
-
-.btn-interaction:active {
-  transform: scale(0.95);
-}
-
-/* Magnetic effect for icons/buttons */
-.magnetic-hover {
-  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-.magnetic-hover:hover {
-  transform: scale(1.1);
-}
-
-/* Subtle pulse for active indicators */
-@keyframes soft-pulse {
-  0% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.4); }
-  70% { box-shadow: 0 0 0 10px rgba(249, 115, 22, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0); }
-}
-
-.active-pulse {
-  animation: soft-pulse 2s infinite;
-}
-
-/* Staggered entry for grid items */
-.stagger-item {
-  opacity: 0;
-  transform: translateY(20px);
-  animation: slideUpFade 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-@keyframes slideUpFade {
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-.transition-all-300 {
-  transition: all 0.3s ease;
-}
-
-.scale-on-hover:hover {
-  transform: scale(1.02);
-}
-
-/* --- New Premium Micro-interactions --- */
-
-.shimmer-button {
-  position: relative;
-  overflow: hidden;
-}
-
-.shimmer-button::after {
-  content: '';
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: linear-gradient(
-    to bottom right,
-    rgba(255, 255, 255, 0) 0%,
-    rgba(255, 255, 255, 0) 40%,
-    rgba(255, 255, 255, 0.4) 50%,
-    rgba(255, 255, 255, 0) 60%,
-    rgba(255, 255, 255, 0) 100%
-  );
-  transform: rotate(45deg);
-  animation: shimmer-effect 3s infinite;
-}
-
-@keyframes shimmer-effect {
-  0% { transform: translateX(-100%) rotate(45deg); }
-  100% { transform: translateX(100%) rotate(45deg); }
-}
-
-.magnetic-icon {
-  display: inline-flex;
-  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.magnetic-icon:hover {
-  transform: scale(1.25) translateY(-2px);
-}
-
-.card-image-pan {
-  transition: transform 1.2s cubic-bezier(0.33, 1, 0.68, 1);
-}
-
-.group:hover .card-image-pan {
-  transform: scale(1.15) rotate(1deg);
-}
-
-.glass-pill {
-  background: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.click-scale {
-  transition: transform 0.1s ease;
-}
-
-.click-scale:active {
-  transform: scale(0.94);
-}
-

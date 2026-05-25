@@ -5,7 +5,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { FiX } from 'react-icons/fi';
 import { toast } from 'react-toastify';
 import { useUser } from '../Contexts/UserContext';
@@ -17,9 +17,6 @@ import ChatSidebar from '../Components/Chat/ChatSidebar';
 import ReportMessageModal from '../Components/Chat/ReportMessageModal';
 import ChatRoomMembersModal from '../Components/Chat/ChatRoomMembersModal';
 import ChatPickerModal from '../Components/Chat/ChatPickerModal';
-import ContentUnavailableState from '../Components/ContentUnavailableState';
-import GalleryViewerModal from '../Components/GalleryViewerModal';
-import PostViewerModal from '../Components/PostViewerModal';
 import {
   CHAT_LIMITS,
   CHAT_SOCKET_EVENTS,
@@ -101,7 +98,6 @@ import {
   validateComposerAttachment,
   validateComposerText,
 } from '../Components/Chat/chatPage.utils';
-import { authFetchResponse } from '../utils/authFetch';
 import '../Components/Chat/chat.css';
 
 const TEXT_SEND_MAX_RETRIES = 3;
@@ -122,34 +118,20 @@ const isSocketTimeoutError = (error) =>
     .toLowerCase()
     .includes('chat socket timed out');
 
-const mapSharedPostDetailToViewer = (payload = {}, sharePayload = null) => ({
-  id: Number(payload?.id || 0),
-  author: String(sharePayload?.creatorName || 'Familyss User').trim() || 'Familyss User',
-  authorId: payload?.createdBy || null,
-  avatar: '/assets/user.png',
-  caption: payload?.caption || '',
-  fullImageUrl: payload?.postImage || '',
-  postVideo: payload?.postVideo || '',
-  likes: Number(payload?.likeCount || 0),
-  comments: Number(payload?.commentCount || 0),
-  commentCount: Number(payload?.commentCount || 0),
-  isLiked: Boolean(payload?.isLiked),
-  createdBy: payload?.createdBy || null,
-  privacy: payload?.privacy || '',
-  publicShareId: payload?.publicShareId || null,
-  shareUrl: payload?.shareUrl || null,
-  time: payload?.createdAt ? new Date(payload.createdAt).toLocaleString() : '',
-});
-
 const ChatPage = () => {
   const navigate = useNavigate();
   const { conversationId: routeConversationId } = useParams();
+  const [searchParams] = useSearchParams();
   const { userInfo } = useUser();
   const {
+    activeFamilyCode,
+    families,
     isChatConnected,
+    joinFamilyRoom,
     joinConversation,
     leaveConversation,
     emitTyping,
+    setActiveFamilyCode,
     socket,
   } = useChat();
 
@@ -165,11 +147,8 @@ const ChatPage = () => {
     () => String(userInfo?.profileUrl || userInfo?.profile || '').trim(),
     [userInfo],
   );
-  const defaultRoomFamilyCode = useMemo(
-    () => normalizeFamilyCode(userInfo?.familyCode),
-    [userInfo?.familyCode],
-  );
-  const hasChatAccess = Boolean(currentUserId);
+  const hasFamilyScope = Boolean(activeFamilyCode);
+  const routeFamilyCode = normalizeFamilyCode(searchParams.get('familyCode'));
   const routeConversationIdNumber = Number(routeConversationId || 0) || null;
 
   const [activeTab, setActiveTab] = useState('messages');
@@ -229,9 +208,6 @@ const ChatPage = () => {
   const [deleteConversationSubmitting, setDeleteConversationSubmitting] = useState(false);
   const [deleteConversationError, setDeleteConversationError] = useState('');
   const [infoPanelOpen, setInfoPanelOpen] = useState(false);
-  const [sharedPostViewer, setSharedPostViewer] = useState(null);
-  const [sharedGalleryViewer, setSharedGalleryViewer] = useState(null);
-  const [sharedUnavailable, setSharedUnavailable] = useState(null);
   const [messageSearchOpen, setMessageSearchOpen] = useState(false);
   const [messageSearchQuery, setMessageSearchQuery] = useState('');
   const [activeMessageSearchIndex, setActiveMessageSearchIndex] = useState(-1);
@@ -263,7 +239,7 @@ const ChatPage = () => {
   const roomPhotoInputRef = useRef(null);
   const openRequestIdRef = useRef(0);
   const selectedConversationRef = useRef(null);
-  const conversationFamilyCodeRef = useRef(defaultRoomFamilyCode);
+  const activeFamilyCodeRef = useRef(normalizeFamilyCode(activeFamilyCode));
   const conversationRef = useRef(null);
   const familyMembersFamilyCodeRef = useRef('');
   const localTypingRef = useRef(false);
@@ -293,10 +269,8 @@ const ChatPage = () => {
   }, [selectedId]);
 
   useEffect(() => {
-    conversationFamilyCodeRef.current = normalizeFamilyCode(
-      conversation?.familyCode || defaultRoomFamilyCode,
-    );
-  }, [conversation?.familyCode, defaultRoomFamilyCode]);
+    activeFamilyCodeRef.current = normalizeFamilyCode(activeFamilyCode);
+  }, [activeFamilyCode]);
 
   useEffect(() => {
     chatSocketRef.current = socket;
@@ -305,7 +279,7 @@ const ChatPage = () => {
 
   useEffect(() => {
     setPresenceByUserId({});
-  }, [currentUserId]);
+  }, [activeFamilyCode]);
 
   useEffect(() => {
     setFamilyMembers([]);
@@ -330,7 +304,7 @@ const ChatPage = () => {
     setRoomNameError('');
     setRoomNameSubmitting(false);
     familyMembersFamilyCodeRef.current = '';
-  }, [currentUserId]);
+  }, [activeFamilyCode]);
 
   useEffect(
     () => () => {
@@ -363,9 +337,12 @@ const ChatPage = () => {
     });
   }, [messageSearchOpen]);
 
-  const syncListsFromCache = useCallback(() => {
-    setConversations(getCachedConversations());
-    setRooms(getCachedRooms());
+  const syncListsFromCache = useCallback((familyCode = activeFamilyCodeRef.current) => {
+    const normalizedFamilyCode = normalizeFamilyCode(familyCode);
+    if (!normalizedFamilyCode) return;
+
+    setConversations(getCachedConversations(normalizedFamilyCode));
+    setRooms(getCachedRooms(normalizedFamilyCode));
   }, []);
 
   const applyConversationRefresh = useCallback(
@@ -374,8 +351,14 @@ const ChatPage = () => {
         return null;
       }
 
+      const normalizedFamilyCode = normalizeFamilyCode(
+        nextConversation?.familyCode || activeFamilyCodeRef.current,
+      );
       const cachedConversation = cacheConversation(nextConversation);
-      syncListsFromCache();
+
+      if (normalizedFamilyCode) {
+        syncListsFromCache(normalizedFamilyCode);
+      }
 
       if (isSameConversation(cachedConversation?.id, selectedConversationRef.current)) {
         setConversation(cachedConversation);
@@ -389,25 +372,30 @@ const ChatPage = () => {
 
   const loadFamilyMembers = useCallback(
     async (forceReload = false) => {
-      if (!currentUserId) {
+      const familyCode = activeFamilyCodeRef.current;
+      if (!familyCode) {
         return [];
       }
 
-      if (!forceReload && familyMembersFamilyCodeRef.current === 'global' && familyMembers.length > 0) {
+      if (
+        !forceReload &&
+        familyMembersFamilyCodeRef.current === familyCode &&
+        familyMembers.length > 0
+      ) {
         return familyMembers;
       }
 
-      const response = await getFamilyMembersForChat();
-      const nextMembers = response?.contacts || response?.members || [];
+      const response = await getFamilyMembersForChat(familyCode);
+      const nextMembers = response?.members || [];
       setFamilyMembers(nextMembers);
-      familyMembersFamilyCodeRef.current = 'global';
+      familyMembersFamilyCodeRef.current = familyCode;
       return nextMembers;
     },
-    [currentUserId, familyMembers],
+    [familyMembers],
   );
 
   useEffect(() => {
-    if (!hasChatAccess) {
+    if (!hasFamilyScope) {
       return;
     }
 
@@ -433,7 +421,7 @@ const ChatPage = () => {
         window.clearTimeout(timeoutId);
       }
     };
-  }, [hasChatAccess, loadFamilyMembers]);
+  }, [activeFamilyCode, hasFamilyScope, loadFamilyMembers]);
 
   const resolveConversationFamilyCode = useCallback(
     (conversationId, fallbackFamilyCode = '') => {
@@ -445,7 +433,7 @@ const ChatPage = () => {
 
       if (isSameConversation(conversationId, selectedConversationRef.current)) {
         const selectedFamilyCode = normalizeFamilyCode(
-          conversationRef.current?.familyCode || conversationFamilyCodeRef.current,
+          conversationRef.current?.familyCode || activeFamilyCodeRef.current,
         );
         if (selectedFamilyCode) {
           return selectedFamilyCode;
@@ -472,18 +460,36 @@ const ChatPage = () => {
     }
 
     const conversationId = selectedConversationRef.current;
-    const familyCode = conversationFamilyCodeRef.current;
+    const familyCode = activeFamilyCodeRef.current;
     if (localTypingRef.current && conversationId && familyCode) {
       emitTyping(conversationId, familyCode, false);
     }
 
     localTypingRef.current = false;
-  }, [emitTyping, resolveConversationFamilyCode]);
+  }, [emitTyping]);
 
   useEffect(() => () => {
     stopLocalTyping();
     clearRemoteTyping();
   }, [clearRemoteTyping, stopLocalTyping]);
+
+  useEffect(() => {
+    if (!routeFamilyCode || families.length === 0) {
+      return;
+    }
+
+    if (routeFamilyCode === normalizeFamilyCode(activeFamilyCode)) {
+      return;
+    }
+
+    const hasRouteFamily = families.some(
+      (family) => normalizeFamilyCode(family?.familyCode) === routeFamilyCode,
+    );
+
+    if (hasRouteFamily) {
+      setActiveFamilyCode(routeFamilyCode);
+    }
+  }, [activeFamilyCode, families, routeFamilyCode, setActiveFamilyCode]);
 
   useEffect(() => {
     stopLocalTyping();
@@ -504,7 +510,7 @@ const ChatPage = () => {
     setRoomNameDraft('');
     setRoomNameError('');
     setRoomNameSubmitting(false);
-  }, [clearRemoteTyping, currentUserId, stopLocalTyping]);
+  }, [activeFamilyCode, clearRemoteTyping, stopLocalTyping]);
 
   const clearOpenConversation = useCallback(
     (options = {}) => {
@@ -541,7 +547,10 @@ const ChatPage = () => {
       setActiveMessageSearchIndex(-1);
 
       if (options?.navigateToList !== false && routeConversationIdNumber) {
-        navigate('/chat', { replace: true });
+        const nextUrl = activeFamilyCodeRef.current
+          ? `/chat?familyCode=${encodeURIComponent(activeFamilyCodeRef.current)}`
+          : '/chat';
+        navigate(nextUrl, { replace: true });
       }
     },
     [clearRemoteTyping, navigate, routeConversationIdNumber, stopLocalTyping],
@@ -550,7 +559,7 @@ const ChatPage = () => {
   useEffect(() => {
     let isCancelled = false;
 
-    if (!hasChatAccess) {
+    if (!hasFamilyScope) {
       setConversations([]);
       setRooms([]);
       setMessagesListLoading(false);
@@ -566,8 +575,8 @@ const ChatPage = () => {
       };
     }
 
-    const cachedConversations = getCachedConversations();
-    const cachedRooms = getCachedRooms();
+    const cachedConversations = getCachedConversations(activeFamilyCode);
+    const cachedRooms = getCachedRooms(activeFamilyCode);
     if (cachedConversations.length > 0) {
       setConversations(cachedConversations);
     }
@@ -579,12 +588,15 @@ const ChatPage = () => {
 
     (async () => {
       try {
-        const conversationResponse = await getConversations();
+        const conversationResponse = await getConversations(activeFamilyCode);
 
         if (isCancelled) return;
 
         setConversations(
-          cacheConversations(undefined, conversationResponse?.conversations || []),
+          cacheConversations(
+            activeFamilyCode,
+            conversationResponse?.conversations || [],
+          ),
         );
       } catch (error) {
         if (!isCancelled) {
@@ -602,11 +614,11 @@ const ChatPage = () => {
 
     (async () => {
       try {
-        const roomResponse = await getRooms();
+        const roomResponse = await getRooms(activeFamilyCode);
 
         if (isCancelled) return;
 
-        setRooms(cacheRooms(undefined, roomResponse?.rooms || []));
+        setRooms(cacheRooms(activeFamilyCode, roomResponse?.rooms || []));
       } catch (error) {
         if (!isCancelled) {
           console.error('Chat rooms load failed:', error);
@@ -624,12 +636,12 @@ const ChatPage = () => {
     return () => {
       isCancelled = true;
     };
-  }, [hasChatAccess]);
+  }, [activeFamilyCode, hasFamilyScope]);
 
   const markConversationReadNow = useCallback(
     async (conversationId, options = {}) => {
       const targetConversationId = Number(conversationId || selectedConversationRef.current || 0);
-      const familyCode = resolveConversationFamilyCode(targetConversationId);
+      const familyCode = activeFamilyCodeRef.current;
       if (!targetConversationId || !familyCode) {
         return null;
       }
@@ -643,8 +655,14 @@ const ChatPage = () => {
                 familyCode,
               )
             : await markConversationRead(targetConversationId, familyCode);
-        markCachedConversationRead(targetConversationId);
-        syncListsFromCache();
+        if (result?.familyCode) {
+          markCachedConversationRead(result.familyCode, targetConversationId);
+          if (
+            normalizeFamilyCode(result.familyCode) === activeFamilyCodeRef.current
+          ) {
+            syncListsFromCache(result.familyCode);
+          }
+        }
 
         if (isSameConversation(targetConversationId, selectedConversationRef.current)) {
           const cachedConversation = getCachedConversation(targetConversationId);
@@ -661,7 +679,7 @@ const ChatPage = () => {
         return null;
       }
     },
-    [isChatConnected, resolveConversationFamilyCode, socket, syncListsFromCache],
+    [isChatConnected, socket, syncListsFromCache],
   );
 
   const applyConversationMessageUpdate = useCallback(
@@ -694,7 +712,9 @@ const ChatPage = () => {
             : { unreadCount: nextUnreadCount },
         );
 
-        syncListsFromCache();
+        if (normalizeFamilyCode(resolvedFamilyCode) === activeFamilyCodeRef.current) {
+          syncListsFromCache(resolvedFamilyCode);
+        }
       }
 
       if (isSameConversation(targetConversationId, selectedConversationRef.current)) {
@@ -745,7 +765,9 @@ const ChatPage = () => {
             : { unreadCount: nextUnreadCount },
         );
 
-        syncListsFromCache();
+        if (normalizeFamilyCode(resolvedFamilyCode) === activeFamilyCodeRef.current) {
+          syncListsFromCache(resolvedFamilyCode);
+        }
       }
 
       if (isSameConversation(targetConversationId, selectedConversationRef.current)) {
@@ -795,7 +817,9 @@ const ChatPage = () => {
             : { unreadCount: nextUnreadCount },
         );
 
-        syncListsFromCache();
+        if (normalizeFamilyCode(resolvedFamilyCode) === activeFamilyCodeRef.current) {
+          syncListsFromCache(resolvedFamilyCode);
+        }
       }
 
       if (isSameConversation(targetConversationId, selectedConversationRef.current)) {
@@ -1147,25 +1171,29 @@ const ChatPage = () => {
   const refreshConversationFromServer = useCallback(
     async (payload = {}) => {
       const conversationId = Number(payload?.conversationId || payload?.id || 0);
-      if (!conversationId) {
+      const familyCode = normalizeFamilyCode(
+        payload?.familyCode || resolveConversationFamilyCode(conversationId),
+      );
+      if (!conversationId || !familyCode) {
         return null;
       }
 
       try {
-        const nextConversation = await getConversation(conversationId);
+        const nextConversation = await getConversation(conversationId, familyCode);
         return applyConversationRefresh(nextConversation);
       } catch (error) {
         console.error('Failed to refresh room conversation:', error);
         return null;
       }
     },
-    [applyConversationRefresh],
+    [applyConversationRefresh, resolveConversationFamilyCode],
   );
 
   const openChat = useCallback(
     async (conversationId, conversationType = CONVERSATION_TYPES.DIRECT) => {
       const targetConversationId = Number(conversationId || 0);
-      if (!targetConversationId) {
+      const familyCode = activeFamilyCodeRef.current;
+      if (!targetConversationId || !familyCode) {
         return;
       }
 
@@ -1221,8 +1249,13 @@ const ChatPage = () => {
       }
 
       try {
-        const conversationPromise = getConversation(targetConversationId);
-        const messagePromise = getMessages(targetConversationId, null);
+        const conversationPromise = getConversation(targetConversationId, familyCode);
+        const messagePromise = getMessages(
+          targetConversationId,
+          null,
+          currentUserId,
+          familyCode,
+        );
         const conversationResponse = await conversationPromise;
 
         if (openRequestIdRef.current !== requestId) {
@@ -1252,15 +1285,15 @@ const ChatPage = () => {
           loadingOlder: false,
           initialized: true,
         });
-        syncListsFromCache();
+        syncListsFromCache(familyCode);
         await markConversationReadNow(targetConversationId, { suppressErrors: true });
       } catch (error) {
         if (openRequestIdRef.current === requestId) {
           console.error('Failed to open conversation:', error);
           setResolvedConversationId(null);
           if (isUnavailableConversationError(error)) {
-            removeCachedConversation(targetConversationId);
-            syncListsFromCache();
+            removeCachedConversation(targetConversationId, familyCode);
+            syncListsFromCache(familyCode);
             clearOpenConversation();
           }
         }
@@ -1282,9 +1315,11 @@ const ChatPage = () => {
 
   const loadOlderMessages = useCallback(async () => {
     const targetConversationId = Number(selectedConversationRef.current || 0);
+    const familyCode = activeFamilyCodeRef.current;
     const nextCursor = messagePagination?.nextCursor || null;
     if (
       !targetConversationId ||
+      !familyCode ||
       !nextCursor ||
       !messagePagination?.hasMore ||
       messagePagination?.loadingOlder ||
@@ -1307,6 +1342,8 @@ const ChatPage = () => {
       const messageResponse = await getMessages(
         targetConversationId,
         nextCursor,
+        currentUserId,
+        familyCode,
       );
 
       if (!isSameConversation(targetConversationId, selectedConversationRef.current)) {
@@ -1358,7 +1395,14 @@ const ChatPage = () => {
   );
 
   useEffect(() => {
-    if (!hasChatAccess || !routeConversationIdNumber) {
+    if (!hasFamilyScope || !routeConversationIdNumber) {
+      return;
+    }
+
+    if (
+      routeFamilyCode &&
+      routeFamilyCode !== normalizeFamilyCode(activeFamilyCode)
+    ) {
       return;
     }
 
@@ -1381,7 +1425,7 @@ const ChatPage = () => {
   }, [
     conversation,
     conversations,
-    hasChatAccess,
+    hasFamilyScope,
     openChat,
     rooms,
     routeConversationIdNumber,
@@ -1514,97 +1558,84 @@ const ChatPage = () => {
       const conversationId = Number(payload?.conversationId || 0);
       if (!conversationId) return;
 
-      void (async () => {
-        let cachedConversation = getCachedConversation(conversationId);
-        const hasCachedConversation = Boolean(cachedConversation);
-        if (!cachedConversation) {
-          cachedConversation = await refreshConversationFromServer(payload);
-        }
-
-        const messageConversation =
-          cachedConversation ||
-          (payload?.type || payload?.roomId || payload?.roomType
-            ? {
-                id: conversationId,
-                familyCode: payload?.familyCode || '',
-                type: payload?.type || 'direct',
-                conversationType: payload?.conversationType || null,
-                roomId: Number(payload?.roomId || 0) || null,
-                roomType: payload?.roomType || null,
-                roomName: payload?.roomName || null,
-                roomAvatarUrl: payload?.roomAvatarUrl || '',
-              }
-            : null);
-
-        const isActiveConversation = isSameConversation(
-          conversationId,
-          selectedConversationRef.current,
-        );
-        const sentByCurrentUser =
-          Number(payload?.senderId || 0) === Number(currentUserId || 0);
-        const shouldClearUnread = isActiveConversation || sentByCurrentUser;
-        const nextUnreadCount = shouldClearUnread
-          ? 0
-          : Number(messageConversation?.unreadCount || 0) + (hasCachedConversation ? 1 : 0);
-        const matchingPendingMessage = sentByCurrentUser
-          ? shiftMatchingPendingTextMessage(conversationId, payload)
+      const cachedConversation = getCachedConversation(conversationId);
+      const hasCachedConversation = Boolean(cachedConversation);
+      const isActiveConversation = isSameConversation(
+        conversationId,
+        selectedConversationRef.current,
+      );
+      const sentByCurrentUser =
+        Number(payload?.senderId || 0) === Number(currentUserId || 0);
+      const shouldClearUnread = isActiveConversation || sentByCurrentUser;
+      const nextUnreadCount = shouldClearUnread
+        ? 0
+        : Number(cachedConversation?.unreadCount || 0) + 1;
+      const matchingPendingMessage = sentByCurrentUser
+        ? shiftMatchingPendingTextMessage(conversationId, payload)
+        : null;
+      const matchingOptimisticMessageId =
+        sentByCurrentUser && !matchingPendingMessage
+          ? findOptimisticMessageIdByClientRequestId(
+              conversationId,
+              payload?.clientRequestId,
+            )
           : null;
-        const matchingOptimisticMessageId =
-          sentByCurrentUser && !matchingPendingMessage
-            ? findOptimisticMessageIdByClientRequestId(
-                conversationId,
-                payload?.clientRequestId,
-              )
-            : null;
-        const matchingPendingMediaMessage =
-          sentByCurrentUser && !matchingPendingMessage && !matchingOptimisticMessageId
-            ? shiftMatchingPendingMediaMessage(conversationId, payload)
-            : null;
-        const messageUpdateOptions = {
-          familyCode: payload?.familyCode || messageConversation?.familyCode,
+      const matchingPendingMediaMessage =
+        sentByCurrentUser && !matchingPendingMessage && !matchingOptimisticMessageId
+          ? shiftMatchingPendingMediaMessage(conversationId, payload)
+          : null;
+
+      if (matchingPendingMessage?.tempId) {
+        replaceConversationMessageUpdate(
+          conversationId,
+          matchingPendingMessage.tempId,
+          payload,
+          {
+            familyCode: payload?.familyCode || cachedConversation?.familyCode,
+            clearUnread: shouldClearUnread,
+            unreadCount: nextUnreadCount,
+          },
+        );
+      } else if (matchingOptimisticMessageId) {
+        replaceConversationMessageUpdate(
+          conversationId,
+          matchingOptimisticMessageId,
+          payload,
+          {
+            familyCode: payload?.familyCode || cachedConversation?.familyCode,
+            clearUnread: shouldClearUnread,
+            unreadCount: nextUnreadCount,
+          },
+        );
+      } else if (matchingPendingMediaMessage?.tempId) {
+        revokeObjectUrl(matchingPendingMediaMessage.previewUrl);
+        replaceConversationMessageUpdate(
+          conversationId,
+          matchingPendingMediaMessage.tempId,
+          payload,
+          {
+            familyCode: payload?.familyCode || cachedConversation?.familyCode,
+            clearUnread: shouldClearUnread,
+            unreadCount: nextUnreadCount,
+          },
+        );
+      } else {
+        applyConversationMessageUpdate(conversationId, payload, {
+          familyCode: payload?.familyCode || cachedConversation?.familyCode,
           clearUnread: shouldClearUnread,
-          unreadCount: shouldClearUnread
-            ? 0
-            : Number(messageConversation?.unreadCount || nextUnreadCount),
-          conversation: messageConversation,
-        };
+          unreadCount: nextUnreadCount,
+        });
+      }
 
-        if (matchingPendingMessage?.tempId) {
-          replaceConversationMessageUpdate(
-            conversationId,
-            matchingPendingMessage.tempId,
-            payload,
-            messageUpdateOptions,
-          );
-        } else if (matchingOptimisticMessageId) {
-          replaceConversationMessageUpdate(
-            conversationId,
-            matchingOptimisticMessageId,
-            payload,
-            messageUpdateOptions,
-          );
-        } else if (matchingPendingMediaMessage?.tempId) {
-          revokeObjectUrl(matchingPendingMediaMessage.previewUrl);
-          replaceConversationMessageUpdate(
-            conversationId,
-            matchingPendingMediaMessage.tempId,
-            payload,
-            messageUpdateOptions,
-          );
-        } else {
-          applyConversationMessageUpdate(
-            conversationId,
-            payload,
-            messageUpdateOptions,
-          );
-        }
+      if (!hasCachedConversation) {
+        void refreshConversationFromServer(payload);
+      }
 
-        if (isActiveConversation && !sentByCurrentUser) {
-          window.setTimeout(() => {
-            markConversationReadNow(conversationId, { suppressErrors: true });
-          }, 150);
-        }
-      })();
+      if (isActiveConversation && !sentByCurrentUser) {
+        window.setTimeout(() => {
+          markConversationReadNow(conversationId, { suppressErrors: true });
+        }, 150);
+      }
     };
 
     const handleMessageDeleted = (payload = {}) => {
@@ -1634,7 +1665,10 @@ const ChatPage = () => {
           },
         });
 
-        syncListsFromCache();
+        const familyCode = normalizeFamilyCode(nextConversation?.familyCode);
+        if (familyCode === activeFamilyCodeRef.current) {
+          syncListsFromCache(familyCode);
+        }
 
         if (isSameConversation(conversationId, selectedConversationRef.current)) {
           setConversation(nextConversation);
@@ -1688,8 +1722,14 @@ const ChatPage = () => {
       if (!conversationId || !readAt) return;
 
       if (readerUserId === Number(currentUserId || 0)) {
-        markCachedConversationRead(conversationId);
-        syncListsFromCache();
+        if (payload?.familyCode) {
+          markCachedConversationRead(payload.familyCode, conversationId);
+          if (
+            normalizeFamilyCode(payload.familyCode) === activeFamilyCodeRef.current
+          ) {
+            syncListsFromCache(payload.familyCode);
+          }
+        }
         return;
       }
 
@@ -1723,6 +1763,14 @@ const ChatPage = () => {
     };
 
     const handlePresenceSnapshot = (payload = {}) => {
+      const payloadFamilyCode = normalizeFamilyCode(payload?.familyCode);
+      if (
+        payloadFamilyCode &&
+        payloadFamilyCode !== activeFamilyCodeRef.current
+      ) {
+        return;
+      }
+
       const nextPresenceByUserId = {};
       (Array.isArray(payload?.presences) ? payload.presences : []).forEach((entry) => {
         const userId = Number(entry?.userId || 0);
@@ -1740,8 +1788,13 @@ const ChatPage = () => {
     };
 
     const handlePresenceUpdated = (payload = {}) => {
+      const payloadFamilyCode = normalizeFamilyCode(payload?.familyCode);
       const userId = Number(payload?.userId || 0);
-      if (!userId) {
+      if (
+        !userId ||
+        (payloadFamilyCode &&
+          payloadFamilyCode !== activeFamilyCodeRef.current)
+      ) {
         return;
       }
 
@@ -1768,8 +1821,13 @@ const ChatPage = () => {
         return;
       }
 
-      removeCachedConversation(conversationId);
-      syncListsFromCache();
+      removeCachedConversation(conversationId, payload?.familyCode);
+      if (
+        payload?.familyCode &&
+        normalizeFamilyCode(payload.familyCode) === activeFamilyCodeRef.current
+      ) {
+        syncListsFromCache(payload.familyCode);
+      }
 
       if (isSameConversation(conversationId, selectedConversationRef.current)) {
         clearOpenConversation({
@@ -1786,8 +1844,13 @@ const ChatPage = () => {
         return;
       }
 
-      removeCachedConversation(conversationId);
-      syncListsFromCache();
+      removeCachedConversation(conversationId, payload?.familyCode);
+      if (
+        payload?.familyCode &&
+        normalizeFamilyCode(payload.familyCode) === activeFamilyCodeRef.current
+      ) {
+        syncListsFromCache(payload.familyCode);
+      }
 
       if (isSameConversation(conversationId, selectedConversationRef.current)) {
         clearOpenConversation({
@@ -1842,6 +1905,15 @@ const ChatPage = () => {
   ]);
 
   useEffect(() => {
+    const familyCode = normalizeFamilyCode(activeFamilyCode);
+    if (!socket || !isChatConnected || !familyCode) {
+      return;
+    }
+
+    joinFamilyRoom(familyCode);
+  }, [activeFamilyCode, isChatConnected, joinFamilyRoom, socket]);
+
+  useEffect(() => {
     if (!socket || !isChatConnected) {
       return;
     }
@@ -1851,7 +1923,7 @@ const ChatPage = () => {
 
   const handleTypingActivity = useCallback(() => {
     const conversationId = selectedConversationRef.current;
-    const familyCode = resolveConversationFamilyCode(conversationId);
+    const familyCode = activeFamilyCodeRef.current;
     if (!conversationId || !familyCode) {
       return;
     }
@@ -1947,10 +2019,7 @@ const ChatPage = () => {
   const handleSend = useCallback(() => {
     const trimmedText = String(text || '').trim();
     const targetConversationId = Number(selectedId || 0);
-    const familyCodeAtSend = resolveConversationFamilyCode(
-      targetConversationId,
-      defaultRoomFamilyCode,
-    );
+    const familyCodeAtSend = activeFamilyCode;
     if (hasAttachmentDraft && attachmentDraft?.file) {
       const attachmentError = validateComposerAttachment(attachmentDraft.file);
       if (attachmentError) {
@@ -2047,16 +2116,15 @@ const ChatPage = () => {
       void processTextSendQueue();
     }
   }, [
+    activeFamilyCode,
     applyConversationMessageUpdate,
     conversation?.canSend,
     currentUserAvatarUrl,
     currentUserDisplayName,
     currentUserId,
-    defaultRoomFamilyCode,
     processTextSendQueue,
     queuePendingTextMessage,
     replyTo,
-    resolveConversationFamilyCode,
     selectedId,
     safeSendMedia,
     stopLocalTyping,
@@ -2065,60 +2133,10 @@ const ChatPage = () => {
     hasAttachmentDraft,
   ]);
 
-  const handleOpenSharedMessage = useCallback(async (message) => {
-    const sharePayload = message?.sharePayload || null;
-    const entityId = Number(sharePayload?.entityId || 0);
-    if (!entityId) {
-      return;
-    }
-
-    try {
-      if (message?.messageType === MESSAGE_TYPES.POST_SHARE) {
-        const response = await authFetchResponse(`/post/${entityId}`, {
-          method: 'GET',
-          skipThrow: true,
-        });
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          throw new Error(payload?.message || 'This post is unavailable right now.');
-        }
-        setSharedPostViewer(
-          mapSharedPostDetailToViewer(payload?.data || payload, sharePayload),
-        );
-        return;
-      }
-
-      if (message?.messageType === MESSAGE_TYPES.GALLERY_SHARE) {
-        setSharedGalleryViewer({
-          id: entityId,
-          title: sharePayload?.previewTitle || 'Gallery',
-          galleryTitle: sharePayload?.previewTitle || 'Gallery',
-          description: sharePayload?.previewText || '',
-          galleryDescription: sharePayload?.previewText || '',
-          coverPhoto: sharePayload?.previewMediaUrl || '',
-          coverImage: sharePayload?.previewMediaUrl || '',
-          photosCount: Number(sharePayload?.mediaCount || 0),
-          imageCount: Number(sharePayload?.mediaCount || 0),
-          author: sharePayload?.creatorName || 'Familyss User',
-        });
-      }
-    } catch (error) {
-      setSharedUnavailable({
-        title: 'This shared content is unavailable',
-        description:
-          error?.message ||
-          'The original post or gallery may have been removed, deleted, or is no longer available to you.',
-      });
-    }
-  }, []);
-
   const sendMedia = useCallback(
     async (file, options = {}) => {
       const targetConversationId = Number(selectedId || 0);
-      const familyCodeAtSend = resolveConversationFamilyCode(
-        targetConversationId,
-        defaultRoomFamilyCode,
-      );
+      const familyCodeAtSend = activeFamilyCode;
       let optimisticMessageId = 0;
       if (
         !file ||
@@ -2266,18 +2284,17 @@ const ChatPage = () => {
       }
     },
     [
+      activeFamilyCode,
       applyConversationMessageFailure,
       applyConversationMessageUpdate,
       conversation?.canSend,
       currentUserAvatarUrl,
       currentUserDisplayName,
       currentUserId,
-      defaultRoomFamilyCode,
       queuePendingMediaMessage,
       removePendingMediaMessage,
       replaceConversationMessageUpdate,
       replyTo,
-      resolveConversationFamilyCode,
       selectedId,
       stopLocalTyping,
       text,
@@ -2317,15 +2334,14 @@ const ChatPage = () => {
 
   const handleDelete = useCallback(
     async (message) => {
-      const conversationFamilyCode = resolveConversationFamilyCode(selectedId);
-      if (!conversationFamilyCode || !message) return;
+      if (!activeFamilyCode || !message) return;
       if (!window.confirm('Delete this message?')) return;
 
       try {
         if (socket && isChatConnected) {
-          await deleteMessageSocket(socket, message.id, conversationFamilyCode);
+          await deleteMessageSocket(socket, message.id, activeFamilyCode);
         } else {
-          await deleteMsg(message.id, conversationFamilyCode);
+          await deleteMsg(message.id, activeFamilyCode);
         }
 
         const nextMessages = cacheMessages(
@@ -2346,19 +2362,18 @@ const ChatPage = () => {
               content: 'Message deleted',
             },
           });
-          syncListsFromCache();
+          syncListsFromCache(activeFamilyCode);
           setConversation(getCachedConversation(selectedId));
         }
       } catch (error) {
         console.error('Failed to delete message:', error);
       }
     },
-    [isChatConnected, resolveConversationFamilyCode, selectedId, socket, syncListsFromCache],
+    [activeFamilyCode, isChatConnected, selectedId, socket, syncListsFromCache],
   );
 
   const handleMute = useCallback(async () => {
-    const conversationFamilyCode = resolveConversationFamilyCode(conversation?.id);
-    if (!conversation || !conversationFamilyCode) return;
+    if (!conversation || !activeFamilyCode) return;
 
     try {
       const result =
@@ -2366,12 +2381,12 @@ const ChatPage = () => {
           ? await toggleMuteSocket(
               socket,
               conversation.id,
-              conversationFamilyCode,
+              activeFamilyCode,
               conversation.isMuted,
             )
           : await toggleMute(
               conversation.id,
-              conversationFamilyCode,
+              activeFamilyCode,
               conversation.isMuted,
             );
 
@@ -2380,16 +2395,16 @@ const ChatPage = () => {
         isMuted: Boolean(result?.isMuted),
       });
       setConversation(nextConversation);
-      syncListsFromCache();
+      syncListsFromCache(activeFamilyCode);
     } catch (error) {
       console.error('Failed to update mute state:', error);
     } finally {
       setMenuOpen(false);
     }
-  }, [conversation, isChatConnected, resolveConversationFamilyCode, socket, syncListsFromCache]);
+  }, [activeFamilyCode, conversation, isChatConnected, socket, syncListsFromCache]);
 
   const handleOpenRoomMembers = useCallback(async () => {
-    if (!conversation?.roomId) {
+    if (!conversation?.roomId || !activeFamilyCodeRef.current) {
       return;
     }
 
@@ -2422,11 +2437,7 @@ const ChatPage = () => {
   }, []);
 
   const handleAddRoomMembers = useCallback(async () => {
-    const conversationFamilyCode = resolveConversationFamilyCode(
-      conversation?.id,
-      defaultRoomFamilyCode,
-    );
-    if (!conversation?.roomId || !conversationFamilyCode || selectedRoomMemberIds.length === 0) {
+    if (!conversation?.roomId || !activeFamilyCode || selectedRoomMemberIds.length === 0) {
       return;
     }
 
@@ -2439,12 +2450,12 @@ const ChatPage = () => {
           ? await addMembersToRoomSocket(
               socket,
               conversation.roomId,
-              conversationFamilyCode,
+              activeFamilyCode,
               selectedRoomMemberIds,
             )
           : await addMembersToRoom(
               conversation.roomId,
-              conversationFamilyCode,
+              activeFamilyCode,
               selectedRoomMemberIds,
             );
       applyConversationRefresh(nextConversation);
@@ -2456,22 +2467,17 @@ const ChatPage = () => {
       setRoomMembersSubmitting(false);
     }
   }, [
+    activeFamilyCode,
     applyConversationRefresh,
     conversation?.roomId,
-    defaultRoomFamilyCode,
     isChatConnected,
-    resolveConversationFamilyCode,
     selectedRoomMemberIds,
     socket,
   ]);
 
   const handleRemoveRoomMember = useCallback(
     async (member) => {
-      const conversationFamilyCode = resolveConversationFamilyCode(
-        conversation?.id,
-        defaultRoomFamilyCode,
-      );
-      if (!conversation?.roomId || !conversationFamilyCode || !member?.userId) {
+      if (!conversation?.roomId || !activeFamilyCode || !member?.userId) {
         return;
       }
 
@@ -2489,12 +2495,12 @@ const ChatPage = () => {
             ? await removeMemberFromRoomSocket(
                 socket,
                 conversation.roomId,
-                conversationFamilyCode,
+                activeFamilyCode,
                 member.userId,
               )
             : await removeMemberFromRoom(
                 conversation.roomId,
-                conversationFamilyCode,
+                activeFamilyCode,
                 member.userId,
               );
         applyConversationRefresh(nextConversation);
@@ -2505,15 +2511,7 @@ const ChatPage = () => {
         setRoomMembersSubmitting(false);
       }
     },
-    [
-      applyConversationRefresh,
-      conversation?.id,
-      conversation?.roomId,
-      defaultRoomFamilyCode,
-      isChatConnected,
-      resolveConversationFamilyCode,
-      socket,
-    ],
+    [activeFamilyCode, applyConversationRefresh, conversation?.roomId, isChatConnected, socket],
   );
 
   const handleOpenRoomPhotoPicker = useCallback(() => {
@@ -2530,11 +2528,7 @@ const ChatPage = () => {
         input.value = '';
       }
 
-      const conversationFamilyCode = resolveConversationFamilyCode(
-        conversation?.id,
-        defaultRoomFamilyCode,
-      );
-      if (!file || !conversation?.roomId || !conversationFamilyCode) {
+      if (!file || !conversation?.roomId || !activeFamilyCode) {
         return;
       }
 
@@ -2544,7 +2538,7 @@ const ChatPage = () => {
       try {
         const nextConversation = await updateRoomConversation(
           conversation.roomId,
-          conversationFamilyCode,
+          activeFamilyCode,
           { file },
         );
         applyConversationRefresh(nextConversation);
@@ -2557,7 +2551,7 @@ const ChatPage = () => {
         setRoomPhotoUploading(false);
       }
     },
-    [applyConversationRefresh, conversation?.id, conversation?.roomId, defaultRoomFamilyCode, resolveConversationFamilyCode],
+    [activeFamilyCode, applyConversationRefresh, conversation?.roomId],
   );
 
   const handleCloseDeleteConversationModal = useCallback(() => {
@@ -2570,18 +2564,17 @@ const ChatPage = () => {
   }, [deleteConversationSubmitting]);
 
   const handleOpenDeleteConversationModal = useCallback(() => {
-    if (!selectedId) {
+    if (!selectedId || !activeFamilyCode) {
       return;
     }
 
     setDeleteConversationError('');
     setDeleteConversationOpen(true);
     setMenuOpen(false);
-  }, [selectedId]);
+  }, [activeFamilyCode, selectedId]);
 
   const handleConfirmHideConversation = useCallback(async () => {
-    const conversationFamilyCode = resolveConversationFamilyCode(selectedId);
-    if (!selectedId || !conversationFamilyCode) {
+    if (!selectedId || !activeFamilyCode) {
       return;
     }
 
@@ -2595,25 +2588,25 @@ const ChatPage = () => {
     try {
       if (socket && isChatConnected) {
         try {
-          await hideConversationSocket(socket, selectedId, conversationFamilyCode);
+          await hideConversationSocket(socket, selectedId, activeFamilyCode);
         } catch (error) {
           if (!isSocketTimeoutError(error)) {
             throw error;
           }
-          await hideConversationRequest(selectedId, conversationFamilyCode);
+          await hideConversationRequest(selectedId, activeFamilyCode);
         }
       } else {
-        await hideConversationRequest(selectedId, conversationFamilyCode);
+        await hideConversationRequest(selectedId, activeFamilyCode);
       }
 
-      removeCachedConversation(selectedId);
+      removeCachedConversation(selectedId, activeFamilyCode);
       if (isGroupConversation) {
-        const roomResponse = await getRooms();
-        setRooms(cacheRooms(undefined, roomResponse?.rooms || []));
+        const roomResponse = await getRooms(activeFamilyCode);
+        setRooms(cacheRooms(activeFamilyCode, roomResponse?.rooms || []));
       } else {
-        const conversationResponse = await getConversations();
+        const conversationResponse = await getConversations(activeFamilyCode);
         setConversations(
-          cacheConversations(undefined, conversationResponse?.conversations || []),
+          cacheConversations(activeFamilyCode, conversationResponse?.conversations || []),
         );
       }
       clearOpenConversation();
@@ -2628,17 +2621,17 @@ const ChatPage = () => {
       setDeleteConversationSubmitting(false);
     }
   }, [
+    activeFamilyCode,
     clearOpenConversation,
     conversation?.roomId,
     isChatConnected,
-    resolveConversationFamilyCode,
     selectedId,
     selectedType,
     socket,
   ]);
 
   const handleLeaveRoom = useCallback(() => {
-    if (!conversation?.roomId || !selectedId) {
+    if (!conversation?.roomId || !activeFamilyCode || !selectedId) {
       return;
     }
 
@@ -2647,13 +2640,14 @@ const ChatPage = () => {
     setSelectedRoomMemberIds([]);
     handleOpenDeleteConversationModal();
   }, [
+    activeFamilyCode,
     conversation?.roomId,
     handleOpenDeleteConversationModal,
     selectedId,
   ]);
 
   const handleRenameRoom = useCallback(() => {
-    if (!conversation?.roomId) {
+    if (!conversation?.roomId || !activeFamilyCode) {
       return;
     }
 
@@ -2663,6 +2657,7 @@ const ChatPage = () => {
     setRoomNameError('');
     setRoomNameEditorOpen(true);
   }, [
+    activeFamilyCode,
     conversation?.roomId,
     conversation?.roomName,
   ]);
@@ -2678,11 +2673,7 @@ const ChatPage = () => {
   }, [roomNameSubmitting]);
 
   const handleSubmitRoomName = useCallback(async () => {
-    const conversationFamilyCode = resolveConversationFamilyCode(
-      conversation?.id,
-      defaultRoomFamilyCode,
-    );
-    if (!conversation?.roomId || !conversationFamilyCode) {
+    if (!conversation?.roomId || !activeFamilyCode) {
       return;
     }
 
@@ -2702,7 +2693,7 @@ const ChatPage = () => {
     try {
       const nextConversation = await updateRoomConversation(
         conversation.roomId,
-        conversationFamilyCode,
+        activeFamilyCode,
         { roomName: normalizedRoomName },
       );
       applyConversationRefresh(nextConversation);
@@ -2715,29 +2706,23 @@ const ChatPage = () => {
       setRoomNameSubmitting(false);
     }
   }, [
+    activeFamilyCode,
     applyConversationRefresh,
-    conversation?.id,
     conversation?.roomId,
     conversation?.roomName,
-    defaultRoomFamilyCode,
     handleCloseRoomNameEditor,
-    resolveConversationFamilyCode,
     roomNameDraft,
   ]);
 
   const handleRemoveRoomPhoto = useCallback(async () => {
-    const conversationFamilyCode = resolveConversationFamilyCode(
-      conversation?.id,
-      defaultRoomFamilyCode,
-    );
-    if (!conversation?.roomId || !conversationFamilyCode || !conversation?.roomAvatarUrl) {
+    if (!conversation?.roomId || !activeFamilyCode || !conversation?.roomAvatarUrl) {
       return;
     }
 
     try {
       const nextConversation = await updateRoomConversation(
         conversation.roomId,
-        conversationFamilyCode,
+        activeFamilyCode,
         { removeAvatar: true },
       );
       applyConversationRefresh(nextConversation);
@@ -2748,28 +2733,22 @@ const ChatPage = () => {
       setMenuOpen(false);
     }
   }, [
+    activeFamilyCode,
     applyConversationRefresh,
     conversation?.roomAvatarUrl,
-    conversation?.id,
     conversation?.roomId,
-    defaultRoomFamilyCode,
-    resolveConversationFamilyCode,
   ]);
 
   const handleDeleteConversation = useCallback(() => {
-    if (!selectedId) {
+    if (!selectedId || !activeFamilyCode) {
       return;
     }
 
     handleOpenDeleteConversationModal();
-  }, [handleOpenDeleteConversationModal, selectedId]);
+  }, [activeFamilyCode, handleOpenDeleteConversationModal, selectedId]);
 
   const handleConfirmDeleteAndLeaveGroup = useCallback(async () => {
-    const conversationFamilyCode = resolveConversationFamilyCode(
-      conversation?.id,
-      defaultRoomFamilyCode,
-    );
-    if (!conversation?.roomId || !conversationFamilyCode || !selectedId) {
+    if (!conversation?.roomId || !activeFamilyCode || !selectedId) {
       return;
     }
 
@@ -2780,14 +2759,14 @@ const ChatPage = () => {
 
     try {
       if (socket && isChatConnected) {
-        await leaveRoomConversationSocket(socket, conversation.roomId, conversationFamilyCode);
+        await leaveRoomConversationSocket(socket, conversation.roomId, activeFamilyCode);
       } else {
-        await leaveRoomConversation(conversation.roomId, conversationFamilyCode);
+        await leaveRoomConversation(conversation.roomId, activeFamilyCode);
       }
-      removeCachedConversation(selectedId);
+      removeCachedConversation(selectedId, activeFamilyCode);
 
-      const roomResponse = await getRooms();
-      setRooms(cacheRooms(undefined, roomResponse?.rooms || []));
+      const roomResponse = await getRooms(activeFamilyCode);
+      setRooms(cacheRooms(activeFamilyCode, roomResponse?.rooms || []));
       clearOpenConversation();
       setDeleteConversationOpen(false);
       toast.success('You left the group successfully.');
@@ -2802,22 +2781,16 @@ const ChatPage = () => {
       setLeavingRoom(false);
     }
   }, [
+    activeFamilyCode,
     clearOpenConversation,
-    conversation?.id,
     conversation?.roomId,
-    defaultRoomFamilyCode,
     isChatConnected,
-    resolveConversationFamilyCode,
     selectedId,
     socket,
   ]);
 
   const handleDeleteRoom = useCallback(async () => {
-    const conversationFamilyCode = resolveConversationFamilyCode(
-      conversation?.id,
-      defaultRoomFamilyCode,
-    );
-    if (!conversation?.roomId || !conversationFamilyCode || !selectedId) {
+    if (!conversation?.roomId || !activeFamilyCode || !selectedId) {
       return;
     }
 
@@ -2828,13 +2801,13 @@ const ChatPage = () => {
 
     try {
       if (socket && isChatConnected) {
-        await deleteRoomConversationSocket(socket, conversation.roomId, conversationFamilyCode);
+        await deleteRoomConversationSocket(socket, conversation.roomId, activeFamilyCode);
       } else {
-        await deleteRoomConversation(conversation.roomId, conversationFamilyCode);
+        await deleteRoomConversation(conversation.roomId, activeFamilyCode);
       }
-      removeCachedConversation(selectedId);
-      const roomResponse = await getRooms();
-      setRooms(cacheRooms(undefined, roomResponse?.rooms || []));
+      removeCachedConversation(selectedId, activeFamilyCode);
+      const roomResponse = await getRooms(activeFamilyCode);
+      setRooms(cacheRooms(activeFamilyCode, roomResponse?.rooms || []));
       clearOpenConversation();
     } catch (error) {
       console.error('Failed to delete room:', error);
@@ -2843,13 +2816,11 @@ const ChatPage = () => {
       setMenuOpen(false);
     }
   }, [
+    activeFamilyCode,
     clearOpenConversation,
-    conversation?.id,
     conversation?.roomId,
     conversation?.roomName,
-    defaultRoomFamilyCode,
     isChatConnected,
-    resolveConversationFamilyCode,
     selectedId,
     socket,
   ]);
@@ -2901,7 +2872,7 @@ const ChatPage = () => {
   );
 
   const handleOpenNewConversation = useCallback(async () => {
-    if (!currentUserId) {
+    if (!activeFamilyCodeRef.current) {
       return;
     }
 
@@ -2916,11 +2887,11 @@ const ChatPage = () => {
       setNewConversationError(error?.message || 'Failed to load family members');
       setNewConversationOpen(true);
     }
-  }, [currentUserId, loadFamilyMembers]);
+  }, [loadFamilyMembers]);
 
   const handleCreateDirectConversation = useCallback(async () => {
     const targetUserId = Number(newConversationMemberId || 0);
-    if (!targetUserId) {
+    if (!activeFamilyCode || !targetUserId) {
       return;
     }
 
@@ -2928,9 +2899,9 @@ const ChatPage = () => {
     setNewConversationError('');
 
     try {
-      const nextConversation = await createConversation(targetUserId);
+      const nextConversation = await createConversation(activeFamilyCode, targetUserId);
       cacheConversation(nextConversation);
-      syncListsFromCache();
+      syncListsFromCache(activeFamilyCode);
       setNewConversationOpen(false);
       setNewConversationMemberId(null);
       openChat(nextConversation.id, CONVERSATION_TYPES.DIRECT);
@@ -2940,10 +2911,15 @@ const ChatPage = () => {
     } finally {
       setNewConversationSubmitting(false);
     }
-  }, [newConversationMemberId, openChat, syncListsFromCache]);
+  }, [
+    activeFamilyCode,
+    newConversationMemberId,
+    openChat,
+    syncListsFromCache,
+  ]);
 
   const handleOpenCreateRoom = useCallback(async () => {
-    if (!defaultRoomFamilyCode) {
+    if (!activeFamilyCodeRef.current) {
       return;
     }
 
@@ -2959,7 +2935,7 @@ const ChatPage = () => {
       setCreateRoomError(error?.message || 'Failed to load family members');
       setCreateRoomOpen(true);
     }
-  }, [defaultRoomFamilyCode, loadFamilyMembers]);
+  }, [loadFamilyMembers]);
 
   const handleToggleCreateRoomMember = useCallback((member) => {
     const memberId = Number(member?.userId || 0);
@@ -2976,7 +2952,7 @@ const ChatPage = () => {
 
   const handleCreateRoom = useCallback(async () => {
     const normalizedRoomName = String(createRoomName || '').trim();
-    if (!defaultRoomFamilyCode || !normalizedRoomName || createRoomMemberIds.length === 0) {
+    if (!activeFamilyCode || !normalizedRoomName || createRoomMemberIds.length === 0) {
       return;
     }
 
@@ -2985,12 +2961,12 @@ const ChatPage = () => {
 
     try {
       const nextConversation = await createRoomConversation(
-        defaultRoomFamilyCode,
+        activeFamilyCode,
         normalizedRoomName,
         createRoomMemberIds,
       );
       cacheConversation(nextConversation);
-      syncListsFromCache();
+      syncListsFromCache(activeFamilyCode);
       setCreateRoomOpen(false);
       setCreateRoomName('');
       setCreateRoomMemberIds([]);
@@ -3003,9 +2979,9 @@ const ChatPage = () => {
       setCreateRoomSubmitting(false);
     }
   }, [
+    activeFamilyCode,
     createRoomMemberIds,
     createRoomName,
-    defaultRoomFamilyCode,
     openChat,
     syncListsFromCache,
   ]);
@@ -3267,10 +3243,10 @@ const ChatPage = () => {
           userId: memberId,
           familyCode:
             familyMember?.familyCode ||
-            normalizeFamilyCode(conversation?.familyCode || defaultRoomFamilyCode),
+            normalizeFamilyCode(conversation?.familyCode || activeFamilyCode),
           sourceFamilyCode:
             familyMember?.sourceFamilyCode ||
-            normalizeFamilyCode(conversation?.familyCode || defaultRoomFamilyCode),
+            normalizeFamilyCode(conversation?.familyCode || activeFamilyCode),
           membershipType: familyMember?.membershipType || 'member',
           isNotInTree: Boolean(familyMember?.isNotInTree),
           profileUrl: familyMember?.profileUrl || member?.profileUrl || '',
@@ -3282,7 +3258,7 @@ const ChatPage = () => {
         };
       })
       .filter(Boolean);
-  }, [conversation?.familyCode, conversation?.roomMembers, defaultRoomFamilyCode, familyMemberMap]);
+  }, [activeFamilyCode, conversation?.familyCode, conversation?.roomMembers, familyMemberMap]);
   const currentRoomMemberIds = useMemo(
     () =>
       new Set(
@@ -3302,11 +3278,17 @@ const ChatPage = () => {
   const availableDirectMembers = useMemo(
     () =>
       familyMembers.filter(
-        (member) =>
-          Number(member?.userId || 0) > 0 &&
-          Number(member?.userId || 0) !== Number(currentUserId || 0),
+        (member) => Number(member?.userId || 0) > 0 && Number(member?.userId || 0) !== Number(currentUserId || 0),
       ),
     [currentUserId, familyMembers],
+  );
+  const activeFamily = useMemo(
+    () =>
+      families.find(
+        (family) =>
+          normalizeFamilyCode(family?.familyCode) === normalizeFamilyCode(activeFamilyCode),
+      ) || null,
+    [activeFamilyCode, families],
   );
   const activeParticipant = conversation?.participants?.[0] || {};
   const activeParticipantPresence =
@@ -3318,12 +3300,15 @@ const ChatPage = () => {
     () => familyMemberMap.get(Number(activeParticipant?.userId || 0)) || null,
     [activeParticipant?.userId, familyMemberMap],
   );
-  const familyMembersLoadedForScope = familyMembersFamilyCodeRef.current === 'global';
+  const familyMembersLoadedForScope =
+    familyMembersFamilyCodeRef.current === normalizeFamilyCode(activeFamilyCode);
   const roomMemberCount = familyMembersLoadedForScope
     ? currentRoomMembers.length
     : Number(conversation?.memberCount || currentRoomMembers.length || 0);
   const canManageRoom = Boolean(isGroup && conversation?.canManageRoom);
-  const canManageRoomMembers = canManageRoom;
+  const canManageRoomMembers =
+    canManageRoom &&
+    !['general', 'announcements'].includes(String(conversation?.roomType || '').toLowerCase());
   const canLeaveRoom = Boolean(isGroup && conversation?.canLeaveRoom);
   const roomDisplayName = getRoomDisplayName(conversation);
   const roomTypeLabel = getRoomTypeLabel(conversation?.roomType);
@@ -3378,13 +3363,12 @@ const ChatPage = () => {
     [messages],
   );
   const infoPanelTitle = isGroup ? 'Group info' : 'Contact info';
-  const infoFamilyLabel =
-    conversation?.familyName || conversation?.familyCode || defaultRoomFamilyCode || 'Chat';
   const infoPanelDescription = getConversationInfoDescription(
     conversation,
-    infoFamilyLabel || 'your network',
+    activeFamily?.familyName || activeFamilyCode,
   );
   const infoCreatedAtLabel = formatInfoDateTime(conversation?.createdAt);
+  const infoFamilyLabel = activeFamily?.familyName || activeFamilyCode || 'Family chat';
   const infoPrimaryMeta = isGroup
     ? `${roomTypeLabel} in ${infoFamilyLabel}`
     : `${getChatMemberMetaText(selectedContactMember || {})} in ${infoFamilyLabel}`;
@@ -3447,6 +3431,7 @@ const ChatPage = () => {
           familyMemberMap={familyMemberMap}
           filteredConversations={filteredConversations}
           filteredRooms={filteredRooms}
+          hasFamilyScope={hasFamilyScope}
           listLoading={listLoading}
           msgCount={msgCount}
           onCreateRoom={handleOpenCreateRoom}
@@ -3496,6 +3481,7 @@ const ChatPage = () => {
             directChatBadges={directChatBadges}
             header={{
               activeParticipant,
+              hasFamilyScope,
               initials: headerInitials,
               name: headerName,
               onBack: handleBack,
@@ -3561,7 +3547,6 @@ const ChatPage = () => {
               matchIds: messageSearchMatchIds,
               nodeRefs: messageNodeRefs,
               onDeleteMessage: handleDelete,
-              onOpenSharedMessage: handleOpenSharedMessage,
               onScroll: handleMessagesScroll,
               onReply: setReplyTo,
               onReportMessage: setReportMsg,
@@ -3576,7 +3561,7 @@ const ChatPage = () => {
       {reportMsg && (
         <ReportMessageModal
           message={reportMsg}
-          familyCode={conversation?.familyCode || defaultRoomFamilyCode}
+          familyCode={activeFamilyCode}
           onClose={() => setReportMsg(null)}
         />
       )}
@@ -3593,50 +3578,10 @@ const ChatPage = () => {
         onDeleteAndLeave={handleConfirmDeleteAndLeaveGroup}
       />
 
-      <PostViewerModal
-        isOpen={Boolean(sharedPostViewer)}
-        onClose={() => setSharedPostViewer(null)}
-        post={sharedPostViewer}
-        authToken={null}
-        currentUser={userInfo}
-      />
-
-      <GalleryViewerModal
-        isOpen={Boolean(sharedGalleryViewer)}
-        onClose={() => setSharedGalleryViewer(null)}
-        album={sharedGalleryViewer}
-        currentUser={userInfo}
-        authToken={null}
-      />
-
-      {sharedUnavailable ? (
-        <div
-          className="fixed inset-0 z-[95] bg-black/50 backdrop-blur-sm"
-          onClick={() => setSharedUnavailable(null)}
-          role="presentation"
-        >
-          <div className="h-full overflow-y-auto" onClick={(event) => event.stopPropagation()} role="presentation">
-            <ContentUnavailableState
-              title={sharedUnavailable.title}
-              description={sharedUnavailable.description}
-              action={(
-                <button
-                  type="button"
-                  onClick={() => setSharedUnavailable(null)}
-                  className="mt-6 rounded-full bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700"
-                >
-                  Close
-                </button>
-              )}
-            />
-          </div>
-        </div>
-      ) : null}
-
       <ChatPickerModal
         isOpen={newConversationOpen}
         title="New conversation"
-        subtitle="Choose someone from your family, linked, or associated contacts to start a chat."
+        subtitle="Choose a Familyss app user from your family circle to start a direct chat."
         members={availableDirectMembers}
         selectedIds={newConversationMemberId ? [Number(newConversationMemberId)] : []}
         onToggleMember={(member) => {
@@ -3655,9 +3600,9 @@ const ChatPage = () => {
         isSubmitting={newConversationSubmitting}
         selectionMode="single"
         error={newConversationError}
-        emptyStateTitle="No reachable contacts available"
-        emptyStateSubtitle="Family, linked, and associated Familyss users will appear here when available."
-        searchPlaceholder="Search reachable contacts"
+        emptyStateTitle="No family app users available"
+        emptyStateSubtitle="Associated and linked Familyss users will appear here when available."
+        searchPlaceholder="Search family app users"
         submitDisabled={!newConversationMemberId}
         disableMember={(member) =>
           Boolean(
@@ -3695,7 +3640,7 @@ const ChatPage = () => {
         isSubmitting={createRoomSubmitting}
         error={createRoomError}
         emptyStateTitle="No family app users available"
-        emptyStateSubtitle="Family, linked, and associated Familyss users will appear here when available."
+        emptyStateSubtitle="Associated and linked Familyss users will appear here when available."
         searchPlaceholder="Search family app users"
         submitDisabled={!String(createRoomName || '').trim() || createRoomMemberIds.length === 0}
         topContent={(
