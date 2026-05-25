@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "571573204535",
+    "project_id": "familyss-sarbajira",
+    "storage_bucket": "familyss-sarbajira.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:571573204535:android:1a1e72c2dadb49464d31b2",
+        "android_client_info": {
+          "package_name": "com.familyss.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAWu8rV2bgD5vnYMO8tNE98EXV9sOZgKQY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

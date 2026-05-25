@@ -12,7 +12,12 @@ import {
 
 import { authFetchResponse } from '../utils/authFetch';
 import { hasFamilyAccessStatus } from '../utils/familyAccess';
-import { removeCurrentChatPushRegistration } from '../services/chatPush.service';
+import {
+  initializeChatPush,
+  removeCurrentChatPushRegistration,
+} from '../services/chatPush.service';
+import { disconnectNotificationSocket } from '../hooks/useNotificationSocket';
+import { disconnectChatSocket } from '../hooks/useChatSocket';
 
 const UserContext = createContext();
 
@@ -37,16 +42,21 @@ export const UserProvider = ({ children }) => {
     initializeAuth();
   }, []);
 
-  const clearUserData = useCallback(async () => {
-    try {
-      await removeCurrentChatPushRegistration();
-    } catch (error) {
-      console.warn('Push cleanup during logout failed:', error);
-    }
+  const clearUserData = useCallback(() => {
+    disconnectNotificationSocket('logout');
+    disconnectChatSocket('logout');
 
+    const pushCleanupPromise = removeCurrentChatPushRegistration().catch((error) => {
+      console.warn('Push cleanup during logout failed:', error);
+    });
+
+    userInfoRef.current = null;
+    profileRefreshRef.current.inFlight = false;
     setUserInfo(null);
     setUserLoading(false);
     clearAuthData();
+
+    return pushCleanupPromise;
   }, []);
 
   const redirectToLogin = useCallback(() => {
@@ -341,6 +351,33 @@ export const UserProvider = ({ children }) => {
   useEffect(() => {
     fetchUserDetails();
   }, [fetchUserDetails]);
+
+  useEffect(() => {
+    if (!userInfo?.userId) {
+      return undefined;
+    }
+
+    let isActive = true;
+    let cleanup;
+
+    initializeChatPush()
+      .then((dispose) => {
+        if (!isActive) {
+          return dispose?.();
+        }
+
+        cleanup = dispose;
+        return undefined;
+      })
+      .catch((error) => {
+        console.warn('Push initialization after login failed:', error);
+      });
+
+    return () => {
+      isActive = false;
+      cleanup?.();
+    };
+  }, [userInfo?.userId]);
 
   useEffect(() => {
     const MIN_REFRESH_INTERVAL_MS = 60 * 1000;
