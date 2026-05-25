@@ -19,6 +19,14 @@ const normalizeFamilyCode = (familyCode) =>
 const normalizeMembershipType = (value) =>
   String(value || 'member').trim().toLowerCase();
 
+const normalizeRelationshipLabel = (value) => {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'family' || normalized === 'linked' || normalized === 'associated') {
+    return normalized;
+  }
+  return '';
+};
+
 const resolveChatAssetUrl = (value = '') => {
   const raw = String(value || '').trim();
   if (!raw) {
@@ -337,12 +345,18 @@ const normalizeFamilyMember = (member = {}, familyCode = '') => {
   const user = member?.user || {};
   const profile = user?.userProfile || {};
   const userId = Number(user?.id || member?.userId || member?.memberId || 0);
-  const firstName = profile?.firstName || '';
-  const lastName = profile?.lastName || '';
+  const firstName = member?.firstName || profile?.firstName || '';
+  const lastName = member?.lastName || profile?.lastName || '';
   const name =
-    String(user?.fullName || '').trim() ||
+    String(member?.name || user?.fullName || '').trim() ||
     [firstName, lastName].filter(Boolean).join(' ').trim() ||
     'Family Member';
+  const relationshipLabel = normalizeRelationshipLabel(
+    member?.relationshipLabel || member?.membershipType,
+  );
+  const membershipType =
+    member?.membershipType ||
+    (relationshipLabel === 'family' ? 'member' : relationshipLabel || 'member');
 
   return {
     id: Number(member?.id || userId || 0),
@@ -350,12 +364,16 @@ const normalizeFamilyMember = (member = {}, familyCode = '') => {
     firstName,
     lastName,
     name,
-    profileUrl: resolveChatAssetUrl(user?.profileImage || profile?.profile || ''),
+    profileUrl: resolveChatAssetUrl(
+      member?.profileUrl || user?.profileImage || profile?.profile || '',
+    ),
     familyRole: member?.familyRole || 'Member',
     isFamilyAdmin: Boolean(member?.isFamilyAdmin),
-    isAppUser: Boolean(user?.isAppUser),
-    userStatus: Number(user?.status || 0),
-    membershipType: member?.membershipType || 'member',
+    isAppUser:
+      typeof member?.isAppUser === 'boolean' ? member.isAppUser : Boolean(user?.isAppUser),
+    userStatus: Number(member?.userStatus || user?.status || 0),
+    membershipType,
+    relationshipLabel: relationshipLabel || (membershipType === 'member' ? 'family' : membershipType),
     isNotInTree: Boolean(member?.isNotInTree),
     familyCode: normalizeFamilyCode(member?.familyCode || familyCode),
     sourceFamilyCode: normalizeFamilyCode(
@@ -452,6 +470,9 @@ const normalizeConversation = (conversation = {}) => ({
   unreadCount: Number(conversation?.unreadCount || 0),
   isMuted: Boolean(conversation?.isMuted),
   relationship: conversation?.relationship || '',
+  relationshipLabel: normalizeRelationshipLabel(
+    conversation?.relationshipLabel || conversation?.relationship,
+  ),
   roomId: Number(conversation?.roomId || 0) || null,
   roomType: conversation?.roomType || null,
   roomName: conversation?.roomName || null,
@@ -472,27 +493,90 @@ const normalizeConversation = (conversation = {}) => ({
   counterpartyStatus: conversation?.counterpartyStatus || null,
 });
 
-const normalizeMessageResponse = (payload) => payload?.data || payload || null;
+const normalizeSharePayload = (payload = null) => {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
 
-export const getChatFamilies = async () => {
-  const response = await authFetchResponse(CHAT_API_ENDPOINTS.families, {
-    method: 'GET',
-  });
-  const json = await parseJson(response);
+  const previewMediaKind = String(payload?.previewMediaKind || '').trim().toLowerCase();
+
   return {
-    families: getNestedArray(json, 'families'),
+    ...payload,
+    shareType: String(payload?.shareType || '').trim().toLowerCase(),
+    entityId: Number(payload?.entityId || 0),
+    shareId: payload?.shareId ? String(payload.shareId) : null,
+    familyCode: normalizeFamilyCode(payload?.familyCode || ''),
+    previewTitle: String(payload?.previewTitle || '').trim(),
+    previewText: String(payload?.previewText || '').trim(),
+    previewMediaUrl: resolveChatAssetUrl(payload?.previewMediaUrl || ''),
+    previewMediaKind:
+      previewMediaKind === 'image' || previewMediaKind === 'video' ? previewMediaKind : null,
+    creatorName: String(payload?.creatorName || '').trim(),
+    mediaCount: Number(payload?.mediaCount || 0),
   };
 };
 
-export const createConversation = async (familyCode, participantUserId) => {
-  const normalizedFamilyCode = requireFamilyCode(
-    familyCode,
-    'create a conversation',
+export const normalizeMessage = (message = {}) => ({
+  ...message,
+  id: Number(message?.id || 0),
+  conversationId: Number(message?.conversationId || 0),
+  senderId: Number(message?.senderId || 0),
+  content: message?.content ?? null,
+  messageType: message?.messageType || MESSAGE_TYPES.TEXT,
+  mediaUrl: resolveChatAssetUrl(message?.mediaUrl || ''),
+  mediaMimeType: message?.mediaMimeType || '',
+  mediaSize: Number(message?.mediaSize || 0),
+  sharePayload: normalizeSharePayload(message?.sharePayload),
+  replyTo: message?.replyTo
+    ? {
+        ...message.replyTo,
+        id: Number(message.replyTo.id || 0),
+        content: message.replyTo.content || '',
+        senderName: message.replyTo.senderName || '',
+      }
+    : null,
+});
+
+const normalizeMessageResponse = (payload) => normalizeMessage(payload?.data || payload || null);
+
+export const getReachableContacts = async () => {
+  const response = await authFetchResponse(CHAT_API_ENDPOINTS.contacts, {
+    method: 'GET',
+  });
+  const json = await parseJson(response);
+  const contacts = getNestedArray(json, 'contacts')
+    .map((contact) => normalizeFamilyMember(contact))
+    .filter(
+      (contact) =>
+        contact.userId > 0 && contact.isAppUser && Number(contact.userStatus || 0) === 1,
+    );
+
+  return {
+    contacts,
+    familyContacts: contacts.filter(
+      (contact) => normalizeRelationshipLabel(contact?.relationshipLabel) === 'family',
+    ),
+    linkedContacts: contacts.filter(
+      (contact) => normalizeRelationshipLabel(contact?.relationshipLabel) === 'linked',
+    ),
+    associatedContacts: contacts.filter(
+      (contact) => normalizeRelationshipLabel(contact?.relationshipLabel) === 'associated',
+    ),
+  };
+};
+
+export const createConversation = async (familyCodeOrParticipantUserId, maybeParticipantUserId) => {
+  const hasLegacyFamilyScopeArg = typeof familyCodeOrParticipantUserId === 'string';
+  const normalizedFamilyCode = hasLegacyFamilyScopeArg
+    ? normalizeFamilyCode(familyCodeOrParticipantUserId)
+    : '';
+  const participantUserId = Number(
+    hasLegacyFamilyScopeArg ? maybeParticipantUserId : familyCodeOrParticipantUserId,
   );
   const response = await authFetchResponse(CHAT_API_ENDPOINTS.conversations, {
     method: 'POST',
     body: JSON.stringify({
-      familyCode: normalizedFamilyCode,
+      ...(normalizedFamilyCode ? { familyCode: normalizedFamilyCode } : {}),
       participantUserId,
     }),
   });
@@ -500,91 +584,38 @@ export const createConversation = async (familyCode, participantUserId) => {
   return normalizeConversation(json?.data || json || {});
 };
 
-export const getConversations = async (familyCode) => {
-  const normalizedFamilyCode = requireFamilyCode(
-    familyCode,
-    'load conversations',
-  );
-  const response = await authFetchResponse(
-    `${CHAT_API_ENDPOINTS.conversations}?familyCode=${encodeURIComponent(normalizedFamilyCode)}`,
-    {
-      method: 'GET',
-    },
-  );
+export const getConversations = async () => {
+  const response = await authFetchResponse(CHAT_API_ENDPOINTS.conversations, {
+    method: 'GET',
+  });
   const json = await parseJson(response);
   return {
     conversations: getNestedArray(json, 'conversations').map(normalizeConversation),
   };
 };
 
-export const getRooms = async (familyCode) => {
-  const normalizedFamilyCode = requireFamilyCode(familyCode, 'load rooms');
-  const response = await authFetchResponse(
-    `${CHAT_API_ENDPOINTS.rooms}?familyCode=${encodeURIComponent(normalizedFamilyCode)}`,
-    {
-      method: 'GET',
-    },
-  );
+export const getRooms = async () => {
+  const response = await authFetchResponse(CHAT_API_ENDPOINTS.rooms, {
+    method: 'GET',
+  });
   const json = await parseJson(response);
   return {
     rooms: getNestedArray(json, 'rooms').map(normalizeConversation),
   };
 };
 
-export const getConversation = async (conversationId, familyCode) => {
-  const normalizedFamilyCode = requireFamilyCode(
-    familyCode,
-    'load conversation details',
-  );
-  const response = await authFetchResponse(
-    `${CHAT_API_ENDPOINTS.conversation(conversationId)}?familyCode=${encodeURIComponent(normalizedFamilyCode)}`,
-    {
-      method: 'GET',
-    },
-  );
+export const getConversation = async (conversationId) => {
+  const response = await authFetchResponse(CHAT_API_ENDPOINTS.conversation(conversationId), {
+    method: 'GET',
+  });
   const json = await parseJson(response);
   return normalizeConversation(json?.data || json || {});
 };
 
-export const getFamilyMembersForChat = async (familyCode) => {
-  const normalizedFamilyCode = requireFamilyCode(
-    familyCode,
-    'load family members for chat',
-  );
-  const response = await authFetchResponse(
-    CHAT_API_ENDPOINTS.familyMembers(normalizedFamilyCode),
-    {
-      method: 'GET',
-    },
-  );
-  const json = await parseJson(response);
-  const members = dedupeFamilyMembersForChat(
-    getNestedArray(json, 'data')
-      .map((member) => normalizeFamilyMember(member, normalizedFamilyCode))
-      .filter(
-        (member) =>
-          member.userId > 0 && member.isAppUser && Number(member.userStatus || 0) === 1,
-      ),
-    normalizedFamilyCode,
-  );
+export const getFamilyMembersForChat = async () => getReachableContacts();
 
-  return {
-    members,
-  };
-};
-
-export const getMessages = async (
-  conversationId,
-  cursor,
-  _currentUserId = null,
-  familyCode,
-) => {
-  const normalizedFamilyCode = requireFamilyCode(
-    familyCode,
-    'load conversation messages',
-  );
+export const getMessages = async (conversationId, cursor) => {
   const params = new URLSearchParams();
-  params.set('familyCode', normalizedFamilyCode);
   if (cursor?.beforeCreatedAt) params.set('beforeCreatedAt', cursor.beforeCreatedAt);
   if (cursor?.beforeId) params.set('beforeId', String(cursor.beforeId));
   params.set('limit', String(cursor?.limit || CHAT_LIMITS.MESSAGES_PER_PAGE));
@@ -597,9 +628,9 @@ export const getMessages = async (
   );
   const json = await parseJson(response);
   const messages = Array.isArray(json?.messages)
-    ? json.messages
+    ? json.messages.map(normalizeMessage)
     : Array.isArray(json?.data?.messages)
-      ? json.data.messages
+      ? json.data.messages.map(normalizeMessage)
       : [];
 
   return {
@@ -621,6 +652,7 @@ export const sendTextMessage = async (conversationId, familyCode, content, optio
       content,
       replyToId: options?.replyTo?.id || options?.replyToId || null,
       mentionedUserIds: options?.mentionedUserIds || [],
+      ...(options?.sharePayload ? { sharePayload: options.sharePayload } : {}),
     }),
   });
   const json = await parseJson(response);
@@ -649,6 +681,7 @@ export const sendTextMessageSocket = async (
       clientRequestId: options?.clientRequestId || undefined,
       replyToId: options?.replyTo?.id || options?.replyToId || null,
       mentionedUserIds: options?.mentionedUserIds || [],
+      ...(options?.sharePayload ? { sharePayload: options.sharePayload } : {}),
     },
     'send a message',
     (response) => Number(response?.conversationId || 0) === Number(conversationId || 0),
@@ -866,6 +899,7 @@ export const getUnreadChatCount = async () => {
   const json = await parseJson(response);
   return {
     count: Number(json?.count ?? json?.data?.count ?? 0),
+    totalCount: Number(json?.totalCount ?? json?.data?.totalCount ?? json?.count ?? 0),
   };
 };
 
@@ -882,6 +916,10 @@ export const getMessagePreviewText = (message) => {
       return 'Photo';
     case MESSAGE_TYPES.VOICE:
       return 'Voice message';
+    case MESSAGE_TYPES.POST_SHARE:
+      return 'Shared a post';
+    case MESSAGE_TYPES.GALLERY_SHARE:
+      return 'Shared a gallery';
     case MESSAGE_TYPES.SYSTEM:
       return 'System message';
     case MESSAGE_TYPES.TOMBSTONE:

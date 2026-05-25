@@ -32,9 +32,17 @@ export const getMessageReplyPreview = (message) => {
     return null;
   }
 
+  const previewText =
+    String(message?.content || '').trim() ||
+    (message?.messageType === MESSAGE_TYPES.POST_SHARE
+      ? 'Shared a post'
+      : message?.messageType === MESSAGE_TYPES.GALLERY_SHARE
+        ? 'Shared a gallery'
+        : '');
+
   return {
     id: messageId,
-    content: message?.content || '',
+    content: previewText,
     senderName: message?.senderName || '',
   };
 };
@@ -185,6 +193,39 @@ export const createOptimisticMediaMessage = ({
   sendStatus: 'sending',
 });
 
+export const createOptimisticShareMessage = ({
+  id,
+  conversationId,
+  senderId,
+  senderName,
+  senderAvatar,
+  content,
+  createdAt,
+  replyTo,
+  messageType,
+  sharePayload,
+}) => ({
+  id: Number(id || 0),
+  conversationId: Number(conversationId || 0),
+  senderId: Number(senderId || 0),
+  senderName: senderName || 'You',
+  senderAvatar: senderAvatar || '',
+  content: content || '',
+  createdAt,
+  updatedAt: createdAt,
+  messageType: messageType || MESSAGE_TYPES.POST_SHARE,
+  mediaUrl: '',
+  mediaMimeType: '',
+  mediaSize: 0,
+  sharePayload: sharePayload || null,
+  isDeleted: false,
+  deletedAt: null,
+  deliveredAt: null,
+  readAt: null,
+  replyTo: replyTo || null,
+  sendStatus: 'sending',
+});
+
 export const resizeComposer = (element) => {
   if (!element) return;
   element.style.height = 'auto';
@@ -260,7 +301,14 @@ export const buildTypingUserLabel = (names = []) => {
 };
 
 export const getMessageSearchText = (message = {}) =>
-  [message?.content, message?.replyTo?.content, message?.senderName]
+  [
+    message?.content,
+    message?.replyTo?.content,
+    message?.senderName,
+    message?.sharePayload?.previewTitle,
+    message?.sharePayload?.previewText,
+    message?.sharePayload?.creatorName,
+  ]
     .filter(Boolean)
     .join(' ')
     .toLowerCase();
@@ -367,14 +415,6 @@ export const getConversationInfoDescription = (conversation, familyName) => {
     return `Archived room history preserved for ${resolvedFamilyName}. New messages are disabled.`;
   }
 
-  if (roomType === 'announcements') {
-    return `Announcements for ${resolvedFamilyName}. Only family admins can post here.`;
-  }
-
-  if (roomType === 'general') {
-    return `General room for everyone in ${resolvedFamilyName}.`;
-  }
-
   if (roomType === 'event') {
     return `Event discussion room inside ${resolvedFamilyName}.`;
   }
@@ -393,10 +433,6 @@ export const getRoomDisplayName = (conversation = {}) => {
   }
 
   switch (String(conversation?.roomType || '').trim().toLowerCase()) {
-    case 'general':
-      return 'General';
-    case 'announcements':
-      return 'Announcements';
     case 'event':
       return 'Event';
     case 'custom':

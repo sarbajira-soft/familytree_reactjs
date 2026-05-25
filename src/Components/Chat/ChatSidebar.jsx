@@ -3,19 +3,39 @@ import { FiMessageCircle, FiPlus, FiSearch, FiUsers } from 'react-icons/fi';
 import { CONVERSATION_TYPES } from '../../constants/chat.constants';
 import {
   formatMessageTime,
-  getChatMemberBadges,
   getInitials,
   getMessagePreviewText,
   getRoomIcon,
 } from '../../services/chat.service';
 import { getRoomDisplayName, isSameConversation } from './chatPage.utils';
 
+const getRelationshipPillLabel = (member = {}) => {
+  const relationshipLabel = String(
+    member?.relationshipLabel || member?.membershipType || '',
+  )
+    .trim()
+    .toLowerCase();
+
+  if (relationshipLabel === 'family' || relationshipLabel === 'member') {
+    return 'Family';
+  }
+
+  if (relationshipLabel === 'associated') {
+    return 'Associated';
+  }
+
+  if (relationshipLabel === 'linked') {
+    return 'Linked';
+  }
+
+  return '';
+};
+
 const ChatSidebar = ({
   activeTab,
   familyMemberMap,
   filteredConversations,
   filteredRooms,
-  hasFamilyScope,
   listLoading,
   msgCount,
   onCreateRoom,
@@ -62,32 +82,31 @@ const ChatSidebar = ({
         </button>
       </div>
 
-      {hasFamilyScope &&
-        (activeTab === 'messages' ? (
-          <button
-            className="chat-sidebar-action chat-sidebar-action--inline"
-            onClick={onNewConversation}
-            type="button"
-          >
-            <FiPlus size={14} />
-            New conversation
-          </button>
-        ) : (
-          <button
-            className="chat-sidebar-action chat-sidebar-action--inline"
-            onClick={onCreateRoom}
-            type="button"
-          >
-            <FiPlus size={14} />
-            Create room
-          </button>
-        ))}
+      {activeTab === 'messages' ? (
+        <button
+          className="chat-sidebar-action chat-sidebar-action--inline"
+          onClick={onNewConversation}
+          type="button"
+        >
+          <FiPlus size={14} />
+          New conversation
+        </button>
+      ) : (
+        <button
+          className="chat-sidebar-action chat-sidebar-action--inline"
+          onClick={onCreateRoom}
+          type="button"
+        >
+          <FiPlus size={14} />
+          Create room
+        </button>
+      )}
     </div>
 
-    {hasFamilyScope && activeTab === 'rooms' ? (
+    {activeTab === 'rooms' ? (
       <div className="chat-sidebar-note-row">
         <span className="chat-sidebar-note">
-          Custom rooms can include linked, associated, and not-in-tree app users.
+          Rooms are limited to your reachable family, linked, and associated contacts.
         </span>
       </div>
     ) : null}
@@ -105,18 +124,13 @@ const ChatSidebar = ({
             </div>
           ))}
         </div>
-      ) : !hasFamilyScope ? (
-        <div className="chat-empty">
-          <FiUsers size={40} />
-          <p>No rooms available</p>
-        </div>
       ) : activeTab === 'messages' ? (
         filteredConversations.length > 0 ? (
           filteredConversations.map((conversationItem) => {
             const participant = conversationItem?.participants?.[0] || {};
             const participantMember =
               familyMemberMap.get(Number(participant?.userId || 0)) || null;
-            const participantBadges = getChatMemberBadges(participantMember || {});
+            const relationshipPillLabel = getRelationshipPillLabel(participantMember || {});
             const fullName =
               `${participant.firstName || ''} ${participant.lastName || ''}`.trim() ||
               participant?.name ||
@@ -153,15 +167,11 @@ const ChatSidebar = ({
                   <div className="chat-li-top">
                     <div className="chat-li-name-row">
                       <span className="chat-li-name">{fullName}</span>
-                      {participantBadges.map((badge) => (
-                        <span
-                          className={`chat-member-chip ${badge.className}`}
-                          key={`${conversationItem.id}-${badge.key}`}
-                          title={badge.title}
-                        >
-                          {badge.label}
+                      {relationshipPillLabel ? (
+                        <span className="chat-member-chip" title={relationshipPillLabel}>
+                          {relationshipPillLabel}
                         </span>
-                      ))}
+                      ) : null}
                     </div>
                     <span
                       className={`chat-li-time${conversationItem.unreadCount ? ' unread' : ''}`}
@@ -204,12 +214,15 @@ const ChatSidebar = ({
                   getRoomIcon(room.roomType)
                 )}
               </div>
-              <div className="chat-li-body">
-                <div className="chat-li-top">
-                  <span className="chat-li-name">{roomDisplayLabel}</span>
-                  <span className={`chat-li-time${room.unreadCount ? ' unread' : ''}`}>
-                    {formatMessageTime(room?.lastMessage?.createdAt)}
-                  </span>
+                <div className="chat-li-body">
+                  <div className="chat-li-top">
+                    <span className="chat-li-name">
+                      {roomDisplayLabel}
+                      {room?.memberCount > 0 ? ` (${room.memberCount})` : ''}
+                    </span>
+                    <span className={`chat-li-time${room.unreadCount ? ' unread' : ''}`}>
+                      {formatMessageTime(room?.lastMessage?.createdAt)}
+                    </span>
                 </div>
                 <div className="chat-li-preview">
                   {getMessagePreviewText(room?.lastMessage)}

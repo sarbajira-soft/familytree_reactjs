@@ -1560,15 +1560,13 @@ const PostPage = () => {
                     <FaCommentDots size={19} />
                     <span className="text-sm">{post.comments}</span>
                   </button>
-                  {post.privacy === "public" ? (
-                    <button
-                      onClick={() => setShareSheetPost(post)}
-                      className="flex items-center bg-white gap-2 text-gray-700 hover:text-emerald-600 transition-colors duration-200 active:scale-95"
-                    >
-                      <FiShare2 size={19} />
-                      <span className="text-sm">Share</span>
-                    </button>
-                  ) : null}
+                  <button
+                    onClick={() => setShareSheetPost(post)}
+                    className="flex items-center bg-white gap-2 text-gray-700 hover:text-emerald-600 transition-colors duration-200 active:scale-95"
+                  >
+                    <FiShare2 size={19} />
+                    <span className="text-sm">Share</span>
+                  </button>
                 </div>
 
                 {/* Comments Section */}
@@ -1724,6 +1722,7 @@ const PostPage = () => {
       />
 
       <PublicPostShareSheet
+        currentUserId={userInfo?.userId}
         isOpen={!!shareSheetPost}
         post={shareSheetPost}
         onClose={() => setShareSheetPost(null)}
