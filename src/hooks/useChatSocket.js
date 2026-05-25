@@ -37,6 +37,8 @@ export const useChatSocket = (userInfo, handlers = {}) => {
   const socketRef = useRef(null);
   const [socket, setSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
+  const visibilityTimeoutRef = useRef(null);
+  const lastEmittedVisibilityRef = useRef(null);
 
   useEffect(() => {
     if (!userInfo?.userId) {
@@ -83,31 +85,55 @@ export const useChatSocket = (userInfo, handlers = {}) => {
     activeChatSocket = nextSocket;
     activeChatSocketUserId = Number(userInfo.userId);
     setSocket(nextSocket);
+    lastEmittedVisibilityRef.current = null;
 
-    const emitVisibilityState = () => {
+    const emitVisibilityState = (force = false) => {
       if (!nextSocket.connected || typeof document === 'undefined') {
         return;
       }
 
+      const visibility = document.visibilityState || 'visible';
+      if (!force && lastEmittedVisibilityRef.current === visibility) {
+        return;
+      }
+
       nextSocket.emit('visibility_change', {
-        visibility: document.visibilityState || 'visible',
+        visibility,
       });
+      lastEmittedVisibilityRef.current = visibility;
+    };
+
+    const scheduleVisibilityEmit = (force = false) => {
+      if (visibilityTimeoutRef.current) {
+        clearTimeout(visibilityTimeoutRef.current);
+        visibilityTimeoutRef.current = null;
+      }
+
+      if (force) {
+        emitVisibilityState(true);
+        return;
+      }
+
+      visibilityTimeoutRef.current = setTimeout(() => {
+        visibilityTimeoutRef.current = null;
+        emitVisibilityState(false);
+      }, 400);
     };
 
     nextSocket.on('connect', () => {
       setIsConnected(false);
-      emitVisibilityState();
     });
 
     // The namespace transport can connect before the backend finishes auth.
     // We only mark chat as ready after the gateway confirms the session.
     nextSocket.on('connected', () => {
       setIsConnected(true);
-      emitVisibilityState();
+      scheduleVisibilityEmit(true);
     });
 
     nextSocket.on('disconnect', () => {
       setIsConnected(false);
+      lastEmittedVisibilityRef.current = null;
     });
 
     nextSocket.on('connect_error', (error) => {
@@ -120,7 +146,7 @@ export const useChatSocket = (userInfo, handlers = {}) => {
     }
 
     const handleVisibilityChange = () => {
-      emitVisibilityState();
+      scheduleVisibilityEmit(false);
     };
 
     if (typeof document !== 'undefined') {
@@ -128,6 +154,10 @@ export const useChatSocket = (userInfo, handlers = {}) => {
     }
 
     return () => {
+      if (visibilityTimeoutRef.current) {
+        clearTimeout(visibilityTimeoutRef.current);
+        visibilityTimeoutRef.current = null;
+      }
       if (typeof document !== 'undefined') {
         document.removeEventListener('visibilitychange', handleVisibilityChange);
       }

@@ -161,6 +161,22 @@ const ChatPage = () => {
   const [resolvedConversationId, setResolvedConversationId] = useState(null);
   const [selectedType, setSelectedType] = useState(CONVERSATION_TYPES.DIRECT);
   const [conversation, setConversation] = useState(null);
+  const cachedActiveConversation = selectedId ? getCachedConversation(selectedId) : null;
+  const activeConversationParticipants = Array.isArray(conversation?.participants)
+    ? conversation.participants
+    : Array.isArray(cachedActiveConversation?.participants)
+      ? cachedActiveConversation.participants
+      : [];
+  const activeChatTargetUserId =
+    selectedType === CONVERSATION_TYPES.DIRECT
+      ? Number(
+          activeConversationParticipants.find(
+            (participant) =>
+              Number(participant?.userId || 0) > 0 &&
+              Number(participant?.userId || 0) !== Number(currentUserId || 0),
+          )?.userId || 0,
+        ) || null
+      : null;
   const [messages, setMessages] = useState([]);
   const [messagePagination, setMessagePagination] = useState({
     nextCursor: null,
@@ -1418,7 +1434,12 @@ const ChatPage = () => {
 
   useEffect(() => {
     const normalizedActiveFamilyCode = normalizeFamilyCode(activeFamilyCode);
-    if (!selectedId || !resolvedConversationId || !normalizedActiveFamilyCode) {
+    if (
+      !isChatConnected ||
+      !selectedId ||
+      !resolvedConversationId ||
+      !normalizedActiveFamilyCode
+    ) {
       return undefined;
     }
 
@@ -1437,16 +1458,9 @@ const ChatPage = () => {
       return undefined;
     }
 
-    const activeChatTargetUserId =
-      selectedType === CONVERSATION_TYPES.DIRECT
-        ? Number(
-            conversation?.participants?.find(
-              (participant) =>
-                Number(participant?.userId || 0) > 0 &&
-                Number(participant?.userId || 0) !== Number(currentUserId || 0),
-            )?.userId || 0,
-          ) || null
-        : null;
+    if (selectedType === CONVERSATION_TYPES.DIRECT && !activeChatTargetUserId) {
+      return undefined;
+    }
 
     joinConversation(selectedId, normalizedActiveFamilyCode, activeChatTargetUserId);
 
@@ -1457,15 +1471,14 @@ const ChatPage = () => {
     };
   }, [
     activeFamilyCode,
+    activeChatTargetUserId,
     clearRemoteTyping,
     conversation?.familyCode,
-    conversation?.participants,
-    currentUserId,
+    isChatConnected,
     joinConversation,
     leaveConversation,
     resolvedConversationId,
     selectedId,
-    selectedType,
     stopLocalTyping,
   ]);
 

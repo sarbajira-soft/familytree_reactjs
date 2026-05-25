@@ -142,16 +142,11 @@ export const useNotificationSocket = (userInfo) => {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const socketRef = useRef(null);
-  const renderCountRef = useRef(0);
-  const listenerRegistrationCountRef = useRef(0);
   const refetchTimeoutRef = useRef(null);
   const inFlightNotificationFetchRef = useRef(null);
+  const visibilityTimeoutRef = useRef(null);
+  const lastEmittedVisibilityRef = useRef(null);
   const queryClient = useQueryClient();
-
-  renderCountRef.current += 1;
-  console.debug(
-    `[NotificationSocket] render count=${renderCountRef.current} user=${Number(userInfo?.userId || 0)} notifications=${notifications.length} unread=${unreadCount}`,
-  );
 
   const syncNotificationCollections = useCallback((updater) => {
     setNotifications((prev) => {
@@ -165,19 +160,41 @@ export const useNotificationSocket = (userInfo) => {
     });
   }, [queryClient]);
 
-  const emitAppState = useCallback(() => {
+  const emitVisibilityState = useCallback((force = false) => {
     if (!socketRef.current?.connected || typeof document === 'undefined') {
       return;
     }
 
     const visibilityState = document.visibilityState || 'visible';
-    socketRef.current.emit('app-state', {
-      visibilityState,
-    });
+    if (!force && lastEmittedVisibilityRef.current === visibilityState) {
+      return;
+    }
+
     socketRef.current.emit('visibility_change', {
       visibility: visibilityState,
     });
+    lastEmittedVisibilityRef.current = visibilityState;
   }, []);
+
+  const scheduleVisibilityStateEmit = useCallback(
+    (force = false) => {
+      if (visibilityTimeoutRef.current) {
+        clearTimeout(visibilityTimeoutRef.current);
+        visibilityTimeoutRef.current = null;
+      }
+
+      if (force) {
+        emitVisibilityState(true);
+        return;
+      }
+
+      visibilityTimeoutRef.current = setTimeout(() => {
+        visibilityTimeoutRef.current = null;
+        emitVisibilityState(false);
+      }, 400);
+    },
+    [emitVisibilityState],
+  );
 
   const syncNotificationReadState = useCallback((payload) => {
     syncNotificationCollections((prev) => {
@@ -222,24 +239,15 @@ export const useNotificationSocket = (userInfo) => {
   const refetchNotifications = useCallback(async (reason = 'manual') => {
     const token = getToken();
     if (!token || !userInfo?.userId) {
-      console.debug(
-        `[NotificationSocket] refetch skipped reason=${reason} user=${Number(userInfo?.userId || 0)} token=${token ? 'present' : 'missing'}`,
-      );
       syncNotificationCollections(() => []);
       return [];
     }
 
     if (inFlightNotificationFetchRef.current) {
-      console.debug(
-        `[NotificationSocket] refetch joined existing request reason=${reason} user=${Number(userInfo.userId)}`,
-      );
       return inFlightNotificationFetchRef.current;
     }
 
     try {
-      console.debug(
-        `[NotificationSocket] refetch start reason=${reason} user=${Number(userInfo.userId)}`,
-      );
       const request = (async () => {
         const response = await authFetchResponse('/notifications?all=true', {
           method: 'GET',
@@ -257,9 +265,6 @@ export const useNotificationSocket = (userInfo) => {
           mergedNotifications = mergeNotifications(prev, fetchedNotifications);
           return mergedNotifications;
         });
-        console.debug(
-          `[NotificationSocket] refetch success reason=${reason} user=${Number(userInfo.userId)} count=${fetchedNotifications.length}`,
-        );
         return mergedNotifications;
       })();
       inFlightNotificationFetchRef.current = request;
@@ -278,9 +283,6 @@ export const useNotificationSocket = (userInfo) => {
         clearTimeout(refetchTimeoutRef.current);
       }
 
-      console.debug(
-        `[NotificationSocket] refetch scheduled reason=${reason} user=${Number(userInfo?.userId || 0)}`,
-      );
       refetchTimeoutRef.current = setTimeout(() => {
         refetchTimeoutRef.current = null;
         void refetchNotifications(reason);
@@ -318,9 +320,6 @@ export const useNotificationSocket = (userInfo) => {
   }, [userInfo?.userId]);
 
   useEffect(() => {
-    console.debug(
-      `[NotificationSocket] useEffect fetchUnreadCount triggered user=${Number(userInfo?.userId || 0)}`,
-    );
     void fetchUnreadCount();
   }, [fetchUnreadCount, userInfo?.userId]);
 
@@ -329,17 +328,11 @@ export const useNotificationSocket = (userInfo) => {
       return undefined;
     }
 
-    console.debug(
-      `[NotificationSocket] useEffect initial notification fetch triggered user=${Number(userInfo.userId)}`,
-    );
     void refetchNotifications('initial-page-load');
     return undefined;
   }, [refetchNotifications, userInfo?.userId]);
 
   useEffect(() => {
-    console.debug(
-      `[NotificationSocket] socket effect triggered user=${Number(userInfo?.userId || 0)}`,
-    );
     if (!userInfo?.userId) {
       disconnectNotificationSocket('missing-user');
       socketRef.current = null;
@@ -384,23 +377,19 @@ export const useNotificationSocket = (userInfo) => {
     socketRef.current = socket;
     activeNotificationSocket = socket;
     activeNotificationSocketUserId = Number(userInfo.userId);
-    listenerRegistrationCountRef.current += 1;
-    console.debug(
-      `[NotificationSocket] listener registration count=${listenerRegistrationCountRef.current} user=${Number(userInfo.userId)}`,
-    );
 
     socket.on('connect', () => {
       setIsConnected(true);
-      emitAppState();
     });
 
     socket.on('connected', () => {
       setIsConnected(true);
-      emitAppState();
+      scheduleVisibilityStateEmit(true);
     });
 
     socket.on('disconnect', () => {
       setIsConnected(false);
+      lastEmittedVisibilityRef.current = null;
     });
 
     socket.on('connect_error', (error) => {
@@ -424,9 +413,6 @@ export const useNotificationSocket = (userInfo) => {
           !alreadyExists && isNotificationUnread(normalizedNotification);
         return mergeNotifications(existingNotifications, [normalizedNotification]);
       });
-      console.debug(
-        `[NotificationSocket] socket notification received id=${Number(normalizedNotification?.id || 0)} triggering scheduled refetch`,
-      );
       scheduleNotificationRefetch('socket-notification');
       if (addedUnreadNotification) {
         setUnreadCount((prev) => prev + 1);
@@ -453,9 +439,6 @@ export const useNotificationSocket = (userInfo) => {
 
     socket.on('notification-updated', (payload) => {
       syncNotificationStatus(payload);
-      console.debug(
-        `[NotificationSocket] invalidate skipped event=notification-updated notificationId=${Number(payload?.notificationId || 0)}`,
-      );
     });
 
     socket.on('notification-read', (payload) => {
@@ -465,9 +448,6 @@ export const useNotificationSocket = (userInfo) => {
       } else {
         void fetchUnreadCount();
       }
-      console.debug(
-        `[NotificationSocket] invalidate skipped event=notification-read notificationId=${Number(payload?.notificationId || 0)}`,
-      );
     });
 
     socket.on('family_event', (event) => {
@@ -490,7 +470,7 @@ export const useNotificationSocket = (userInfo) => {
     });
 
     const handleVisibilityChange = () => {
-      emitAppState();
+      scheduleVisibilityStateEmit(false);
     };
 
     if (typeof document !== 'undefined') {
@@ -498,12 +478,13 @@ export const useNotificationSocket = (userInfo) => {
     }
 
     return () => {
-      console.debug(
-        `[NotificationSocket] cleanup triggered user=${Number(userInfo?.userId || 0)}`,
-      );
       if (refetchTimeoutRef.current) {
         clearTimeout(refetchTimeoutRef.current);
         refetchTimeoutRef.current = null;
+      }
+      if (visibilityTimeoutRef.current) {
+        clearTimeout(visibilityTimeoutRef.current);
+        visibilityTimeoutRef.current = null;
       }
       if (typeof document !== 'undefined') {
         document.removeEventListener('visibilitychange', handleVisibilityChange);
@@ -513,9 +494,9 @@ export const useNotificationSocket = (userInfo) => {
       setIsConnected(false);
     };
   }, [
-    emitAppState,
     fetchUnreadCount,
     scheduleNotificationRefetch,
+    scheduleVisibilityStateEmit,
     syncNotificationCollections,
     syncNotificationReadState,
     syncNotificationStatus,

@@ -48,6 +48,11 @@ export const ChatProvider = ({ children }) => {
   const [activeFamilyCode, setActiveFamilyCode] = useState('');
   const joinedFamilyCodeRef = useRef('');
   const previousUserIdRef = useRef(null);
+  const activeConversationStateRef = useRef({
+    conversationId: null,
+    familyCode: '',
+    targetUserId: null,
+  });
 
   const handleUnreadCount = useCallback((payload) => {
     setUnreadChatCount(Number(payload?.count || 0));
@@ -128,45 +133,91 @@ export const ChatProvider = ({ children }) => {
 
   const joinConversation = useCallback(
     (conversationId, familyCode = activeFamilyCode, targetUserId = null) => {
-      if (!socket || !conversationId || !familyCode) return;
+      if (!socket || !socket.connected || !conversationId || !familyCode) return false;
       const normalizedConversationId = Number(conversationId);
+      const normalizedFamilyCode = normalizeFamilyCode(familyCode);
       const normalizedTargetUserId = Number(targetUserId || 0) || null;
+      const currentState = activeConversationStateRef.current;
+
+      if (
+        Number(currentState.conversationId || 0) === normalizedConversationId &&
+        normalizeFamilyCode(currentState.familyCode) === normalizedFamilyCode &&
+        Number(currentState.targetUserId || 0) === Number(normalizedTargetUserId || 0)
+      ) {
+        return false;
+      }
+
       socket.emit(CHAT_SOCKET_EVENTS.JOIN_CONVERSATION, {
         conversationId: normalizedConversationId,
-        familyCode,
-      });
-      socket.emit(CHAT_SOCKET_EVENTS.ACTIVE_CONVERSATION, {
-        conversationId: normalizedConversationId,
-        targetUserId: normalizedTargetUserId,
+        familyCode: normalizedFamilyCode,
       });
       socket.emit('chat_opened', {
         conversationId: normalizedConversationId,
         targetUserId: normalizedTargetUserId,
       });
+      activeConversationStateRef.current = {
+        conversationId: normalizedConversationId,
+        familyCode: normalizedFamilyCode,
+        targetUserId: normalizedTargetUserId,
+      };
       setActivePushConversationId(normalizedConversationId);
+      return true;
     },
     [activeFamilyCode, socket],
   );
 
   const leaveConversation = useCallback(
     (conversationId) => {
-      if (!socket || !conversationId) return;
-      const normalizedConversationId = Number(conversationId);
-      socket.emit(CHAT_SOCKET_EVENTS.LEAVE_CONVERSATION, {
-        conversationId: normalizedConversationId,
-      });
-      socket.emit(CHAT_SOCKET_EVENTS.CLEAR_ACTIVE_CONVERSATION, {
-        conversationId: normalizedConversationId,
-      });
-      socket.emit('chat_closed', {
-        conversationId: normalizedConversationId,
-      });
+      const normalizedConversationId = Number(conversationId || 0) || null;
+      const currentState = activeConversationStateRef.current;
+      const shouldEmitClose =
+        !!socket &&
+        !!socket.connected &&
+        !!normalizedConversationId &&
+        Number(currentState.conversationId || 0) === normalizedConversationId;
+
+      if (shouldEmitClose) {
+        socket.emit(CHAT_SOCKET_EVENTS.LEAVE_CONVERSATION, {
+          conversationId: normalizedConversationId,
+        });
+        socket.emit('chat_closed', {
+          conversationId: normalizedConversationId,
+        });
+      }
+
+      if (
+        !normalizedConversationId ||
+        Number(currentState.conversationId || 0) === normalizedConversationId
+      ) {
+        activeConversationStateRef.current = {
+          conversationId: null,
+          familyCode: '',
+          targetUserId: null,
+        };
+      }
+
+      if (!normalizedConversationId) {
+        clearActivePushConversationId();
+        return false;
+      }
+
       clearActivePushConversationId(normalizedConversationId);
+      return shouldEmitClose;
     },
     [socket],
   );
 
-  useEffect(() => () => clearActivePushConversationId(), []);
+  useEffect(
+    () => () => {
+      activeConversationStateRef.current = {
+        conversationId: null,
+        familyCode: '',
+        targetUserId: null,
+      };
+      clearActivePushConversationId();
+    },
+    [],
+  );
 
   const joinFamilyRoom = useCallback(
     (familyCode = activeFamilyCode) => {
@@ -191,6 +242,11 @@ export const ChatProvider = ({ children }) => {
   useEffect(() => {
     if (!socket || !isConnected) {
       joinedFamilyCodeRef.current = '';
+      activeConversationStateRef.current = {
+        conversationId: null,
+        familyCode: '',
+        targetUserId: null,
+      };
       return undefined;
     }
 
