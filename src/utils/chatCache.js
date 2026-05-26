@@ -1,5 +1,5 @@
-const conversationListsByFamily = new Map();
-const roomListsByFamily = new Map();
+let cachedConversationList = [];
+let cachedRoomList = [];
 const conversationsById = new Map();
 const messagesByConversationId = new Map();
 
@@ -119,38 +119,27 @@ const setConversationDetailInternal = (conversation = {}) => {
   conversationsById.set(conversationId, mergeConversation(current, conversation));
 };
 
-const getListMap = (isRoom = false) =>
-  isRoom ? roomListsByFamily : conversationListsByFamily;
-
 export const clearChatCache = () => {
-  conversationListsByFamily.clear();
-  roomListsByFamily.clear();
+  cachedConversationList = [];
+  cachedRoomList = [];
   conversationsById.clear();
   messagesByConversationId.clear();
 };
 
-export const getCachedConversations = (familyCode) => {
-  const key = normalizeFamilyCode(familyCode);
-  return cloneConversations(conversationListsByFamily.get(key) || []);
-};
+export const getCachedConversations = () => cloneConversations(cachedConversationList);
 
-export const cacheConversations = (familyCode, conversations = []) => {
-  const key = normalizeFamilyCode(familyCode);
+export const cacheConversations = (_familyCode, conversations = []) => {
   const next = sortConversations(cloneConversations(conversations));
-  conversationListsByFamily.set(key, next);
+  cachedConversationList = next;
   next.forEach(setConversationDetailInternal);
   return cloneConversations(next);
 };
 
-export const getCachedRooms = (familyCode) => {
-  const key = normalizeFamilyCode(familyCode);
-  return cloneConversations(roomListsByFamily.get(key) || []);
-};
+export const getCachedRooms = () => cloneConversations(cachedRoomList);
 
-export const cacheRooms = (familyCode, rooms = []) => {
-  const key = normalizeFamilyCode(familyCode);
+export const cacheRooms = (_familyCode, rooms = []) => {
   const next = sortConversations(cloneConversations(rooms));
-  roomListsByFamily.set(key, next);
+  cachedRoomList = next;
   next.forEach(setConversationDetailInternal);
   return cloneConversations(next);
 };
@@ -170,44 +159,40 @@ export const cacheConversation = (conversation = {}) => {
 
   setConversationDetailInternal(conversation);
   const mergedConversation = conversationsById.get(conversationId);
-  const familyCode = normalizeFamilyCode(mergedConversation?.familyCode);
   const isRoomConversation = Boolean(
     mergedConversation?.roomId || mergedConversation?.roomType || mergedConversation?.type === 'group',
   );
+  cachedConversationList = cloneConversations(cachedConversationList).filter(
+    (entry) => Number(entry?.id || 0) !== conversationId,
+  );
+  cachedRoomList = cloneConversations(cachedRoomList).filter(
+    (entry) => Number(entry?.id || 0) !== conversationId,
+  );
 
-  if (familyCode) {
-    const listMap = getListMap(isRoomConversation);
-    const currentList = listMap.get(familyCode) || [];
-    listMap.set(
-      familyCode,
-      upsertConversationListEntry(currentList, mergedConversation),
+  if (isRoomConversation) {
+    cachedRoomList = upsertConversationListEntry(cachedRoomList, mergedConversation);
+  } else {
+    cachedConversationList = upsertConversationListEntry(
+      cachedConversationList,
+      mergedConversation,
     );
   }
 
   return cloneConversation(mergedConversation);
 };
 
-export const removeCachedConversation = (conversationId, familyCode = '') => {
+export const removeCachedConversation = (conversationId, _familyCode = '') => {
   const key = Number(conversationId || 0);
   if (!key) {
     return;
   }
 
-  const cachedConversation = conversationsById.get(key) || {};
-  const normalizedFamilyCode = normalizeFamilyCode(
-    familyCode || cachedConversation?.familyCode,
+  cachedConversationList = cloneConversations(cachedConversationList).filter(
+    (entry) => Number(entry?.id || 0) !== key,
   );
-
-  if (normalizedFamilyCode) {
-    const nextConversationList = cloneConversations(
-      conversationListsByFamily.get(normalizedFamilyCode) || [],
-    ).filter((entry) => Number(entry?.id || 0) !== key);
-    const nextRoomList = cloneConversations(
-      roomListsByFamily.get(normalizedFamilyCode) || [],
-    ).filter((entry) => Number(entry?.id || 0) !== key);
-    conversationListsByFamily.set(normalizedFamilyCode, nextConversationList);
-    roomListsByFamily.set(normalizedFamilyCode, nextRoomList);
-  }
+  cachedRoomList = cloneConversations(cachedRoomList).filter(
+    (entry) => Number(entry?.id || 0) !== key,
+  );
 
   conversationsById.delete(key);
   messagesByConversationId.delete(key);

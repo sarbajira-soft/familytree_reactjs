@@ -147,7 +147,7 @@ const ChatPage = () => {
     () => String(userInfo?.profileUrl || userInfo?.profile || '').trim(),
     [userInfo],
   );
-  const hasFamilyScope = Boolean(activeFamilyCode);
+  const hasFamilyScope = Boolean(currentUserId);
   const routeFamilyCode = normalizeFamilyCode(searchParams.get('familyCode'));
   const routeConversationIdNumber = Number(routeConversationId || 0) || null;
 
@@ -337,12 +337,9 @@ const ChatPage = () => {
     });
   }, [messageSearchOpen]);
 
-  const syncListsFromCache = useCallback((familyCode = activeFamilyCodeRef.current) => {
-    const normalizedFamilyCode = normalizeFamilyCode(familyCode);
-    if (!normalizedFamilyCode) return;
-
-    setConversations(getCachedConversations(normalizedFamilyCode));
-    setRooms(getCachedRooms(normalizedFamilyCode));
+  const syncListsFromCache = useCallback(() => {
+    setConversations(getCachedConversations());
+    setRooms(getCachedRooms());
   }, []);
 
   const applyConversationRefresh = useCallback(
@@ -351,14 +348,8 @@ const ChatPage = () => {
         return null;
       }
 
-      const normalizedFamilyCode = normalizeFamilyCode(
-        nextConversation?.familyCode || activeFamilyCodeRef.current,
-      );
       const cachedConversation = cacheConversation(nextConversation);
-
-      if (normalizedFamilyCode) {
-        syncListsFromCache(normalizedFamilyCode);
-      }
+      syncListsFromCache();
 
       if (isSameConversation(cachedConversation?.id, selectedConversationRef.current)) {
         setConversation(cachedConversation);
@@ -372,30 +363,29 @@ const ChatPage = () => {
 
   const loadFamilyMembers = useCallback(
     async (forceReload = false) => {
-      const familyCode = activeFamilyCodeRef.current;
-      if (!familyCode) {
+      if (!currentUserId) {
         return [];
       }
 
       if (
         !forceReload &&
-        familyMembersFamilyCodeRef.current === familyCode &&
+        familyMembersFamilyCodeRef.current === (activeFamilyCodeRef.current || '__GLOBAL__') &&
         familyMembers.length > 0
       ) {
         return familyMembers;
       }
 
-      const response = await getFamilyMembersForChat(familyCode);
+      const response = await getFamilyMembersForChat();
       const nextMembers = response?.members || [];
       setFamilyMembers(nextMembers);
-      familyMembersFamilyCodeRef.current = familyCode;
+      familyMembersFamilyCodeRef.current = activeFamilyCodeRef.current || '__GLOBAL__';
       return nextMembers;
     },
-    [familyMembers],
+    [currentUserId, familyMembers],
   );
 
   useEffect(() => {
-    if (!hasFamilyScope) {
+    if (!currentUserId) {
       return;
     }
 
@@ -421,7 +411,7 @@ const ChatPage = () => {
         window.clearTimeout(timeoutId);
       }
     };
-  }, [activeFamilyCode, hasFamilyScope, loadFamilyMembers]);
+  }, [currentUserId, loadFamilyMembers]);
 
   const resolveConversationFamilyCode = useCallback(
     (conversationId, fallbackFamilyCode = '') => {
@@ -547,10 +537,7 @@ const ChatPage = () => {
       setActiveMessageSearchIndex(-1);
 
       if (options?.navigateToList !== false && routeConversationIdNumber) {
-        const nextUrl = activeFamilyCodeRef.current
-          ? `/chat?familyCode=${encodeURIComponent(activeFamilyCodeRef.current)}`
-          : '/chat';
-        navigate(nextUrl, { replace: true });
+        navigate('/chat', { replace: true });
       }
     },
     [clearRemoteTyping, navigate, routeConversationIdNumber, stopLocalTyping],
@@ -559,7 +546,7 @@ const ChatPage = () => {
   useEffect(() => {
     let isCancelled = false;
 
-    if (!hasFamilyScope) {
+    if (!currentUserId) {
       setConversations([]);
       setRooms([]);
       setMessagesListLoading(false);
@@ -575,8 +562,8 @@ const ChatPage = () => {
       };
     }
 
-    const cachedConversations = getCachedConversations(activeFamilyCode);
-    const cachedRooms = getCachedRooms(activeFamilyCode);
+    const cachedConversations = getCachedConversations();
+    const cachedRooms = getCachedRooms();
     if (cachedConversations.length > 0) {
       setConversations(cachedConversations);
     }
@@ -588,7 +575,7 @@ const ChatPage = () => {
 
     (async () => {
       try {
-        const conversationResponse = await getConversations(activeFamilyCode);
+        const conversationResponse = await getConversations();
 
         if (isCancelled) return;
 
@@ -614,7 +601,7 @@ const ChatPage = () => {
 
     (async () => {
       try {
-        const roomResponse = await getRooms(activeFamilyCode);
+        const roomResponse = await getRooms();
 
         if (isCancelled) return;
 
@@ -636,13 +623,16 @@ const ChatPage = () => {
     return () => {
       isCancelled = true;
     };
-  }, [activeFamilyCode, hasFamilyScope]);
+  }, [activeFamilyCode, currentUserId]);
 
   const markConversationReadNow = useCallback(
     async (conversationId, options = {}) => {
       const targetConversationId = Number(conversationId || selectedConversationRef.current || 0);
-      const familyCode = activeFamilyCodeRef.current;
-      if (!targetConversationId || !familyCode) {
+      const familyCode = resolveConversationFamilyCode(
+        targetConversationId,
+        activeFamilyCodeRef.current,
+      );
+      if (!targetConversationId) {
         return null;
       }
 
@@ -655,14 +645,8 @@ const ChatPage = () => {
                 familyCode,
               )
             : await markConversationRead(targetConversationId, familyCode);
-        if (result?.familyCode) {
-          markCachedConversationRead(result.familyCode, targetConversationId);
-          if (
-            normalizeFamilyCode(result.familyCode) === activeFamilyCodeRef.current
-          ) {
-            syncListsFromCache(result.familyCode);
-          }
-        }
+        markCachedConversationRead(result?.familyCode || familyCode, targetConversationId);
+        syncListsFromCache();
 
         if (isSameConversation(targetConversationId, selectedConversationRef.current)) {
           const cachedConversation = getCachedConversation(targetConversationId);
@@ -679,7 +663,7 @@ const ChatPage = () => {
         return null;
       }
     },
-    [isChatConnected, socket, syncListsFromCache],
+    [isChatConnected, resolveConversationFamilyCode, socket, syncListsFromCache],
   );
 
   const applyConversationMessageUpdate = useCallback(
@@ -696,26 +680,20 @@ const ChatPage = () => {
       );
       const cachedConversation = getCachedConversation(targetConversationId);
 
-      if (resolvedFamilyCode) {
-        const nextUnreadCount = options?.clearUnread
-          ? 0
-          : typeof options?.unreadCount === 'number'
-            ? Number(options.unreadCount)
-            : Number(cachedConversation?.unreadCount || 0);
-
-        cacheConversationMessage(
-          resolvedFamilyCode,
-          targetConversationId,
-          message,
-          options?.clearUnread
-            ? { clearUnread: true }
-            : { unreadCount: nextUnreadCount },
-        );
-
-        if (normalizeFamilyCode(resolvedFamilyCode) === activeFamilyCodeRef.current) {
-          syncListsFromCache(resolvedFamilyCode);
-        }
-      }
+      const nextUnreadCount = options?.clearUnread
+        ? 0
+        : typeof options?.unreadCount === 'number'
+          ? Number(options.unreadCount)
+          : Number(cachedConversation?.unreadCount || 0);
+      cacheConversationMessage(
+        resolvedFamilyCode,
+        targetConversationId,
+        message,
+        options?.clearUnread
+          ? { clearUnread: true }
+          : { unreadCount: nextUnreadCount },
+      );
+      syncListsFromCache();
 
       if (isSameConversation(targetConversationId, selectedConversationRef.current)) {
         setMessages(nextMessages);
@@ -749,26 +727,20 @@ const ChatPage = () => {
       );
       const cachedConversation = getCachedConversation(targetConversationId);
 
-      if (resolvedFamilyCode) {
-        const nextUnreadCount = options?.clearUnread
-          ? 0
-          : typeof options?.unreadCount === 'number'
-            ? Number(options.unreadCount)
-            : Number(cachedConversation?.unreadCount || 0);
-
-        cacheConversationMessage(
-          resolvedFamilyCode,
-          targetConversationId,
-          message,
-          options?.clearUnread
-            ? { clearUnread: true }
-            : { unreadCount: nextUnreadCount },
-        );
-
-        if (normalizeFamilyCode(resolvedFamilyCode) === activeFamilyCodeRef.current) {
-          syncListsFromCache(resolvedFamilyCode);
-        }
-      }
+      const nextUnreadCount = options?.clearUnread
+        ? 0
+        : typeof options?.unreadCount === 'number'
+          ? Number(options.unreadCount)
+          : Number(cachedConversation?.unreadCount || 0);
+      cacheConversationMessage(
+        resolvedFamilyCode,
+        targetConversationId,
+        message,
+        options?.clearUnread
+          ? { clearUnread: true }
+          : { unreadCount: nextUnreadCount },
+      );
+      syncListsFromCache();
 
       if (isSameConversation(targetConversationId, selectedConversationRef.current)) {
         setMessages(nextMessages);
@@ -801,7 +773,7 @@ const ChatPage = () => {
       );
       const cachedConversation = getCachedConversation(targetConversationId);
 
-      if (resolvedFamilyCode && failedMessage) {
+      if (failedMessage) {
         const nextUnreadCount = options?.clearUnread
           ? 0
           : typeof options?.unreadCount === 'number'
@@ -816,10 +788,7 @@ const ChatPage = () => {
             ? { clearUnread: true }
             : { unreadCount: nextUnreadCount },
         );
-
-        if (normalizeFamilyCode(resolvedFamilyCode) === activeFamilyCodeRef.current) {
-          syncListsFromCache(resolvedFamilyCode);
-        }
+        syncListsFromCache();
       }
 
       if (isSameConversation(targetConversationId, selectedConversationRef.current)) {
@@ -1171,15 +1140,12 @@ const ChatPage = () => {
   const refreshConversationFromServer = useCallback(
     async (payload = {}) => {
       const conversationId = Number(payload?.conversationId || payload?.id || 0);
-      const familyCode = normalizeFamilyCode(
-        payload?.familyCode || resolveConversationFamilyCode(conversationId),
-      );
-      if (!conversationId || !familyCode) {
+      if (!conversationId) {
         return null;
       }
 
       try {
-        const nextConversation = await getConversation(conversationId, familyCode);
+        const nextConversation = await getConversation(conversationId);
         return applyConversationRefresh(nextConversation);
       } catch (error) {
         console.error('Failed to refresh room conversation:', error);
@@ -1192,8 +1158,7 @@ const ChatPage = () => {
   const openChat = useCallback(
     async (conversationId, conversationType = CONVERSATION_TYPES.DIRECT) => {
       const targetConversationId = Number(conversationId || 0);
-      const familyCode = activeFamilyCodeRef.current;
-      if (!targetConversationId || !familyCode) {
+      if (!targetConversationId) {
         return;
       }
 
@@ -1249,12 +1214,11 @@ const ChatPage = () => {
       }
 
       try {
-        const conversationPromise = getConversation(targetConversationId, familyCode);
+        const conversationPromise = getConversation(targetConversationId);
         const messagePromise = getMessages(
           targetConversationId,
           null,
           currentUserId,
-          familyCode,
         );
         const conversationResponse = await conversationPromise;
 
@@ -1285,15 +1249,15 @@ const ChatPage = () => {
           loadingOlder: false,
           initialized: true,
         });
-        syncListsFromCache(familyCode);
+        syncListsFromCache();
         await markConversationReadNow(targetConversationId, { suppressErrors: true });
       } catch (error) {
         if (openRequestIdRef.current === requestId) {
           console.error('Failed to open conversation:', error);
           setResolvedConversationId(null);
           if (isUnavailableConversationError(error)) {
-            removeCachedConversation(targetConversationId, familyCode);
-            syncListsFromCache(familyCode);
+            removeCachedConversation(targetConversationId);
+            syncListsFromCache();
             clearOpenConversation();
           }
         }
@@ -1315,11 +1279,9 @@ const ChatPage = () => {
 
   const loadOlderMessages = useCallback(async () => {
     const targetConversationId = Number(selectedConversationRef.current || 0);
-    const familyCode = activeFamilyCodeRef.current;
     const nextCursor = messagePagination?.nextCursor || null;
     if (
       !targetConversationId ||
-      !familyCode ||
       !nextCursor ||
       !messagePagination?.hasMore ||
       messagePagination?.loadingOlder ||
@@ -1343,7 +1305,6 @@ const ChatPage = () => {
         targetConversationId,
         nextCursor,
         currentUserId,
-        familyCode,
       );
 
       if (!isSameConversation(targetConversationId, selectedConversationRef.current)) {
@@ -1395,14 +1356,7 @@ const ChatPage = () => {
   );
 
   useEffect(() => {
-    if (!hasFamilyScope || !routeConversationIdNumber) {
-      return;
-    }
-
-    if (
-      routeFamilyCode &&
-      routeFamilyCode !== normalizeFamilyCode(activeFamilyCode)
-    ) {
+    if (!routeConversationIdNumber) {
       return;
     }
 
@@ -1425,7 +1379,6 @@ const ChatPage = () => {
   }, [
     conversation,
     conversations,
-    hasFamilyScope,
     openChat,
     rooms,
     routeConversationIdNumber,
@@ -1433,12 +1386,10 @@ const ChatPage = () => {
   ]);
 
   useEffect(() => {
-    const normalizedActiveFamilyCode = normalizeFamilyCode(activeFamilyCode);
     if (
       !isChatConnected ||
       !selectedId ||
-      !resolvedConversationId ||
-      !normalizedActiveFamilyCode
+      !resolvedConversationId
     ) {
       return undefined;
     }
@@ -1447,22 +1398,11 @@ const ChatPage = () => {
       return undefined;
     }
 
-    const selectedConversationFamilyCode = normalizeFamilyCode(
-      conversation?.familyCode || getCachedConversation(selectedId)?.familyCode || '',
-    );
-
-    if (
-      selectedConversationFamilyCode &&
-      selectedConversationFamilyCode !== normalizedActiveFamilyCode
-    ) {
-      return undefined;
-    }
-
     if (selectedType === CONVERSATION_TYPES.DIRECT && !activeChatTargetUserId) {
       return undefined;
     }
 
-    joinConversation(selectedId, normalizedActiveFamilyCode, activeChatTargetUserId);
+    joinConversation(selectedId, conversation?.familyCode, activeChatTargetUserId);
 
     return () => {
       leaveConversation(selectedId);
@@ -1470,7 +1410,6 @@ const ChatPage = () => {
       clearRemoteTyping();
     };
   }, [
-    activeFamilyCode,
     activeChatTargetUserId,
     clearRemoteTyping,
     conversation?.familyCode,
@@ -1664,11 +1603,7 @@ const ChatPage = () => {
             content: 'Message deleted',
           },
         });
-
-        const familyCode = normalizeFamilyCode(nextConversation?.familyCode);
-        if (familyCode === activeFamilyCodeRef.current) {
-          syncListsFromCache(familyCode);
-        }
+        syncListsFromCache();
 
         if (isSameConversation(conversationId, selectedConversationRef.current)) {
           setConversation(nextConversation);
@@ -1722,14 +1657,8 @@ const ChatPage = () => {
       if (!conversationId || !readAt) return;
 
       if (readerUserId === Number(currentUserId || 0)) {
-        if (payload?.familyCode) {
-          markCachedConversationRead(payload.familyCode, conversationId);
-          if (
-            normalizeFamilyCode(payload.familyCode) === activeFamilyCodeRef.current
-          ) {
-            syncListsFromCache(payload.familyCode);
-          }
-        }
+        markCachedConversationRead(payload?.familyCode, conversationId);
+        syncListsFromCache();
         return;
       }
 
@@ -1763,14 +1692,6 @@ const ChatPage = () => {
     };
 
     const handlePresenceSnapshot = (payload = {}) => {
-      const payloadFamilyCode = normalizeFamilyCode(payload?.familyCode);
-      if (
-        payloadFamilyCode &&
-        payloadFamilyCode !== activeFamilyCodeRef.current
-      ) {
-        return;
-      }
-
       const nextPresenceByUserId = {};
       (Array.isArray(payload?.presences) ? payload.presences : []).forEach((entry) => {
         const userId = Number(entry?.userId || 0);
@@ -1788,13 +1709,8 @@ const ChatPage = () => {
     };
 
     const handlePresenceUpdated = (payload = {}) => {
-      const payloadFamilyCode = normalizeFamilyCode(payload?.familyCode);
       const userId = Number(payload?.userId || 0);
-      if (
-        !userId ||
-        (payloadFamilyCode &&
-          payloadFamilyCode !== activeFamilyCodeRef.current)
-      ) {
+      if (!userId) {
         return;
       }
 
@@ -1822,12 +1738,7 @@ const ChatPage = () => {
       }
 
       removeCachedConversation(conversationId, payload?.familyCode);
-      if (
-        payload?.familyCode &&
-        normalizeFamilyCode(payload.familyCode) === activeFamilyCodeRef.current
-      ) {
-        syncListsFromCache(payload.familyCode);
-      }
+      syncListsFromCache();
 
       if (isSameConversation(conversationId, selectedConversationRef.current)) {
         clearOpenConversation({
@@ -1845,12 +1756,7 @@ const ChatPage = () => {
       }
 
       removeCachedConversation(conversationId, payload?.familyCode);
-      if (
-        payload?.familyCode &&
-        normalizeFamilyCode(payload.familyCode) === activeFamilyCodeRef.current
-      ) {
-        syncListsFromCache(payload.familyCode);
-      }
+      syncListsFromCache();
 
       if (isSameConversation(conversationId, selectedConversationRef.current)) {
         clearOpenConversation({
@@ -1905,13 +1811,12 @@ const ChatPage = () => {
   ]);
 
   useEffect(() => {
-    const familyCode = normalizeFamilyCode(activeFamilyCode);
-    if (!socket || !isChatConnected || !familyCode) {
+    if (!socket || !isChatConnected) {
       return;
     }
 
-    joinFamilyRoom(familyCode);
-  }, [activeFamilyCode, isChatConnected, joinFamilyRoom, socket]);
+    joinFamilyRoom();
+  }, [isChatConnected, joinFamilyRoom, socket]);
 
   useEffect(() => {
     if (!socket || !isChatConnected) {
@@ -1923,8 +1828,11 @@ const ChatPage = () => {
 
   const handleTypingActivity = useCallback(() => {
     const conversationId = selectedConversationRef.current;
-    const familyCode = activeFamilyCodeRef.current;
-    if (!conversationId || !familyCode) {
+    const familyCode = resolveConversationFamilyCode(
+      conversationId,
+      activeFamilyCodeRef.current,
+    );
+    if (!conversationId) {
       return;
     }
 
@@ -1938,13 +1846,13 @@ const ChatPage = () => {
     }
 
     localTypingTimeoutRef.current = window.setTimeout(() => {
-      if (localTypingRef.current && conversationId && familyCode) {
+      if (localTypingRef.current && conversationId) {
         emitTyping(conversationId, familyCode, false);
       }
       localTypingRef.current = false;
       localTypingTimeoutRef.current = null;
     }, CHAT_LIMITS.TYPING_TIMEOUT_MS);
-  }, [emitTyping]);
+  }, [emitTyping, resolveConversationFamilyCode]);
 
   const handleTextChange = useCallback(
     (event) => {
@@ -2019,7 +1927,10 @@ const ChatPage = () => {
   const handleSend = useCallback(() => {
     const trimmedText = String(text || '').trim();
     const targetConversationId = Number(selectedId || 0);
-    const familyCodeAtSend = activeFamilyCode;
+    const familyCodeAtSend = resolveConversationFamilyCode(
+      targetConversationId,
+      activeFamilyCode,
+    );
     if (hasAttachmentDraft && attachmentDraft?.file) {
       const attachmentError = validateComposerAttachment(attachmentDraft.file);
       if (attachmentError) {
@@ -2046,7 +1957,6 @@ const ChatPage = () => {
       if (
         !trimmedText ||
         !targetConversationId ||
-        !familyCodeAtSend ||
         conversation?.canSend === false
       ) {
         return;
@@ -2125,6 +2035,7 @@ const ChatPage = () => {
     processTextSendQueue,
     queuePendingTextMessage,
     replyTo,
+    resolveConversationFamilyCode,
     selectedId,
     safeSendMedia,
     stopLocalTyping,
@@ -2136,12 +2047,14 @@ const ChatPage = () => {
   const sendMedia = useCallback(
     async (file, options = {}) => {
       const targetConversationId = Number(selectedId || 0);
-      const familyCodeAtSend = activeFamilyCode;
+      const familyCodeAtSend = resolveConversationFamilyCode(
+        targetConversationId,
+        activeFamilyCode,
+      );
       let optimisticMessageId = 0;
       if (
         !file ||
         !targetConversationId ||
-        !familyCodeAtSend ||
         conversation?.canSend === false ||
         sendingMediaRef.current
       ) {
@@ -2295,6 +2208,7 @@ const ChatPage = () => {
       removePendingMediaMessage,
       replaceConversationMessageUpdate,
       replyTo,
+      resolveConversationFamilyCode,
       selectedId,
       stopLocalTyping,
       text,

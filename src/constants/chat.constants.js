@@ -5,6 +5,7 @@
 
 export const CHAT_API_ENDPOINTS = {
   families: '/chat/families',
+  contacts: '/chat/contacts',
   unreadCount: '/chat/unread/count',
   conversations: '/chat/conversations',
   conversation: (id) => `/chat/conversations/${id}`,

@@ -19,6 +19,15 @@ const normalizeFamilyCode = (familyCode) =>
 const normalizeMembershipType = (value) =>
   String(value || 'member').trim().toLowerCase();
 
+const normalizeRelationshipLabel = (value) => {
+  const normalizedValue = String(value || 'family').trim().toLowerCase();
+  if (['family', 'linked', 'associated'].includes(normalizedValue)) {
+    return normalizedValue;
+  }
+
+  return 'family';
+};
+
 const resolveChatAssetUrl = (value = '') => {
   const raw = String(value || '').trim();
   if (!raw) {
@@ -368,6 +377,52 @@ const normalizeFamilyMember = (member = {}, familyCode = '') => {
   };
 };
 
+const normalizeChatContact = (contact = {}) => {
+  const relationshipLabel = normalizeRelationshipLabel(
+    contact?.relationshipLabel || contact?.relationship,
+  );
+  const membershipType =
+    relationshipLabel === 'linked'
+      ? 'linked'
+      : relationshipLabel === 'associated'
+        ? 'associated'
+        : 'member';
+
+  return {
+    id: Number(contact?.id || contact?.userId || 0),
+    userId: Number(contact?.userId || contact?.id || 0),
+    firstName: contact?.firstName || '',
+    lastName: contact?.lastName || '',
+    name:
+      String(contact?.name || '').trim() ||
+      [contact?.firstName, contact?.lastName].filter(Boolean).join(' ').trim() ||
+      'Family Member',
+    profileUrl: resolveChatAssetUrl(contact?.profileUrl || contact?.profileImage || ''),
+    familyRole:
+      contact?.familyRole ||
+      (relationshipLabel === 'linked'
+        ? 'Linked contact'
+        : relationshipLabel === 'associated'
+          ? 'Associated contact'
+          : 'Family contact'),
+    isFamilyAdmin: Boolean(contact?.isFamilyAdmin),
+    isAppUser: Boolean(contact?.isAppUser),
+    userStatus: Number(contact?.userStatus || contact?.status || 0),
+    membershipType,
+    relationshipLabel,
+    isNotInTree: Boolean(contact?.isNotInTree),
+    familyCode: normalizeFamilyCode(contact?.familyCode),
+    sourceFamilyCode: normalizeFamilyCode(
+      contact?.sourceFamilyCode || contact?.scopeFamilyCode || contact?.familyCode,
+    ),
+    scopeFamilyCode: normalizeFamilyCode(contact?.scopeFamilyCode || contact?.familyCode),
+    blockStatus: contact?.blockStatus || {
+      isBlockedByMe: false,
+      isBlockedByThem: false,
+    },
+  };
+};
+
 export const getChatMemberBadges = (member = {}) => {
   const membershipType = normalizeMembershipType(member?.membershipType);
   const badges = [];
@@ -484,92 +539,74 @@ export const getChatFamilies = async () => {
   };
 };
 
-export const createConversation = async (familyCode, participantUserId) => {
-  const normalizedFamilyCode = requireFamilyCode(
-    familyCode,
-    'create a conversation',
-  );
+export const getChatContacts = async () => {
+  const response = await authFetchResponse(CHAT_API_ENDPOINTS.contacts, {
+    method: 'GET',
+  });
+  const json = await parseJson(response);
+  const contacts = getNestedArray(json, 'contacts').map(normalizeChatContact);
+  const familyContacts = getNestedArray(json, 'familyContacts').map(normalizeChatContact);
+  const linkedContacts = getNestedArray(json, 'linkedContacts').map(normalizeChatContact);
+  const associatedContacts = getNestedArray(json, 'associatedContacts').map(normalizeChatContact);
+
+  return {
+    contacts,
+    familyContacts,
+    linkedContacts,
+    associatedContacts,
+  };
+};
+
+export const createConversation = async (participantUserId, familyCode = '') => {
+  const normalizedFamilyCode = normalizeFamilyCode(familyCode);
   const response = await authFetchResponse(CHAT_API_ENDPOINTS.conversations, {
     method: 'POST',
     body: JSON.stringify({
-      familyCode: normalizedFamilyCode,
       participantUserId,
+      ...(normalizedFamilyCode ? { familyCode: normalizedFamilyCode } : {}),
     }),
   });
   const json = await parseJson(response);
   return normalizeConversation(json?.data || json || {});
 };
 
-export const getConversations = async (familyCode) => {
-  const normalizedFamilyCode = requireFamilyCode(
-    familyCode,
-    'load conversations',
-  );
-  const response = await authFetchResponse(
-    `${CHAT_API_ENDPOINTS.conversations}?familyCode=${encodeURIComponent(normalizedFamilyCode)}`,
-    {
-      method: 'GET',
-    },
-  );
+export const getConversations = async () => {
+  const response = await authFetchResponse(CHAT_API_ENDPOINTS.conversations, {
+    method: 'GET',
+  });
   const json = await parseJson(response);
   return {
     conversations: getNestedArray(json, 'conversations').map(normalizeConversation),
   };
 };
 
-export const getRooms = async (familyCode) => {
-  const normalizedFamilyCode = requireFamilyCode(familyCode, 'load rooms');
-  const response = await authFetchResponse(
-    `${CHAT_API_ENDPOINTS.rooms}?familyCode=${encodeURIComponent(normalizedFamilyCode)}`,
-    {
-      method: 'GET',
-    },
-  );
+export const getRooms = async () => {
+  const response = await authFetchResponse(CHAT_API_ENDPOINTS.rooms, {
+    method: 'GET',
+  });
   const json = await parseJson(response);
   return {
     rooms: getNestedArray(json, 'rooms').map(normalizeConversation),
   };
 };
 
-export const getConversation = async (conversationId, familyCode) => {
-  const normalizedFamilyCode = requireFamilyCode(
-    familyCode,
-    'load conversation details',
-  );
-  const response = await authFetchResponse(
-    `${CHAT_API_ENDPOINTS.conversation(conversationId)}?familyCode=${encodeURIComponent(normalizedFamilyCode)}`,
-    {
-      method: 'GET',
-    },
-  );
+export const getConversation = async (conversationId) => {
+  const response = await authFetchResponse(CHAT_API_ENDPOINTS.conversation(conversationId), {
+    method: 'GET',
+  });
   const json = await parseJson(response);
   return normalizeConversation(json?.data || json || {});
 };
 
-export const getFamilyMembersForChat = async (familyCode) => {
-  const normalizedFamilyCode = requireFamilyCode(
-    familyCode,
-    'load family members for chat',
-  );
-  const response = await authFetchResponse(
-    CHAT_API_ENDPOINTS.familyMembers(normalizedFamilyCode),
-    {
-      method: 'GET',
-    },
-  );
-  const json = await parseJson(response);
-  const members = dedupeFamilyMembersForChat(
-    getNestedArray(json, 'data')
-      .map((member) => normalizeFamilyMember(member, normalizedFamilyCode))
-      .filter(
-        (member) =>
-          member.userId > 0 && member.isAppUser && Number(member.userStatus || 0) === 1,
-      ),
-    normalizedFamilyCode,
-  );
+export const getFamilyMembersForChat = async () => {
+  const response = await getChatContacts();
+  const members = dedupeFamilyMembersForChat(response?.contacts || []);
 
   return {
     members,
+    familyContacts: response?.familyContacts || [],
+    linkedContacts: response?.linkedContacts || [],
+    associatedContacts: response?.associatedContacts || [],
   };
 };
 
@@ -577,14 +614,9 @@ export const getMessages = async (
   conversationId,
   cursor,
   _currentUserId = null,
-  familyCode,
+  familyCode = '',
 ) => {
-  const normalizedFamilyCode = requireFamilyCode(
-    familyCode,
-    'load conversation messages',
-  );
   const params = new URLSearchParams();
-  params.set('familyCode', normalizedFamilyCode);
   if (cursor?.beforeCreatedAt) params.set('beforeCreatedAt', cursor.beforeCreatedAt);
   if (cursor?.beforeId) params.set('beforeId', String(cursor.beforeId));
   params.set('limit', String(cursor?.limit || CHAT_LIMITS.MESSAGES_PER_PAGE));
@@ -610,15 +642,12 @@ export const getMessages = async (
 };
 
 export const sendTextMessage = async (conversationId, familyCode, content, options = {}) => {
-  const normalizedFamilyCode = requireFamilyCode(
-    familyCode,
-    'send a message',
-  );
+  const normalizedFamilyCode = normalizeFamilyCode(familyCode);
   const response = await authFetchResponse(CHAT_API_ENDPOINTS.sendMessage(conversationId), {
     method: 'POST',
     body: JSON.stringify({
-      familyCode: normalizedFamilyCode,
       content,
+      ...(normalizedFamilyCode ? { familyCode: normalizedFamilyCode } : {}),
       replyToId: options?.replyTo?.id || options?.replyToId || null,
       mentionedUserIds: options?.mentionedUserIds || [],
     }),
@@ -634,18 +663,15 @@ export const sendTextMessageSocket = async (
   content,
   options = {},
 ) => {
-  const normalizedFamilyCode = requireFamilyCode(
-    familyCode,
-    'send a message',
-  );
+  const normalizedFamilyCode = normalizeFamilyCode(familyCode);
   return emitChatSocketEvent(
     socket,
     CHAT_SOCKET_EVENTS.SEND_MESSAGE,
     'message-sent',
     {
       conversationId: Number(conversationId),
-      familyCode: normalizedFamilyCode,
       content,
+      ...(normalizedFamilyCode ? { familyCode: normalizedFamilyCode } : {}),
       clientRequestId: options?.clientRequestId || undefined,
       replyToId: options?.replyTo?.id || options?.replyToId || null,
       mentionedUserIds: options?.mentionedUserIds || [],
@@ -657,13 +683,12 @@ export const sendTextMessageSocket = async (
 };
 
 export const sendMediaMessage = async (conversationId, familyCode, file, options = {}) => {
-  const normalizedFamilyCode = requireFamilyCode(
-    familyCode,
-    'send media',
-  );
+  const normalizedFamilyCode = normalizeFamilyCode(familyCode);
   const formData = new FormData();
   formData.append('file', file);
-  formData.append('familyCode', normalizedFamilyCode);
+  if (normalizedFamilyCode) {
+    formData.append('familyCode', normalizedFamilyCode);
+  }
   if (options?.content) {
     formData.append('content', options.content);
   }
@@ -683,14 +708,11 @@ export const sendMediaMessage = async (conversationId, familyCode, file, options
 };
 
 export const markConversationRead = async (conversationId, familyCode, readAt = null) => {
-  const normalizedFamilyCode = requireFamilyCode(
-    familyCode,
-    'mark a conversation as read',
-  );
+  const normalizedFamilyCode = normalizeFamilyCode(familyCode);
   const response = await authFetchResponse(CHAT_API_ENDPOINTS.markRead(conversationId), {
     method: 'PATCH',
     body: JSON.stringify({
-      familyCode: normalizedFamilyCode,
+      ...(normalizedFamilyCode ? { familyCode: normalizedFamilyCode } : {}),
       ...(readAt ? { readAt } : {}),
     }),
   });
@@ -703,17 +725,14 @@ export const markConversationReadSocket = async (
   familyCode,
   readAt = null,
 ) => {
-  const normalizedFamilyCode = requireFamilyCode(
-    familyCode,
-    'mark a conversation as read',
-  );
+  const normalizedFamilyCode = normalizeFamilyCode(familyCode);
   return emitChatSocketEvent(
     socket,
     CHAT_SOCKET_EVENTS.MARK_READ,
     'marked-read',
     {
       conversationId: Number(conversationId),
-      familyCode: normalizedFamilyCode,
+      ...(normalizedFamilyCode ? { familyCode: normalizedFamilyCode } : {}),
       ...(readAt ? { readAt } : {}),
     },
     'mark a conversation as read',
@@ -754,14 +773,11 @@ export const deleteMessageSocket = async (socket, messageId, familyCode) => {
 };
 
 export const toggleMute = async (conversationId, familyCode, isMuted) => {
-  const normalizedFamilyCode = requireFamilyCode(
-    familyCode,
-    'change mute settings',
-  );
+  const normalizedFamilyCode = normalizeFamilyCode(familyCode);
   const response = await authFetchResponse(CHAT_API_ENDPOINTS.muteConversation(conversationId), {
     method: 'PATCH',
     body: JSON.stringify({
-      familyCode: normalizedFamilyCode,
+      ...(normalizedFamilyCode ? { familyCode: normalizedFamilyCode } : {}),
       isMuted: !Boolean(isMuted),
     }),
   });
@@ -770,17 +786,14 @@ export const toggleMute = async (conversationId, familyCode, isMuted) => {
 };
 
 export const toggleMuteSocket = async (socket, conversationId, familyCode, isMuted) => {
-  const normalizedFamilyCode = requireFamilyCode(
-    familyCode,
-    'change mute settings',
-  );
+  const normalizedFamilyCode = normalizeFamilyCode(familyCode);
   return emitChatSocketEvent(
     socket,
     CHAT_SOCKET_EVENTS.TOGGLE_MUTE,
     'mute-updated',
     {
       conversationId: Number(conversationId),
-      familyCode: normalizedFamilyCode,
+      ...(normalizedFamilyCode ? { familyCode: normalizedFamilyCode } : {}),
       isMuted: !Boolean(isMuted),
     },
     'change mute settings',
@@ -793,14 +806,11 @@ export const deleteConversation = async (conversationId, familyCode) => {
 };
 
 export const hideConversation = async (conversationId, familyCode) => {
-  const normalizedFamilyCode = requireFamilyCode(
-    familyCode,
-    'delete a conversation',
-  );
+  const normalizedFamilyCode = normalizeFamilyCode(familyCode);
   const response = await authFetchResponse(CHAT_API_ENDPOINTS.hideConversation(conversationId), {
     method: 'POST',
     body: JSON.stringify({
-      familyCode: normalizedFamilyCode,
+      ...(normalizedFamilyCode ? { familyCode: normalizedFamilyCode } : {}),
     }),
   });
   const json = await parseJson(response);
@@ -826,17 +836,14 @@ export const deleteConversationSocket = async (socket, conversationId, familyCod
 };
 
 export const hideConversationSocket = async (socket, conversationId, familyCode) => {
-  const normalizedFamilyCode = requireFamilyCode(
-    familyCode,
-    'delete a conversation',
-  );
+  const normalizedFamilyCode = normalizeFamilyCode(familyCode);
   return emitChatSocketEvent(
     socket,
     CHAT_SOCKET_EVENTS.HIDE_CONVERSATION,
     CHAT_SOCKET_EVENTS.CONVERSATION_HIDDEN,
     {
       conversationId: Number(conversationId),
-      familyCode: normalizedFamilyCode,
+      ...(normalizedFamilyCode ? { familyCode: normalizedFamilyCode } : {}),
     },
     'delete a conversation',
     (response) => Number(response?.conversationId || 0) === Number(conversationId || 0),
@@ -866,6 +873,7 @@ export const getUnreadChatCount = async () => {
   const json = await parseJson(response);
   return {
     count: Number(json?.count ?? json?.data?.count ?? 0),
+    totalCount: Number(json?.totalCount ?? json?.data?.totalCount ?? json?.count ?? 0),
   };
 };
 
