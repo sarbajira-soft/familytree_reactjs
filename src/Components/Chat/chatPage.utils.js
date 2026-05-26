@@ -32,9 +32,17 @@ export const getMessageReplyPreview = (message) => {
     return null;
   }
 
+  const previewText =
+    String(message?.content || '').trim() ||
+    (message?.messageType === MESSAGE_TYPES.POST_SHARE
+      ? 'Shared a post'
+      : message?.messageType === MESSAGE_TYPES.GALLERY_SHARE
+        ? 'Shared a gallery'
+        : '');
+
   return {
     id: messageId,
-    content: message?.content || '',
+    content: previewText,
     senderName: message?.senderName || '',
   };
 };
@@ -260,7 +268,14 @@ export const buildTypingUserLabel = (names = []) => {
 };
 
 export const getMessageSearchText = (message = {}) =>
-  [message?.content, message?.replyTo?.content, message?.senderName]
+  [
+    message?.content,
+    message?.replyTo?.content,
+    message?.senderName,
+    message?.sharePayload?.previewTitle,
+    message?.sharePayload?.previewText,
+    message?.sharePayload?.creatorName,
+  ]
     .filter(Boolean)
     .join(' ')
     .toLowerCase();

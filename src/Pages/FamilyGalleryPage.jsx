@@ -493,19 +493,16 @@ const FamilyGalleryPage = () => {
                           <div className="flex items-center gap-3 text-xs font-medium text-gray-500">
                              <span className="flex items-center gap-1 ">{album.likeCount || 0} <FiHeart size={14} className="text-red-500" /></span>
                             <span className="flex items-center gap-1">{album.commentCount || 0} <FiMessageCircle size={14} className="text-blue-500" /></span>
-                            {album.privacy === "public" ? (
-                              <button
-                                type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  setShareGallery(album);
-                                }}
-                                className="inline-flex items-center gap-1 rounded-full  px-3 py-1 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-200"
-                              >
-                                <FiShare2 size={14} />
-                                {/* Share */}
-                              </button>
-                            ) : null}
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setShareGallery(album);
+                              }}
+                              className="inline-flex items-center gap-1 rounded-full  px-3 py-1 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-200"
+                            >
+                              <FiShare2 size={14} />
+                            </button>
                            
                           </div>
                         </div>
@@ -577,6 +574,7 @@ const FamilyGalleryPage = () => {
       />
 
       <PublicGalleryShareSheet
+        currentUserId={userInfo?.userId}
         isOpen={Boolean(shareGallery)}
         gallery={shareGallery}
         onClose={() => setShareGallery(null)}

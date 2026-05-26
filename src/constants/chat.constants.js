@@ -37,6 +37,8 @@ export const MESSAGE_TYPES = {
   TEXT: 'text',
   IMAGE: 'image',
   VOICE: 'voice',
+  POST_SHARE: 'post_share',
+  GALLERY_SHARE: 'gallery_share',
   SYSTEM: 'system',
   TOMBSTONE: 'tombstone',
 };

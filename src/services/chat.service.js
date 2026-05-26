@@ -496,12 +496,12 @@ const normalizeConversation = (conversation = {}) => ({
   lastMessage: conversation?.lastMessage
     ? {
         id: Number(conversation.lastMessage.id || 0),
-      content: conversation.lastMessage.content || '',
+        content: conversation.lastMessage.content || '',
       createdAt: conversation.lastMessage.createdAt || null,
       senderId: Number(conversation.lastMessage.senderId || 0),
       senderName: conversation.lastMessage.senderName || '',
       messageType: conversation.lastMessage.messageType || MESSAGE_TYPES.TEXT,
-      mediaUrl: conversation.lastMessage.mediaUrl || '',
+      mediaUrl: resolveChatAssetUrl(conversation.lastMessage.mediaUrl || ''),
     }
     : null,
   unreadCount: Number(conversation?.unreadCount || 0),
@@ -527,7 +527,57 @@ const normalizeConversation = (conversation = {}) => ({
   counterpartyStatus: conversation?.counterpartyStatus || null,
 });
 
-const normalizeMessageResponse = (payload) => payload?.data || payload || null;
+const normalizeSharePayload = (payload = null) => {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+
+  const previewMediaKind = String(payload?.previewMediaKind || '').trim().toLowerCase();
+
+  return {
+    ...payload,
+    shareType: String(payload?.shareType || '').trim().toLowerCase(),
+    entityId: Number(payload?.entityId || 0),
+    shareId: payload?.shareId ? String(payload.shareId) : null,
+    familyCode: normalizeFamilyCode(payload?.familyCode || '') || null,
+    previewTitle: String(payload?.previewTitle || '').trim(),
+    previewText: String(payload?.previewText || '').trim(),
+    previewMediaUrl: resolveChatAssetUrl(payload?.previewMediaUrl || ''),
+    previewMediaKind:
+      previewMediaKind === 'image' || previewMediaKind === 'video' ? previewMediaKind : null,
+    creatorName: String(payload?.creatorName || '').trim(),
+    mediaCount: Number(payload?.mediaCount || 0),
+  };
+};
+
+export const normalizeMessage = (message = null) => {
+  if (!message || typeof message !== 'object') {
+    return null;
+  }
+
+  return {
+    ...message,
+    id: Number(message?.id || 0),
+    conversationId: Number(message?.conversationId || 0),
+    senderId: Number(message?.senderId || 0),
+    content: message?.content ?? null,
+    messageType: message?.messageType || MESSAGE_TYPES.TEXT,
+    mediaUrl: resolveChatAssetUrl(message?.mediaUrl || ''),
+    mediaMimeType: message?.mediaMimeType || '',
+    mediaSize: Number(message?.mediaSize || 0),
+    sharePayload: normalizeSharePayload(message?.sharePayload),
+    replyTo: message?.replyTo
+      ? {
+          ...message.replyTo,
+          id: Number(message.replyTo.id || 0),
+          content: message.replyTo.content || '',
+          senderName: message.replyTo.senderName || '',
+        }
+      : null,
+  };
+};
+
+const normalizeMessageResponse = (payload) => normalizeMessage(payload?.data || payload || null);
 
 export const getChatFamilies = async () => {
   const response = await authFetchResponse(CHAT_API_ENDPOINTS.families, {
@@ -629,9 +679,9 @@ export const getMessages = async (
   );
   const json = await parseJson(response);
   const messages = Array.isArray(json?.messages)
-    ? json.messages
+    ? json.messages.map(normalizeMessage).filter(Boolean)
     : Array.isArray(json?.data?.messages)
-      ? json.data.messages
+      ? json.data.messages.map(normalizeMessage).filter(Boolean)
       : [];
 
   return {
@@ -648,8 +698,10 @@ export const sendTextMessage = async (conversationId, familyCode, content, optio
     body: JSON.stringify({
       content,
       ...(normalizedFamilyCode ? { familyCode: normalizedFamilyCode } : {}),
+      clientRequestId: options?.clientRequestId || undefined,
       replyToId: options?.replyTo?.id || options?.replyToId || null,
       mentionedUserIds: options?.mentionedUserIds || [],
+      ...(options?.sharePayload ? { sharePayload: options.sharePayload } : {}),
     }),
   });
   const json = await parseJson(response);
@@ -675,11 +727,12 @@ export const sendTextMessageSocket = async (
       clientRequestId: options?.clientRequestId || undefined,
       replyToId: options?.replyTo?.id || options?.replyToId || null,
       mentionedUserIds: options?.mentionedUserIds || [],
+      ...(options?.sharePayload ? { sharePayload: options.sharePayload } : {}),
     },
     'send a message',
     (response) => Number(response?.conversationId || 0) === Number(conversationId || 0),
     [CHAT_SOCKET_EVENTS.NEW_MESSAGE],
-  );
+  ).then(normalizeMessage);
 };
 
 export const sendMediaMessage = async (conversationId, familyCode, file, options = {}) => {
@@ -890,6 +943,10 @@ export const getMessagePreviewText = (message) => {
       return 'Photo';
     case MESSAGE_TYPES.VOICE:
       return 'Voice message';
+    case MESSAGE_TYPES.POST_SHARE:
+      return 'Shared a post';
+    case MESSAGE_TYPES.GALLERY_SHARE:
+      return 'Shared a gallery';
     case MESSAGE_TYPES.SYSTEM:
       return 'System message';
     case MESSAGE_TYPES.TOMBSTONE:

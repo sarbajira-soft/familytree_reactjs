@@ -17,6 +17,9 @@ import ChatSidebar from '../Components/Chat/ChatSidebar';
 import ReportMessageModal from '../Components/Chat/ReportMessageModal';
 import ChatRoomMembersModal from '../Components/Chat/ChatRoomMembersModal';
 import ChatPickerModal from '../Components/Chat/ChatPickerModal';
+import ContentUnavailableState from '../Components/ContentUnavailableState';
+import GalleryViewerModal from '../Components/GalleryViewerModal';
+import PostViewerModal from '../Components/PostViewerModal';
 import {
   CHAT_LIMITS,
   CHAT_SOCKET_EVENTS,
@@ -41,6 +44,7 @@ import {
   getFamilyMembersForChat,
   getInitials,
   hideConversation as hideConversationRequest,
+  normalizeMessage,
   hideConversationSocket,
   getMessages,
   getRooms,
@@ -51,6 +55,7 @@ import {
   removeMemberFromRoom,
   removeMemberFromRoomSocket,
   sendMediaMessage,
+  sendTextMessage,
   sendTextMessageSocket,
   toggleMute,
   toggleMuteSocket,
@@ -98,6 +103,8 @@ import {
   validateComposerAttachment,
   validateComposerText,
 } from '../Components/Chat/chatPage.utils';
+import { authFetchResponse } from '../utils/authFetch';
+import { mapGalleryDetail } from '../utils/galleryAdapter';
 import '../Components/Chat/chat.css';
 
 const TEXT_SEND_MAX_RETRIES = 3;
@@ -208,6 +215,9 @@ const ChatPage = () => {
   const [deleteConversationSubmitting, setDeleteConversationSubmitting] = useState(false);
   const [deleteConversationError, setDeleteConversationError] = useState('');
   const [infoPanelOpen, setInfoPanelOpen] = useState(false);
+  const [sharedPostViewer, setSharedPostViewer] = useState(null);
+  const [sharedGalleryViewer, setSharedGalleryViewer] = useState(null);
+  const [sharedUnavailable, setSharedUnavailable] = useState(null);
   const [messageSearchOpen, setMessageSearchOpen] = useState(false);
   const [messageSearchQuery, setMessageSearchQuery] = useState('');
   const [activeMessageSearchIndex, setActiveMessageSearchIndex] = useState(-1);
@@ -954,21 +964,45 @@ const ChatPage = () => {
       while (textSendQueueRef.current.length > 0) {
         const currentEntry = textSendQueueRef.current[0];
         const activeSocket = chatSocketRef.current;
-        if (!activeSocket || !chatSocketReadyRef.current || !activeSocket.connected) {
-          break;
-        }
 
         try {
-          const nextMessage = await sendTextMessageSocket(
-            activeSocket,
-            currentEntry.conversationId,
-            currentEntry.familyCode,
-            currentEntry.content,
-            {
-              clientRequestId: currentEntry.clientRequestId,
-              replyToId: currentEntry.replyToId,
-            },
-          );
+          let nextMessage = null;
+          const canUseSocket =
+            Boolean(activeSocket) &&
+            Boolean(chatSocketReadyRef.current) &&
+            Boolean(activeSocket.connected);
+
+          if (canUseSocket) {
+            try {
+              nextMessage = await sendTextMessageSocket(
+                activeSocket,
+                currentEntry.conversationId,
+                currentEntry.familyCode,
+                currentEntry.content,
+                {
+                  clientRequestId: currentEntry.clientRequestId,
+                  replyToId: currentEntry.replyToId,
+                },
+              );
+            } catch (error) {
+              if (!isSocketTimeoutError(error) && activeSocket?.connected) {
+                throw error;
+              }
+            }
+          }
+
+          if (!nextMessage) {
+            nextMessage = await sendTextMessage(
+              currentEntry.conversationId,
+              currentEntry.familyCode,
+              currentEntry.content,
+              {
+                clientRequestId: currentEntry.clientRequestId,
+                replyToId: currentEntry.replyToId,
+              },
+            );
+          }
+
           if (!nextMessage || !Number(nextMessage?.id || 0)) {
             throw new Error('Message send did not return a valid message payload');
           }
@@ -1494,7 +1528,8 @@ const ChatPage = () => {
     }
 
     const handleNewMessage = (payload = {}) => {
-      const conversationId = Number(payload?.conversationId || 0);
+      const normalizedPayload = normalizeMessage(payload);
+      const conversationId = Number(normalizedPayload?.conversationId || 0);
       if (!conversationId) return;
 
       const cachedConversation = getCachedConversation(conversationId);
@@ -1504,33 +1539,33 @@ const ChatPage = () => {
         selectedConversationRef.current,
       );
       const sentByCurrentUser =
-        Number(payload?.senderId || 0) === Number(currentUserId || 0);
+        Number(normalizedPayload?.senderId || 0) === Number(currentUserId || 0);
       const shouldClearUnread = isActiveConversation || sentByCurrentUser;
       const nextUnreadCount = shouldClearUnread
         ? 0
         : Number(cachedConversation?.unreadCount || 0) + 1;
       const matchingPendingMessage = sentByCurrentUser
-        ? shiftMatchingPendingTextMessage(conversationId, payload)
+        ? shiftMatchingPendingTextMessage(conversationId, normalizedPayload)
         : null;
       const matchingOptimisticMessageId =
         sentByCurrentUser && !matchingPendingMessage
           ? findOptimisticMessageIdByClientRequestId(
               conversationId,
-              payload?.clientRequestId,
+              normalizedPayload?.clientRequestId,
             )
           : null;
       const matchingPendingMediaMessage =
         sentByCurrentUser && !matchingPendingMessage && !matchingOptimisticMessageId
-          ? shiftMatchingPendingMediaMessage(conversationId, payload)
+          ? shiftMatchingPendingMediaMessage(conversationId, normalizedPayload)
           : null;
 
       if (matchingPendingMessage?.tempId) {
         replaceConversationMessageUpdate(
           conversationId,
           matchingPendingMessage.tempId,
-          payload,
+          normalizedPayload,
           {
-            familyCode: payload?.familyCode || cachedConversation?.familyCode,
+            familyCode: normalizedPayload?.familyCode || cachedConversation?.familyCode,
             clearUnread: shouldClearUnread,
             unreadCount: nextUnreadCount,
           },
@@ -1539,9 +1574,9 @@ const ChatPage = () => {
         replaceConversationMessageUpdate(
           conversationId,
           matchingOptimisticMessageId,
-          payload,
+          normalizedPayload,
           {
-            familyCode: payload?.familyCode || cachedConversation?.familyCode,
+            familyCode: normalizedPayload?.familyCode || cachedConversation?.familyCode,
             clearUnread: shouldClearUnread,
             unreadCount: nextUnreadCount,
           },
@@ -1551,23 +1586,23 @@ const ChatPage = () => {
         replaceConversationMessageUpdate(
           conversationId,
           matchingPendingMediaMessage.tempId,
-          payload,
+          normalizedPayload,
           {
-            familyCode: payload?.familyCode || cachedConversation?.familyCode,
+            familyCode: normalizedPayload?.familyCode || cachedConversation?.familyCode,
             clearUnread: shouldClearUnread,
             unreadCount: nextUnreadCount,
           },
         );
       } else {
-        applyConversationMessageUpdate(conversationId, payload, {
-          familyCode: payload?.familyCode || cachedConversation?.familyCode,
+        applyConversationMessageUpdate(conversationId, normalizedPayload, {
+          familyCode: normalizedPayload?.familyCode || cachedConversation?.familyCode,
           clearUnread: shouldClearUnread,
           unreadCount: nextUnreadCount,
         });
       }
 
       if (!hasCachedConversation) {
-        void refreshConversationFromServer(payload);
+        void refreshConversationFromServer(normalizedPayload);
       }
 
       if (isActiveConversation && !sentByCurrentUser) {
@@ -2043,6 +2078,104 @@ const ChatPage = () => {
     attachmentDraft,
     hasAttachmentDraft,
   ]);
+
+  const handleOpenSharedMessage = useCallback(async (message) => {
+    const sharePayload = message?.sharePayload || null;
+    const entityId = Number(sharePayload?.entityId || 0);
+    if (!entityId) {
+      setSharedUnavailable({
+        title: 'This shared content is unavailable',
+        description:
+          'The original post or gallery may have been removed, deleted, or is no longer available to you.',
+      });
+      return;
+    }
+
+    try {
+      if (message?.messageType === MESSAGE_TYPES.POST_SHARE) {
+        const response = await authFetchResponse(`/post/${entityId}`, {
+          method: 'GET',
+          skipThrow: true,
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload?.message || 'This post is unavailable right now.');
+        }
+        const postDetail = payload?.data || payload || {};
+
+        setSharedPostViewer({
+          ...postDetail,
+          author:
+            postDetail?.user?.name ||
+            postDetail?.author ||
+            sharePayload?.creatorName ||
+            'Familyss User',
+          authorId:
+            postDetail?.user?.userId ||
+            postDetail?.authorId ||
+            postDetail?.createdBy ||
+            null,
+          avatar: postDetail?.user?.profile || postDetail?.avatar || '/assets/user.png',
+          caption: postDetail?.caption || '',
+          fullImageUrl:
+            postDetail?.fullImageUrl || postDetail?.postImage || postDetail?.url || '',
+          url: postDetail?.url || postDetail?.postImage || postDetail?.fullImageUrl || '',
+          postVideo: postDetail?.postVideo || '',
+          likes: Number(postDetail?.likes ?? postDetail?.likeCount ?? 0),
+          comments: Number(postDetail?.comments ?? postDetail?.commentCount ?? 0),
+          commentCount: Number(postDetail?.commentCount ?? postDetail?.comments ?? 0),
+          isLiked: Boolean(postDetail?.isLiked),
+          privacy: postDetail?.privacy || '',
+          publicShareId: postDetail?.publicShareId || null,
+          shareUrl: postDetail?.shareUrl || null,
+          time: postDetail?.createdAt ? new Date(postDetail.createdAt).toLocaleString() : '',
+        });
+        return;
+      }
+
+      if (message?.messageType === MESSAGE_TYPES.GALLERY_SHARE) {
+        setSharedGalleryViewer(
+          mapGalleryDetail({
+            id: entityId,
+            familyCode: sharePayload?.familyCode || null,
+            title: sharePayload?.previewTitle || 'Gallery',
+            galleryTitle: sharePayload?.previewTitle || 'Gallery',
+            description: sharePayload?.previewText || '',
+            galleryDescription: sharePayload?.previewText || '',
+            coverPhoto: sharePayload?.previewMediaUrl || '',
+            coverImage: sharePayload?.previewMediaUrl || '',
+            author: sharePayload?.creatorName || 'Familyss User',
+            imageCount: Number(sharePayload?.mediaCount || 0),
+            photosCount: Number(sharePayload?.mediaCount || 0),
+            images: sharePayload?.previewMediaUrl
+              ? [
+                  {
+                    id: `shared-gallery-${entityId}`,
+                    url: sharePayload.previewMediaUrl,
+                    caption: sharePayload?.previewTitle || 'Gallery',
+                    sortOrder: 0,
+                  },
+                ]
+              : [],
+          }),
+        );
+        return;
+      }
+
+      setSharedUnavailable({
+        title: 'This shared content is unavailable',
+        description:
+          'The original post or gallery may have been removed, deleted, or is no longer available to you.',
+      });
+    } catch (error) {
+      setSharedUnavailable({
+        title: 'This shared content is unavailable',
+        description:
+          error?.message ||
+          'The original post or gallery may have been removed, deleted, or is no longer available to you.',
+      });
+    }
+  }, []);
 
   const sendMedia = useCallback(
     async (file, options = {}) => {
@@ -2813,7 +2946,7 @@ const ChatPage = () => {
     setNewConversationError('');
 
     try {
-      const nextConversation = await createConversation(activeFamilyCode, targetUserId);
+      const nextConversation = await createConversation(targetUserId, activeFamilyCode);
       cacheConversation(nextConversation);
       syncListsFromCache(activeFamilyCode);
       setNewConversationOpen(false);
@@ -3461,6 +3594,7 @@ const ChatPage = () => {
               matchIds: messageSearchMatchIds,
               nodeRefs: messageNodeRefs,
               onDeleteMessage: handleDelete,
+              onOpenSharedMessage: handleOpenSharedMessage,
               onScroll: handleMessagesScroll,
               onReply: setReplyTo,
               onReportMessage: setReportMsg,
@@ -3491,6 +3625,46 @@ const ChatPage = () => {
         onDelete={handleConfirmHideConversation}
         onDeleteAndLeave={handleConfirmDeleteAndLeaveGroup}
       />
+
+      <PostViewerModal
+        isOpen={Boolean(sharedPostViewer)}
+        onClose={() => setSharedPostViewer(null)}
+        post={sharedPostViewer}
+        authToken={null}
+        currentUser={userInfo}
+      />
+
+      <GalleryViewerModal
+        isOpen={Boolean(sharedGalleryViewer)}
+        onClose={() => setSharedGalleryViewer(null)}
+        album={sharedGalleryViewer}
+        currentUser={userInfo}
+        authToken={null}
+      />
+
+      {sharedUnavailable ? (
+        <div
+          className="fixed inset-0 z-[95] bg-black/50 backdrop-blur-sm"
+          onClick={() => setSharedUnavailable(null)}
+          role="presentation"
+        >
+          <div className="h-full overflow-y-auto" onClick={(event) => event.stopPropagation()} role="presentation">
+            <ContentUnavailableState
+              title={sharedUnavailable.title}
+              description={sharedUnavailable.description}
+              action={(
+                <button
+                  type="button"
+                  onClick={() => setSharedUnavailable(null)}
+                  className="mt-6 rounded-full bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700"
+                >
+                  Close
+                </button>
+              )}
+            />
+          </div>
+        </div>
+      ) : null}
 
       <ChatPickerModal
         isOpen={newConversationOpen}
