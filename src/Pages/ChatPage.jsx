@@ -3353,9 +3353,7 @@ const ChatPage = () => {
     ? currentRoomMembers.length
     : Number(conversation?.memberCount || currentRoomMembers.length || 0);
   const canManageRoom = Boolean(isGroup && conversation?.canManageRoom);
-  const canManageRoomMembers =
-    canManageRoom &&
-    !['general', 'announcements'].includes(String(conversation?.roomType || '').toLowerCase());
+  const canManageRoomMembers = canManageRoom;
   const canLeaveRoom = Boolean(isGroup && conversation?.canLeaveRoom);
   const roomDisplayName = getRoomDisplayName(conversation);
   const roomTypeLabel = getRoomTypeLabel(conversation?.roomType);

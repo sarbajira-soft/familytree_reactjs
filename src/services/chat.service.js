@@ -1207,10 +1207,6 @@ export const getInitials = (firstName, lastName) => {
 
 export const getRoomIcon = (roomType) => {
   switch (roomType) {
-    case ROOM_TYPES.GENERAL:
-      return '💬';
-    case ROOM_TYPES.ANNOUNCEMENTS:
-      return '📢';
     case ROOM_TYPES.EVENT:
       return '🎉';
     case ROOM_TYPES.CUSTOM:

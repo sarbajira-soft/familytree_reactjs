@@ -361,10 +361,6 @@ export const formatInfoDateTime = (value) => {
 
 export const getRoomTypeLabel = (roomType) => {
   switch (String(roomType || '').trim().toLowerCase()) {
-    case 'general':
-      return 'General room';
-    case 'announcements':
-      return 'Announcements room';
     case 'event':
       return 'Event room';
     case 'custom':
@@ -380,14 +376,6 @@ export const getConversationInfoDescription = (conversation, familyName) => {
 
   if (conversation?.conversationType === 'archived') {
     return `Archived room history preserved for ${resolvedFamilyName}. New messages are disabled.`;
-  }
-
-  if (roomType === 'announcements') {
-    return `Announcements for ${resolvedFamilyName}. Only family admins can post here.`;
-  }
-
-  if (roomType === 'general') {
-    return `General room for everyone in ${resolvedFamilyName}.`;
   }
 
   if (roomType === 'event') {
@@ -408,10 +396,6 @@ export const getRoomDisplayName = (conversation = {}) => {
   }
 
   switch (String(conversation?.roomType || '').trim().toLowerCase()) {
-    case 'general':
-      return 'General';
-    case 'announcements':
-      return 'Announcements';
     case 'event':
       return 'Event';
     case 'custom':

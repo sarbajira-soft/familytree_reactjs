@@ -44,8 +44,6 @@ export const MESSAGE_TYPES = {
 };
 
 export const ROOM_TYPES = {
-  GENERAL: 'general',
-  ANNOUNCEMENTS: 'announcements',
   EVENT: 'event',
   CUSTOM: 'custom',
 };
@@ -66,7 +64,6 @@ export const CONVERSATION_AVAILABILITY_REASONS = {
   ACCOUNT_PENDING_DELETION: 'account_pending_deletion',
   ACCOUNT_SUSPENDED: 'account_suspended',
   ACCOUNT_UNAVAILABLE: 'account_unavailable',
-  ANNOUNCEMENT_ADMIN_ONLY: 'announcement_admin_only',
   FAMILY_CONNECTION_LOST: 'family_connection_lost',
   PARTICIPANT_BLOCKED: 'participant_blocked',
   PARTICIPANT_PENDING_DELETION: 'participant_pending_deletion',

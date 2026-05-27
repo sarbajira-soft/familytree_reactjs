@@ -18,8 +18,7 @@ const ChatListItem = ({ conversation, onClick }) => {
   let avatarCls = 'chat-avatar';
   if (isGroup) {
     avatarCls += ' chat-avatar--room';
-    if (conversation.roomType === 'announcements') avatarCls += ' chat-avatar--announcements';
-    else if (conversation.roomType === 'event') avatarCls += ' chat-avatar--event';
+    if (conversation.roomType === 'event') avatarCls += ' chat-avatar--event';
     else if (conversation.roomType === 'custom') avatarCls += ' chat-avatar--custom';
   }
 
