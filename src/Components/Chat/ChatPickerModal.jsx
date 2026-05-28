@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  FiAlertCircle,
   FiCheck,
   FiSearch,
   FiUser,
+  FiUsers,
   FiX,
 } from 'react-icons/fi';
 import {
@@ -33,6 +35,10 @@ const ChatPickerModal = ({
   searchPlaceholder = 'Search family app users',
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const memberList = useMemo(
+    () => (Array.isArray(members) ? members : []),
+    [members],
+  );
 
   useEffect(() => {
     if (!isOpen) {
@@ -43,10 +49,10 @@ const ChatPickerModal = ({
   const filteredMembers = useMemo(() => {
     const query = String(searchTerm || '').trim().toLowerCase();
     if (!query) {
-      return members;
+      return memberList;
     }
 
-    return members.filter((member) => {
+    return memberList.filter((member) => {
       const haystack = [
         member?.name,
         member?.familyRole,
@@ -60,72 +66,138 @@ const ChatPickerModal = ({
 
       return haystack.includes(query);
     });
-  }, [members, searchTerm]);
+  }, [memberList, searchTerm]);
+
+  const normalizedSelectedIds = useMemo(
+    () =>
+      (Array.isArray(selectedIds) ? selectedIds : [])
+        .map((selectedId) => Number(selectedId || 0))
+        .filter((selectedId) => selectedId > 0),
+    [selectedIds],
+  );
+  const selectedIdSet = useMemo(
+    () => new Set(normalizedSelectedIds),
+    [normalizedSelectedIds],
+  );
+  const selectedMembers = useMemo(
+    () =>
+      memberList.filter((member) =>
+        selectedIdSet.has(Number(member?.userId || 0)),
+      ),
+    [memberList, selectedIdSet],
+  );
+  const selectedCount = normalizedSelectedIds.length;
+  const totalCount = memberList.length;
+  const isSingleSelect = selectionMode === 'single';
+  const hasSearch = String(searchTerm || '').trim().length > 0;
 
   if (!isOpen) {
     return null;
   }
 
   return (
-  <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-3 sm:p-4" role="presentation">
-    <div className="w-full max-w-2xl max-h-[92vh] overflow-hidden flex flex-col rounded-2xl bg-white dark:bg-slate-900 shadow-2xl" role="dialog" aria-modal="true" aria-label={title}>
+  <div
+    className="chat-picker-overlay"
+    onClick={(event) => {
+      if (event.target === event.currentTarget && !isSubmitting) {
+        onClose?.();
+      }
+    }}
+    role="presentation"
+  >
+    <div
+      className="chat-picker-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+    >
+      <div className="chat-picker-hero">
+        <div className="chat-picker-hero__icon" aria-hidden="true">
+          {isSingleSelect ? <FiUser size={20} /> : <FiUsers size={20} />}
+        </div>
 
-      {/* Header */}
-      <div className="flex items-start justify-between border-b border-gray-200 dark:border-slate-700 px-4 py-4 sm:px-5">
-        <div className="min-w-0">
-          <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">{title}</h3>
-
-          {subtitle ? (
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{subtitle}</p>
-          ) : null}
+        <div className="chat-picker-hero__copy">
+          <h3>{title}</h3>
         </div>
 
         <button
           type="button"
-          className="ml-3 rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-800"
+          className="chat-picker-close"
           onClick={onClose}
+          disabled={isSubmitting}
           aria-label="Close"
         >
           <FiX size={18} />
         </button>
       </div>
 
-      {/* Top Content */}
       {topContent ? (
-        <div className="border-b border-gray-100 dark:border-slate-800 px-4 py-3 sm:px-5">
+        <div className="chat-picker-top-content">
           {topContent}
         </div>
       ) : null}
 
-      {/* Search */}
-      <div className="px-4 pt-4 sm:px-5">
-        <label className="flex items-center gap-3 rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-3">
-          <FiSearch size={16} className="text-gray-400" />
+      <div className="chat-picker-toolbar">
+        <label className="chat-picker-search">
+          <FiSearch size={18} />
 
           <input
             type="text"
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
             placeholder={searchPlaceholder}
-            className="w-full bg-transparent text-sm outline-none text-gray-900 dark:text-white placeholder:text-gray-400"
+            aria-label={searchPlaceholder}
           />
+
+          {hasSearch ? (
+            <button
+              type="button"
+              className="chat-picker-search__clear"
+              onClick={() => setSearchTerm('')}
+              aria-label="Clear search"
+            >
+              <FiX size={15} />
+            </button>
+          ) : null}
         </label>
+
+        <div className="chat-picker-summary" aria-live="polite">
+          <span>{filteredMembers.length}/{totalCount}</span>
+          <span>{selectedCount} selected</span>
+        </div>
+
+        {selectedMembers.length > 0 ? (
+          <div className="chat-picker-selected-strip">
+            {selectedMembers.slice(0, 4).map((member) => (
+              <span className="chat-picker-selected-chip" key={`selected-${member.userId}`}>
+                {member.profileUrl ? (
+                  <img src={member.profileUrl} alt="" />
+                ) : (
+                  <span>{getInitials(member.firstName, member.lastName) || <FiUser size={12} />}</span>
+                )}
+                {member.name}
+              </span>
+            ))}
+            {selectedMembers.length > 4 ? (
+              <span className="chat-picker-selected-more">
+                +{selectedMembers.length - 4} more
+              </span>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
-      {/* Error */}
       {error ? (
-        <div className="px-4 pt-3 sm:px-5">
-          <div className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-600 dark:bg-red-500/10 dark:text-red-400">
-            {error}
-          </div>
+        <div className="chat-picker-error">
+          <FiAlertCircle size={17} />
+          <span>{error}</span>
         </div>
       ) : null}
 
-      {/* Members List */}
-      <div className="flex-1 overflow-y-auto px-3 py-4 sm:px-4 custom-scrollbar">
+      <div className="chat-picker-list custom-scrollbar">
         {filteredMembers.length > 0 ? (
           filteredMembers.map((member) => {
-            const isSelected = selectedIds.includes(Number(member?.userId || 0));
+            const isSelected = selectedIdSet.has(Number(member?.userId || 0));
 
             const isDisabled =
               typeof disableMember === 'function'
@@ -149,19 +221,13 @@ const ChatPickerModal = ({
                     onToggleMember?.(member);
                   }
                 }}
-                className={`mb-2 flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left transition-all ${
-                  isSelected
-                    ? 'bg-blue-50 dark:bg-blue-500/10'
-                    : 'hover:bg-gray-100 dark:hover:bg-slate-800'
-                } ${isDisabled ? 'cursor-not-allowed opacity-50' : ''}`}
+                className={`chat-picker-member${isSelected ? ' is-selected' : ''}${isDisabled ? ' is-disabled' : ''}`}
               >
-                {/* Avatar */}
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gray-200 text-sm font-semibold text-gray-700">
+                <div className="chat-picker-member__avatar">
                   {member.profileUrl ? (
                     <img
                       src={member.profileUrl}
                       alt={member.name}
-                      className="h-full w-full object-cover"
                     />
                   ) : (
                     getInitials(member.firstName, member.lastName) || (
@@ -170,15 +236,14 @@ const ChatPickerModal = ({
                   )}
                 </div>
 
-                {/* Meta */}
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="truncate text-sm font-semibold text-gray-900 dark:text-white">
+                <div className="chat-picker-member__meta">
+                  <div className="chat-picker-member__title-row">
+                    <span className="chat-picker-member__name">
                       {member.name}
                     </span>
 
                     {member.isFamilyAdmin ? (
-                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-600 dark:bg-slate-700 dark:text-gray-300">
+                      <span className="chat-picker-member__badge chat-picker-member__badge--admin">
                         Admin
                       </span>
                     ) : null}
@@ -187,32 +252,27 @@ const ChatPickerModal = ({
                       <span
                         key={`${member.userId}-${badge.key}`}
                         title={badge.title}
-                        className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${badge.className}`}
+                        className={`chat-picker-member__badge ${badge.className}`}
                       >
                         {badge.label}
                       </span>
                     ))}
                   </div>
 
-                  <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  <div className="chat-picker-member__role">
                     {getChatMemberMetaText(member)}
                   </div>
 
                   {note ? (
-                    <div className="mt-1 text-xs text-gray-400">
+                    <div className="chat-picker-member__note">
                       {note}
                     </div>
                   ) : null}
                 </div>
 
-                {/* Selection */}
-                <div className={`flex h-5 w-5 items-center justify-center rounded-full border ${
-                  isSelected
-                    ? 'border-blue-600 bg-blue-600 text-white'
-                    : 'border-gray-300'
-                }`}>
-                  {selectionMode === 'single' ? (
-                    <span className="h-2 w-2 rounded-full bg-white" />
+                <div className={`chat-picker-member__select${isSelected ? ' is-selected' : ''}`}>
+                  {isSingleSelect ? (
+                    isSelected ? <span /> : null
                   ) : (
                     isSelected && <FiCheck size={12} />
                   )}
@@ -221,37 +281,48 @@ const ChatPickerModal = ({
             );
           })
         ) : (
-          <div className="flex flex-col items-center justify-center py-14 text-center">
-            <p className="text-base font-semibold text-gray-700 dark:text-gray-200">
-              {emptyStateTitle}
-            </p>
-
-            <span className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              {emptyStateSubtitle}
+          <div className="chat-picker-empty">
+            <div className="chat-picker-empty__icon">
+              <FiSearch size={22} />
+            </div>
+            <p>{hasSearch ? 'No matching members' : emptyStateTitle}</p>
+            <span>
+              {hasSearch
+                ? 'Try a different name or family code.'
+                : emptyStateSubtitle}
             </span>
           </div>
         )}
       </div>
 
-      {/* Footer */}
-      <div className="flex gap-3 border-t border-gray-200 dark:border-slate-700 px-4 py-4 sm:px-5">
-        <button
-          type="button"
-          onClick={onClose}
-          disabled={isSubmitting}
-          className="flex-1 rounded-xl bg-gray-100 px-4 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-200 dark:bg-slate-800 dark:text-gray-200"
-        >
-          Cancel
-        </button>
+      <div className="chat-picker-footer">
+        <div className="chat-picker-footer__hint" aria-live="polite">
+          {selectedCount > 0
+            ? `${selectedCount} ${selectedCount === 1 ? 'person' : 'people'} selected`
+            : isSingleSelect
+              ? 'Select one person to continue'
+              : 'Select people to continue'}
+        </div>
 
-        <button
-          type="button"
-          onClick={onSubmit}
-          disabled={submitDisabled || isSubmitting}
-          className="flex-1 rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {isSubmitting ? 'Please wait...' : submitLabel}
-        </button>
+        <div className="chat-picker-footer__actions">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={isSubmitting}
+            className="chat-picker-btn chat-picker-btn--secondary"
+          >
+            Cancel
+          </button>
+
+          <button
+            type="button"
+            onClick={onSubmit}
+            disabled={submitDisabled || isSubmitting}
+            className="chat-picker-btn chat-picker-btn--primary"
+          >
+            {isSubmitting ? 'Please wait...' : submitLabel}
+          </button>
+        </div>
       </div>
     </div>
   </div>

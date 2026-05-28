@@ -3736,41 +3736,29 @@ const ChatPage = () => {
         searchPlaceholder="Search family app users"
         submitDisabled={!String(createRoomName || '').trim() || createRoomMemberIds.length === 0}
         topContent={(
-          <>
-            <div className="chat-form-group">
+          <div className="chat-picker-room-setup chat-picker-room-setup--simple">
+            <div className="chat-picker-room-setup__header">
               <label className="chat-form-label" htmlFor="chat-create-room-name">
                 Room name
               </label>
-              <input
-                id="chat-create-room-name"
-                className="chat-form-input"
-                type="text"
-                value={createRoomName}
-                onChange={(event) => {
-                  setCreateRoomName(event.target.value);
-                  if (createRoomError) {
-                    setCreateRoomError('');
-                  }
-                }}
-                placeholder="Enter room name"
-                maxLength={100}
-                autoFocus
-              />
+              <span>{String(createRoomName || '').trim().length}/100</span>
             </div>
-            <p className="chat-helper-text">
-              You will be added automatically even if you do not select yourself.
-            </p>
-            {!String(createRoomName || '').trim() ? (
-              <p className="chat-helper-text chat-helper-text--warning">
-                Enter a room name to enable Create room.
-              </p>
-            ) : null}
-            {createRoomMemberIds.length === 0 ? (
-              <p className="chat-helper-text chat-helper-text--warning">
-                Select at least one member to create a room.
-              </p>
-            ) : null}
-          </>
+            <input
+              id="chat-create-room-name"
+              className="chat-form-input"
+              type="text"
+              value={createRoomName}
+              onChange={(event) => {
+                setCreateRoomName(event.target.value);
+                if (createRoomError) {
+                  setCreateRoomError('');
+                }
+              }}
+              placeholder="Enter room name"
+              maxLength={100}
+              autoFocus
+            />
+          </div>
         )}
       />
 
