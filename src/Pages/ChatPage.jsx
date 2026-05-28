@@ -1704,7 +1704,13 @@ const ChatPage = () => {
 
       const nextMessages = cacheMessages(
         conversationId,
-        applyReadReceipt(currentMessages, currentUserId, readerUserId, readAt),
+        applyReadReceipt(
+          currentMessages,
+          currentUserId,
+          readerUserId,
+          readAt,
+          payload?.reader || null,
+        ),
       );
 
       if (isSameConversation(conversationId, selectedConversationRef.current)) {

@@ -75,6 +75,7 @@ export const createOptimisticTextMessage = ({
   deletedAt: null,
   deliveredAt: null,
   readAt: null,
+  seenBy: [],
   clientRequestId: clientRequestId || '',
   replyTo: replyTo || null,
   sendStatus: 'sending',
@@ -189,6 +190,7 @@ export const createOptimisticMediaMessage = ({
   deletedAt: null,
   deliveredAt: null,
   readAt: null,
+  seenBy: [],
   replyTo: replyTo || null,
   sendStatus: 'sending',
 });
@@ -211,21 +213,76 @@ export const markMessageDeleted = (messages = [], messageId) =>
       : message,
   );
 
-export const applyReadReceipt = (messages = [], currentUserId, readerUserId, readAt) => {
+const buildSeenByEntry = (reader = {}, readerUserId, readAt) => {
+  const firstName = String(reader?.firstName || '').trim();
+  const lastName = String(reader?.lastName || '').trim();
+  const name =
+    String(reader?.name || '').trim() ||
+    `${firstName} ${lastName}`.trim() ||
+    'Family Member';
+
+  return {
+    userId: Number(reader?.userId || readerUserId || 0),
+    firstName,
+    lastName,
+    name,
+    profileUrl: reader?.profileUrl || '',
+    readAt,
+  };
+};
+
+const mergeSeenByEntry = (seenBy = [], entry = null) => {
+  const normalizedEntryUserId = Number(entry?.userId || 0);
+  if (!normalizedEntryUserId) {
+    return Array.isArray(seenBy) ? seenBy : [];
+  }
+
+  const currentSeenBy = Array.isArray(seenBy) ? seenBy : [];
+  const hasEntry = currentSeenBy.some(
+    (seenEntry) => Number(seenEntry?.userId || 0) === normalizedEntryUserId,
+  );
+
+  if (!hasEntry) {
+    return [...currentSeenBy, entry];
+  }
+
+  return currentSeenBy.map((seenEntry) =>
+    Number(seenEntry?.userId || 0) === normalizedEntryUserId
+      ? {
+          ...seenEntry,
+          ...entry,
+        }
+      : seenEntry,
+  );
+};
+
+export const applyReadReceipt = (
+  messages = [],
+  currentUserId,
+  readerUserId,
+  readAt,
+  reader = null,
+) => {
   if (Number(readerUserId || 0) === Number(currentUserId || 0)) {
     return Array.isArray(messages) ? messages : [];
   }
 
   const readAtTs = new Date(readAt || 0).getTime();
+  const readerEntry = buildSeenByEntry(reader || {}, readerUserId, readAt);
   return (Array.isArray(messages) ? messages : []).map((message) => {
     const messageTs = new Date(message?.createdAt || 0).getTime();
     if (
       Number(message?.senderId || 0) === Number(currentUserId || 0) &&
       messageTs <= readAtTs
     ) {
+      const currentReadAtTs = new Date(message?.readAt || 0).getTime();
       return {
         ...message,
-        readAt,
+        readAt:
+          !Number.isFinite(currentReadAtTs) || readAtTs > currentReadAtTs
+            ? readAt
+            : message?.readAt,
+        seenBy: mergeSeenByEntry(message?.seenBy, readerEntry),
       };
     }
 

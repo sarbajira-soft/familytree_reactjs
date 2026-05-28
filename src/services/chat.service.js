@@ -550,6 +550,28 @@ const normalizeSharePayload = (payload = null) => {
   };
 };
 
+const normalizeSeenByEntry = (entry = null) => {
+  if (!entry || typeof entry !== 'object') {
+    return null;
+  }
+
+  const firstName = String(entry?.firstName || '').trim();
+  const lastName = String(entry?.lastName || '').trim();
+  const name =
+    String(entry?.name || '').trim() ||
+    `${firstName} ${lastName}`.trim() ||
+    'Family Member';
+
+  return {
+    userId: Number(entry?.userId || entry?.id || 0),
+    firstName,
+    lastName,
+    name,
+    profileUrl: resolveChatAssetUrl(entry?.profileUrl || entry?.profileImage || ''),
+    readAt: entry?.readAt || null,
+  };
+};
+
 export const normalizeMessage = (message = null) => {
   if (!message || typeof message !== 'object') {
     return null;
@@ -574,6 +596,9 @@ export const normalizeMessage = (message = null) => {
           senderName: message.replyTo.senderName || '',
         }
       : null,
+    seenBy: Array.isArray(message?.seenBy)
+      ? message.seenBy.map(normalizeSeenByEntry).filter(Boolean)
+      : [],
   };
 };
 
@@ -1181,6 +1206,25 @@ export const formatFullTime = (dateStr) => {
     minute: '2-digit',
     hour12: true,
   });
+};
+
+export const formatSeenAgo = (dateStr) => {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  const diffMs = Date.now() - date.getTime();
+
+  if (!Number.isFinite(diffMs)) return '';
+
+  const diffMins = Math.floor(diffMs / minute);
+  const diffHours = Math.floor(diffMs / hour);
+  const diffDays = Math.floor(diffMs / (24 * hour));
+
+  if (diffMins < 1) return 'just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+
+  return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 };
 
 export const formatDateSeparator = (dateStr) => {

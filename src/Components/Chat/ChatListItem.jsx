@@ -43,7 +43,7 @@ const ChatListItem = ({ conversation, onClick }) => {
           <span className={`chat-item-time${unread > 0 ? ' unread' : ''}`}>{time}</span>
         </div>
         <div className="chat-item-preview">
-          {isSentByMe && !isGroup && <span className="ticks">✓✓</span>}
+          {isSentByMe && !isGroup && <span className="chat-item-preview-prefix">You: </span>}
           {isGroup && conversation.lastMessage?.senderName && (
             <span style={{ fontWeight: 500, color: '#111b21' }}>{conversation.lastMessage.senderName}: </span>
           )}

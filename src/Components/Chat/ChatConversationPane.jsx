@@ -30,6 +30,7 @@ import {
 } from '../../constants/chat.constants';
 import {
   formatFullTime,
+  formatSeenAgo,
   getInitials,
   getRoomIcon,
 } from '../../services/chat.service';
@@ -38,6 +39,51 @@ import {
   getReceiptState,
   renderHighlightedText,
 } from './chatPage.utils';
+
+const getSeenByEntries = (message = {}, currentUserId) =>
+  (Array.isArray(message?.seenBy) ? message.seenBy : []).filter((entry) => {
+    const entryUserId = Number(entry?.userId || 0);
+    return (
+      entryUserId > 0 &&
+      entryUserId !== Number(currentUserId || 0) &&
+      entryUserId !== Number(message?.senderId || 0)
+    );
+  });
+
+const getSeenByName = (entry = {}) =>
+  String(entry?.name || '').trim() ||
+  `${String(entry?.firstName || '').trim()} ${String(entry?.lastName || '').trim()}`.trim() ||
+  'Family Member';
+
+const getSeenBySummary = (entries = []) => {
+  const names = entries.map(getSeenByName).filter(Boolean);
+  if (names.length <= 3) {
+    return names.join(', ');
+  }
+
+  return `${names.slice(0, 3).join(', ')} +${names.length - 3}`;
+};
+
+const getReceiptText = (receiptState, message = {}) => {
+  if (receiptState === 'failed') {
+    return 'Failed to send';
+  }
+
+  if (receiptState === 'sending') {
+    return 'Sending';
+  }
+
+  if (receiptState === 'seen') {
+    const seenAgo = formatSeenAgo(message?.readAt);
+    return seenAgo ? `Seen ${seenAgo}` : 'Seen';
+  }
+
+  if (receiptState === 'delivered') {
+    return 'Delivered';
+  }
+
+  return receiptState ? 'Sent' : '';
+};
 
 const ChatConversationPane = ({
   chatLoading,
@@ -144,6 +190,26 @@ const ChatConversationPane = ({
     </div>
   );
 }
+
+  const latestSentMessageId = (Array.isArray(messagesPane.groupedMessages)
+    ? messagesPane.groupedMessages
+    : []
+  ).reduce((latestMessageId, item) => {
+    if (item?.type === 'date') {
+      return latestMessageId;
+    }
+
+    const message = item?.data || {};
+    const messageId = Number(message?.id || 0);
+    const isSentByCurrentUser =
+      Number(message?.senderId || 0) === Number(messagesPane.currentUserId || 0);
+    const isUnavailableMessage =
+      Boolean(message?.isDeleted) || message?.messageType === MESSAGE_TYPES.TOMBSTONE;
+
+    return isSentByCurrentUser && !isUnavailableMessage && messageId
+      ? messageId
+      : latestMessageId;
+  }, 0);
 
   return (
     <>
@@ -381,22 +447,23 @@ const ChatConversationPane = ({
                 const isActiveSearchMatch =
                   isSearchMatch && Number(messagesPane.activeSearchId || 0) === messageId;
                 const receiptState = isSent ? getReceiptState(message) : null;
-                const receiptGlyph =
-                  receiptState === 'failed'
-                    ? '!'
-                    : receiptState === 'sending' || receiptState === 'sent'
-                      ? '\u2713'
-                      : '\u2713\u2713';
-                const receiptLabel =
-                  receiptState === 'failed'
-                    ? 'Failed to send'
-                    : receiptState === 'sending'
-                      ? 'Sending'
-                      : receiptState === 'seen'
-                        ? 'Seen'
-                        : receiptState === 'delivered'
-                          ? 'Delivered'
-                          : 'Sent';
+                const shouldShowReceipt = isSent && messageId === latestSentMessageId;
+                const receiptText = getReceiptText(receiptState, message);
+                const seenByEntries = shouldShowReceipt
+                  ? getSeenByEntries(message, messagesPane.currentUserId)
+                  : [];
+                const showRoomSeenBy =
+                  shouldShowReceipt &&
+                  isGroup &&
+                  receiptState === 'seen' &&
+                  seenByEntries.length > 0;
+                const seenBySummary = showRoomSeenBy ? getSeenBySummary(seenByEntries) : '';
+                const showTextReceipt =
+                  shouldShowReceipt &&
+                  receiptState &&
+                  receiptText &&
+                  !showRoomSeenBy &&
+                  (!isGroup || receiptState === 'sending' || receiptState === 'failed');
                 const canDelete =
                   isSent &&
                   !isUnavailableMessage &&
@@ -581,19 +648,41 @@ const ChatConversationPane = ({
                     </div>
 
                     <div
-                      className={`msg-time-row ${isSent ? 'msg-row--sent' : ''}`}
+                      className={`msg-time-row ${isSent ? 'msg-row--sent' : ''}${showRoomSeenBy ? ' msg-time-row--seen-by' : ''}`}
                       style={isSent ? undefined : { paddingLeft: 38 }}
                     >
-                      {formatFullTime(message.createdAt)}
-                      {isSent && receiptState && (
+                      <span>{formatFullTime(message.createdAt)}</span>
+                      {showRoomSeenBy ? (
+                        <span
+                          className="msg-seen-by"
+                          title={`Seen by ${seenBySummary}`}
+                          aria-label={`Seen by ${seenBySummary}`}
+                        >
+                          <span className="msg-seen-by__avatars" aria-hidden="true">
+                            {seenByEntries.slice(0, 5).map((entry) => {
+                              const seenUserName = getSeenByName(entry);
+                              return (
+                                <span className="msg-seen-by__avatar" key={entry.userId}>
+                                  {entry.profileUrl ? (
+                                    <img src={entry.profileUrl} alt="" />
+                                  ) : (
+                                    getInitials(entry.firstName || seenUserName, entry.lastName)
+                                  )}
+                                </span>
+                              );
+                            })}
+                          </span>
+                          <span>Seen by {seenBySummary}</span>
+                        </span>
+                      ) : showTextReceipt ? (
                         <span
                           className={`msg-receipt msg-receipt--${receiptState}`}
-                          title={receiptLabel}
-                          aria-label={receiptLabel}
+                          title={receiptText}
+                          aria-label={receiptText}
                         >
-                          {receiptGlyph}
+                          {receiptText}
                         </span>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                 );
