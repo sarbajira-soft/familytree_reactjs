@@ -45,8 +45,9 @@ export const ChatProvider = ({ children }) => {
   const { userInfo } = useUser();
   const [unreadChatCount, setUnreadChatCount] = useState(0);
   const [families, setFamilies] = useState([]);
-  const [activeFamilyCode, setActiveFamilyCode] = useState('');
-  const joinedFamilyCodeRef = useRef('');
+  const [activeFamilyCode, setActiveFamilyCode] = useState(
+    normalizeFamilyCode(userInfo?.familyCode),
+  );
   const previousUserIdRef = useRef(null);
   const activeConversationStateRef = useRef({
     conversationId: null,
@@ -84,7 +85,7 @@ export const ChatProvider = ({ children }) => {
     if (!userInfo?.userId) return;
     try {
       const data = await getUnreadChatCount();
-      setUnreadChatCount(Number(data?.count || 0));
+      setUnreadChatCount(Number(data?.totalCount ?? data?.count ?? 0));
     } catch (error) {
       console.warn('Chat unread count refresh failed:', error);
     }
@@ -127,21 +128,26 @@ export const ChatProvider = ({ children }) => {
   }, [userInfo?.familyCode, userInfo?.userId]);
 
   useEffect(() => {
+    const preferredFamilyCode = normalizeFamilyCode(userInfo?.familyCode);
+    if (preferredFamilyCode) {
+      setActiveFamilyCode(preferredFamilyCode);
+    }
+  }, [userInfo?.familyCode]);
+
+  useEffect(() => {
     refreshUnreadCount();
     refreshFamilies();
   }, [refreshFamilies, refreshUnreadCount]);
 
   const joinConversation = useCallback(
     (conversationId, familyCode = activeFamilyCode, targetUserId = null) => {
-      if (!socket || !socket.connected || !conversationId || !familyCode) return false;
+      if (!socket || !socket.connected || !conversationId) return false;
       const normalizedConversationId = Number(conversationId);
-      const normalizedFamilyCode = normalizeFamilyCode(familyCode);
       const normalizedTargetUserId = Number(targetUserId || 0) || null;
       const currentState = activeConversationStateRef.current;
 
       if (
         Number(currentState.conversationId || 0) === normalizedConversationId &&
-        normalizeFamilyCode(currentState.familyCode) === normalizedFamilyCode &&
         Number(currentState.targetUserId || 0) === Number(normalizedTargetUserId || 0)
       ) {
         return false;
@@ -149,7 +155,6 @@ export const ChatProvider = ({ children }) => {
 
       socket.emit(CHAT_SOCKET_EVENTS.JOIN_CONVERSATION, {
         conversationId: normalizedConversationId,
-        familyCode: normalizedFamilyCode,
       });
       socket.emit('chat_opened', {
         conversationId: normalizedConversationId,
@@ -157,7 +162,7 @@ export const ChatProvider = ({ children }) => {
       });
       activeConversationStateRef.current = {
         conversationId: normalizedConversationId,
-        familyCode: normalizedFamilyCode,
+        familyCode: normalizeFamilyCode(familyCode),
         targetUserId: normalizedTargetUserId,
       };
       setActivePushConversationId(normalizedConversationId);
@@ -220,28 +225,17 @@ export const ChatProvider = ({ children }) => {
   );
 
   const joinFamilyRoom = useCallback(
-    (familyCode = activeFamilyCode) => {
-      if (!socket || !familyCode) return;
-      socket.emit(CHAT_SOCKET_EVENTS.JOIN_FAMILY_ROOM, {
-        familyCode,
-      });
-    },
-    [activeFamilyCode, socket],
+    () => {},
+    [],
   );
 
   const leaveFamilyRoom = useCallback(
-    (familyCode = activeFamilyCode) => {
-      if (!socket || !familyCode) return;
-      socket.emit(CHAT_SOCKET_EVENTS.LEAVE_FAMILY_ROOM, {
-        familyCode,
-      });
-    },
-    [activeFamilyCode, socket],
+    () => {},
+    [],
   );
 
   useEffect(() => {
     if (!socket || !isConnected) {
-      joinedFamilyCodeRef.current = '';
       activeConversationStateRef.current = {
         conversationId: null,
         familyCode: '',
@@ -249,43 +243,28 @@ export const ChatProvider = ({ children }) => {
       };
       return undefined;
     }
-
-    const normalizedFamilyCode = normalizeFamilyCode(activeFamilyCode);
-    if (!normalizedFamilyCode) {
-      return undefined;
-    }
-
-    joinFamilyRoom(normalizedFamilyCode);
-    joinedFamilyCodeRef.current = normalizedFamilyCode;
-
-    return () => {
-      leaveFamilyRoom(normalizedFamilyCode);
-      if (joinedFamilyCodeRef.current === normalizedFamilyCode) {
-        joinedFamilyCodeRef.current = '';
-      }
-    };
-  }, [activeFamilyCode, isConnected, joinFamilyRoom, leaveFamilyRoom, socket]);
+    return undefined;
+  }, [isConnected, socket]);
 
   const emitTyping = useCallback(
     (conversationId, familyCode = activeFamilyCode, isTyping = true) => {
-      if (!socket || !conversationId || !familyCode) return;
-      socket.emit(
-        isTyping ? CHAT_SOCKET_EVENTS.TYPING_START : CHAT_SOCKET_EVENTS.TYPING_STOP,
-        {
-          conversationId: Number(conversationId),
-          familyCode,
-        },
-      );
+      if (!socket || !conversationId) return;
+      const normalizedFamilyCode = normalizeFamilyCode(familyCode);
+      socket.emit(isTyping ? CHAT_SOCKET_EVENTS.TYPING_START : CHAT_SOCKET_EVENTS.TYPING_STOP, {
+        conversationId: Number(conversationId),
+        ...(normalizedFamilyCode ? { familyCode: normalizedFamilyCode } : {}),
+      });
     },
     [activeFamilyCode, socket],
   );
 
   const markConversationReadSocket = useCallback(
     (conversationId, familyCode = activeFamilyCode, readAt = null) => {
-      if (!socket || !conversationId || !familyCode) return;
+      if (!socket || !conversationId) return;
+      const normalizedFamilyCode = normalizeFamilyCode(familyCode);
       socket.emit(CHAT_SOCKET_EVENTS.MARK_READ, {
         conversationId: Number(conversationId),
-        familyCode,
+        ...(normalizedFamilyCode ? { familyCode: normalizedFamilyCode } : {}),
         ...(readAt ? { readAt } : {}),
       });
     },

@@ -442,16 +442,14 @@ const PostViewerModal = ({
                     <span className="flex items-center gap-2 px-4 py-2 rounded-full bg-gray-200 text-gray-700">
                       <FaCommentDots size={18} /> {totalCommentCount}
                     </span>
-                    {String(post?.privacy || "").toLowerCase() === "public" ? (
-                      <button
-                        type="button"
-                        onClick={() => setShareSheetOpen(true)}
-                        className="flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition"
-                      >
-                        <FiShare2 size={18} />
-                        <span>Share</span>
-                      </button>
-                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => setShareSheetOpen(true)}
+                      className="flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition"
+                    >
+                      <FiShare2 size={18} />
+                      <span>Share</span>
+                    </button>
                   </div>
                 </div>
 
@@ -614,6 +612,7 @@ const PostViewerModal = ({
       </AnimatePresence>
 
       <PublicPostShareSheet
+        currentUserId={currentUserId}
         isOpen={shareSheetOpen}
         post={post}
         onClose={() => setShareSheetOpen(false)}

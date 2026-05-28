@@ -616,16 +616,14 @@ const GalleryViewerModal = ({
                     <span className="flex items-center gap-2 px-4 py-2 rounded-full bg-gray-200 text-gray-700">
                       <FaCommentDots size={18} /> {totalCommentCount}
                     </span>
-                    {activeAlbum?.privacy === "public" ? (
-                      <button
-                        type="button"
-                        onClick={() => setIsShareSheetOpen(true)}
-                        className="flex items-center gap-2 rounded-full bg-gray-200 px-4 py-2 text-gray-700 transition hover:bg-gray-300"
-                      >
-                        <FiShare2 size={18} />
-                        <span>Share</span>
-                      </button>
-                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => setIsShareSheetOpen(true)}
+                      className="flex items-center gap-2 rounded-full bg-gray-200 px-4 py-2 text-gray-700 transition hover:bg-gray-300"
+                    >
+                      <FiShare2 size={18} />
+                      <span>Share</span>
+                    </button>
                   </div>
                 </div>
 
@@ -834,6 +832,7 @@ const GalleryViewerModal = ({
         )}
       </AnimatePresence>
       <PublicGalleryShareSheet
+        currentUserId={currentUserId}
         isOpen={isShareSheetOpen}
         gallery={activeAlbum}
         onClose={() => setIsShareSheetOpen(false)}

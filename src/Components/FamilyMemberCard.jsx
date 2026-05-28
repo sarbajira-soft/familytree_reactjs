@@ -528,7 +528,7 @@ const FamilyMemberCard = ({ familyCode, token, onViewMember, currentUser }) => {
     setChatStartingStates((prev) => ({ ...prev, [stateKey]: true }));
 
     try {
-      const conversation = await createConversation(requestFamilyCode, targetUserId);
+      const conversation = await createConversation(targetUserId, requestFamilyCode);
       const conversationId = Number(conversation?.id || 0);
       const resolvedFamilyCode = normalizeFamilyCode(conversation?.familyCode || requestFamilyCode);
 
