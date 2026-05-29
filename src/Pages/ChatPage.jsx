@@ -2467,7 +2467,7 @@ const ChatPage = () => {
     setSelectedRoomMemberIds([]);
 
     try {
-      await loadFamilyMembers();
+      await loadFamilyMembers(true);
     } catch (error) {
       console.error('Failed to load room members:', error);
       setRoomMembersError(error?.message || 'Failed to load family members');
@@ -2933,7 +2933,7 @@ const ChatPage = () => {
     setNewConversationMemberId(null);
 
     try {
-      await loadFamilyMembers();
+      await loadFamilyMembers(true);
       setNewConversationOpen(true);
     } catch (error) {
       console.error('Failed to load family members for direct chat:', error);
@@ -2981,7 +2981,7 @@ const ChatPage = () => {
     setCreateRoomMemberIds([]);
 
     try {
-      await loadFamilyMembers();
+      await loadFamilyMembers(true);
       setCreateRoomOpen(true);
     } catch (error) {
       console.error('Failed to load family members for room creation:', error);
