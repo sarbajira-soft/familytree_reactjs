@@ -3474,6 +3474,108 @@ const ChatPage = () => {
   const desktopInfoPanel = <ChatInfoPanel {...infoPanelProps} />;
   const mobileInfoPanel = <ChatInfoPanel {...infoPanelProps} mobile />;
 
+  const composerProps = useMemo(() => ({
+    attachmentDraft,
+    fileInputRef,
+    hasAttachmentDraft,
+    hasText: hasComposerText,
+    inputRef,
+    isDisabled: isComposerDisabled,
+    onClearAttachment: () => setAttachmentDraft(null),
+    onClearReply: () => setReplyTo(null),
+    onEmojiSelect: handleEmojiSelect,
+    onFileChange: handleFileChange,
+    onKeyDown: handleComposerKeyDown,
+    onOpenAttachmentPicker: handleOpenAttachmentPicker,
+    onRoomPhotoChange: handleRoomPhotoChange,
+    onSend: handleSend,
+    onStageAttachment: handleStageAttachment,
+    onTextBlur: stopLocalTyping,
+    onTextChange: handleTextChange,
+    onTogglePicker: handleToggleComposerPicker,
+    placeholder: composerPlaceholder,
+    ref: composerRef,
+    replyTo,
+    roomPhotoInputRef,
+    showPicker: showComposerPicker,
+    text,
+  }), [attachmentDraft, hasComposerText, isComposerDisabled, handleEmojiSelect, handleFileChange, handleComposerKeyDown, handleOpenAttachmentPicker, handleRoomPhotoChange, handleSend, handleStageAttachment, stopLocalTyping, handleTextChange, handleToggleComposerPicker, composerPlaceholder, replyTo, showComposerPicker, text]);
+
+  const headerProps = useMemo(() => ({
+    activeParticipant,
+    hasFamilyScope,
+    initials: headerInitials,
+    name: headerName,
+    onBack: handleBack,
+    badgeLabel: headerBadgeLabel,
+    onHeaderSearch: handleHeaderSearch,
+    onOpenInfoPanel: handleOpenInfoPanel,
+    roomAvatarUrl,
+    showOnline: showHeaderOnline,
+    statusLabel: headerStatusLabel,
+  }), [activeParticipant, hasFamilyScope, headerInitials, headerName, handleBack, headerBadgeLabel, handleHeaderSearch, handleOpenInfoPanel, roomAvatarUrl, showHeaderOnline, headerStatusLabel]);
+
+  const infoPanelObj = useMemo(() => ({
+    desktopNode: desktopInfoPanel,
+    mobileNode: mobileInfoPanel,
+    onOverlayClose: handleCloseInfoPanel,
+    showDesktop: showDesktopInfoPanel,
+    showMobile: showMobileInfoPanel,
+  }), [desktopInfoPanel, mobileInfoPanel, handleCloseInfoPanel, showDesktopInfoPanel, showMobileInfoPanel]);
+
+  const menuProps = useMemo(() => ({
+    canLeaveRoom,
+    canManageRoom,
+    canManageRoomMembers,
+    leavingRoom,
+    onDeleteConversation: handleDeleteConversation,
+    onDeleteRoom: handleDeleteRoom,
+    onLeaveRoom: handleLeaveRoom,
+    onMute: handleMute,
+    onOpenRoomMembers: handleOpenRoomMembers,
+    onOpenRoomPhotoPicker: handleOpenRoomPhotoPicker,
+    onRemoveRoomPhoto: handleRemoveRoomPhoto,
+    onRenameRoom: handleRenameRoom,
+    onToggle: () => setMenuOpen((current) => !current),
+    open: menuOpen,
+    ref: menuRef,
+    roomPhotoUploading,
+  }), [canLeaveRoom, canManageRoom, canManageRoomMembers, leavingRoom, handleDeleteConversation, handleDeleteRoom, handleLeaveRoom, handleMute, handleOpenRoomMembers, handleOpenRoomPhotoPicker, handleRemoveRoomPhoto, handleRenameRoom, menuOpen, roomPhotoUploading]);
+
+  const messageSearchProps = useMemo(() => ({
+    activeIndex: activeMessageSearchIndex,
+    inputRef: messageSearchInputRef,
+    onClose: () => {
+      setMessageSearchOpen(false);
+      setMessageSearchQuery('');
+      setActiveMessageSearchIndex(-1);
+    },
+    onCycle: handleCycleMessageSearch,
+    onKeyDown: handleMessageSearchKeyDown,
+    onQueryChange: setMessageSearchQuery,
+    open: messageSearchOpen,
+    query: messageSearchQuery,
+    total: messageSearchMatches.length,
+  }), [activeMessageSearchIndex, handleCycleMessageSearch, handleMessageSearchKeyDown, messageSearchOpen, messageSearchQuery, messageSearchMatches.length]);
+
+  const messagesPaneProps = useMemo(() => ({
+    containerRef: messagesContainerRef,
+    activeSearchId: activeMessageSearchId,
+    currentUserId,
+    endRef: messagesEndRef,
+    groupedMessages,
+    hasOlderMessages: messagePagination.hasMore,
+    hasResolvedHistory: messagePagination.initialized,
+    isLoadingOlderMessages: messagePagination.loadingOlder,
+    matchIds: messageSearchMatchIds,
+    nodeRefs: messageNodeRefs,
+    onDeleteMessage: handleDelete,
+    onOpenSharedMessage: handleOpenSharedMessage,
+    onScroll: handleMessagesScroll,
+    onReply: setReplyTo,
+    onReportMessage: setReportMsg,
+  }), [activeMessageSearchId, currentUserId, groupedMessages, messagePagination.hasMore, messagePagination.initialized, messagePagination.loadingOlder, messageSearchMatchIds, handleDelete, handleOpenSharedMessage, handleMessagesScroll]);
+
   return (
     <div className="chat-split" id="chat-page">
       {showSidebar ? (
@@ -3502,110 +3604,20 @@ const ChatPage = () => {
         <div className="chat-main">
           <ChatConversationPane
             chatLoading={chatLoading}
-            composer={{
-              attachmentDraft,
-              fileInputRef,
-              hasAttachmentDraft,
-              hasText: hasComposerText,
-              inputRef,
-              isDisabled: isComposerDisabled,
-              onClearAttachment: () => setAttachmentDraft(null),
-              onClearReply: () => setReplyTo(null),
-              onEmojiSelect: handleEmojiSelect,
-              onFileChange: handleFileChange,
-              onKeyDown: handleComposerKeyDown,
-              onOpenAttachmentPicker: handleOpenAttachmentPicker,
-              onRoomPhotoChange: handleRoomPhotoChange,
-              onSend: handleSend,
-              onStageAttachment: handleStageAttachment,
-              onTextBlur: stopLocalTyping,
-              onTextChange: handleTextChange,
-              onTogglePicker: handleToggleComposerPicker,
-              placeholder: composerPlaceholder,
-              ref: composerRef,
-              replyTo,
-              roomPhotoInputRef,
-              showPicker: showComposerPicker,
-              text,
-            }}
+            composer={composerProps}
             conversation={conversation}
             directChatBadges={directChatBadges}
-            header={{
-              activeParticipant,
-              hasFamilyScope,
-              initials: headerInitials,
-              name: headerName,
-              onBack: handleBack,
-              badgeLabel: headerBadgeLabel,
-              onHeaderSearch: handleHeaderSearch,
-              onOpenInfoPanel: handleOpenInfoPanel,
-              roomAvatarUrl,
-              showOnline: showHeaderOnline,
-              statusLabel: headerStatusLabel,
-            }}
-            infoPanel={{
-              desktopNode: desktopInfoPanel,
-              mobileNode: mobileInfoPanel,
-              onOverlayClose: handleCloseInfoPanel,
-              showDesktop: showDesktopInfoPanel,
-              showMobile: showMobileInfoPanel,
-            }}
+            header={headerProps}
+            infoPanel={infoPanelObj}
             isChatConnected={isChatConnected}
             isGroup={isGroup}
             isMobile={isMobile}
-            menu={{
-              canLeaveRoom,
-              canManageRoom,
-              canManageRoomMembers,
-              leavingRoom,
-              onDeleteConversation: handleDeleteConversation,
-              onDeleteRoom: handleDeleteRoom,
-              onLeaveRoom: handleLeaveRoom,
-              onMute: handleMute,
-              onOpenRoomMembers: handleOpenRoomMembers,
-              onOpenRoomPhotoPicker: handleOpenRoomPhotoPicker,
-              onRemoveRoomPhoto: handleRemoveRoomPhoto,
-              onRenameRoom: handleRenameRoom,
-              onToggle: () => setMenuOpen((current) => !current),
-              open: menuOpen,
-              ref: menuRef,
-              roomPhotoUploading,
-            }}
-            messageSearch={{
-              activeIndex: activeMessageSearchIndex,
-              inputRef: messageSearchInputRef,
-              onClose: () => {
-                setMessageSearchOpen(false);
-                setMessageSearchQuery('');
-                setActiveMessageSearchIndex(-1);
-              },
-              onCycle: handleCycleMessageSearch,
-              onKeyDown: handleMessageSearchKeyDown,
-              onQueryChange: setMessageSearchQuery,
-              open: messageSearchOpen,
-              query: messageSearchQuery,
-              total: messageSearchMatches.length,
-            }}
-            messagesPane={{
-              containerRef: messagesContainerRef,
-              activeSearchId: activeMessageSearchId,
-              currentUserId,
-              endRef: messagesEndRef,
-              groupedMessages,
-              hasOlderMessages: messagePagination.hasMore,
-              hasResolvedHistory: messagePagination.initialized,
-              isLoadingOlderMessages: messagePagination.loadingOlder,
-              matchIds: messageSearchMatchIds,
-              nodeRefs: messageNodeRefs,
-              onDeleteMessage: handleDelete,
-              onOpenSharedMessage: handleOpenSharedMessage,
-              onScroll: handleMessagesScroll,
-              onReply: setReplyTo,
-              onReportMessage: setReportMsg,
-              typingLabel,
-              typingUserIds,
-            }}
+            menu={menuProps}
+            messageSearch={messageSearchProps}
+            messagesPane={messagesPaneProps}
             selectedId={selectedId}
+            typingLabel={typingLabel}
+            typingUserIds={typingUserIds}
           />
         </div>
       ) : null}
