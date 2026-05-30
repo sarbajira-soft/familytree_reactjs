@@ -14,7 +14,6 @@ import ChatConversationPane from '../Components/Chat/ChatConversationPane';
 import ChatDeleteConversationModal from '../Components/Chat/ChatDeleteConversationModal';
 import ChatInfoPanel from '../Components/Chat/ChatInfoPanel';
 import ChatSidebar from '../Components/Chat/ChatSidebar';
-import ReportMessageModal from '../Components/Chat/ReportMessageModal';
 import ChatRoomMembersModal from '../Components/Chat/ChatRoomMembersModal';
 import ChatPickerModal from '../Components/Chat/ChatPickerModal';
 import ContentUnavailableState from '../Components/ContentUnavailableState';
@@ -194,7 +193,6 @@ const ChatPage = () => {
   const [chatLoading, setChatLoading] = useState(false);
   const [replyTo, setReplyTo] = useState(null);
   const [attachmentDraft, setAttachmentDraft] = useState(null);
-  const [reportMsg, setReportMsg] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [text, setText] = useState('');
   const [showComposerPicker, setShowComposerPicker] = useState(false);
@@ -247,6 +245,7 @@ const ChatPage = () => {
   const messageSearchInputRef = useRef(null);
   const fileInputRef = useRef(null);
   const roomPhotoInputRef = useRef(null);
+  const virtuosoRef = useRef(null);
   const openRequestIdRef = useRef(0);
   const selectedConversationRef = useRef(null);
   const activeFamilyCodeRef = useRef(normalizeFamilyCode(activeFamilyCode));
@@ -502,9 +501,7 @@ const ChatPage = () => {
     setReplyTo(null);
     setAttachmentDraft(null);
     setMenuOpen(false);
-    setReportMsg(null);
-    setInfoPanelOpen(false);
-    setShowComposerPicker(false);
+    setInfoPanelOpen(false);    setShowComposerPicker(false);
     setText('');
     setRoomNameEditorOpen(false);
     setRoomNameDraft('');
@@ -531,7 +528,6 @@ const ChatPage = () => {
       setReplyTo(null);
       setAttachmentDraft(null);
       setMenuOpen(false);
-      setReportMsg(null);
       setInfoPanelOpen(false);
       setShowComposerPicker(false);
       setText('');
@@ -1214,7 +1210,6 @@ const ChatPage = () => {
       setAttachmentDraft(null);
       setText('');
       setMenuOpen(false);
-      setReportMsg(null);
       setInfoPanelOpen(false);
       setMessageSearchOpen(false);
       setMessageSearchQuery('');
@@ -2084,6 +2079,37 @@ const ChatPage = () => {
     attachmentDraft,
     hasAttachmentDraft,
   ]);
+
+  const handleRetryMessage = useCallback((failedMessage) => {
+    if (!failedMessage || failedMessage.sendStatus !== 'failed') return;
+    
+    const targetConversationId = Number(failedMessage.conversationId || selectedId || 0);
+    const familyCodeAtSend = resolveConversationFamilyCode(targetConversationId, activeFamilyCode);
+    const clientRequestId = `retry-message:${targetConversationId}:${Date.now()}:${Math.random().toString(36).slice(2, 10)}`;
+    
+    applyConversationMessageUpdate(
+      targetConversationId,
+      {
+        ...failedMessage,
+        clientRequestId,
+        sendStatus: 'sending',
+      },
+      { clearUnread: false }
+    );
+    
+    textSendQueueRef.current.push({
+      attemptCount: 0,
+      clientRequestId,
+      content: failedMessage.content,
+      conversationId: targetConversationId,
+      familyCode: familyCodeAtSend,
+      replyPreview: failedMessage.replyTo,
+      replyToId: failedMessage.replyTo?.id || null,
+      tempId: failedMessage.id,
+    });
+    
+    void processTextSendQueue();
+  }, [selectedId, activeFamilyCode, resolveConversationFamilyCode, applyConversationMessageUpdate, processTextSendQueue]);
 
   const handleOpenSharedMessage = useCallback(async (message) => {
     const sharePayload = message?.sharePayload || null;
@@ -3559,6 +3585,7 @@ const ChatPage = () => {
   }), [activeMessageSearchIndex, handleCycleMessageSearch, handleMessageSearchKeyDown, messageSearchOpen, messageSearchQuery, messageSearchMatches.length]);
 
   const messagesPaneProps = useMemo(() => ({
+    virtuosoRef,
     containerRef: messagesContainerRef,
     activeSearchId: activeMessageSearchId,
     currentUserId,
@@ -3573,8 +3600,8 @@ const ChatPage = () => {
     onOpenSharedMessage: handleOpenSharedMessage,
     onScroll: handleMessagesScroll,
     onReply: setReplyTo,
-    onReportMessage: setReportMsg,
-  }), [activeMessageSearchId, currentUserId, groupedMessages, messagePagination.hasMore, messagePagination.initialized, messagePagination.loadingOlder, messageSearchMatchIds, handleDelete, handleOpenSharedMessage, handleMessagesScroll]);
+    onRetryMessage: handleRetryMessage,
+  }), [activeMessageSearchId, currentUserId, groupedMessages, messagePagination.hasMore, messagePagination.initialized, messagePagination.loadingOlder, messageSearchMatchIds, handleDelete, handleOpenSharedMessage, handleMessagesScroll, handleRetryMessage]);
 
   return (
     <div className="chat-split" id="chat-page">
@@ -3621,14 +3648,6 @@ const ChatPage = () => {
           />
         </div>
       ) : null}
-
-      {reportMsg && (
-        <ReportMessageModal
-          message={reportMsg}
-          familyCode={activeFamilyCode}
-          onClose={() => setReportMsg(null)}
-        />
-      )}
 
       <ChatDeleteConversationModal
         isOpen={deleteConversationOpen}

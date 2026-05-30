@@ -12,6 +12,7 @@ import {
   FiLogOut,
   FiMoreVertical,
   FiPaperclip,
+  FiRefreshCw,
   FiSearch,
   FiSend,
   FiSmile,
@@ -115,6 +116,37 @@ const ChatConversationPane = ({
   typingUserIds,
 }) => {
   const [previewImage, setPreviewImage] = useState(null);
+  const [isAtBottom, setIsAtBottom] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const prevMessagesLength = React.useRef(messagesPane.groupedMessages.length);
+  const [isDragging, setIsDragging] = useState(false);
+
+  React.useEffect(() => {
+    if (messagesPane.groupedMessages.length > prevMessagesLength.current) {
+      if (!isAtBottom) {
+        setUnreadCount(prev => prev + (messagesPane.groupedMessages.length - prevMessagesLength.current));
+      }
+    }
+    prevMessagesLength.current = messagesPane.groupedMessages.length;
+  }, [messagesPane.groupedMessages.length, isAtBottom]);
+
+  const handleDragOver = useCallback((e) => {
+    e.preventDefault();
+    if (!isDragging) setIsDragging(true);
+  }, [isDragging]);
+
+  const handleDragLeave = useCallback((e) => {
+    e.preventDefault();
+    setIsDragging(false);
+  }, []);
+
+  const handleDrop = useCallback((e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      composer.onFileChange?.({ target: { files: e.dataTransfer.files } });
+    }
+  }, [composer]);
 
   const virtuosoComponents = useMemo(() => ({
     Item: VirtuosoItem,
@@ -370,6 +402,19 @@ const ChatConversationPane = ({
               {showTextReceipt && (
                 <span className={`msg-receipt msg-receipt--${receiptState}`}>
                   {receiptText}
+                  {receiptState === 'failed' && (
+                    <button
+                      className="ml-1 inline-flex items-center text-red-500 hover:text-red-700"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        messagesPane.onRetryMessage?.(message);
+                      }}
+                      title="Retry sending"
+                      type="button"
+                    >
+                      <FiRefreshCw size={12} />
+                    </button>
+                  )}
                 </span>
               )}
             </div>
@@ -399,17 +444,6 @@ const ChatConversationPane = ({
                   title="Delete"
                 >
                   <FiTrash2 />
-                </button>
-              )}
-              {!isSent && !isDeleted && (
-                <button
-                  className="msg-action-btn"
-                  onClick={() => messagesPane.onReportMessage(message)}
-                  type="button"
-                  aria-label="Report message"
-                  title="Report"
-                >
-                  <FiAlertTriangle />
                 </button>
               )}
             </div>
@@ -706,9 +740,27 @@ const ChatConversationPane = ({
         className={`chat-body-shell${infoPanel.showDesktop ? ' chat-body-shell--with-info' : ''}`}
       >
         <div className="chat-thread-pane">
-          <div className="chat-messages-wrap">
+          <div
+            className={`chat-messages-wrap ${isDragging ? 'ring-2 ring-inset ring-blue-500 bg-blue-50/10' : ''}`}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            {isDragging && (
+              <div className="absolute inset-0 z-40 flex items-center justify-center bg-blue-500/10 backdrop-blur-[1px]">
+                <div className="flex flex-col items-center rounded-xl bg-white/90 p-6 shadow-xl dark:bg-slate-800/90 pointer-events-none">
+                  <FiPaperclip className="mb-2 text-4xl text-blue-500" />
+                  <p className="text-lg font-semibold text-slate-700 dark:text-slate-200">Drop files here</p>
+                </div>
+              </div>
+            )}
             <div className="chat-messages-bg" />
             <Virtuoso
+              ref={messagesPane.virtuosoRef}
+              atBottomStateChange={(atBottom) => {
+                setIsAtBottom(atBottom);
+                if (atBottom) setUnreadCount(0);
+              }}
               className="chat-messages custom-scrollbar"
               style={{ width: '100%', height: '100%' }}
               data={messagesPane.groupedMessages}
@@ -744,6 +796,26 @@ const ChatConversationPane = ({
           />
 
           <div className="chat-composer" ref={composer.ref}>
+            {!isAtBottom && (
+              <button
+                className="chat-fab-scroll-bottom absolute right-4 -top-12 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white text-slate-600 shadow-md border border-slate-100 hover:bg-slate-50 hover:text-slate-800 transition-colors dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white"
+                onClick={() => {
+                  messagesPane.virtuosoRef?.current?.scrollToIndex({
+                    index: messagesPane.groupedMessages.length - 1,
+                    behavior: 'smooth',
+                  });
+                }}
+                type="button"
+                aria-label="Scroll to bottom"
+              >
+                <FiChevronDown size={20} />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-blue-500 px-1 text-[10px] font-bold text-white shadow-sm">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </button>
+            )}
             {composer.attachmentDraft && (
               <div className="chat-attachment-preview">
                 <div className="chat-attachment-preview__media">
