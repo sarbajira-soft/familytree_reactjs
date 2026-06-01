@@ -9,18 +9,15 @@ import {
   FiImage
 } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
-import CreateAlbumModal from "../Components/CreateAlbumModal";
 import CreatePostModal from "../Components/CreatePostModal";
 import DashboardGiftProductModal from "../Components/DashboardGiftProductModal";
 import EventModal from "../Components/EventModal";
-import GalleryViewerModal from "../Components/GalleryViewerModal";
 import { useGiftEvent } from "../Contexts/GiftEventContext";
 import { useUser } from "../Contexts/UserContext";
 import { fetchProducts as fetchMedusaProducts, fetchRegions } from "../Retail/services/productService";
 import { getProductThumbnail } from "../Retail/utils/helpers";
 import { getToken } from "../utils/auth";
 import { authFetch } from "../utils/authFetch";
-import { getGalleryListFromApiResponse, mapGallerySummary } from "../utils/galleryAdapter";
 import DashboardShimmer from "./DashboardShimmer";
 import PostPage from "./PostPage";
 import { MEDUSA_REGION_ID_KEY } from "../Retail/utils/constants";
@@ -316,7 +313,6 @@ const buildGiftSuggestionsByEvent = (events, productSuggestionsPool, prev) => {
 
 const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
   const [isCreateEventModalOpen, setIsCreateEventModalOpen] = useState(false);
-  const [isCreateAlbumModalOpen, setIsCreateAlbumModalOpen] = useState(false);
   const [isCreatePostModalOpen, setIsCreatePostModalOpen] = useState(false);
   const [isScheduleOptionsOpen, setIsScheduleOptionsOpen] = useState(false);
   const [isEventCalendarModalOpen, setIsEventCalendarModalOpen] = useState(false);
@@ -329,8 +325,6 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const token = getToken();
-  const [isGalleryModalOpen, setIsGalleryModalOpen] = useState(false);
-  const [selectedAlbum, setSelectedAlbum] = useState(null);
   // Dashboard data query
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: ["dashboardData", userInfo?.userId, userInfo?.familyCode],
@@ -346,15 +340,6 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
     enabled: !!userInfo?.familyCode && !!token,
   });
 
-  const { data: galleryData, isLoading: isGalleryLoading } = useQuery({
-    queryKey: ["dashboardGallery", userInfo?.userId],
-    queryFn: async () =>
-      authFetch(`${apiBaseUrl}/gallery/by-options?privacy=public&page=1&limit=3`, {
-        method: "GET",
-      }),
-    enabled: !!token,
-  });
-
   const upcomingEventsPreview = useMemo(() => {
     if (!dashboardData?.events) return [];
     const rawEvents = dashboardData.events;
@@ -365,21 +350,6 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
 
   const productSuggestionsPool = medusaProducts;
 
-  const galleryPreview = useMemo(() => {
-    if (!galleryData) return [];
-    return getGalleryListFromApiResponse(galleryData).map(mapGallerySummary);
-  }, [galleryData]);
-
-  const openGalleryModal = (album) => {
-    setSelectedAlbum(album);
-    setIsGalleryModalOpen(true);
-  };
-
-  const onGalleryCreated = async () => {
-    await queryClient.invalidateQueries({
-      queryKey: ["dashboardGallery", userInfo?.userId],
-    });
-  };
 
   const handleProductSuggestionClick = (product) => {
     if (!product || !product.id) {
@@ -507,7 +477,7 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
     return event.eventTitle || event.title || "Special Event";
   };
 
-  if (isLoading || isGalleryLoading) {
+  if (isLoading) {
     return <DashboardShimmer />;
   }
 
@@ -555,58 +525,7 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
               </div>
             </div>
 
-            {/* Recent Photos at top */}
-            {galleryPreview.length > 0 && (
-              <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-sm font-semibold text-gray-800">
-                    Recent Photos
-                  </p>
-
-                  <button
-                    onClick={() => navigate("/family-gallery")}
-                    className="text-xs font-semibold bg-white text-primary-700 hover:text-primary-900"
-                  >
-                    View all
-                  </button>
-                </div>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {galleryPreview.map((album) => {
-                    const cover =
-                      album.coverPhoto ||
-                      (album.galleryAlbums &&
-                        album.galleryAlbums[0] &&
-                        album.galleryAlbums[0].album) ||
-                      "https://via.placeholder.com/150x150?text=Photo";
-                    return (
-                      <button
-                        type="button"
-                        key={album.id}
-                        className="relative w-full pt-[100%] overflow-hidden rounded-lg cursor-pointer group bg-transparent p-0 border-0 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
-                        onClick={() => openGalleryModal(album)}
-                        aria-label={`Open album ${album.galleryTitle || album.title || "Album"
-                          }`}
-                      >
-                        <img
-                          src={cover}
-                          alt={album.galleryTitle || album.title || "Album"}
-                          className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-                        />
-
-                        {/* Hover overlay */}
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                          <div className="text-white text-xs font-semibold text-center px-2">
-                            <p className="line-clamp-2">
-                              {album.galleryTitle || album.title || "Album"}
-                            </p>
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+          
 
             {/* Upcoming event cards under calendar */}
             {upcomingEventsPreview.length > 0 && (
@@ -925,14 +844,7 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
         onClose={() => setIsCreateEventModalOpen(false)}
         mode="create"
       />
-      <CreateAlbumModal
-        isOpen={isCreateAlbumModalOpen}
-        onClose={() => setIsCreateAlbumModalOpen(false)}
-        onCreateAlbum={onGalleryCreated}
-        currentUser={userInfo}
-        authToken={token}
-        mode="create"
-      />
+      
       <CreatePostModal
         isOpen={isCreatePostModalOpen}
         onClose={() => setIsCreatePostModalOpen(false)}
@@ -945,16 +857,7 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
           setSelectedGiftProductId(null);
         }}
       />
-      {/* Gallery Viewer Modal */}
-      {selectedAlbum && (
-        <GalleryViewerModal
-          isOpen={isGalleryModalOpen}
-          onClose={() => setIsGalleryModalOpen(false)}
-          album={selectedAlbum}
-          currentUser={userInfo}
-          authToken={token}
-        />
-      )}
+     
     </div>
   );
 };

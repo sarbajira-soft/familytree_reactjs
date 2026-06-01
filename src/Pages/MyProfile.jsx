@@ -39,8 +39,8 @@ const getPrivacyBadgeConfig = (privacy) => {
   }
 
   if (normalized === 'public') {
-    return { label: 'Public', className: 'bg-orange-600/90 text-white' };
-  }
+  return null;
+}
 
   if (normalized) {
     return { label: normalized.charAt(0).toUpperCase() + normalized.slice(1), className: 'bg-gray-800/80 text-white' };
