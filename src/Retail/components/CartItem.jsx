@@ -152,6 +152,7 @@ const CartItem = ({ item, onIncrease, onDecrease, onRemove, onViewDetails, isUpd
             >
               <FiMinus />
             </button>
+            
             <span className="min-w-[1.5rem] text-center font-semibold">{item.quantity}</span>
             <button
               type="button"
