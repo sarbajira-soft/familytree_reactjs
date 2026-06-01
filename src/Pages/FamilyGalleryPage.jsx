@@ -346,53 +346,53 @@ const FamilyGalleryPage = () => {
       ) : (
       <div className="mx-auto flex max-w-7xl flex-col px-4 py-8 md:px-6 lg:px-8">
         <div className="w-full">
-          <div className="mb-6 flex flex-col items-start justify-between gap-4 border-b border-gray-200 pb-6 sm:flex-row sm:items-center">
-            <div className="flex w-full flex-col items-start gap-3 sm:w-auto sm:flex-row sm:items-center">
-              <div className="flex w-full  flex-row gap-2">
-                <div className="flex flex-1 justify-between gap-2 rounded-full bg-gray-100 p-1 sm:flex-none sm:justify-start">
-                    <button
-                      className={`flex flex-1 items-center justify-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-semibold transition-all sm:flex-none sm:px-4 sm:text-sm ${
-                         "bg-gradient-to-r from-secondary-500 to-secondary-600 text-white shadow"
-                      }`}
-                    >
-                      <MdPeople size={16} /> Family
-                    </button>
-                  
-                </div>
+          <div className="mb-6 flex justify-end border-b border-gray-200 pb-6">
+  <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+    
+    {/* Family + Create Album */}
+    <div className="flex gap-2">
+      <button
+        className="flex h-10 min-w-[120px] items-center justify-center gap-2 rounded-full bg-gradient-to-r from-secondary-500 to-secondary-600 px-4 text-sm font-semibold text-white shadow"
+      >
+        <MdPeople size={16} />
+        Family
+      </button>
 
-                <button
-                  className="flex flex-none items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-primary-700 px-2.5 py-1.5 text-xs font-semibold text-white shadow transition-all hover:bg-primary-800 sm:px-4 sm:text-sm"
-                  onClick={() => setIsCreateAlbumModalOpen(true)}
-                >
-                  <FiPlusCircle size={16} /> Create Album
-                </button>
-              </div>
+      <button
+        className="flex h-10 min-w-[200px] items-center justify-center gap-2 rounded-full bg-primary-700 px-4 text-sm font-semibold text-white shadow transition-all hover:bg-primary-800"
+        onClick={() => setIsCreateAlbumModalOpen(true)}
+      >
+        <FiPlusCircle size={16} />
+        Create Album
+      </button>
+    </div>
 
-              <input
-                type="text"
-                autoFocus
-                placeholder="Search Albums..."
-                value={searchCaption}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  setSearchCaption(value);
+    {/* Search */}
+    <input
+      type="text"
+      autoFocus
+      placeholder="Search Albums..."
+      value={searchCaption}
+      onChange={(event) => {
+        const value = event.target.value;
+        setSearchCaption(value);
 
-                  if (searchTimeoutRef.current) {
-                    clearTimeout(searchTimeoutRef.current);
-                  }
+        if (searchTimeoutRef.current) {
+          clearTimeout(searchTimeoutRef.current);
+        }
 
-                  searchTimeoutRef.current = setTimeout(() => {
-                    void fetchGalleries({
-                      cursor: null,
-                      galleryTitleSearch: value,
-                      replace: true,
-                    });
-                  }, 400);
-                }}
-                className="w-full rounded-full border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 dark:bg-slate-800 dark:text-white sm:w-48"
-              />
-            </div>
-          </div>
+        searchTimeoutRef.current = setTimeout(() => {
+          void fetchGalleries({
+            cursor: null,
+            galleryTitleSearch: value,
+            replace: true,
+          });
+        }, 400);
+      }}
+      className="h-10 w-full rounded-full border border-gray-300 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 sm:w-64"
+    />
+  </div>
+</div>
 
           {loadingAlbums ? (
             <GalleryPageShimmer />

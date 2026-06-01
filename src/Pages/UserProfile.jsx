@@ -153,6 +153,7 @@ const renderGalleriesContent = ({
   loadingGalleries,
   userGalleries,
   galleriesError,
+  galleriesPrivate,
   handleViewAlbum,
   hasMoreGalleries,
   loadingMoreGalleries,
@@ -168,6 +169,15 @@ const renderGalleriesContent = ({
             height={220}
           />
         ))}
+      </div>
+    );
+  }
+
+  if (galleriesPrivate) {
+    return (
+      <div className="lg:col-span-3 text-center py-12 bg-white rounded-2xl shadow-md border border-gray-100">
+        <p className="text-gray-900 font-semibold text-lg">This gallery section is private</p>
+        <p className="text-gray-500 text-sm mt-1">Only family members can view these galleries.</p>
       </div>
     );
   }
@@ -246,6 +256,7 @@ const UserProfileView = ({
   loadingGalleries,
   postsError,
   galleriesError,
+  galleriesPrivate,
   isPrivateAccount,
   blockStatus,
   onBlockStatusChange,
@@ -422,6 +433,7 @@ const UserProfileView = ({
           loadingGalleries,
           userGalleries,
           galleriesError,
+          galleriesPrivate,
           handleViewAlbum,
           hasMoreGalleries,
           loadingMoreGalleries,
@@ -472,6 +484,7 @@ UserProfileView.propTypes = {
   loadingGalleries: PropTypes.bool,
   postsError: PropTypes.string,
   galleriesError: PropTypes.string,
+  galleriesPrivate: PropTypes.bool,
   isPrivateAccount: PropTypes.bool,
   blockStatus: PropTypes.shape({
     isBlockedByMe: PropTypes.bool,
@@ -675,9 +688,11 @@ const UserProfile = () => {
       const json = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        throw new Error(
+        const error = new Error(
           json?.message || json?.error || `Failed to load galleries (${response.status})`,
         );
+        error.status = response.status;
+        throw error;
       }
 
       const list = getGalleryListFromApiResponse(json);
@@ -701,6 +716,7 @@ const UserProfile = () => {
     getNextPageParam: (lastPage) =>
       lastPage?.hasMore ? Number(lastPage.page || 1) + 1 : undefined,
     enabled: canLoadProfileContent && !showPosts,
+    retry: (failureCount, error) => error?.status !== 403 && failureCount < 2,
     staleTime: 3 * 60 * 1000,
     cacheTime: 10 * 60 * 1000,
   });
@@ -726,7 +742,8 @@ const UserProfile = () => {
   const loadingGalleries =
     galleriesQuery.isLoading || (galleriesQuery.isFetching && !galleriesQuery.data);
   const postsError = postsQuery.error?.message || null;
-  const galleriesError = galleriesQuery.error?.message || null;
+  const galleriesPrivate = galleriesQuery.error?.status === 403;
+  const galleriesError = galleriesPrivate ? null : galleriesQuery.error?.message || null;
   const canViewProfileContent = canLoadProfileContent;
 
   const handleViewAlbum = (album) => {
@@ -785,6 +802,7 @@ const UserProfile = () => {
       loadingGalleries={loadingGalleries}
       postsError={postsError}
       galleriesError={galleriesError}
+      galleriesPrivate={galleriesPrivate}
       isPrivateAccount={isPrivateAccount}
       blockStatus={profileBlockStatus}
       onBlockStatusChange={handleProfileBlockStatusChange}
