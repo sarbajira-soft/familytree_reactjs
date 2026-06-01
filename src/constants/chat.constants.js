@@ -5,6 +5,7 @@
 
 export const CHAT_API_ENDPOINTS = {
   families: '/chat/families',
+  contacts: '/chat/contacts',
   unreadCount: '/chat/unread/count',
   conversations: '/chat/conversations',
   conversation: (id) => `/chat/conversations/${id}`,
@@ -36,13 +37,13 @@ export const MESSAGE_TYPES = {
   TEXT: 'text',
   IMAGE: 'image',
   VOICE: 'voice',
+  POST_SHARE: 'post_share',
+  GALLERY_SHARE: 'gallery_share',
   SYSTEM: 'system',
   TOMBSTONE: 'tombstone',
 };
 
 export const ROOM_TYPES = {
-  GENERAL: 'general',
-  ANNOUNCEMENTS: 'announcements',
   EVENT: 'event',
   CUSTOM: 'custom',
 };
@@ -63,7 +64,6 @@ export const CONVERSATION_AVAILABILITY_REASONS = {
   ACCOUNT_PENDING_DELETION: 'account_pending_deletion',
   ACCOUNT_SUSPENDED: 'account_suspended',
   ACCOUNT_UNAVAILABLE: 'account_unavailable',
-  ANNOUNCEMENT_ADMIN_ONLY: 'announcement_admin_only',
   FAMILY_CONNECTION_LOST: 'family_connection_lost',
   PARTICIPANT_BLOCKED: 'participant_blocked',
   PARTICIPANT_PENDING_DELETION: 'participant_pending_deletion',

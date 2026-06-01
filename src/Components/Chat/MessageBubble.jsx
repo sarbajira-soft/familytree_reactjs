@@ -1,5 +1,5 @@
 import React from 'react';
-import { formatFullTime } from '../../services/chat.service';
+import { formatFullTime, formatSeenAgo } from '../../services/chat.service';
 import { MESSAGE_TYPES, CHAT_LIMITS } from '../../constants/chat.constants';
 
 const MessageBubble = ({ message, isSent, currentUserId, onReply, onDelete, onReport, showSenderName }) => {
@@ -8,6 +8,11 @@ const MessageBubble = ({ message, isSent, currentUserId, onReply, onDelete, onRe
   const isSystem = message.messageType === MESSAGE_TYPES.SYSTEM;
   const isDeleted = message.isDeleted || message.messageType === MESSAGE_TYPES.TOMBSTONE;
   const isRead = !!message.readAt;
+  const receiptText = isRead
+    ? `Seen ${formatSeenAgo(message.readAt) || 'just now'}`
+    : message.sendStatus === 'sending'
+      ? 'Sending'
+      : 'Sent';
   const canDel = isSent && !isDeleted && (Date.now() - new Date(message.createdAt).getTime()) <= CHAT_LIMITS.DELETE_WINDOW_MS;
 
   if (isSystem) {
@@ -69,7 +74,7 @@ const MessageBubble = ({ message, isSent, currentUserId, onReply, onDelete, onRe
             <span className="msg-time">{formatFullTime(message.createdAt)}</span>
             {isSent && (
               <span className={`msg-read ${isRead ? 'msg-read--read' : ''}`}>
-                {isRead ? '✓✓' : '✓'}
+                {receiptText}
               </span>
             )}
           </span>

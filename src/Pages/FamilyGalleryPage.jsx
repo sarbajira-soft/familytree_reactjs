@@ -1,33 +1,36 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FiHeart, FiMessageCircle, FiMoreVertical, FiPlusCircle, FiShare2 } from "react-icons/fi";
-import { MdPeople, MdPublic } from "react-icons/md";
+import { FiHeart, FiMessageCircle, FiMoreVertical, FiPlusCircle } from "react-icons/fi";
+import { MdPeople } from "react-icons/md";
 
 import GalleryViewerModal from "../Components/GalleryViewerModal";
-import PublicGalleryShareSheet from "../Components/PublicGalleryShareSheet";
 import ReportContentModal from "../Components/ReportContentModal";
 import CreateAlbumModal from "../Components/CreateAlbumModal";
+import NoFamilyView from "../Components/NoFamilyView";
+import PendingApprovalView from "../Components/PendingApprovalView";
+import CreateFamilyModal from "../Components/CreateFamilyModal";
+import JoinFamilyModal from "../Components/JoinFamilyModal";
 import { useUser } from "../Contexts/UserContext";
 import GalleryPageShimmer from "./GalleryPageShimmer";
 import useGallerySeenBatch from "../hooks/useGallerySeenBatch";
 import { authFetchResponse } from "../utils/authFetch";
 import { getToken } from "../utils/auth";
-import { hasFamilyAccess } from "../utils/familyAccess";
+import { hasFamilyAccess, hasFamilyAccessStatus } from "../utils/familyAccess";
 import {
   getGalleryListFromApiResponse,
   mapGallerySummary,
 } from "../utils/galleryAdapter";
 
 const FamilyGalleryPage = () => {
-  const { userInfo } = useUser();
+  const { userInfo, userLoading } = useUser();
   const canAccessFamilyFeed = hasFamilyAccess(userInfo);
   const [token] = useState(() => getToken());
   const navigate = useNavigate();
-
-  const [activeFeed, setActiveFeed] = useState("public");
   const [isGalleryModalOpen, setIsGalleryModalOpen] = useState(false);
   const [selectedAlbum, setSelectedAlbum] = useState(null);
   const [isCreateAlbumModalOpen, setIsCreateAlbumModalOpen] = useState(false);
+  const [isCreateFamilyModalOpen, setIsCreateFamilyModalOpen] = useState(false);
+  const [isJoinFamilyModalOpen, setIsJoinFamilyModalOpen] = useState(false);
   const [galleryAlbums, setGalleryAlbums] = useState([]);
   const [loadingAlbums, setLoadingAlbums] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -38,7 +41,6 @@ const FamilyGalleryPage = () => {
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [reportTarget, setReportTarget] = useState(null);
   const [albumActionMenuAlbumId, setAlbumActionMenuAlbumId] = useState(null);
-  const [shareGallery, setShareGallery] = useState(null);
 
   const searchTimeoutRef = useRef(null);
   const requestIdRef = useRef(0);
@@ -78,9 +80,9 @@ const FamilyGalleryPage = () => {
   } = {}) => {
     const normalizedSearch = String(galleryTitleSearch || "").trim();
     const cursorKey = cursor || "__initial__";
-    const requestKey = `${activeFeed}|${cursorKey}|${normalizedSearch}`;
+    const requestKey = `${cursorKey}|${normalizedSearch}`;
 
-    if (activeFeed === "family" && !canAccessFamilyFeed) {
+    if (!canAccessFamilyFeed) {
       setGalleryAlbums([]);
       setLoadingAlbums(false);
       setLoadingMore(false);
@@ -118,7 +120,7 @@ const FamilyGalleryPage = () => {
     setFeedError("");
 
     try {
-      let endpoint = `/gallery/feed?privacy=${activeFeed}&limit=20`;
+      let endpoint = `/gallery/feed?privacy=family&limit=20`;
 
       if (cursor) {
         endpoint += `&cursor=${encodeURIComponent(cursor)}`;
@@ -198,7 +200,6 @@ const FamilyGalleryPage = () => {
       replace: true,
     });
   }, [
-    activeFeed,
     userInfo?.userId,
     userInfo?.familyCode,
     userInfo?.approveStatus,
@@ -285,6 +286,23 @@ const FamilyGalleryPage = () => {
     });
   };
 
+  const handleCreateFamily = () => {
+    setIsCreateFamilyModalOpen(true);
+  };
+
+  const handleJoinFamily = () => {
+    setIsJoinFamilyModalOpen(true);
+  };
+
+  const handleFamilyCreated = () => {
+    setIsCreateFamilyModalOpen(false);
+  };
+
+  const handleFamilyJoined = () => {
+    setIsJoinFamilyModalOpen(false);
+    window.location.reload();
+  };
+
   useEffect(() => {
     if (!albumActionMenuAlbumId) return undefined;
 
@@ -299,41 +317,47 @@ const FamilyGalleryPage = () => {
     };
   }, [albumActionMenuAlbumId]);
 
+  if (userLoading) {
+    return <GalleryPageShimmer />;
+  }
+
+  const pendingFamilyCode = userInfo?.pendingFamilyCode || "";
+  const hasPendingRequest =
+    userInfo?.approveStatus === "pending" && Boolean(pendingFamilyCode);
+
+  const accessView = !userInfo?.familyCode && !hasPendingRequest ? (
+    <NoFamilyView
+      onCreateFamily={handleCreateFamily}
+      onJoinFamily={handleJoinFamily}
+    />
+  ) : !hasFamilyAccessStatus(userInfo?.approveStatus) ? (
+    <PendingApprovalView
+      familyCode={pendingFamilyCode || userInfo.familyCode}
+      onJoinFamily={handleJoinFamily}
+    />
+  ) : null;
+
   return (
     <>
+      {accessView ? (
+        <div className="min-h-[calc(100vh-6rem)] bg-gray-50 flex items-center justify-center px-4 py-6">
+          {accessView}
+        </div>
+      ) : (
       <div className="mx-auto flex max-w-7xl flex-col px-4 py-8 md:px-6 lg:px-8">
         <div className="w-full">
           <div className="mb-6 flex flex-col items-start justify-between gap-4 border-b border-gray-200 pb-6 sm:flex-row sm:items-center">
-            <h1 className="text-2xl font-extrabold leading-none text-gray-900 sm:text-3xl">
-              Gallery Hub
-            </h1>
-
             <div className="flex w-full flex-col items-start gap-3 sm:w-auto sm:flex-row sm:items-center">
-              <div className="flex w-full flex-row gap-2">
+              <div className="flex w-full  flex-row gap-2">
                 <div className="flex flex-1 justify-between gap-2 rounded-full bg-gray-100 p-1 sm:flex-none sm:justify-start">
-                  <button
-                    onClick={() => setActiveFeed("public")}
-                    className={`flex flex-1 items-center justify-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-semibold transition-all sm:flex-none sm:px-4 sm:text-sm ${
-                      activeFeed === "public"
-                        ? "bg-gradient-to-r from-secondary-500 to-secondary-600 text-white shadow"
-                        : "bg-primary-700 text-white hover:bg-primary-800"
-                    }`}
-                  >
-                    <MdPublic size={16} /> Public
-                  </button>
-
-                  {canAccessFamilyFeed ? (
                     <button
-                      onClick={() => setActiveFeed("family")}
                       className={`flex flex-1 items-center justify-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-semibold transition-all sm:flex-none sm:px-4 sm:text-sm ${
-                        activeFeed === "family"
-                          ? "bg-gradient-to-r from-secondary-500 to-secondary-600 text-white shadow"
-                          : "bg-primary-700 text-white hover:bg-primary-800"
+                         "bg-gradient-to-r from-secondary-500 to-secondary-600 text-white shadow"
                       }`}
                     >
                       <MdPeople size={16} /> Family
                     </button>
-                  ) : null}
+                  
                 </div>
 
                 <button
@@ -474,39 +498,17 @@ const FamilyGalleryPage = () => {
                         </p>
 
                         <div className="flex items-center justify-between gap-3 text-sm text-gray-500">
-                          {album.privacy === "family" ? (
+                          
                             <span
                               className="flex items-center dark:bg-slate-900 gap-1 rounded-full bg-primary-50 px-3 py-1 font-medium text-primary-600"
                               title="Family Album"
                             >
                               <MdPeople size={16} /> 
                             </span>
-                          ) : (
-                            <span
-                              className="flex items-center gap-1 dark:bg-slate-900 rounded-full bg-secondary-50 px-3 py-1 font-medium text-secondary-400"
-                              title="Public Album"
-                            >
-                              <MdPublic size={16} /> 
-                            </span>
-                          )}
 
                           <div className="flex items-center gap-3 text-xs font-medium text-gray-500">
                              <span className="flex items-center gap-1 ">{album.likeCount || 0} <FiHeart size={14} className="text-red-500" /></span>
                             <span className="flex items-center gap-1">{album.commentCount || 0} <FiMessageCircle size={14} className="text-blue-500" /></span>
-                            {album.privacy === "public" ? (
-                              <button
-                                type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  setShareGallery(album);
-                                }}
-                                className="inline-flex items-center gap-1 rounded-full  px-3 py-1 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-200"
-                              >
-                                <FiShare2 size={14} />
-                                {/* Share */}
-                              </button>
-                            ) : null}
-                           
                           </div>
                         </div>
                       </div>
@@ -519,7 +521,7 @@ const FamilyGalleryPage = () => {
                         No albums here yet!
                       </p>
                       <p className="text-lg">
-                        Looks like the {activeFeed === "family" ? "Family" : "Public"} feed is a bit quiet. Why not be the first to share?
+                        Looks like the Family  feed is a bit quiet. Why not be the first to share?
                       </p>
                     </div>
                   </div>
@@ -547,6 +549,7 @@ const FamilyGalleryPage = () => {
           )}
         </div>
       </div>
+      )}
 
       {selectedAlbum ? (
         <GalleryViewerModal
@@ -576,11 +579,20 @@ const FamilyGalleryPage = () => {
         mode="create"
       />
 
-      <PublicGalleryShareSheet
-        isOpen={Boolean(shareGallery)}
-        gallery={shareGallery}
-        onClose={() => setShareGallery(null)}
+      <CreateFamilyModal
+        isOpen={isCreateFamilyModalOpen}
+        onClose={() => setIsCreateFamilyModalOpen(false)}
+        onFamilyCreated={handleFamilyCreated}
+        token={token}
       />
+
+      <JoinFamilyModal
+        isOpen={isJoinFamilyModalOpen}
+        onClose={() => setIsJoinFamilyModalOpen(false)}
+        onFamilyJoined={handleFamilyJoined}
+        token={token}
+      />
+
     </>
   );
 };

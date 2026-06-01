@@ -8,11 +8,10 @@ import {
   FaChevronRight,
   FaUndoAlt,
 } from "react-icons/fa";
-import { FiShare2, FiSmile, FiSend } from "react-icons/fi";
+import {  FiSmile, FiSend } from "react-icons/fi";
 import { AnimatePresence, motion } from "framer-motion";
 import EmojiPicker from "emoji-picker-react";
 import CommentItem from "./CommentItem";
-import PublicGalleryShareSheet from "./PublicGalleryShareSheet";
 import { buildCommentTree, countComments } from "../utils/commentUtils";
 import Swal from "sweetalert2";
 
@@ -83,19 +82,12 @@ const GalleryViewerModal = ({
   const fsCarouselRef = useRef(null);
   const [rotation, setRotation] = useState(0);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [isShareSheetOpen, setIsShareSheetOpen] = useState(false);
   const textareaRef = useRef(null);
   const emojiPickerRef = useRef(null);
   const seenTimerRef = useRef(null);
   const activeAlbum = galleryDetail || album;
   const photos = activeAlbum?.photos || [];
   const comments = useMemo(() => buildCommentTree(commentRows), [commentRows]);
-
-  useEffect(() => {
-    if (!isOpen) {
-      setIsShareSheetOpen(false);
-    }
-  }, [isOpen]);
 
   useEffect(() => {
     if (!isFullScreen) return;
@@ -616,16 +608,6 @@ const GalleryViewerModal = ({
                     <span className="flex items-center gap-2 px-4 py-2 rounded-full bg-gray-200 text-gray-700">
                       <FaCommentDots size={18} /> {totalCommentCount}
                     </span>
-                    {activeAlbum?.privacy === "public" ? (
-                      <button
-                        type="button"
-                        onClick={() => setIsShareSheetOpen(true)}
-                        className="flex items-center gap-2 rounded-full bg-gray-200 px-4 py-2 text-gray-700 transition hover:bg-gray-300"
-                      >
-                        <FiShare2 size={18} />
-                        <span>Share</span>
-                      </button>
-                    ) : null}
                   </div>
                 </div>
 
@@ -833,11 +815,6 @@ const GalleryViewerModal = ({
           </motion.div>
         )}
       </AnimatePresence>
-      <PublicGalleryShareSheet
-        isOpen={isShareSheetOpen}
-        gallery={activeAlbum}
-        onClose={() => setIsShareSheetOpen(false)}
-      />
     </AnimatePresence>
   );
 };

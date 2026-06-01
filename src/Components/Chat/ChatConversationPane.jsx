@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
+import { Virtuoso } from 'react-virtuoso';
 import EmojiPicker, { EmojiStyle, Theme } from 'emoji-picker-react';
 import {
   FiAlertTriangle,
@@ -11,6 +12,7 @@ import {
   FiLogOut,
   FiMoreVertical,
   FiPaperclip,
+  FiRefreshCw,
   FiSearch,
   FiSend,
   FiSmile,
@@ -23,12 +25,14 @@ import {
 import TypingIndicator from './TypingIndicator';
 import VoiceRecorder from './VoiceRecorder';
 import ChatStateBanner from './ChatStateBanner';
+import ChatSharedContentCard from './ChatSharedContentCard';
 import {
   CHAT_LIMITS,
   MESSAGE_TYPES,
 } from '../../constants/chat.constants';
 import {
   formatFullTime,
+  formatSeenAgo,
   getInitials,
   getRoomIcon,
 } from '../../services/chat.service';
@@ -37,6 +41,62 @@ import {
   getReceiptState,
   renderHighlightedText,
 } from './chatPage.utils';
+
+const VirtuosoItem = React.forwardRef(({ children, className, ...props }, ref) => (
+  <div
+    {...props}
+    ref={ref}
+    className={['chat-virtuoso-item', className].filter(Boolean).join(' ')}
+  >
+    {children}
+  </div>
+));
+VirtuosoItem.displayName = 'ChatVirtuosoItem';
+
+const getSeenByEntries = (message = {}, currentUserId) =>
+  (Array.isArray(message?.seenBy) ? message.seenBy : []).filter((entry) => {
+    const entryUserId = Number(entry?.userId || 0);
+    return (
+      entryUserId > 0 &&
+      entryUserId !== Number(currentUserId || 0) &&
+      entryUserId !== Number(message?.senderId || 0)
+    );
+  });
+
+const getSeenByName = (entry = {}) =>
+  String(entry?.name || '').trim() ||
+  `${String(entry?.firstName || '').trim()} ${String(entry?.lastName || '').trim()}`.trim() ||
+  'Family Member';
+
+const getSeenBySummary = (entries = []) => {
+  const names = entries.map(getSeenByName).filter(Boolean);
+  if (names.length <= 3) {
+    return names.join(', ');
+  }
+
+  return `${names.slice(0, 3).join(', ')} +${names.length - 3}`;
+};
+
+const getReceiptText = (receiptState, message = {}) => {
+  if (receiptState === 'failed') {
+    return 'Failed to send';
+  }
+
+  if (receiptState === 'sending') {
+    return 'Sending';
+  }
+
+  if (receiptState === 'seen') {
+    const seenAgo = formatSeenAgo(message?.readAt);
+    return seenAgo ? `Seen ${seenAgo}` : 'Seen';
+  }
+
+  if (receiptState === 'delivered') {
+    return 'Delivered';
+  }
+
+  return receiptState ? 'Sent' : '';
+};
 
 const ChatConversationPane = ({
   chatLoading,
@@ -52,9 +112,347 @@ const ChatConversationPane = ({
   messageSearch,
   messagesPane,
   selectedId,
+  typingLabel,
+  typingUserIds,
 }) => {
-
   const [previewImage, setPreviewImage] = useState(null);
+  const [isAtBottom, setIsAtBottom] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const prevMessagesLength = React.useRef(messagesPane.groupedMessages.length);
+  const [isDragging, setIsDragging] = useState(false);
+
+  React.useEffect(() => {
+    if (messagesPane.groupedMessages.length > prevMessagesLength.current) {
+      if (!isAtBottom) {
+        setUnreadCount(prev => prev + (messagesPane.groupedMessages.length - prevMessagesLength.current));
+      }
+    }
+    prevMessagesLength.current = messagesPane.groupedMessages.length;
+  }, [messagesPane.groupedMessages.length, isAtBottom]);
+
+  const handleDragOver = useCallback((e) => {
+    e.preventDefault();
+    if (!isDragging) setIsDragging(true);
+  }, [isDragging]);
+
+  const handleDragLeave = useCallback((e) => {
+    e.preventDefault();
+    setIsDragging(false);
+  }, []);
+
+  const handleDrop = useCallback((e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      composer.onFileChange?.({ target: { files: e.dataTransfer.files } });
+    }
+  }, [composer]);
+
+  const virtuosoComponents = useMemo(() => ({
+    Item: VirtuosoItem,
+    Header: () => (
+      <div className="chat-history-header">
+        {messagesPane.isLoadingOlderMessages && (
+          <div className="flex justify-center py-4">
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-300 border-t-blue-500"></div>
+          </div>
+        )}
+        {messagesPane.hasResolvedHistory &&
+        !messagesPane.hasOlderMessages &&
+        messagesPane.groupedMessages.length > 0 ? (
+          <div className="chat-history-loader chat-history-loader--complete">
+            Beginning of conversation
+          </div>
+        ) : null}
+      </div>
+    )
+  }), [messagesPane.hasResolvedHistory, messagesPane.hasOlderMessages, messagesPane.groupedMessages.length, messagesPane.isLoadingOlderMessages]);
+
+  const latestSentMessageId = useMemo(() => {
+    for (let i = messagesPane.groupedMessages.length - 1; i >= 0; i--) {
+      const item = messagesPane.groupedMessages[i];
+      if (item.type === 'message') {
+        const msg = item.data;
+        if (Number(msg?.senderId || 0) === Number(messagesPane.currentUserId || 0)) {
+          return Number(msg?.id || 0);
+        }
+      }
+    }
+    return 0;
+  }, [messagesPane.groupedMessages, messagesPane.currentUserId]);
+
+  const virtuosoItemContent = useCallback((index, item) => {
+    if (item.type === 'date') {
+      return (
+        <div className="chat-message-item chat-message-item--center" key={item.key}>
+          <div className="chat-date-sep">
+            <span>{item.label}</span>
+          </div>
+        </div>
+      );
+    }
+
+    const message = item.data;
+    const messageId = Number(message?.id || 0);
+    const isSent =
+      Number(message?.senderId || 0) === Number(messagesPane.currentUserId || 0);
+    const isDeleted = Boolean(message?.isDeleted);
+    const isTombstone = message?.messageType === MESSAGE_TYPES.TOMBSTONE;
+    const isUnavailableMessage = isDeleted || isTombstone;
+    const isSearchMatch = messagesPane.matchIds.has(messageId);
+    const isActiveSearchMatch =
+      isSearchMatch && Number(messagesPane.activeSearchId || 0) === messageId;
+    const receiptState = isSent ? getReceiptState(message) : null;
+    const shouldShowReceipt = isSent && messageId === latestSentMessageId;
+    const receiptText = getReceiptText(receiptState, message);
+    const seenByEntries = shouldShowReceipt
+      ? getSeenByEntries(message, messagesPane.currentUserId)
+      : [];
+    const showRoomSeenBy =
+      shouldShowReceipt &&
+      isGroup &&
+      receiptState === 'seen' &&
+      seenByEntries.length > 0;
+    const seenBySummary = showRoomSeenBy ? getSeenBySummary(seenByEntries) : '';
+    const showTextReceipt =
+      shouldShowReceipt &&
+      receiptState &&
+      (!isGroup || receiptState !== 'seen' || seenByEntries.length === 0);
+    const showSystemMessage = message?.messageType === MESSAGE_TYPES.SYSTEM;
+    const previousMessage =
+      index > 0 ? messagesPane.groupedMessages[index - 1]?.data : null;
+    const isConsecutive =
+      previousMessage &&
+      !showSystemMessage &&
+      Number(previousMessage?.senderId || 0) === Number(message?.senderId || 0) &&
+      previousMessage?.messageType !== MESSAGE_TYPES.SYSTEM &&
+      message.createdAt &&
+      previousMessage.createdAt &&
+      new Date(message.createdAt).getTime() - new Date(previousMessage.createdAt).getTime() <
+        5 * 60 * 1000;
+    const showSenderName = isGroup && !isConsecutive && !isSent && !isUnavailableMessage;
+
+    return (
+      <div
+        className={`chat-message-item${isSent ? ' chat-message-item--sent' : ' chat-message-item--received'}`}
+        key={item.key}
+      >
+        <div
+          className={`msg-row${isSent ? ' msg-row--sent' : ' msg-row--received'}${
+            isActiveSearchMatch ? ' msg-row--search-active' : ''
+          }`}
+          ref={(node) => {
+            if (isSearchMatch && node) {
+              messagesPane.nodeRefs.current.set(messageId, node);
+            } else if (isSearchMatch) {
+              messagesPane.nodeRefs.current.delete(messageId);
+            }
+          }}
+        >
+          {!isSent && !showSystemMessage && (
+            <div className="msg-avatar-sm" aria-hidden="true">
+              {isConsecutive || isUnavailableMessage ? null : message?.senderAvatar ? (
+                <img src={message.senderAvatar} alt="" />
+              ) : (
+                (message?.senderName || '?').charAt(0).toUpperCase()
+              )}
+            </div>
+          )}
+
+          <div
+            className={`msg-bubble${isSent ? ' msg-bubble--sent' : ' msg-bubble--received'}${
+              showSystemMessage ? ' msg-bubble--system' : ''
+            }${isUnavailableMessage ? ' msg-bubble--deleted' : ''}${
+              isSearchMatch ? ' msg-bubble--search-match' : ''
+            }${isActiveSearchMatch ? ' msg-bubble--search-active' : ''}`}
+          >
+          {showSenderName && (
+            <div className="msg-sender">{message.senderName}</div>
+          )}
+
+          {message?.replyTo && !isUnavailableMessage && !showSystemMessage && (
+            <div className="msg-reply-bar">
+              <div className="msg-reply-bar-name">
+                {message.replyTo.senderName || 'Unknown'}
+              </div>
+              <div className="msg-reply-bar-text">
+                {message.replyTo.content || 'Attachment'}
+              </div>
+            </div>
+          )}
+
+          {isDeleted ? (
+            <span>This message was deleted</span>
+          ) : isTombstone ? (
+            <span>Message unavailable</span>
+          ) : showSystemMessage ? (
+            <span>{message.content}</span>
+          ) : message?.messageType === MESSAGE_TYPES.IMAGE && message?.mediaUrl ? (
+            <div className="msg-media-block">
+              <a
+                href={message.mediaUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="msg-media-link"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setPreviewImage(message.mediaUrl);
+                }}
+              >
+                <img
+                  src={message.mediaUrl}
+                  alt={message.attachmentName || 'Image'}
+                  className="msg-media-image"
+                  loading="lazy"
+                />
+              </a>
+              {message.content && (
+                <div className="msg-media-caption">
+                  {renderHighlightedText(message.content, messageSearch.query)}
+                </div>
+              )}
+            </div>
+          ) : message?.messageType === MESSAGE_TYPES.VOICE && message?.mediaUrl ? (
+            <div className="msg-media-block">
+              <audio controls src={message.mediaUrl} className="max-w-full">
+                <track kind="captions" />
+                Your browser does not support the audio element.
+              </audio>
+            </div>
+          ) : message?.messageType === MESSAGE_TYPES.POST_SHARE ||
+            message?.messageType === MESSAGE_TYPES.GALLERY_SHARE ? (
+            <div className="msg-share-block">
+              <button
+                type="button"
+                className="chat-share-card"
+                onClick={() => messagesPane.onOpenSharedMessage(message)}
+              >
+                <div className="chat-share-card__media">
+                  {message?.sharePayload?.previewMediaUrl ? (
+                    <img
+                      src={message.sharePayload.previewMediaUrl}
+                      alt="Preview"
+                      className="chat-share-card__image"
+                    />
+                  ) : (
+                    <div className="chat-share-card__placeholder">
+                      {message?.messageType === MESSAGE_TYPES.POST_SHARE ? (
+                        <FiImage size={24} />
+                      ) : (
+                        <FiFolder size={24} />
+                      )}
+                    </div>
+                  )}
+                  {message?.messageType === MESSAGE_TYPES.POST_SHARE && (
+                    <div className="chat-share-card__badge">Post</div>
+                  )}
+                  {message?.messageType === MESSAGE_TYPES.GALLERY_SHARE && (
+                    <div className="chat-share-card__badge">Gallery</div>
+                  )}
+                </div>
+                <div className="chat-share-card__body">
+                  <span className="chat-share-card__eyebrow">
+                    {message?.sharePayload?.creatorName || 'Familyss User'}
+                  </span>
+                  <strong className="chat-share-card__title">
+                    {message?.sharePayload?.previewTitle || 'Shared Content'}
+                  </strong>
+                  {message?.sharePayload?.previewText && (
+                    <p className="chat-share-card__description">
+                      {message.sharePayload.previewText}
+                    </p>
+                  )}
+                  <span className="chat-share-card__action">View full post →</span>
+                </div>
+              </button>
+              {message.content && (
+                <div className="msg-share-caption">
+                  {renderHighlightedText(message.content, messageSearch.query)}
+                </div>
+              )}
+            </div>
+          ) : (
+            renderHighlightedText(message.content, messageSearch.query)
+          )}
+
+          {!showSystemMessage && (
+            <div className={`msg-time-row${showRoomSeenBy ? ' msg-time-row--seen-by' : ''}`}>
+              {message.createdAt ? formatSeenAgo(message.createdAt) : 'Sending...'}
+
+              {showRoomSeenBy && (
+                <div className="msg-seen-by">
+                  <span className="msg-seen-by__avatars">
+                    {seenByEntries.map((entry) => (
+                      <span
+                        key={`seen-${messageId}-${entry.userId}`}
+                        className="msg-seen-by__avatar"
+                        title={`${entry.name} - ${formatFullTime(entry.readAt)}`}
+                      >
+                        {entry.profileUrl ? (
+                          <img src={entry.profileUrl} alt={entry.name} />
+                        ) : (
+                          entry.initials
+                        )}
+                      </span>
+                    ))}
+                  </span>
+                </div>
+              )}
+
+              {showTextReceipt && (
+                <span className={`msg-receipt msg-receipt--${receiptState}`}>
+                  {receiptText}
+                  {receiptState === 'failed' && (
+                    <button
+                      className="ml-1 inline-flex items-center text-red-500 hover:text-red-700"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        messagesPane.onRetryMessage?.(message);
+                      }}
+                      title="Retry sending"
+                      type="button"
+                    >
+                      <FiRefreshCw size={12} />
+                    </button>
+                  )}
+                </span>
+              )}
+            </div>
+          )}
+
+          {!isUnavailableMessage && !showSystemMessage && (
+            <div
+              className={`msg-actions${isSent ? ' msg-actions--sent' : ' msg-actions--received'}`}
+            >
+              {conversation?.canSend !== false && (
+                <button
+                  className="msg-action-btn"
+                  onClick={() => messagesPane.onReply(message)}
+                  type="button"
+                  aria-label="Reply to message"
+                  title="Reply"
+                >
+                  <FiCornerUpLeft />
+                </button>
+              )}
+              {isSent && !isDeleted && (
+                <button
+                  className="msg-action-btn"
+                  onClick={() => messagesPane.onDeleteMessage(message)}
+                  type="button"
+                  aria-label="Delete message"
+                  title="Delete"
+                >
+                  <FiTrash2 />
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+      </div>
+    );
+  }, [messagesPane, messageSearch.query, isGroup, latestSentMessageId]);
   if (!selectedId) {
     return (
       <div className="chat-placeholder">
@@ -342,252 +740,55 @@ const ChatConversationPane = ({
         className={`chat-body-shell${infoPanel.showDesktop ? ' chat-body-shell--with-info' : ''}`}
       >
         <div className="chat-thread-pane">
-          <div className="chat-messages-wrap">
+          <div
+            className={`chat-messages-wrap ${isDragging ? 'ring-2 ring-inset ring-blue-500 bg-blue-50/10' : ''}`}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            {isDragging && (
+              <div className="absolute inset-0 z-40 flex items-center justify-center bg-blue-500/10 backdrop-blur-[1px]">
+                <div className="flex flex-col items-center rounded-xl bg-white/90 p-6 shadow-xl dark:bg-slate-800/90 pointer-events-none">
+                  <FiPaperclip className="mb-2 text-4xl text-blue-500" />
+                  <p className="text-lg font-semibold text-slate-700 dark:text-slate-200">Drop files here</p>
+                </div>
+              </div>
+            )}
             <div className="chat-messages-bg" />
-            <div
+            <Virtuoso
+              ref={messagesPane.virtuosoRef}
+              atBottomStateChange={(atBottom) => {
+                setIsAtBottom(atBottom);
+                if (atBottom) setUnreadCount(0);
+              }}
               className="chat-messages custom-scrollbar"
-              onScroll={messagesPane.onScroll}
-              ref={messagesPane.containerRef}
-            >
-              {messagesPane.isLoadingOlderMessages ? (
-                <div className="chat-history-loader" role="status" aria-live="polite">
-                  Loading older messages...
-                </div>
-              ) : messagesPane.hasResolvedHistory &&
-                !messagesPane.hasOlderMessages &&
-                messagesPane.groupedMessages.length > 0 ? (
-                <div className="chat-history-loader chat-history-loader--complete">
-                  Beginning of conversation
-                </div>
-              ) : null}
-              {messagesPane.groupedMessages.map((item) => {
-                if (item.type === 'date') {
-                  return (
-                    <div className="chat-date-sep" key={item.key}>
-                      <span>{item.label}</span>
-                    </div>
-                  );
+              style={{ width: '100%', height: '100%' }}
+              data={messagesPane.groupedMessages}
+              firstItemIndex={1000000 - messagesPane.groupedMessages.length}
+              initialTopMostItemIndex={messagesPane.groupedMessages.length > 0 ? messagesPane.groupedMessages.length - 1 : 0}
+              followOutput={(isAtBottom) => isAtBottom ? 'smooth' : false}
+              atTopThreshold={80}
+              startReached={() => {
+                if (messagesPane.hasOlderMessages && !messagesPane.isLoadingOlderMessages) {
+                  messagesPane.onScroll({ currentTarget: { scrollTop: 0 } });
                 }
-
-                const message = item.data;
-                const messageId = Number(message?.id || 0);
-                const isSent =
-                  Number(message?.senderId || 0) === Number(messagesPane.currentUserId || 0);
-                const isDeleted = Boolean(message?.isDeleted);
-                const isTombstone = message?.messageType === MESSAGE_TYPES.TOMBSTONE;
-                const isUnavailableMessage = isDeleted || isTombstone;
-                const isSearchMatch = messagesPane.matchIds.has(messageId);
-                const isActiveSearchMatch =
-                  isSearchMatch && Number(messagesPane.activeSearchId || 0) === messageId;
-                const receiptState = isSent ? getReceiptState(message) : null;
-                const receiptGlyph =
-                  receiptState === 'failed'
-                    ? '!'
-                    : receiptState === 'sending' || receiptState === 'sent'
-                      ? '\u2713'
-                      : '\u2713\u2713';
-                const receiptLabel =
-                  receiptState === 'failed'
-                    ? 'Failed to send'
-                    : receiptState === 'sending'
-                      ? 'Sending'
-                      : receiptState === 'seen'
-                        ? 'Seen'
-                        : receiptState === 'delivered'
-                          ? 'Delivered'
-                          : 'Sent';
-                const canDelete =
-                  isSent &&
-                  !isUnavailableMessage &&
-                  Date.now() - new Date(message?.createdAt).getTime() <=
-                    CHAT_LIMITS.DELETE_WINDOW_MS;
-                const senderInitials = getInitials(
-                  String(message?.senderName || '').split(' ')[0],
-                  String(message?.senderName || '').split(' ')[1],
-                );
-
-                if (message?.messageType === MESSAGE_TYPES.SYSTEM) {
-                  return (
-                    <div
-                      className="msg-row"
-                      key={item.key}
-                      style={{ justifyContent: 'center' }}
-                    >
-                      <div className="msg-bubble msg-bubble--system">
-                        <span>{message.content}</span>
-                      </div>
-                    </div>
-                  );
+              }}
+              scrollerRef={(ref) => {
+                if (messagesPane.containerRef) {
+                  messagesPane.containerRef.current = ref;
                 }
+              }}
+              components={virtuosoComponents}
+              itemContent={virtuosoItemContent}
 
-                return (
-                  <div
-                    key={item.key}
-                    ref={(node) => {
-                      if (node && messageId) {
-                        messagesPane.nodeRefs.current.set(messageId, node);
-                        return;
-                      }
-
-                      if (messageId) {
-                        messagesPane.nodeRefs.current.delete(messageId);
-                      }
-                    }}
-                    tabIndex={isSearchMatch ? -1 : undefined}
-                  >
-                    <div
-                      className={`msg-row ${isSent ? 'msg-row--sent' : 'msg-row--received'}${isActiveSearchMatch ? ' msg-row--search-active' : ''}`}
-                    >
-                      {!isSent && (
-                        <div className="msg-avatar-sm">
-                          {message?.senderAvatar ? (
-                            <img
-                              src={message.senderAvatar}
-                              alt={message.senderName || 'Member'}
-                            />
-                          ) : (
-                            senderInitials
-                          )}
-                        </div>
-                      )}
-                      <div
-                        className={`msg-bubble ${isSent ? 'msg-bubble--sent' : 'msg-bubble--received'}${isUnavailableMessage ? ' msg-bubble--deleted' : ''}${isSearchMatch ? ' msg-bubble--search-match' : ''}${isActiveSearchMatch ? ' msg-bubble--search-active' : ''}`}
-                      >
-                        {!isUnavailableMessage && (
-                          <div
-                            className={`msg-actions ${isSent ? 'msg-actions--sent' : 'msg-actions--received'}`}
-                          >
-                            <button
-                              className="msg-action-btn"
-                              onClick={() => messagesPane.onReply(message)}
-                              type="button"
-                              aria-label="Reply to message"
-                              title="Reply"
-                            >
-                              <FiCornerUpLeft />
-                            </button>
-                            {canDelete && (
-                              <button
-                                className="msg-action-btn"
-                                onClick={() => messagesPane.onDeleteMessage(message)}
-                                type="button"
-                                aria-label="Delete message"
-                                title="Delete"
-                              >
-                                <FiTrash2 />
-                              </button>
-                            )}
-                           
-                          </div>
-                        )}
-
-                        {!isSent && isGroup && !isUnavailableMessage && (
-                          <div className="msg-sender">{message.senderName}</div>
-                        )}
-                        {message.replyTo && !isUnavailableMessage && (
-                          <div className="msg-reply-bar">
-                            <div className="msg-reply-bar-name">
-                              {message.replyTo.senderName || 'Reply'}
-                            </div>
-                            <div className="msg-reply-bar-text">
-                              {renderHighlightedText(
-                                message.replyTo.content?.slice(0, 60),
-                                messageSearch.query,
-                                isActiveSearchMatch,
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        {isUnavailableMessage ? (
-                          <span>
-                            <em>{isTombstone ? 'Message unavailable' : 'Message deleted'}</em>
-                          </span>
-                        ) : message.mediaUrl ? (
-                          message.messageType === MESSAGE_TYPES.VOICE ? (
-                            <audio
-  controls
-  controlsList="nodownload noplaybackrate"
-  disablePictureInPicture
-  preload="metadata"
-  src={message.mediaUrl}
-  className="max-w-full"
-/>
-                          ) : message.messageType === MESSAGE_TYPES.IMAGE ? (
-                            <div className="msg-media-block">
-                              <button
-  type="button"
-  className="msg-media-link"
-  onClick={() => setPreviewImage(message.mediaUrl)}
->
-  <img
-    src={message.mediaUrl}
-    alt={message.content || 'Shared image'}
-    className="msg-media-image"
-  />
-</button>
-                              {message.content ? (
-                                <div className="msg-media-caption">
-                                  {renderHighlightedText(
-                                    message.content,
-                                    messageSearch.query,
-                                    isActiveSearchMatch,
-                                  )}
-                                </div>
-                              ) : null}
-                            </div>
-                          ) : (
-                            <a
-                              href={message.mediaUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              style={{ color: 'inherit', textDecoration: 'underline' }}
-                            >
-                              {renderHighlightedText(
-                                message.content || 'Open attachment',
-                                messageSearch.query,
-                                isActiveSearchMatch,
-                              )}
-                            </a>
-                          )
-                        ) : (
-                          <span>
-                            {renderHighlightedText(
-                              message.content,
-                              messageSearch.query,
-                              isActiveSearchMatch,
-                            )}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div
-                      className={`msg-time-row ${isSent ? 'msg-row--sent' : ''}`}
-                      style={isSent ? undefined : { paddingLeft: 38 }}
-                    >
-                      {formatFullTime(message.createdAt)}
-                      {isSent && receiptState && (
-                        <span
-                          className={`msg-receipt msg-receipt--${receiptState}`}
-                          title={receiptLabel}
-                          aria-label={receiptLabel}
-                        >
-                          {receiptGlyph}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-
-              {messagesPane.typingUserIds.length > 0 && (
-                <TypingIndicator userName={messagesPane.typingLabel} />
-              )}
-
-              <div ref={messagesPane.endRef} />
-            </div>
+            />
           </div>
+
+          {typingUserIds?.length > 0 && (
+            <div className="px-10 py-2">
+              <TypingIndicator userName={typingLabel} />
+            </div>
+          )}
 
           <ChatStateBanner
             availabilityReason={conversation?.availabilityReason}
@@ -595,6 +796,26 @@ const ChatConversationPane = ({
           />
 
           <div className="chat-composer" ref={composer.ref}>
+            {!isAtBottom && (
+              <button
+                className="chat-fab-scroll-bottom absolute right-4 -top-12 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white text-slate-600 shadow-md border border-slate-100 hover:bg-slate-50 hover:text-slate-800 transition-colors dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white"
+                onClick={() => {
+                  messagesPane.virtuosoRef?.current?.scrollToIndex({
+                    index: messagesPane.groupedMessages.length - 1,
+                    behavior: 'smooth',
+                  });
+                }}
+                type="button"
+                aria-label="Scroll to bottom"
+              >
+                <FiChevronDown size={20} />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-blue-500 px-1 text-[10px] font-bold text-white shadow-sm">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </button>
+            )}
             {composer.attachmentDraft && (
               <div className="chat-attachment-preview">
                 <div className="chat-attachment-preview__media">

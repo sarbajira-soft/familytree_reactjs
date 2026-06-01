@@ -18,8 +18,7 @@ const ChatListItem = ({ conversation, onClick }) => {
   let avatarCls = 'chat-avatar';
   if (isGroup) {
     avatarCls += ' chat-avatar--room';
-    if (conversation.roomType === 'announcements') avatarCls += ' chat-avatar--announcements';
-    else if (conversation.roomType === 'event') avatarCls += ' chat-avatar--event';
+    if (conversation.roomType === 'event') avatarCls += ' chat-avatar--event';
     else if (conversation.roomType === 'custom') avatarCls += ' chat-avatar--custom';
   }
 
@@ -44,7 +43,7 @@ const ChatListItem = ({ conversation, onClick }) => {
           <span className={`chat-item-time${unread > 0 ? ' unread' : ''}`}>{time}</span>
         </div>
         <div className="chat-item-preview">
-          {isSentByMe && !isGroup && <span className="ticks">✓✓</span>}
+          {isSentByMe && !isGroup && <span className="chat-item-preview-prefix">You: </span>}
           {isGroup && conversation.lastMessage?.senderName && (
             <span style={{ fontWeight: 500, color: '#111b21' }}>{conversation.lastMessage.senderName}: </span>
           )}

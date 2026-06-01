@@ -4,7 +4,6 @@ import Swal from 'sweetalert2';
 import { throwIfNotOk } from '../utils/apiMessages';
 import { getToken } from '../utils/auth';
 import { useUser } from '../Contexts/UserContext';
-import { hasFamilyAccessStatus } from '../utils/familyAccess';
 
 const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authToken, mode = 'create', albumData = null }) => {
     const { userInfo } = useUser();
@@ -19,17 +18,13 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
     const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
     const MAX_IMAGE_ERROR = 'Image is too large. Please select an image less than 5MB.';
 
-    const getDefaultPrivacy = () => {
-        const hasFamily = Boolean(currentUser?.familyCode || userInfo?.familyCode);
-        const isApproved = hasFamilyAccessStatus(userInfo?.approveStatus);
-        return hasFamily && isApproved ? 'family' : 'public';
-    };
+    const getDefaultPrivacy = () => 'family';
 
     const getPreferredFamilyCode = () =>
         String(currentUser?.familyCode || userInfo?.familyCode || '').trim();
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
-    const [privacy, setPrivacy] = useState(getDefaultPrivacy());
+    const [privacy] = useState('family');
     const [familyCode, setFamilyCode] = useState('');
 
     // For new file uploads
@@ -81,7 +76,6 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
         if (mode === 'edit' && albumData) {
             setTitle(albumData.galleryTitle || albumData.title || '');
             setDescription(albumData.galleryDescription || albumData.description || '');
-            setPrivacy(albumData.privacy === 'private' || albumData.privacy === 'family' ? 'family' : 'public');
             setFamilyCode(String(albumData.familyCode || getPreferredFamilyCode() || '').trim());
             setCoverPhotoFile(null);
             setGalleryPhotoFiles([]);
@@ -112,7 +106,6 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
 
         setTitle('');
         setDescription('');
-        setPrivacy(getDefaultPrivacy());
         setFamilyCode(getDefaultPrivacy() === 'family' ? getPreferredFamilyCode() : '');
         setCoverPhotoFile(null);
         setGalleryPhotoFiles([]);
@@ -136,7 +129,6 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
     const resetForm = () => {
         setTitle('');
         setDescription('');
-        setPrivacy(getDefaultPrivacy());
         setFamilyCode('');
         setCoverPhotoFile(null);
         setGalleryPhotoFiles([]);
@@ -295,7 +287,7 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
         }
 
         const resolvedFamilyCode = getResolvedFamilyCode();
-        if (privacy === 'family' && !resolvedFamilyCode) {
+        if (!resolvedFamilyCode) {
             Swal.fire({
                 icon: 'warning',
                 title: 'Missing Family Code',
@@ -314,7 +306,7 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
         const formData = new FormData();
         formData.append('galleryTitle', trimmedTitle);
         formData.append('galleryDescription', description || '');
-        formData.append('privacy', privacy);
+        formData.append('privacy', 'family');
 
         const nextStatus = 1;
         if (Number.isFinite(Number(nextStatus))) {
@@ -328,9 +320,7 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
             formData.append('createdBy', String(resolvedCreatedBy));
         }
         
-        if (privacy === 'family') {
-            formData.append('familyCode', resolvedFamilyCode);
-        }
+        formData.append('familyCode', resolvedFamilyCode);
 
         if (coverPhotoFile) {
             formData.append('coverPhoto', coverPhotoFile);
@@ -517,85 +507,6 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
                             {String(description || '').length} / {MAX_CAPTION_LENGTH}
                         </div>
                     </div>
-
-                    {/* Privacy Setting */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Privacy
-                        </label>
-                        <div className="flex items-center space-x-4">
-                            {Boolean(getResolvedFamilyCode()) && hasFamilyAccessStatus(userInfo?.approveStatus) ? (
-                                <>
-                                    <label className="inline-flex items-center">
-                                        <input
-                                            type="radio"
-                                            className="form-radio h-4 w-4 text-primary-600 border-gray-300 focus:ring-primary-500"
-                                            name="privacy"
-                                            value="family"
-                                            checked={privacy === 'family'}
-                                            onChange={(e) => {
-                                                const nextValue = e.target.value;
-                                                setPrivacy(nextValue);
-                                                if (nextValue === 'family' && !familyCode.trim()) {
-                                                    const resolved = getResolvedFamilyCode();
-                                                    if (resolved) setFamilyCode(resolved);
-                                                }
-                                            }}
-                                            disabled={isSubmitting}
-                                        />
-                                        <span className={`ml-2 text-gray-700 ${isSubmitting ? 'opacity-50' : ''}`}>Family</span>
-                                    </label>
-                                    <label className="inline-flex items-center">
-                                        <input
-                                            type="radio"
-                                            className="form-radio h-4 w-4 text-primary-600 border-gray-300 focus:ring-primary-500"
-                                            name="privacy"
-                                            value="public"
-                                            checked={privacy === 'public'}
-                                            onChange={(e) => setPrivacy(e.target.value)}
-                                            disabled={isSubmitting}
-                                        />
-                                        <span className={`ml-2 text-gray-700 ${isSubmitting ? 'opacity-50' : ''}`}>Public</span>
-                                    </label>
-                                </>
-                            ) : (
-                                <label className="inline-flex items-center">
-                                    <input
-                                        type="radio"
-                                        className="form-radio h-4 w-4 text-primary-600 border-gray-300 focus:ring-primary-500"
-                                        name="privacy"
-                                        value="public"
-                                        checked={true}
-                                        disabled
-                                    />
-                                    <span className="ml-2 text-gray-700">Public (Only option for non-approved users)</span>
-                                </label>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Family Code Input */}
-                    {privacy === 'family' && (
-                        <div>
-                            <label htmlFor="familyCode" className="block text-sm font-medium text-gray-700 mb-2">
-                                Family Code <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                                type="text"
-                                id="familyCode"
-                                value={familyCode}
-                                onChange={(e) => setFamilyCode(e.target.value)}
-                                disabled={isSubmitting}
-                                className={`w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-300 text-gray-800 placeholder-gray-400 transition-all ${
-                                    isSubmitting ? 'opacity-50 cursor-not-allowed' : ''
-                                }`}
-                                placeholder="Enter family code"
-                                required={privacy === 'family'}
-                                readOnly
-                            />
-                            <p className="mt-1 text-sm text-gray-500">Family code is automatically set based on your family membership.</p>
-                        </div>
-                    )}
 
                     {/* Cover Photo Upload */}
                     <div>
