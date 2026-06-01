@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom';
 import {
   FiHome,
   FiCalendar,
-  FiGift,
   FiImage,
   FiUsers,
   FiMessageCircle,
@@ -52,12 +51,6 @@ const BottomNavBar = ({ activeTab, setActiveTab, onNavigate, chatBadge }) => {
       label: "Gallery",
       icon: <FiImage size={18} />,
       path: "/family-gallery",
-    },
-    {
-      id: "gifts",
-      label: "Gifts",
-      icon: <FiGift size={18} />,
-      path: "/gifts-memories",
     },
   ];
 
