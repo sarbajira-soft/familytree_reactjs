@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import { FiArrowUpRight, FiFilm, FiGrid, FiImage } from 'react-icons/fi';
 import { MESSAGE_TYPES } from '../../constants/chat.constants';
 
-const ChatSharedContentCard = ({ message, onOpen }) => {
+const ChatSharedContentCard = ({ message = null, onOpen = undefined }) => {
   const sharePayload = message?.sharePayload || null;
   const isPost = message?.messageType === MESSAGE_TYPES.POST_SHARE;
   const mediaUrl = String(sharePayload?.previewMediaUrl || '').trim();
@@ -64,11 +64,6 @@ ChatSharedContentCard.propTypes = {
     }),
   }),
   onOpen: PropTypes.func,
-};
-
-ChatSharedContentCard.defaultProps = {
-  message: null,
-  onOpen: undefined,
 };
 
 export default React.memo(ChatSharedContentCard);

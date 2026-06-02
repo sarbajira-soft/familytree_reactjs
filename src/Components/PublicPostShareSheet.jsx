@@ -13,7 +13,7 @@ const SHARE_COPY = {
   text: 'Take a look at this public post on Familyss.',
 };
 
-const PublicPostShareSheet = ({ currentUserId, isOpen, post, onClose }) => {
+const PublicPostShareSheet = ({ currentUserId = null, isOpen = false, post = null, onClose = undefined }) => {
   const [busyAction, setBusyAction] = useState('');
   const [shareToChatOpen, setShareToChatOpen] = useState(false);
   const isPublicShareable =
@@ -226,13 +226,6 @@ PublicPostShareSheet.propTypes = {
     shareUrl: PropTypes.string,
   }),
   onClose: PropTypes.func,
-};
-
-PublicPostShareSheet.defaultProps = {
-  currentUserId: null,
-  isOpen: false,
-  post: null,
-  onClose: undefined,
 };
 
 export default PublicPostShareSheet;
