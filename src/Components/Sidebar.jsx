@@ -2,15 +2,11 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import {
   FiHome,
-  FiUser,
-  FiShare2,
   FiImage,
-  FiGift,
   FiUsers,
   FiClock,
   FiChevronDown,
   FiCalendar,
-  FiPackage,
   FiLink,
 } from "react-icons/fi";
 import { RiGitMergeLine } from "react-icons/ri";
@@ -29,9 +25,6 @@ const Sidebar = ({
   const location = useLocation();
   const [expandedParents, setExpandedParents] = useState({});
   const { userInfo } = useUser();
-
-  // Check if user is admin
-  const isAdmin = userInfo && userInfo.role === 3;
 
   // Check if user is approved
   const isApproved = userInfo && userInfo.approveStatus === "approved";
@@ -112,25 +105,10 @@ const Sidebar = ({
       route: "/family-gallery",
       icon: <FiImage size={19} />,
     },
-    {
-      id: "gifts",
-      label: "Gifts & Memories",
-      route: "/gifts-memories",
-      icon: <FiGift size={19} />,
-    },
-    {
-      id: "orders",
-      label: "Order Management",
-      route: "/orders",
-      icon: <FiPackage size={19} />,
-    },
   ];
 
   const filteredMenuItems = menuItems
     .filter((item) => {
-      // Filter out orders if not admin
-      if (item.id === "orders" && !isAdmin) return false;
-
       // Filter out items that require approval if user is not approved
       if (item.requiresApproval && !isApproved) return false;
 
@@ -215,8 +193,6 @@ const Sidebar = ({
           "/events": "upcomingEvent",
           "/posts-and-feeds": "postsStories",
           "/pending-approvals": "pendingApprovals",
-          "/gifts": "gifts",
-          "/gifts-memories": "gifts",
         };
         const tabId = routeToTabId[item.route];
         if (tabId) setActiveTab(tabId);

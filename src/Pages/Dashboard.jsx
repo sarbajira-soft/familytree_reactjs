@@ -1,29 +1,23 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import PropTypes from "prop-types";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   FiCalendar,
   FiChevronLeft,
   FiChevronRight,
-  FiGift,
   FiImage
 } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import CreateAlbumModal from "../Components/CreateAlbumModal";
 import CreatePostModal from "../Components/CreatePostModal";
-import DashboardGiftProductModal from "../Components/DashboardGiftProductModal";
 import EventModal from "../Components/EventModal";
 import GalleryViewerModal from "../Components/GalleryViewerModal";
-import { useGiftEvent } from "../Contexts/GiftEventContext";
 import { useUser } from "../Contexts/UserContext";
-import { fetchProducts as fetchMedusaProducts, fetchRegions } from "../Retail/services/productService";
-import { getProductThumbnail } from "../Retail/utils/helpers";
 import { getToken } from "../utils/auth";
 import { authFetch } from "../utils/authFetch";
 import { getGalleryListFromApiResponse, mapGallerySummary } from "../utils/galleryAdapter";
 import DashboardShimmer from "./DashboardShimmer";
 import PostPage from "./PostPage";
-import { MEDUSA_REGION_ID_KEY } from "../Retail/utils/constants";
 
 const getLocalDateKey = (dateValue) => {
   if (!dateValue) return "";
@@ -294,38 +288,13 @@ const MiniEventCalendar = ({ events = [] }) => {
   );
 };
 
-const buildGiftSuggestionsByEvent = (events, productSuggestionsPool, prev) => {
-  const next = { ...prev };
-  let changed = false;
-
-  events.forEach((event, index) => {
-    const key = event.id || index;
-    const existing = next[key];
-
-    if (!Array.isArray(existing) || existing.length === 0) {
-      const shuffled = [...productSuggestionsPool].sort(
-        () => Math.random() - 0.5,
-      );
-      next[key] = shuffled.slice(0, 3);
-      changed = true;
-    }
-  });
-
-  return changed ? next : prev;
-};
-
 const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
   const [isCreateEventModalOpen, setIsCreateEventModalOpen] = useState(false);
   const [isCreateAlbumModalOpen, setIsCreateAlbumModalOpen] = useState(false);
   const [isCreatePostModalOpen, setIsCreatePostModalOpen] = useState(false);
   const [isScheduleOptionsOpen, setIsScheduleOptionsOpen] = useState(false);
   const [isEventCalendarModalOpen, setIsEventCalendarModalOpen] = useState(false);
-  const [giftSuggestionsByEvent, setGiftSuggestionsByEvent] = useState({});
-  const [medusaProducts, setMedusaProducts] = useState([]);
-  const [isGiftDetailModalOpen, setIsGiftDetailModalOpen] = useState(false);
-  const [selectedGiftProductId, setSelectedGiftProductId] = useState(null);
   const { userInfo } = useUser();
-  const { setSelectedGiftEvent } = useGiftEvent();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const token = getToken();
@@ -363,8 +332,6 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
     return safeList.map(normalizeDashboardEvent);
   }, [dashboardData]);
 
-  const productSuggestionsPool = medusaProducts;
-
   const galleryPreview = useMemo(() => {
     if (!galleryData) return [];
     return getGalleryListFromApiResponse(galleryData).map(mapGallerySummary);
@@ -380,55 +347,6 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
       queryKey: ["dashboardGallery", userInfo?.userId],
     });
   };
-
-  const handleProductSuggestionClick = (product) => {
-    if (!product || !product.id) {
-      return;
-    }
-    setSelectedGiftProductId(product.id);
-    setIsGiftDetailModalOpen(true);
-  };
-
-  useEffect(() => {
-    let isMounted = true;
-    (async () => {
-      try {
-        let regionId = localStorage.getItem(MEDUSA_REGION_ID_KEY) || null;
-
-        if (!regionId) {
-          const regions = await fetchRegions();
-          const primaryRegionId =
-            (Array.isArray(regions) && regions.length > 0 && regions[0] && regions[0].id) || null;
-          if (!primaryRegionId) return;
-          localStorage.setItem(MEDUSA_REGION_ID_KEY, primaryRegionId);
-          regionId = primaryRegionId;
-        }
-
-        const products = await fetchMedusaProducts({ regionId });
-        if (isMounted && Array.isArray(products)) {
-          setMedusaProducts(products);
-        }
-      } catch (err) {
-        console.error("Failed to load gift products for suggestions", err);
-      }
-    })();
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!upcomingEventsPreview.length) return;
-    if (!productSuggestionsPool.length) return;
-
-    setGiftSuggestionsByEvent((prev) =>
-      buildGiftSuggestionsByEvent(
-        upcomingEventsPreview,
-        productSuggestionsPool,
-        prev,
-      ),
-    );
-  }, [upcomingEventsPreview, productSuggestionsPool]);
 
   const getEventCardStyle = (eventType) => {
     switch (eventType) {
@@ -528,21 +446,13 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
 
           <div className="space-y-4 lg:col-span-4">
             <div className="bg-white rounded-xl shadow-sm p-3 border border-gray-100">
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => setIsCreateAlbumModalOpen(true)}
                   className="flex flex-col items-center justify-center gap-1 bg-primary-700 text-white rounded-lg px-2 py-2 text-[11px] font-semibold hover:bg-primary-800 transition-colors"
                 >
                   <FiImage className="text-base" />
                   <span>Photo</span>
-                </button>
-
-                <button
-                  onClick={() => navigate("/gifts-memories")}
-                  className="flex flex-col items-center justify-center gap-1 bg-secondary-500 text-white rounded-lg px-2 py-2 text-[11px] font-semibold hover:bg-secondary-600 transition-colors"
-                >
-                  <FiGift className="text-base" />
-                  <span>Gift</span>
                 </button>
 
                 <button
@@ -722,101 +632,7 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
                               )}
                             </div>
 
-                            <button
-                              onClick={() => {
-                                setSelectedGiftEvent({
-                                  eventId: event.id || null,
-                                  eventTitle: title,
-                                  eventType: event.eventType || "custom",
-                                  eventDate: dateValue || null,
-                                  eventTime: timeValue || null,
-                                  location: event.location || null,
-                                  memberDetails: event.memberDetails || null,
-                                  createdBy: event.createdBy || null,
-                                  userId:
-                                    (event.memberDetails &&
-                                      event.memberDetails.userId) ||
-                                    event.createdBy ||
-                                    null,
-                                });
-                                navigate("/gifts-memories");
-                              }}
-                              className="ml-3 inline-flex bg-white items-center gap-1 text-[11px] font-semibold text-secondary-600 hover:text-secondary-800 whitespace-nowrap"
-                            >
-                              <FiGift className="text-[13px]" />
-                              <span>Send Gift</span>
-                            </button>
                           </div>
-
-                          {giftSuggestionsByEvent[event.id || index] &&
-                            giftSuggestionsByEvent[event.id || index].length > 0 && (
-                              <div className="mt-2 flex items-center justify-between gap-2">
-                                <div className="flex flex-1 gap-1.5">
-                                  {giftSuggestionsByEvent[event.id || index].map((product) => {
-                                    const image = getProductThumbnail(product);
-                                    return (
-                                      <button
-                                        key={product.id}
-                                        type="button"
-                                        onClick={() => {
-                                          setSelectedGiftEvent({
-                                            eventId: event.id || null,
-                                            eventTitle: title,
-                                            eventType: event.eventType || "custom",
-                                            eventDate: dateValue || null,
-                                            eventTime: timeValue || null,
-                                            location: event.location || null,
-                                            memberDetails: event.memberDetails || null,
-                                            createdBy: event.createdBy || null,
-                                            userId:
-                                              (event.memberDetails &&
-                                                event.memberDetails.userId) ||
-                                              event.createdBy ||
-                                              null,
-                                          });
-                                          handleProductSuggestionClick(product);
-                                        }}
-                                        className="relative flex-1 overflow-hidden rounded-md bg-gray-100 aspect-square group"
-                                      >
-                                        <img
-                                          src={image}
-                                          alt={product.title || product.description || "Gift"}
-                                          className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                                          onError={(e) => {
-                                            e.target.src = "https://placehold.co/80x80?text=Gift";
-                                          }}
-                                        />
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setSelectedGiftEvent({
-                                      eventId: event.id || null,
-                                      eventTitle: title,
-                                      eventType: event.eventType || "custom",
-                                      eventDate: dateValue || null,
-                                      eventTime: timeValue || null,
-                                      location: event.location || null,
-                                      memberDetails: event.memberDetails || null,
-                                      createdBy: event.createdBy || null,
-                                      userId:
-                                        (event.memberDetails &&
-                                          event.memberDetails.userId) ||
-                                        event.createdBy ||
-                                        null,
-                                    });
-                                    navigate("/gifts-memories");
-                                  }}
-                                  className="flex items-center justify-center w-7 h-7 rounded-full bg-secondary-500 text-white hover:bg-secondary-600 flex-shrink-0"
-                                  aria-label="More gifts"
-                                >
-                                  <FiChevronRight size={14} />
-                                </button>
-                              </div>
-                            )}
                         </div>
                       </div>
                     );
@@ -825,37 +641,6 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
               </div>
             )}
 
-            {/* Gift Ideas at bottom */}
-            <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-secondary-100 flex items-center justify-center">
-                    <FiGift className="text-secondary-600" size={16} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-gray-800">
-                      Gift Ideas
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      Make upcoming events more special
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => navigate("/gifts-memories")}
-                  className="text-xs font-semibold bg-white text-secondary-600 hover:text-secondary-800"
-                >
-                  View all
-                </button>
-              </div>
-              <button
-                onClick={() => navigate("/gifts-memories")}
-                className="w-full inline-flex items-center justify-center gap-2 text-xs font-semibold text-white bg-secondary-500 hover:bg-secondary-600 rounded-lg py-2 transition-colors"
-              >
-                <FiGift size={14} />
-                <span>Browse Gift Ideas</span>
-              </button>
-            </div>
           </div>
         </div>
       </div>
@@ -936,14 +721,6 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
       <CreatePostModal
         isOpen={isCreatePostModalOpen}
         onClose={() => setIsCreatePostModalOpen(false)}
-      />
-      <DashboardGiftProductModal
-        isOpen={isGiftDetailModalOpen}
-        productId={selectedGiftProductId}
-        onClose={() => {
-          setIsGiftDetailModalOpen(false);
-          setSelectedGiftProductId(null);
-        }}
       />
       {/* Gallery Viewer Modal */}
       {selectedAlbum && (

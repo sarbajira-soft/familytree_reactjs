@@ -3,8 +3,6 @@ import { useNavigate, Link } from 'react-router-dom';
 import AuthLogo from '../Components/AuthLogo';
 import { setAuthData, isAuthenticated } from '../utils/auth';
 import { useUser } from '../Contexts/UserContext';
-import { MEDUSA_TOKEN_KEY } from '../Retail/utils/constants';
-import * as retailAuthService from '../Retail/services/authService';
 import { markOtpSent } from '../utils/otpCooldown';
 
 const Login = () => {
@@ -168,22 +166,6 @@ const Login = () => {
       const data = await response.json();
       
       setAuthData(data.accessToken, data.user, stayLoggedIn);
-
-      try {
-        const email = data?.user?.email;
-        if (email && formData.password) {
-          const { token: medusaToken } = await retailAuthService.loginCustomer({
-            email,
-            password: formData.password,
-          });
-
-          if (medusaToken) {
-            localStorage.setItem(MEDUSA_TOKEN_KEY, medusaToken);
-          }
-        }
-      } catch (err) {
-        console.error('Medusa customer login failed:', err);
-      }
       
       await refetchUser();
       
