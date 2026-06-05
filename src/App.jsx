@@ -64,6 +64,8 @@ const PublicSharedPostPage = lazy(() => import("./Pages/PublicSharedPostPage"));
 const SharedPostScreen = lazy(() => import("./Pages/SharedPostScreen"));
 const PublicSharedGalleryPage = lazy(() => import("./Pages/PublicSharedGalleryPage"));
 const SharedGalleryScreen = lazy(() => import("./Pages/SharedGalleryScreen"));
+const TutorialsPage = lazy(() => import("./Pages/TutorialsPage"));
+const TutorialDetailPage = lazy(() => import("./Pages/TutorialDetailPage"));
 
 // ---------------- Loading Fallback ----------------
 const LoadingFallback = () => (
@@ -241,6 +243,8 @@ function App() {
                   path="/suggestion-approving"
                   element={<SuggestionApproving />}
                 />
+                <Route path="/tutorials" element={<TutorialsPage />} />
+                <Route path="/tutorials/:id" element={<TutorialDetailPage />} />
 
               </Route>
 

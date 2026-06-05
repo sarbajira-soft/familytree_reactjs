@@ -9,6 +9,7 @@ import {
   FiAlertCircle,
   FiArrowLeft,
   FiBell,
+  FiBookOpen,
   FiCalendar,
   FiChevronDown,
   FiChevronRight,
@@ -910,6 +911,18 @@ const LayoutContent = ({ noScroll = false }) => {
                               <span className="block text-[13px] font-medium leading-5 text-gray-800 dark:text-slate-100">Help & Support</span>
                             </span>
                             <FiChevronRight size={14} className="text-gray-400 dark:text-slate-500" />
+                          </button>
+
+                          <button
+                            onClick={() => navigateTo("/tutorials")}
+                            className="bg-unset flex w-full items-center gap-2 rounded-xl px-2.5 py-1.5 text-left transition hover:bg-gray-100 dark:hover:bg-slate-700"
+                          >
+                            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-200">
+                              <FiBookOpen size={15} />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-[13px] font-medium leading-5 text-gray-800 dark:text-slate-100">Tutorials</span>
+                            </span>
                           </button>
 
                           <div className="my-1 border-t border-gray-200 dark:border-slate-700"></div>
