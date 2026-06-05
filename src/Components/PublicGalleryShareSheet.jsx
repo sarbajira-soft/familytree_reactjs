@@ -13,7 +13,7 @@ const SHARE_COPY = {
   text: 'Take a look at this public gallery on Familyss.',
 };
 
-const PublicGalleryShareSheet = ({ currentUserId, isOpen, gallery, onClose }) => {
+const PublicGalleryShareSheet = ({ currentUserId = null, isOpen = false, gallery = null, onClose = undefined }) => {
   const [busyAction, setBusyAction] = useState('');
   const [shareToChatOpen, setShareToChatOpen] = useState(false);
   const isPublicShareable =
@@ -225,13 +225,6 @@ PublicGalleryShareSheet.propTypes = {
     title: PropTypes.string,
   }),
   onClose: PropTypes.func,
-};
-
-PublicGalleryShareSheet.defaultProps = {
-  currentUserId: null,
-  isOpen: false,
-  gallery: null,
-  onClose: undefined,
 };
 
 export default PublicGalleryShareSheet;

@@ -1,7 +1,13 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 
-const AuthPromptModal = ({ isOpen, onClose, onLogin, onRegister, contentLabel }) => {
+const AuthPromptModal = ({
+  isOpen = false,
+  onClose = undefined,
+  onLogin = undefined,
+  onRegister = undefined,
+  contentLabel = 'post'
+}) => {
   if (!isOpen) {
     return null;
   }
@@ -53,14 +59,6 @@ AuthPromptModal.propTypes = {
   onLogin: PropTypes.func,
   onRegister: PropTypes.func,
   contentLabel: PropTypes.string,
-};
-
-AuthPromptModal.defaultProps = {
-  isOpen: false,
-  onClose: undefined,
-  onLogin: undefined,
-  onRegister: undefined,
-  contentLabel: 'post',
 };
 
 export default AuthPromptModal;

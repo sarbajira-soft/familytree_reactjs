@@ -13,7 +13,6 @@ import { queryClient } from "./utils/queryClient";
 import { UserProvider } from "./Contexts/UserContext";
 import { LanguageProvider } from "./Contexts/LanguageContext";
 import { FamilyTreeProvider } from "./Contexts/FamilyTreeContext";
-import { GiftEventProvider } from "./Contexts/GiftEventContext";
 import { ThemeProvider } from "./Contexts/ThemeContext";
 import { NetworkProvider, useNetwork } from "./Contexts/NetworkContext";
 import OfflineUI from "./Components/OfflineUI";
@@ -46,10 +45,7 @@ const PendingFamilyRequests = lazy(() =>
 );
 
 const FamilyGalleryPage = lazy(() => import("./Pages/FamilyGalleryPage"));
-const GiftListingPage = lazy(() => import("./Pages/GiftListingPage"));
-const RetailPaymentPage = lazy(() => import("./Pages/RetailPaymentPage"));
 const EventsPage = lazy(() => import("./Pages/EventsPage"));
-const OrderManagementPage = lazy(() => import("./Pages/OrderManagementPage"));
 const SuggestionApproving = lazy(() => import("./Pages/SuggestionApproving"));
 const FamilyManagementMobile = lazy(() => import("./Pages/FamilyManagementMobile"));
 const AssociatedFamilyTreePage = lazy(() =>
@@ -68,6 +64,8 @@ const PublicSharedPostPage = lazy(() => import("./Pages/PublicSharedPostPage"));
 const SharedPostScreen = lazy(() => import("./Pages/SharedPostScreen"));
 const PublicSharedGalleryPage = lazy(() => import("./Pages/PublicSharedGalleryPage"));
 const SharedGalleryScreen = lazy(() => import("./Pages/SharedGalleryScreen"));
+const TutorialsPage = lazy(() => import("./Pages/TutorialsPage"));
+const TutorialDetailPage = lazy(() => import("./Pages/TutorialDetailPage"));
 
 // ---------------- Loading Fallback ----------------
 const LoadingFallback = () => (
@@ -94,18 +92,6 @@ const AppContent = () => {
   }
 
   return null; // Return null to render the normal app routes
-};
-
-// ---------------- Admin Route ----------------
-const AdminRoute = ({ children }) => {
-  let userInfo = null;
-  try {
-    userInfo = JSON.parse(localStorage.getItem("userInfo"));
-  } catch {}
-  if (!userInfo || userInfo.role !== 3) {
-    return <Navigate to="/dashboard" replace />;
-  }
-  return children;
 };
 
 function App() {
@@ -158,9 +144,6 @@ function App() {
                   </GuestRoute>
                 }
               />
-
-              <Route path="/retail/payment" element={<RetailPaymentPage />} />
-
                {/* ---------------- Onboarding (Authenticated) ---------------- */}
               <Route
                 path="/on-boarding"
@@ -185,9 +168,7 @@ function App() {
                 element={
                   <PrivateRoute>
                     <LanguageProvider>
-                      <GiftEventProvider>
-                        <Layout />
-                      </GiftEventProvider>
+                      <Layout />
                     </LanguageProvider>
                   </PrivateRoute>
                 }
@@ -253,8 +234,6 @@ function App() {
                   element={<PostsAndFeedsPage />}
                 /> */}
                 <Route path="/family-gallery" element={<FamilyGalleryPage />} />
-                <Route path="/gifts" element={<GiftListingPage />} />
-                <Route path="/gifts-memories" element={<GiftListingPage />} />
                 <Route path="/events" element={<EventsPage />} />
                 {/* Chat Feature Routes */}
                 <Route path="/chat" element={<ChatPage />} />
@@ -264,16 +243,9 @@ function App() {
                   path="/suggestion-approving"
                   element={<SuggestionApproving />}
                 />
+                <Route path="/tutorials" element={<TutorialsPage />} />
+                <Route path="/tutorials/:id" element={<TutorialDetailPage />} />
 
-                {/* Admin-only */}
-                <Route
-                  path="/orders"
-                  element={
-                    <AdminRoute>
-                      <OrderManagementPage />
-                    </AdminRoute>
-                  }
-                />
               </Route>
 
               {/* ---------------- Catch-all Redirect ---------------- */}

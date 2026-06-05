@@ -1,7 +1,6 @@
 import React, { Suspense, useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { App as CapacitorApp } from "@capacitor/app";
-import { Browser } from "@capacitor/browser";
 import Sidebar from "./Sidebar";
 import BottomNavBar from "./BottomNavBar";
 import { ChatProvider, useChat } from "../Contexts/ChatContext";
@@ -10,13 +9,12 @@ import {
   FiAlertCircle,
   FiArrowLeft,
   FiBell,
+  FiBookOpen,
   FiCalendar,
   FiChevronDown,
   FiChevronRight,
-  FiClock,
   FiEdit2,
   FiFileText,
-  FiGift,
   FiHelpCircle,
   FiHome,
   FiImage,
@@ -26,7 +24,6 @@ import {
   FiMenu,
   FiMessageCircle,
   FiMoon,
-  FiPackage,
   FiShield,
   FiSun,
   FiUsers,
@@ -35,7 +32,6 @@ import { RiUser3Line } from "react-icons/ri";
 import { RiGitMergeLine } from "react-icons/ri";
 import { useUser } from "../Contexts/UserContext";
 import { useTheme } from "../Contexts/ThemeContext";
-import { MEDUSA_TOKEN_KEY, MEDUSA_CART_ID_KEY } from "../Retail/utils/constants";
 import NotificationPanel from "./NotificationPanel";
 import SupportHelpModal from "./SupportHelpModal";
 import TermsAndConditionsModal from "./TermsAndConditionsModal";
@@ -173,8 +169,6 @@ const LayoutContent = ({ noScroll = false }) => {
       "/suggestion-approving": "familyManagement",
       // "/posts-and-feeds": "postsStories",
       "/family-gallery": "gallery",
-      "/gifts": "gifts",
-      "/gifts-memories": "gifts",
       "/chat": "chat",
     };
     const tabId =
@@ -346,44 +340,6 @@ const LayoutContent = ({ noScroll = false }) => {
     };
   }, [handleGlobalBack]);
 
-  useEffect(() => {
-    let removeUrlOpenListener = null;
-
-    const handleAppUrlOpen = async ({ url }) => {
-      if (!url || !url.includes("payment-return")) {
-        return;
-      }
-
-      try {
-        await Browser.close();
-      } catch {
-        // Best-effort only. Some Android browser implementations ignore close requests.
-      }
-
-      window.setTimeout(() => {
-        navigate("/gifts?tab=orders");
-      }, 250);
-    };
-
-    try {
-      const maybePromise = CapacitorApp.addListener("appUrlOpen", handleAppUrlOpen);
-      if (maybePromise && typeof maybePromise.then === "function") {
-        maybePromise.then((handle) => {
-          removeUrlOpenListener = () => handle && handle.remove && handle.remove();
-        });
-      } else {
-        removeUrlOpenListener = () =>
-          maybePromise && maybePromise.remove && maybePromise.remove();
-      }
-    } catch {
-      // ignore
-    }
-
-    return () => {
-      if (removeUrlOpenListener) removeUrlOpenListener();
-    };
-  }, [navigate]);
-
   const { userInfo, userLoading, logout } = useUser();
   const { theme, toggleTheme } = useTheme();
   const { unreadChatCount } = useChat();
@@ -444,7 +400,6 @@ const LayoutContent = ({ noScroll = false }) => {
     return () => document.removeEventListener("click", handleClickOutside);
   }, [closeProfileMenu]);
 
-  const isAdmin = userInfo && userInfo.role === 3;
   const isApproved = userInfo && userInfo.approveStatus === "approved";
 
   const isRestrictedUser = useMemo(() => {
@@ -462,9 +417,6 @@ const LayoutContent = ({ noScroll = false }) => {
     [noScroll]
   );
 
-  const isGiftsRoute =
-    location.pathname === "/gifts" || location.pathname === "/gifts-memories";
-
   const isChatRoute =
     location.pathname === "/chat" || location.pathname.startsWith("/chat/");
 
@@ -478,10 +430,9 @@ const LayoutContent = ({ noScroll = false }) => {
   const pullDisabled = useMemo(() => {
     if (shouldLockScroll) return true;
     if (isChatRoute) return true;
-    if (isGiftsRoute) return true;
     if (isRestrictedUser) return true;
     return sidebarOpen || notificationOpen || supportHelpOpen || termsModalOpen;
-  }, [shouldLockScroll, isChatRoute, isGiftsRoute, isRestrictedUser, sidebarOpen, notificationOpen, supportHelpOpen, termsModalOpen]);
+  }, [shouldLockScroll, isChatRoute, isRestrictedUser, sidebarOpen, notificationOpen, supportHelpOpen, termsModalOpen]);
 
   const handlePullRefresh = useCallback(async () => {
     window.location.reload();
@@ -527,21 +478,8 @@ const LayoutContent = ({ noScroll = false }) => {
       route: "/family-gallery",
       icon: <FiImage size={20} />,
     },
-    {
-      id: "gifts",
-      label: "Gifts",
-      route: "/gifts-memories",
-      icon: <FiGift size={20} />,
-    },
-    {
-      id: "orders",
-      label: "Orders",
-      route: "/orders",
-      icon: <FiPackage size={20} />,
-    },
   ]
     .filter((item) => {
-      if (item.id === "orders" && !isAdmin) return false;
       if (item.requiresApproval && !isApproved) return false;
 
       if (item.children) {
@@ -600,8 +538,6 @@ const LayoutContent = ({ noScroll = false }) => {
     setTermsModalOpen(false);
     logout();
     localStorage.removeItem("userInfo");
-    localStorage.removeItem(MEDUSA_TOKEN_KEY);
-    localStorage.removeItem(MEDUSA_CART_ID_KEY);
     navigate("/login");
   };
 
@@ -977,6 +913,18 @@ const LayoutContent = ({ noScroll = false }) => {
                             <FiChevronRight size={14} className="text-gray-400 dark:text-slate-500" />
                           </button>
 
+                          <button
+                            onClick={() => navigateTo("/tutorials")}
+                            className="bg-unset flex w-full items-center gap-2 rounded-xl px-2.5 py-1.5 text-left transition hover:bg-gray-100 dark:hover:bg-slate-700"
+                          >
+                            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-200">
+                              <FiBookOpen size={15} />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-[13px] font-medium leading-5 text-gray-800 dark:text-slate-100">Tutorials</span>
+                            </span>
+                          </button>
+
                           <div className="my-1 border-t border-gray-200 dark:border-slate-700"></div>
 
                           <button
@@ -1105,7 +1053,7 @@ const LayoutContent = ({ noScroll = false }) => {
             <Suspense fallback={outletFallback}>
               <Outlet />
             </Suspense>
-          ) : isChatRoute || isGiftsRoute || isTreeRoute ? (
+          ) : isChatRoute || isTreeRoute ? (
             <Suspense fallback={outletFallback}>
               <Outlet />
             </Suspense>
