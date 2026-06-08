@@ -585,13 +585,13 @@ const Register = () => {
               />
               <label
                 htmlFor="hasAcceptedTerms"
-                className="text-xs text-gray-700"
+                className="text-xs text-gray-700 dark:text-gray-300"
               >
                 I agree to the{" "}
                 <button
                   type="button"
                   onClick={() => setShowTermsModal(true)}
-                  className="text-[#1976d2] underline bg-white hover:text-[#1565c0]"
+                  className="text-[#1976d2] underline bg-transparent dark:bg-transparent hover:text-[#1565c0]"
                 >
                   Terms & Conditions
                 </button>{" "}

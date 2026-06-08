@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import Swal from "sweetalert2";
 import { useNavigate } from "react-router-dom";
 import {
@@ -104,6 +104,17 @@ const ProfilePage = () => {
   const { userInfo, userLoading, refetchUser } = useUser();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+
+  const hasFamilyAccess = useMemo(() => {
+    const status = String(userInfo?.approveStatus || "").toLowerCase();
+    return Boolean(userInfo?.familyCode) && ["approved", "associated"].includes(status);
+  }, [userInfo]);
+
+  useEffect(() => {
+    if (!hasFamilyAccess) {
+      setShowPosts(true);
+    }
+  }, [hasFamilyAccess]);
 
   const [localIsPrivate, setLocalIsPrivate] = useState(
     Boolean(userInfo?.isPrivate),
@@ -471,7 +482,7 @@ const ProfilePage = () => {
         hasMore: Boolean(json?.hasMore),
       };
     },
-    enabled: !!userInfo?.userId && !!token,
+    enabled: !!userInfo?.userId && !!token && hasFamilyAccess,
     placeholderData: (previousData) => previousData,
     staleTime: 3 * 60 * 1000, // 3 minutes
     cacheTime: 10 * 60 * 1000, // 10 minutes
@@ -946,14 +957,16 @@ const ProfilePage = () => {
                               Posts
                             </span>
                           </div>
-                          <div className="text-center">
-                            <span className="block text-xl font-bold text-gray-900 md:text-2xl">
-                              {user.galleryCount}
-                            </span>
-                            <span className="block text-xs font-medium uppercase tracking-wide text-gray-500">
-                              Galleries
-                            </span>
-                          </div>
+                          {hasFamilyAccess && (
+                            <div className="text-center">
+                              <span className="block text-xl font-bold text-gray-900 md:text-2xl">
+                                {user.galleryCount}
+                              </span>
+                              <span className="block text-xs font-medium uppercase tracking-wide text-gray-500">
+                                Galleries
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -986,29 +999,33 @@ const ProfilePage = () => {
               <FiPlusSquare size={20} />
             </button>
           </div>
-          <span className="text-gray-200 px-1 md:px-2" style={{ fontSize: 18 }}>
-            |
-          </span>
-          <div className="flex flex-1 items-center gap-1 md:gap-2">
-            <button
-              onClick={() => setShowPosts(false)}
-              className={`flex-1 flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-lg font-semibold text-sm transition-all duration-300 ${!showPosts
-                  ? "bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow"
-                  : "bg-primary-700 text-white hover:bg-primary-800"
-                }`}
-            >
-              <FiImage size={20} />
-              <span className="hidden sm:inline">Created Galleries</span>
-              <span className="sm:hidden">Galleries</span>
-            </button>
-            <button
-              onClick={handleCreateAlbumClick}
-              className="p-2 rounded-full bg-primary-600 text-white shadow hover:bg-primary-700 transition duration-300 focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-opacity-75"
-              title="Create New Gallery"
-            >
-              <FiCamera size={20} />
-            </button>
-          </div>
+          {hasFamilyAccess && (
+            <>
+              <span className="text-gray-200 px-1 md:px-2" style={{ fontSize: 18 }}>
+                |
+              </span>
+              <div className="flex flex-1 items-center gap-1 md:gap-2">
+                <button
+                  onClick={() => setShowPosts(false)}
+                  className={`flex-1 flex items-center justify-center gap-1.5 px-2.5 py-2 rounded-lg font-semibold text-sm transition-all duration-300 ${!showPosts
+                      ? "bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow"
+                      : "bg-primary-700 text-white hover:bg-primary-800"
+                    }`}
+                >
+                  <FiImage size={20} />
+                  <span className="hidden sm:inline">Created Galleries</span>
+                  <span className="sm:hidden">Galleries</span>
+                </button>
+                <button
+                  onClick={handleCreateAlbumClick}
+                  className="p-2 rounded-full bg-primary-600 text-white shadow hover:bg-primary-700 transition duration-300 focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-opacity-75"
+                  title="Create New Gallery"
+                >
+                  <FiCamera size={20} />
+                </button>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Content Display Area */}

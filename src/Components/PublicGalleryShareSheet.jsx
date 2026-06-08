@@ -7,6 +7,7 @@ import {
   copyTextToClipboard,
 } from '../utils/publicPostShare';
 import ChatShareTargetModal from './Chat/ChatShareTargetModal';
+import { useUser } from '../Contexts/UserContext';
 
 const SHARE_COPY = {
   title: 'Familyss Gallery',
@@ -14,8 +15,15 @@ const SHARE_COPY = {
 };
 
 const PublicGalleryShareSheet = ({ currentUserId = null, isOpen = false, gallery = null, onClose = undefined }) => {
+  const { userInfo } = useUser();
   const [busyAction, setBusyAction] = useState('');
   const [shareToChatOpen, setShareToChatOpen] = useState(false);
+
+  const hasChatAccess = useMemo(() => {
+    const status = String(userInfo?.approveStatus || '').toLowerCase();
+    return Boolean(userInfo?.familyCode) && ['approved', 'associated'].includes(status);
+  }, [userInfo]);
+
   const isPublicShareable =
     String(gallery?.privacy || '').toLowerCase() === 'public' &&
     (Number(gallery?.id) > 0 || String(gallery?.publicShareId || '').trim());
@@ -101,7 +109,7 @@ const PublicGalleryShareSheet = ({ currentUserId = null, isOpen = false, gallery
   return (
     <>
       <div
-        className="fixed inset-0 z-[80] flex items-end justify-center bg-black/45 backdrop-blur-sm px-4 pb-4"
+        className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/45 backdrop-blur-sm px-4 py-4"
         onClick={() => onClose?.()}
       >
         <div
@@ -126,22 +134,24 @@ const PublicGalleryShareSheet = ({ currentUserId = null, isOpen = false, gallery
           </div>
 
           <div className="p-3">
-            <button
-              type="button"
-              onClick={() => setShareToChatOpen(true)}
-              disabled={!!busyAction}
-              className="flex w-full items-center justify-between rounded-2xl px-4 py-4 text-left hover:bg-gray-50 disabled:opacity-60"
-            >
-              <span className="flex items-center gap-3">
-                <span className="grid h-11 w-11 place-items-center rounded-2xl bg-violet-50 text-violet-600">
-                  <FiMessageCircle size={18} />
+            {hasChatAccess && (
+              <button
+                type="button"
+                onClick={() => setShareToChatOpen(true)}
+                disabled={!!busyAction}
+                className="flex w-full items-center justify-between rounded-2xl px-4 py-4 text-left hover:bg-gray-50 disabled:opacity-60"
+              >
+                <span className="flex items-center gap-3">
+                  <span className="grid h-11 w-11 place-items-center rounded-2xl bg-violet-50 text-violet-600">
+                    <FiMessageCircle size={18} />
+                  </span>
+                  <span>
+                    <span className="block text-sm font-semibold text-gray-900">Share to Chat</span>
+                    <span className="block text-xs text-gray-500">Send it inside Familyss chat</span>
+                  </span>
                 </span>
-                <span>
-                  <span className="block text-sm font-semibold text-gray-900">Share to Chat</span>
-                  <span className="block text-xs text-gray-500">Send it inside Familyss chat</span>
-                </span>
-              </span>
-            </button>
+              </button>
+            )}
 
             {isPublicShareable ? (
               <button
