@@ -505,34 +505,7 @@ const EventsPage = () => {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
               {/* Left Block - hidden on mobile to keep header compact */}
               <div className="hidden sm:flex sm:flex-col w-full sm:w-auto">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-[#1976D2] rounded-lg flex items-center justify-center">
-                    <FiCalendar size={22} className="text-white" />
-                  </div>
-                  <h1 className="text-2xl sm:text-4xl font-extrabold text-[#1976D2]">
-                    Events
-                  </h1>
-                </div>
-
-                <p className="text-gray-600 dark:text-slate-300 mt-1 text-sm sm:text-lg">
-                  Create, manage and celebrate memorable moments
-                </p>
-
-                {/* Legend */}
-                {/* <div className="flex items-center gap-4 mt-3 text-xs sm:text-sm">
-                  <div className="flex items-center gap-1">
-                    <div className="w-2.5 h-2.5 bg-pink-500 rounded-full"></div>
-                    <span>Birthdays</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-2.5 h-2.5 bg-red-500 rounded-full"></div>
-                    <span>Anniversaries</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-2.5 h-2.5 bg-[#1976D2] rounded-full"></div>
-                    <span>Custom Events</span>
-                  </div>
-                </div> */}
+               
               </div>
 
               {/* Right Button */}

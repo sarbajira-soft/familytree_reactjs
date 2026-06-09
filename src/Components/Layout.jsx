@@ -1118,7 +1118,7 @@ const LayoutContent = ({ noScroll = false }) => {
                 ? "overflow-hidden pt-0 px-0 pb-0"
               : isTreeRoute
                 ? "overflow-hidden pt-0 px-0 pb-0"
-                : "overflow-y-auto pt-0 px-1 pb-16 md:px-2 md:pb-12 lg:pb-4"
+                : "overflow-y-auto pt-0 px-1 pb-11 md:px-2 md:pb-12 lg:pb-4"
           }`}
         >
           {shouldLockScroll ? (
@@ -1149,6 +1149,7 @@ const LayoutContent = ({ noScroll = false }) => {
               setNotificationOpen(false);
             }}
             chatBadge={unreadChatCount}
+            hasChatAccess={hasChatAccess}
           />
         )}
       </main>

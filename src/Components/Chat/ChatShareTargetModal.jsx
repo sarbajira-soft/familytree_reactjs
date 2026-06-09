@@ -357,7 +357,7 @@ const ChatShareTargetModal = ({ currentUserId, isOpen, onClose, shareItem }) => 
 
   return (
     <div
-      className="fixed inset-0 z-[90] flex items-end justify-center bg-black/45 px-4 pb-4 pt-8 backdrop-blur-sm sm:items-center"
+      className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/45 px-4 py-4 backdrop-blur-sm"
       onClick={() => onClose?.()}
       role="presentation"
     >

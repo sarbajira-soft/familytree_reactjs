@@ -367,7 +367,7 @@ const PostViewerModal = ({
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur pt-4 pb-24 md:pt-0 md:pb-0"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur pt-1 pb-3 md:pt-0 md:pb-0"
           variants={backdropVariants}
           initial="hidden"
           animate="visible"
@@ -376,7 +376,7 @@ const PostViewerModal = ({
         >
           <motion.div
             className="relative bg-white rounded-3xl m-2 shadow-2xl w-full max-w-4xl flex flex-col overflow-hidden"
-            style={{ height: "calc(100dvh - 140px)", maxHeight: "calc(100dvh - 140px)" }}
+            style={{ height: "calc(100dvh - 70px)", maxHeight: "calc(100dvh - 85px)" }}
             variants={modalVariants}
             onClick={(e) => e.stopPropagation()}
           >
@@ -415,7 +415,7 @@ const PostViewerModal = ({
               <div className="flex-1 flex flex-col h-full bg-gray-50 border-t md:border-t-0 md:border-l border-gray-200 min-h-0 overflow-hidden">
                 {/* Caption + actions */}
                 <div className="p-4 pb-2 border-b flex-shrink-0">
-                  <div className="text-gray-900 text-base font-medium mb-2 break-words">
+                  <div className="text-gray-900 text-base font-small mb-2 break-words">
                     {post.caption || "No Caption"}
                   </div>
                   <div className="flex items-center gap-3 mb-1">
