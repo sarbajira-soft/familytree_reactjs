@@ -16,6 +16,7 @@ import {
   FiEdit2,
   FiFileText,
   FiHelpCircle,
+  FiCpu,
   FiHome,
   FiImage,
   FiLink,
@@ -30,11 +31,13 @@ import {
 } from "react-icons/fi";
 import { RiUser3Line } from "react-icons/ri";
 import { RiGitMergeLine } from "react-icons/ri";
+import { Sparkles } from "lucide-react";
 import { useUser } from "../Contexts/UserContext";
 import { useTheme } from "../Contexts/ThemeContext";
 import NotificationPanel from "./NotificationPanel";
 import SupportHelpModal from "./SupportHelpModal";
 import TermsAndConditionsModal from "./TermsAndConditionsModal";
+import GlobalAIChat from "./GlobalAIChat";
 
 const PullToRefresh = ({ children, onRefresh, disabled }) => {
   const containerRef = useRef(null);
@@ -167,9 +170,9 @@ const LayoutContent = ({ noScroll = false }) => {
       "/my-family-member": "familyManagement",
       "/pending-request": "familyManagement",
       "/suggestion-approving": "familyManagement",
-      // "/posts-and-feeds": "postsStories",
       "/family-gallery": "gallery",
       "/chat": "chat",
+      "/ai-assistant": "aiAssistant",
     };
     const tabId =
       pathToTabId[location.pathname] ||
@@ -183,6 +186,7 @@ const LayoutContent = ({ noScroll = false }) => {
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileMenuView, setProfileMenuView] = useState("root");
   const [notificationOpen, setNotificationOpen] = useState(false);
+  const [aiChatOpen, setAiChatOpen] = useState(false);
   const [supportHelpOpen, setSupportHelpOpen] = useState(false);
   const [supportHelpMode, setSupportHelpMode] = useState("report");
   const [termsModalOpen, setTermsModalOpen] = useState(false);
@@ -202,6 +206,7 @@ const LayoutContent = ({ noScroll = false }) => {
     familyMenuOpen: false,
     supportHelpOpen: false,
     termsModalOpen: false,
+    aiChatOpen: false,
   });
 
   useEffect(() => {
@@ -213,6 +218,7 @@ const LayoutContent = ({ noScroll = false }) => {
       familyMenuOpen,
       supportHelpOpen,
       termsModalOpen,
+      aiChatOpen,
     };
   }, [
     sidebarOpen,
@@ -222,11 +228,24 @@ const LayoutContent = ({ noScroll = false }) => {
     familyMenuOpen,
     supportHelpOpen,
     termsModalOpen,
+    aiChatOpen,
   ]);
 
   const closeProfileMenu = useCallback(() => {
     setProfileOpen(false);
     setProfileMenuView("root");
+  }, []);
+
+  const handleToggleAiChat = useCallback(() => {
+    setAiChatOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        setNotificationOpen(false);
+        setProfileOpen(false);
+        setFamilyMenuOpen(false);
+      }
+      return next;
+    });
   }, []);
 
   const handleGlobalBack = useCallback(() => {
@@ -263,6 +282,10 @@ const LayoutContent = ({ noScroll = false }) => {
     } catch {}
 
     const current = overlayStateRef.current;
+    if (current.aiChatOpen) {
+      setAiChatOpen(false);
+      return true;
+    }
     if (current.notificationOpen) {
       setNotificationOpen(false);
       return true;
@@ -528,6 +551,7 @@ const LayoutContent = ({ noScroll = false }) => {
     setFamilyMenuOpen(false);
     setSidebarOpen(false);
     closeProfileMenu();
+    setAiChatOpen(false);
     navigate(route);
   };
 
@@ -536,6 +560,7 @@ const LayoutContent = ({ noScroll = false }) => {
     setSupportHelpOpen(false);
     setSupportHelpMode("report");
     setTermsModalOpen(false);
+    setAiChatOpen(false);
     logout();
     localStorage.removeItem("userInfo");
     navigate("/login");
@@ -760,12 +785,58 @@ const LayoutContent = ({ noScroll = false }) => {
                 </div>
               )}
 
+              {/* AI Assistant */}
+              <div className="relative">
+                {isMobile ? (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleToggleAiChat();
+                    }}
+                    aria-label="Open AI Assistant"
+                    className={`flex items-center gap-1.5 py-1 px-2.5 rounded-full transition-all duration-200 border ${
+                      aiChatOpen
+                        ? "bg-gradient-to-r from-primary-600 to-indigo-600 text-white border-transparent shadow-sm"
+                        : "bg-white border-gray-200 text-primary-600 hover:bg-gray-50 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-200 dark:hover:bg-slate-800/80"
+                    }`}
+                  >
+                    <Sparkles size={13} className={aiChatOpen ? "text-white" : "text-indigo-500 dark:text-indigo-400"} />
+                    <span className="text-[10px] font-bold tracking-wider">AI</span>
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500"></span>
+                    </span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleToggleAiChat();
+                    }}
+                    aria-label="Open AI Assistant"
+                    className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full transition-all duration-200 border ${
+                      aiChatOpen
+                        ? "bg-gradient-to-r from-primary-600 to-indigo-600 text-white border-transparent shadow-md scale-[1.02]"
+                        : "bg-white border-gray-200 text-primary-600 hover:bg-gray-50 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-200 dark:hover:bg-slate-800 hover:border-primary-300 dark:hover:border-primary-900/50 shadow-sm"
+                    }`}
+                  >
+                    <Sparkles size={15} className={`${aiChatOpen ? "text-white" : "text-indigo-500 dark:text-indigo-400 animate-pulse"}`} />
+                    <span className="text-xs font-bold tracking-wide">Ask AI</span>
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                    </span>
+                  </button>
+                )}
+              </div>
+
               {/* Notifications */}
               <div className="relative">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     setNotificationOpen(!notificationOpen);
+                    setAiChatOpen(false);
                   }}
                   className={`bg-unset text-primary-600 relative rounded-3xl hover:bg-gray-100 dark:hover:bg-slate-800 ${isMobile ? "p-1" : "p-1.5"}`}
                 >
@@ -792,6 +863,7 @@ const LayoutContent = ({ noScroll = false }) => {
                     if (nextProfileOpen) {
                       setFamilyMenuOpen(false);
                       setNotificationOpen(false);
+                      setAiChatOpen(false);
                     }
                   }}
                   className={`bg-unset flex items-center space-x-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800 ${isMobile ? "p-0.5" : "p-1"}`}
@@ -1046,7 +1118,7 @@ const LayoutContent = ({ noScroll = false }) => {
                 ? "overflow-hidden pt-0 px-0 pb-0"
               : isTreeRoute
                 ? "overflow-hidden pt-0 px-0 pb-0"
-                : "overflow-y-auto pt-0 px-1 pb-16 md:px-2 md:pb-12 lg:pb-4"
+                : "overflow-y-auto pt-0 px-1 pb-11 md:px-2 md:pb-12 lg:pb-4"
           }`}
         >
           {shouldLockScroll ? (
@@ -1077,6 +1149,7 @@ const LayoutContent = ({ noScroll = false }) => {
               setNotificationOpen(false);
             }}
             chatBadge={unreadChatCount}
+            hasChatAccess={hasChatAccess}
           />
         )}
       </main>
@@ -1107,6 +1180,9 @@ const LayoutContent = ({ noScroll = false }) => {
         isConnected={isConnected}
         refetchUnreadCount={refetchUnreadCount}
       />
+
+      {/* Global Floating AI Assistant Chat widget */}
+      <GlobalAIChat isOpen={aiChatOpen} setIsOpen={setAiChatOpen} />
 
     </div>
   );

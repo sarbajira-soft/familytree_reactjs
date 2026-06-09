@@ -17,6 +17,7 @@ import { useTheme } from "../Contexts/ThemeContext";
 import { getToken } from "../utils/auth";
 import { authFetchResponse } from "../utils/authFetch";
 import EventScheduleManager from "./EventScheduleManager";
+import AITextareaHelper from "./AITextareaHelper";
 import {
   createEmptySchedule,
   EVENT_SCHEDULE_REQUIRED_MESSAGE,
@@ -821,19 +822,22 @@ const EventModal = ({
                   </span>
                   Description
                 </label>
-                <textarea
-                  value={description}
-                  onChange={(browserEvent) => {
-                    setDescription(browserEvent.target.value);
-                    if (errors.description) {
-                      setErrors((prev) => ({ ...prev, description: undefined }));
-                    }
-                  }}
-                  rows="4"
-                  maxLength={250}
-                  className="w-full resize-none rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 text-sm text-gray-900 transition-all duration-200 focus:border-transparent focus:bg-white focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800/90 dark:text-slate-100 dark:focus:bg-slate-800 sm:px-4"
-                  placeholder="Tell us about your event..."
-                />
+                <div className="relative">
+                  <textarea
+                    value={description}
+                    onChange={(browserEvent) => {
+                      setDescription(browserEvent.target.value);
+                      if (errors.description) {
+                        setErrors((prev) => ({ ...prev, description: undefined }));
+                      }
+                    }}
+                    rows="4"
+                    maxLength={250}
+                    className="w-full resize-none rounded-xl border border-gray-200 bg-gray-50 pr-12 px-3 py-3 text-sm text-gray-900 transition-all duration-200 focus:border-transparent focus:bg-white focus:ring-2 focus:ring-primary-500 dark:border-slate-700 dark:bg-slate-800/90 dark:text-slate-100 dark:focus:bg-slate-800 sm:px-4"
+                    placeholder="Tell us about your event... Or type keywords and click Sparkles to write with AI (e.g. picnic lunch games)"
+                  />
+                  <AITextareaHelper value={description} onChange={setDescription} type="event" disabled={isLoading} />
+                </div>
                 {errors.description ? (
                   <p className="text-xs text-red-600">{errors.description}</p>
                 ) : null}

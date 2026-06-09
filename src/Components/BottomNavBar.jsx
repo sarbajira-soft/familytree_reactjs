@@ -10,7 +10,7 @@ import {
 } from "react-icons/fi";
 
 import { RiGitMergeLine } from "react-icons/ri";
-const BottomNavBar = ({ activeTab, setActiveTab, onNavigate, chatBadge }) => {
+const BottomNavBar = ({ activeTab, setActiveTab, onNavigate, chatBadge, hasChatAccess }) => {
   const navigate = useNavigate();
 
   const tabs = [
@@ -19,13 +19,6 @@ const BottomNavBar = ({ activeTab, setActiveTab, onNavigate, chatBadge }) => {
       label: "Home",
       icon: <FiHome size={18} />,
       path: "/dashboard",
-    },
-    {
-      id: "chat",
-      label: "Chat",
-      icon: <FiMessageCircle size={18} />,
-      path: "/chat",
-      badge: chatBadge || 0,
     },
     {
       id: "upcomingEvent",

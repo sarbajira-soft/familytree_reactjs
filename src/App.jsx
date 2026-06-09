@@ -66,6 +66,7 @@ const PublicSharedGalleryPage = lazy(() => import("./Pages/PublicSharedGalleryPa
 const SharedGalleryScreen = lazy(() => import("./Pages/SharedGalleryScreen"));
 const TutorialsPage = lazy(() => import("./Pages/TutorialsPage"));
 const TutorialDetailPage = lazy(() => import("./Pages/TutorialDetailPage"));
+const AIAssistantPage = lazy(() => import("./Pages/AIAssistantPage"));
 
 // ---------------- Loading Fallback ----------------
 const LoadingFallback = () => (
@@ -238,6 +239,7 @@ function App() {
                 {/* Chat Feature Routes */}
                 <Route path="/chat" element={<ChatPage />} />
                 <Route path="/chat/:conversationId" element={<ChatWindowPage />} />
+                <Route path="/ai-assistant" element={<AIAssistantPage />} />
                 <Route path="/upcoming-events" element={<EventsPage />} />
                 <Route
                   path="/suggestion-approving"

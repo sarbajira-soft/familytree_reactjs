@@ -301,6 +301,12 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
   const [isGalleryModalOpen, setIsGalleryModalOpen] = useState(false);
   const [selectedAlbum, setSelectedAlbum] = useState(null);
   // Dashboard data query
+  const hasFamilyAccess = useMemo(() => {
+    const status = String(userInfo?.approveStatus || "").toLowerCase();
+    return Boolean(userInfo?.familyCode) && ["approved", "associated"].includes(status);
+  }, [userInfo]);
+
+  // Dashboard data query
   const { data: dashboardData, isLoading } = useQuery({
     queryKey: ["dashboardData", userInfo?.userId, userInfo?.familyCode],
     queryFn: async () => {
@@ -312,7 +318,7 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
       ]);
       return { stats, events };
     },
-    enabled: !!userInfo?.familyCode && !!token,
+    enabled: !!userInfo?.familyCode && !!token && hasFamilyAccess,
   });
 
   const { data: galleryData, isLoading: isGalleryLoading } = useQuery({
@@ -321,7 +327,7 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
       authFetch(`${apiBaseUrl}/gallery/by-options?privacy=family&page=1&limit=3`, {
         method: "GET",
       }),
-    enabled: !!token,
+    enabled: !!token && hasFamilyAccess,
   });
 
   const upcomingEventsPreview = useMemo(() => {
@@ -435,14 +441,15 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
 
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 pb-8">
-        <div className="lg:col-span-8 space-y-3">
+        <div className={`${hasFamilyAccess ? "lg:col-span-8" : "lg:col-span-12"} space-y-3`}>
           {/* Posts Section */}
           <div className="bg-white rounded-xl shadow-md p-2 sm:p-3 border border-gray-100">
             <PostPage />
           </div>
         </div>
 
-        <div className="hidden lg:block space-y-4 lg:col-span-4">
+        {hasFamilyAccess && (
+          <div className="hidden lg:block space-y-4 lg:col-span-4">
 
           <div className="space-y-4 lg:col-span-4">
             <div className="bg-white rounded-xl shadow-sm p-3 border border-gray-100">
@@ -643,6 +650,7 @@ const Dashboard = ({ apiBaseUrl = import.meta.env.VITE_API_BASE_URL }) => {
 
           </div>
         </div>
+      )}
       </div>
 
       {/* Modals */}
