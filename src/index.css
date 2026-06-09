@@ -437,37 +437,35 @@
 /* If you want the scrollbar to *only* appear on hover, you'd need more complex JS/CSS or specific browser extensions,
    but this makes it very discreet until scrolled. */
 
-.custom-scrollbar {
-    overflow-y: auto;
-    -ms-overflow-style: none; 
-    scrollbar-width: thin; 
+/* Custom Scrollbar Styles (Slim & Transparent Globally) */
+::-webkit-scrollbar {
+  width: 5px; /* Extremely slim scrollbar */
+  height: 5px; /* Slim horizontal scrollbar */
 }
 
-/* Custom Scrollbar Styles for Webkit browsers (Chrome, Safari, Edge) */
-.custom-scrollbar::-webkit-scrollbar {
-  width: 4px; /* Width of the scrollbar */
-  height: 4px; /* Height of the horizontal scrollbar */
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
+::-webkit-scrollbar-track {
   background: transparent; /* Transparent track */
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.25); /* Slim, transparent gray thumb */
   border-radius: 10px;
 }
 
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #d1d5db; /* Light gray thumb */
-  border-radius: 10px;
-  transition: background 0.2s ease;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af; /* Darker gray on hover */
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.5); /* Slightly darker gray on hover */
 }
 
 /* Custom Scrollbar Styles for Firefox */
-.custom-scrollbar {
+* {
   scrollbar-width: thin;
-  scrollbar-color: #d1d5db transparent;
+  scrollbar-color: rgba(156, 163, 175, 0.25) transparent;
+}
+
+/* Maintain .custom-scrollbar utility class */
+.custom-scrollbar {
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 
 @keyframes scale-in {
