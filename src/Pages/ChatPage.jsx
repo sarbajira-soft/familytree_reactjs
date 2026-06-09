@@ -251,6 +251,8 @@ const ChatPage = () => {
   const activeFamilyCodeRef = useRef(normalizeFamilyCode(activeFamilyCode));
   const conversationRef = useRef(null);
   const familyMembersFamilyCodeRef = useRef('');
+  const familyMembersRef = useRef([]);
+  const familyMembersRequestRef = useRef(null);
   const localTypingRef = useRef(false);
   const localTypingTimeoutRef = useRef(null);
   const remoteTypingTimeoutsRef = useRef(new Map());
@@ -272,6 +274,10 @@ const ChatPage = () => {
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
+
+  useEffect(() => {
+    familyMembersRef.current = familyMembers;
+  }, [familyMembers]);
 
   useEffect(() => {
     selectedConversationRef.current = Number(selectedId || 0) || null;
@@ -312,6 +318,8 @@ const ChatPage = () => {
     setRoomNameDraft('');
     setRoomNameError('');
     setRoomNameSubmitting(false);
+    familyMembersRef.current = [];
+    familyMembersRequestRef.current = null;
     familyMembersFamilyCodeRef.current = '';
   }, [activeFamilyCode]);
 
@@ -376,21 +384,40 @@ const ChatPage = () => {
         return [];
       }
 
+      const cacheScope = activeFamilyCodeRef.current || '__GLOBAL__';
+      const cachedMembers = familyMembersRef.current;
+
       if (
         !forceReload &&
-        familyMembersFamilyCodeRef.current === (activeFamilyCodeRef.current || '__GLOBAL__') &&
-        familyMembers.length > 0
+        familyMembersFamilyCodeRef.current === cacheScope &&
+        cachedMembers.length > 0
       ) {
-        return familyMembers;
+        return cachedMembers;
       }
 
-      const response = await getFamilyMembersForChat();
-      const nextMembers = response?.members || [];
-      setFamilyMembers(nextMembers);
-      familyMembersFamilyCodeRef.current = activeFamilyCodeRef.current || '__GLOBAL__';
-      return nextMembers;
+      if (!forceReload && familyMembersRequestRef.current) {
+        return familyMembersRequestRef.current;
+      }
+
+      const request = getFamilyMembersForChat()
+        .then((response) => {
+          const nextMembers = response?.members || [];
+          const resolvedScope = activeFamilyCodeRef.current || '__GLOBAL__';
+          familyMembersRef.current = nextMembers;
+          familyMembersFamilyCodeRef.current = resolvedScope;
+          setFamilyMembers(nextMembers);
+          return nextMembers;
+        })
+        .finally(() => {
+          if (familyMembersRequestRef.current === request) {
+            familyMembersRequestRef.current = null;
+          }
+        });
+
+      familyMembersRequestRef.current = request;
+      return request;
     },
-    [currentUserId, familyMembers],
+    [currentUserId],
   );
 
   useEffect(() => {
