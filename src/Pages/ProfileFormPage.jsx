@@ -3,6 +3,7 @@ import PhoneInput from 'react-phone-input-2';
 import 'react-phone-input-2/lib/style.css';
 import Swal from 'sweetalert2';
 import PropTypes from 'prop-types';
+import AITextareaHelper from '../Components/AITextareaHelper';
 
 import { authFetchResponse } from '../utils/authFetch';
 
@@ -1469,15 +1470,23 @@ const ProfileFormPage = () => {
                 <label htmlFor="bio" className={labelClassName}>
                   Bio
                 </label>
-                <textarea
-                  id="bio"
-                  name="bio"
-                  value={formData.bio}
-                  onChange={handleChange}
-                  className={inputClassName('bio')}
-                  placeholder="Tell us about yourself..."
-                  rows="3"
-                />
+                <div className="relative">
+                  <textarea
+                    id="bio"
+                    name="bio"
+                    value={formData.bio || ''}
+                    onChange={handleChange}
+                    className={`${inputClassName('bio')} pr-12`}
+                    placeholder="Tell us about yourself... Or type keywords and click Sparkles to write with AI (e.g. loves cooking gardening)"
+                    rows="3"
+                  />
+                  <AITextareaHelper
+                    value={formData.bio || ''}
+                    onChange={(newBio) => setFormData(prev => ({ ...prev, bio: newBio }))}
+                    type="bio"
+                    disabled={isLoading}
+                  />
+                </div>
               </div>
               <div>
                 <label htmlFor="hobbies" className={labelClassName}>

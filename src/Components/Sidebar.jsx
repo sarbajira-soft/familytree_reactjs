@@ -8,9 +8,11 @@ import {
   FiChevronDown,
   FiCalendar,
   FiLink,
+  FiCpu,
 } from "react-icons/fi";
 import { RiGitMergeLine } from "react-icons/ri";
 import { FaTimes } from "react-icons/fa";
+import { Sparkles } from "lucide-react";
 import { useUser } from "../Contexts/UserContext";
 
 const Sidebar = ({
@@ -49,6 +51,12 @@ const Sidebar = ({
       label: "Family Tree",
       route: "/family-tree",
       icon: <RiGitMergeLine size={19} />,
+    },
+    {
+      id: "aiAssistant",
+      label: "Family AI Assistant",
+      route: "/ai-assistant",
+      icon: <Sparkles size={19} />,
     },
     {
       id: "linkedFamilyTrees",

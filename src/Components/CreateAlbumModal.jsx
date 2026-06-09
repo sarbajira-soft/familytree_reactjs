@@ -4,6 +4,7 @@ import Swal from 'sweetalert2';
 import { throwIfNotOk } from '../utils/apiMessages';
 import { getToken } from '../utils/auth';
 import { useUser } from '../Contexts/UserContext';
+import AITextareaHelper from './AITextareaHelper';
 
 const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authToken, mode = 'create', albumData = null }) => {
     const { userInfo } = useUser();
@@ -491,17 +492,21 @@ const CreateAlbumModal = ({ isOpen, onClose, onCreateAlbum, currentUser, authTok
                         <label htmlFor="albumDescription" className="block text-sm font-medium text-gray-700 mb-2">
                             Description
                         </label>
-                        <textarea
-                            id="albumDescription"
-                            value={description}
-                            onChange={(e) => setDescription(e.target.value.slice(0, MAX_CAPTION_LENGTH))}
-                            maxLength={MAX_CAPTION_LENGTH}
-                            disabled={isSubmitting}
-                            rows="3"
-                            className={`w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-300 text-gray-800 placeholder-gray-400 resize-none transition-all ${
-                                isSubmitting ? 'opacity-50 cursor-not-allowed' : ''
-                            }`}
-                        />
+                        <div className="relative">
+                            <textarea
+                                id="albumDescription"
+                                value={description}
+                                onChange={(e) => setDescription(e.target.value.slice(0, MAX_CAPTION_LENGTH))}
+                                maxLength={MAX_CAPTION_LENGTH}
+                                disabled={isSubmitting}
+                                rows="3"
+                                className={`w-full pr-12 p-3 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-300 text-gray-800 placeholder-gray-400 resize-none transition-all ${
+                                    isSubmitting ? 'opacity-50 cursor-not-allowed' : ''
+                                }`}
+                                placeholder="Tell us about this album... Or type keywords and click Sparkles to write with AI (e.g. summer 1995 Kerala trip)"
+                            />
+                            <AITextareaHelper value={description} onChange={setDescription} type="description" disabled={isSubmitting} />
+                        </div>
 
                         <div className="mt-1 text-xs text-gray-400 text-right">
                             {String(description || '').length} / {MAX_CAPTION_LENGTH}
