@@ -23,6 +23,7 @@ import {
   FiX,
 } from 'react-icons/fi';
 import TypingIndicator from './TypingIndicator';
+import EmptyState from '../EmptyState';
 import VoiceRecorder from './VoiceRecorder';
 import ChatStateBanner from './ChatStateBanner';
 import ChatSharedContentCard from './ChatSharedContentCard';
@@ -455,16 +456,14 @@ const ChatConversationPane = ({
   }, [messagesPane, messageSearch.query, isGroup, latestSentMessageId]);
   if (!selectedId) {
     return (
-      <div className="chat-placeholder">
-        <div className="chat-placeholder-icon">Chat</div>
-        <h2>
-          {header.hasFamilyScope ? 'Start with your family circle' : 'Family chat is unavailable'}
-        </h2>
-        <p>
-          {header.hasFamilyScope
+      <div className="flex-1 flex flex-col items-center justify-center bg-transparent h-full p-8 text-center select-none">
+        <EmptyState
+          type="chat"
+          title={header.hasFamilyScope ? 'Start with your family circle' : 'Family chat is unavailable'}
+          description={header.hasFamilyScope
             ? 'Choose a conversation to share updates, memories, and support together.'
             : 'Switch to an available family to open your chat space.'}
-        </p>
+        />
       </div>
     );
   }

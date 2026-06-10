@@ -12,6 +12,7 @@ import {
   FiCalendar, 
   FiInbox
 } from 'react-icons/fi';
+import EmptyState from '../Components/EmptyState';
 
 // Premium Skeleton Loading Card
 function SkeletonCard() {
@@ -288,25 +289,21 @@ export default function TutorialsPage() {
           <SkeletonCard />
         </div>
       ) : rows.length === 0 ? (
-        <div className="flex flex-col items-center justify-center p-16 text-center bg-white dark:bg-slate-900 border border-dashed border-slate-200 dark:border-slate-800 rounded-3xl shadow-sm space-y-4">
-          <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-full text-slate-400 dark:text-slate-600">
-            <FiInbox size={36} />
-          </div>
-          <div className="space-y-1.5 max-w-sm">
-            <h3 className="font-bold text-slate-800 dark:text-slate-200">No tutorials found</h3>
-            <p className="text-xs text-slate-400 dark:text-slate-500 leading-relaxed">
-              We couldn't find any tutorials matching your current filters. Try searching for something else or clearing filters.
-            </p>
-          </div>
-          {hasActiveFilters && (
-            <button
-              type="button"
-              onClick={handleResetAll}
-              className="rounded-xl bg-primary-700 hover:bg-primary-800 text-white px-5 py-2 text-xs font-bold transition-all shadow"
-            >
-              Reset Filters & Search
-            </button>
-          )}
+        <div className="py-6 w-full">
+          <EmptyState
+            type="generic"
+            title="No tutorials found"
+            description="We couldn't find any tutorials matching your current search criteria or type filters."
+            action={hasActiveFilters ? (
+              <button
+                type="button"
+                onClick={handleResetAll}
+                className="rounded-xl bg-primary-700 hover:bg-primary-800 text-white px-5 py-2 text-xs font-bold transition-all shadow"
+              >
+                Reset Filters & Search
+              </button>
+            ) : null}
+          />
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">

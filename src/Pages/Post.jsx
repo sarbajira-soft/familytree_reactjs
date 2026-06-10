@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import CreatePostModal from "../Components/CreatePostModal";
 import PostViewerModal from "../Components/PostViewerModal";
+import EmptyState from "../Components/EmptyState";
 import { useUser } from "../Contexts/UserContext";
 import { useNavigate } from "react-router-dom";
 import {
@@ -1039,15 +1040,11 @@ const PostPage = () => {
     );
   } else {
     feedSection = (
-      <div className="text-center bg-white rounded-xl border p-10 shadow-sm">
-        <p className="text-gray-600 mb-4">No posts in the {activeFeed} feed yet.</p>
-        <button
-          onClick={() => setIsCreateModalOpen(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-full hover:bg-blue-700 transition-all flex items-center gap-2 mx-auto"
-        >
-          <FiFeather /> Create First Post
-        </button>
-      </div>
+      <EmptyState
+        type="posts"
+        title={`No ${activeFeed} posts yet`}
+        description={`Looks like there are no posts in the ${activeFeed} feed. Why not write the first post for your family?`}
+      />
     );
   }
 
@@ -1584,17 +1581,11 @@ const PostPage = () => {
           </div>
         </div>
       ) : (
-        <div className="text-center bg-white rounded-xl border p-10 shadow-sm">
-          <p className="text-gray-600 mb-4">
-            No posts in the {activeFeed} feed yet.
-          </p>
-          <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-full hover:bg-blue-700 transition-all flex items-center gap-2 mx-auto"
-          >
-            <FiFeather /> Create First Post
-          </button>
-        </div>
+        <EmptyState
+          type="posts"
+          title={`No ${activeFeed} posts yet`}
+          description={`Looks like there are no posts in the ${activeFeed} feed. Why not write the first post for your family?`}
+        />
       )}
 
       {/* Floating Create Button */}
