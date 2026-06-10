@@ -15,6 +15,7 @@ import { authFetch } from '../utils/authFetch';
 import { getToken } from '../utils/auth';
 import { hasFamilyAccess } from '../utils/familyAccess';
 import { BlockButton } from '../Components/block/BlockButton';
+import EmptyState from '../Components/EmptyState';
 
 const EMPTY_VTT_TRACK_SRC = 'data:text/vtt,WEBVTT';
 
@@ -406,16 +407,11 @@ const PostsAndFeedsPage = () => {
         });
     } else {
         feedSection = (
-            <div className="bg-white rounded-xl shadow-sm p-8 text-gray-600 border">
-                <p className="text-xl font-medium mb-4">
-                    No posts to display in the {activeFeed} feed yet!
-                </p>
-                <button onClick={() => setIsCreateModalOpen(true)}
-                    className="flex items-center gap-1.5 py-2 px-3 mr-2 rounded-full text-sm font-semibold transition-all duration-200 bg-primary-600 text-white shadow-md"
-                >
-                    <FiFeather size={20} /> Create First Post
-                </button>
-            </div>
+            <EmptyState
+                type="posts"
+                title={`No ${activeFeed} posts yet`}
+                description={`Looks like there are no posts in the ${activeFeed} feed. Why not write the first post for your family?`}
+            />
         );
     }
 

@@ -10,6 +10,7 @@ import NoFamilyView from "../Components/NoFamilyView";
 import PendingApprovalView from "../Components/PendingApprovalView";
 import CreateFamilyModal from "../Components/CreateFamilyModal";
 import JoinFamilyModal from "../Components/JoinFamilyModal";
+import EmptyState from "../Components/EmptyState";
 import { useUser } from "../Contexts/UserContext";
 import GalleryPageShimmer from "./GalleryPageShimmer";
 import useGallerySeenBatch from "../hooks/useGallerySeenBatch";
@@ -347,52 +348,42 @@ const FamilyGalleryPage = () => {
       <div className="mx-auto flex max-w-7xl flex-col px-4 py-8 md:px-6 lg:px-8">
         <div className="w-full">
           <div className="mb-6 flex justify-end border-b border-gray-200 pb-6">
-  <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-    
-    {/* Family + Create Album */}
-    <div className="flex gap-2">
-      <button
-        className="flex h-10 min-w-[120px] items-center justify-center gap-2 rounded-full bg-gradient-to-r from-secondary-500 to-secondary-600 px-4 text-sm font-semibold text-white shadow"
-      >
-        <MdPeople size={16} />
-        Family
-      </button>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center w-full sm:w-auto">
+              {/* Search */}
+              <input
+                type="text"
+                autoFocus
+                placeholder="Search Albums..."
+                value={searchCaption}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setSearchCaption(value);
 
-      <button
-        className="flex h-10 min-w-[200px] items-center justify-center gap-2 rounded-full bg-primary-700 px-4 text-sm font-semibold text-white shadow transition-all hover:bg-primary-800"
-        onClick={() => setIsCreateAlbumModalOpen(true)}
-      >
-        <FiPlusCircle size={16} />
-        Create Album
-      </button>
-    </div>
+                  if (searchTimeoutRef.current) {
+                    clearTimeout(searchTimeoutRef.current);
+                  }
 
-    {/* Search */}
-    <input
-      type="text"
-      autoFocus
-      placeholder="Search Albums..."
-      value={searchCaption}
-      onChange={(event) => {
-        const value = event.target.value;
-        setSearchCaption(value);
+                  searchTimeoutRef.current = setTimeout(() => {
+                    void fetchGalleries({
+                      cursor: null,
+                      galleryTitleSearch: value,
+                      replace: true,
+                    });
+                  }, 400);
+                }}
+                className="h-10 w-full rounded-full border border-gray-300 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 sm:w-64 order-2 sm:order-1"
+              />
 
-        if (searchTimeoutRef.current) {
-          clearTimeout(searchTimeoutRef.current);
-        }
-
-        searchTimeoutRef.current = setTimeout(() => {
-          void fetchGalleries({
-            cursor: null,
-            galleryTitleSearch: value,
-            replace: true,
-          });
-        }, 400);
-      }}
-      className="h-10 w-full rounded-full border border-gray-300 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 sm:w-64"
-    />
-  </div>
-</div>
+              {/* Create Album */}
+              <button
+                className="flex h-10 min-w-[200px] items-center justify-center gap-2 rounded-full bg-primary-700 px-4 text-sm font-semibold text-white shadow transition-all hover:bg-primary-800 order-1 sm:order-2"
+                onClick={() => setIsCreateAlbumModalOpen(true)}
+              >
+                <FiPlusCircle size={16} />
+                Create Album
+              </button>
+            </div>
+          </div>
 
           {loadingAlbums ? (
             <GalleryPageShimmer />
@@ -515,15 +506,10 @@ const FamilyGalleryPage = () => {
                     </div>
                   ))
                 ) : (
-                  <div className="flex items-center justify-center rounded-2xl border border-gray-100 bg-white p-10 text-center text-gray-600 shadow-xl sm:col-span-2 md:col-span-3 lg:col-span-4">
-                    <div>
-                      <p className="mb-4 text-2xl font-bold text-gray-800">
-                        No albums here yet!
-                      </p>
-                      <p className="text-lg">
-                        Looks like the Family  feed is a bit quiet. Why not be the first to share?
-                      </p>
-                    </div>
+                  <div className="col-span-full py-6">
+                    <EmptyState
+                      type="gallery"
+                    />
                   </div>
                 )}
               </div>

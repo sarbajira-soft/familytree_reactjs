@@ -14,10 +14,12 @@ import {
   FiPause,
   FiPlay,
   FiShare2,
+  FiFeather,
 } from "react-icons/fi";
 import { MdPeople, MdPublic } from "react-icons/md";
 import { useNavigate } from "react-router-dom";
 import CreatePostModal from "../Components/CreatePostModal";
+import EmptyState from "../Components/EmptyState";
 import PostViewerModal from "../Components/PostViewerModal";
 import CommentItem from "../Components/CommentItem";
 import ReportContentModal from "../Components/ReportContentModal";
@@ -1686,17 +1688,11 @@ const PostPage = () => {
             )}
           </>
         ) : feedError ? null : (
-          <div className="text-center bg-white rounded-xl border p-10 shadow-sm">
-            <p className="text-gray-600 mb-4">
-              No posts in the {activeFeed} feed yet.
-            </p>
-            <button
-              onClick={() => setIsCreateModalOpen(true)}
-              className="bg-blue-600 text-white px-4 py-2 rounded-full hover:bg-blue-700 transition-all flex items-center gap-2 mx-auto"
-            >
-              Create First Post
-            </button>
-          </div>
+          <EmptyState
+            type="posts"
+            title={`No ${activeFeed} posts yet`}
+            description={`Looks like there are no posts in the ${activeFeed} feed. Why not write the first post for your family?`}
+          />
         )}
       </div>
 

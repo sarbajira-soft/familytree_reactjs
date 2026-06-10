@@ -10,6 +10,7 @@ import {
   FiMapPin,
   FiUsers,
   FiPlusSquare,
+  FiPlusCircle,
   FiList,
   FiArrowRight,
   FiGlobe,
@@ -28,6 +29,7 @@ import CreateFamilyModal from "../Components/CreateFamilyModal";
 import JoinFamilyModal from "../Components/JoinFamilyModal";
 import EventsShimmer from "./EventsShimmer";
 import ReportContentModal from "../Components/ReportContentModal";
+import EmptyState from "../Components/EmptyState";
 import { hasFamilyAccess, hasFamilyAccessStatus } from "../utils/familyAccess";
 import {
   formatEventDateLabel,
@@ -501,8 +503,8 @@ const EventsPage = () => {
       ) : (
         <div className="min-h-screen bg-gray-50 dark:bg-slate-950 pb-16">
           <div className="max-w-7xl mx-auto px-4 py-8 md:px-6 lg:px-8 space-y-5">
-            {/* Header Section */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+            {/* Header Section (Mobile only) */}
+            <div className="flex md:hidden flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
               {/* Left Block - hidden on mobile to keep header compact */}
               <div className="hidden sm:flex sm:flex-col w-full sm:w-auto">
                
@@ -520,54 +522,66 @@ const EventsPage = () => {
               </button>
             </div>
 
-            {/* Filter Tabs – Responsive (Mobile vs Desktop) */}
-            <div className="flex justify-center w-full mt-1">
+            {/* Desktop View Tab Bar and Create Event Button (Image 2 Layout) */}
+            <div className="hidden md:flex justify-between items-center w-full mb-6">
+              {/* Tabs on Left */}
+              <div className="flex items-center gap-3">
+                {/* Upcoming */}
+                <button
+                  onClick={() => setActiveTab("upcoming")}
+                  className={`flex items-center gap-2 py-2.5 px-6 rounded-full font-semibold transition-all text-sm shadow-sm
+                    ${activeTab === "upcoming"
+                      ? "bg-orange-500 hover:bg-orange-600 text-white shadow-md"
+                      : "bg-[#1976D2] hover:bg-[#1565C0] text-white"
+                    }`}
+                >
+                  <FiCalendar size={16} />
+                  <span>Upcoming Events</span>
+                </button>
+
+                {/* My Events */}
+                <button
+                  onClick={() => setActiveTab("my-events")}
+                  className={`flex items-center gap-2 py-2.5 px-6 rounded-full font-semibold transition-all text-sm shadow-sm
+                    ${activeTab === "my-events"
+                      ? "bg-orange-500 hover:bg-orange-600 text-white shadow-md"
+                      : "bg-[#1976D2] hover:bg-[#1565C0] text-white"
+                    }`}
+                >
+                  <FiList size={16} />
+                  <span>My Events</span>
+                </button>
+
+                {/* All Events */}
+                <button
+                  onClick={() => setActiveTab("all")}
+                  className={`flex items-center gap-2 py-2.5 px-6 rounded-full font-semibold transition-all text-sm shadow-sm
+                    ${activeTab === "all"
+                      ? "bg-orange-500 hover:bg-orange-600 text-white shadow-md"
+                      : "bg-[#1976D2] hover:bg-[#1565C0] text-white"
+                    }`}
+                >
+                  <FiGlobe size={16} />
+                  <span>All Events</span>
+                </button>
+              </div>
+
+              {/* Create Event Button on Right */}
+              <button
+                onClick={handleCreateEventClick}
+                className="bg-[#1976D2] hover:bg-[#1565C0] text-white px-6 py-3 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2 text-sm font-semibold"
+              >
+                <FiPlusCircle size={18} />
+                <span>Create Event</span>
+              </button>
+            </div>
+
+            {/* Filter Tabs – Responsive (Mobile only) */}
+            <div className="flex md:hidden justify-center w-full mt-1">
               {/* Container */}
               <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-md p-2 border border-gray-200 dark:border-slate-800 w-full">
-                {/* Desktop View (Old UI) */}
-                <div className="hidden md:flex items-center justify-center gap-4">
-                  {/* Upcoming */}
-                  <button
-                    onClick={() => setActiveTab("upcoming")}
-                    className={`flex items-center gap-2 py-3 px-6 rounded-xl font-semibold transition-all
-        ${activeTab === "upcoming"
-                        ? "bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg scale-105"
-                        : "bg-[#1976D2] text-white hover:bg-[#1565C0]"
-                      }`}
-                  >
-                    <FiCalendar size={18} />
-                    <span>Upcoming Events</span>
-                  </button>
-
-                  {/* My Events */}
-                  <button
-                    onClick={() => setActiveTab("my-events")}
-                    className={`flex items-center gap-2 py-3 px-6 rounded-xl font-semibold transition-all
-        ${activeTab === "my-events"
-                        ? "bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg scale-105"
-                        : "bg-[#1976D2] text-white hover:bg-[#1565C0]"
-                      }`}
-                  >
-                    <FiList size={18} />
-                    <span>My Events</span>
-                  </button>
-
-                  {/* All Events */}
-                  <button
-                    onClick={() => setActiveTab("all")}
-                    className={`flex items-center gap-2 py-3 px-6 rounded-xl font-semibold transition-all
-        ${activeTab === "all"
-                        ? "bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg scale-105"
-                        : "bg-[#1976D2] text-white hover:bg-[#1565C0]"
-                      }`}
-                  >
-                    <FiGlobe size={18} />
-                    <span>All Events</span>
-                  </button>
-                </div>
-
                 {/* Mobile View (Compact UI) */}
-                <div className="flex md:hidden items-center gap-2">
+                <div className="flex items-center gap-2">
                   {/* Upcoming */}
                   <button
                     onClick={() => setActiveTab("upcoming")}
@@ -854,8 +868,10 @@ const EventsPage = () => {
                   );
                 })
               ) : (
-                <div className="col-span-full text-center py-12 text-gray-500">
-                  No events found
+                <div className="col-span-full py-6">
+                  <EmptyState
+                    type="events"
+                  />
                 </div>
               )}
             </div>
