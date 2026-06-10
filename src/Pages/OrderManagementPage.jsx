@@ -5,6 +5,7 @@ import Swal from 'sweetalert2';
 
 import { getToken } from '../utils/auth';
 import { authFetchResponse } from '../utils/authFetch';
+import EmptyState from '../Components/EmptyState';
 
 const DELIVERY_STATUSES = [
   '', 'pending', 'confirmed', 'shipped', 'in_transit', 'out_for_delivery', 'delivered', 'cancelled', 'returned'
@@ -256,10 +257,15 @@ const OrderManagementPage = () => {
           <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg">{error}</div>
         )}
         {filteredOrders.length === 0 ? (
-          <div className="text-center py-12">
-            <FiPackage className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No Orders Found</h3>
-            <p className="text-gray-500">There are no orders to display at the moment.</p>
+          <div className="py-6">
+            <EmptyState
+              type="generic"
+              title="No Orders Found"
+              description={searchTerm || deliveryStatusFilter || paymentStatusFilter
+                ? "No orders match your active search terms or status filters."
+                : "There are no customer orders in the system at the moment."
+              }
+            />
           </div>
         ) : (
           <div className="space-y-4">
