@@ -165,7 +165,7 @@ const ResetPassword = () => {
 
       markOtpSent();
       setCanResend(false);
-      setError('OTP has been resent to your email');
+      setError(email.includes('@') ? 'OTP has been resent to your email' : 'OTP has been resent to your mobile number');
     } catch (err) {
       setError('Failed to resend OTP. Please try again.');
     }

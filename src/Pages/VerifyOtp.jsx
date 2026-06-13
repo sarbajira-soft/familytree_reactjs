@@ -22,6 +22,7 @@ const VerifyOtp = () => {
   const location = useLocation();
   const params = new URLSearchParams(location.search);
   const familyCode = params.get('familyCode');
+  const step = params.get('step') || 'email'; // 'email' or 'mobile'
   const [otp, setOtp] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -63,9 +64,9 @@ const VerifyOtp = () => {
     checkTimeLeft();
     const interval = setInterval(checkTimeLeft, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [step]); // Re-run effect when step changes to reset timer state
 
-  const userName = email || mobile;
+  const userName = step === 'email' ? email : mobile;
   if (!userName) {
     return null;
   }
@@ -101,6 +102,31 @@ const VerifyOtp = () => {
 
       const data = await response.json();
 
+      if (data.nextStep === 'mobile-verification') {
+        setOtp('');
+        // Remove OTP sent key to force restart the cooldown timer for mobile OTP
+        localStorage.removeItem(OTP_SENT_STORAGE_KEY);
+        markOtpSent();
+        navigate(`/verify-otp?step=mobile${familyCode ? `&familyCode=${familyCode}` : ''}`, {
+          state: { email, mobile },
+          replace: true,
+        });
+        setError(data.message || 'Email verified! A verification code has been sent to your mobile phone.');
+        return;
+      }
+
+      if (data.nextStep === 'email-verification') {
+        setOtp('');
+        localStorage.removeItem(OTP_SENT_STORAGE_KEY);
+        markOtpSent();
+        navigate(`/verify-otp?step=email${familyCode ? `&familyCode=${familyCode}` : ''}`, {
+          state: { email, mobile },
+          replace: true,
+        });
+        setError(data.message || 'Mobile verified! A verification code has been sent to your email.');
+        return;
+      }
+
       const tokenUserId = getUserIdFromToken(data.accessToken);
       const minimalUser = {
         userId: tokenUserId,
@@ -131,7 +157,11 @@ const VerifyOtp = () => {
       const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/user/resend-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, mobile }),
+        body: JSON.stringify({
+          email: step === 'email' ? email : undefined,
+          mobile: step === 'mobile' ? mobile : undefined,
+          channel: step === 'email' ? 'email' : 'sms',
+        }),
       });
 
       if (!response.ok) {
@@ -140,10 +170,12 @@ const VerifyOtp = () => {
         return;
       }
 
+      // Restart cooldown
+      localStorage.removeItem(OTP_SENT_STORAGE_KEY);
       markOtpSent();
       setCanResend(false);
 
-      setError('OTP has been resent to your email');
+      setError(`OTP has been resent to your ${step === 'email' ? 'email' : 'mobile'}`);
     } catch (err) {
       console.error('Failed to resend OTP:', err);
       setError('Failed to resend OTP. Please try again.');
@@ -157,9 +189,11 @@ const VerifyOtp = () => {
       </div>
 
       <div className="text-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">Verify Your Account</h2>
+        <h2 className="text-2xl font-bold text-gray-800">
+          {step === 'email' ? 'Verify Your Email' : 'Verify Your Mobile'}
+        </h2>
         <p className="text-sm text-gray-500 mt-1">
-          We've sent a verification code to {email || mobile}
+          We've sent a verification code to {step === 'email' ? email : mobile}
         </p>
       </div>
 
@@ -201,7 +235,7 @@ const VerifyOtp = () => {
             disabled={isLoading}
             className="w-full py-3 bg-[var(--color-primary)] hover:brightness-110 text-white font-semibold rounded-lg transition disabled:opacity-70"
           >
-            {isLoading ? 'Verifying...' : 'Verify OTP'}
+            {isLoading ? 'Verifying...' : step === 'email' ? 'Verify Email' : 'Verify Mobile'}
           </button>
         </form>
 

@@ -16,7 +16,7 @@ const ForgotPassword = () => {
     setMessage('');
 
     if (!email) {
-      setError('Please enter your email');
+      setError('Please enter your email or mobile number');
       return;
     }
 
@@ -55,7 +55,7 @@ const ForgotPassword = () => {
       <div className="text-center mb-6">
         <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Forgot Password</h2>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          Enter your email to receive an OTP
+          Enter your email or mobile number to receive an OTP
         </p>
       </div>
 
@@ -74,15 +74,15 @@ const ForgotPassword = () => {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Email Address
+              Email or Mobile Number
             </label>
             <input
               id="email"
-              type="email"
+              type="text"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-4 py-3 border border-gray-300 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] dark:bg-slate-900 dark:text-white dark:placeholder-gray-400"
-              placeholder="example@email.com"
+              placeholder="example@email.com or +919876543210"
             />
           </div>
 

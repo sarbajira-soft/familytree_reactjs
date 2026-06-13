@@ -135,12 +135,21 @@ const Login = () => {
 
         if (response.status === 403 && isNotVerifiedError(errorMessage)) {
           const payload = buildResendOtpPayload(formData.username);
+          let targetStep = 'email';
+          let finalEmail = payload.email;
+          let finalMobile = payload.mobile;
           try {
-            await fetch(`${import.meta.env.VITE_API_BASE_URL}/user/resend-otp`, {
+            const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/user/resend-otp`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(payload),
             });
+            const data = await res.json().catch(() => ({}));
+            if (data?.via === 'sms') {
+              targetStep = 'mobile';
+            }
+            if (data?.email) finalEmail = data.email;
+            if (data?.mobile) finalMobile = data.mobile;
           } catch (err) {
             console.error('Failed to resend OTP after unverified login attempt:', err);
           }
@@ -151,10 +160,10 @@ const Login = () => {
             // ignore
           }
 
-          navigate('/verify-otp', {
+          navigate(`/verify-otp?step=${targetStep}`, {
             state: {
-              email: payload.email,
-              mobile: payload.mobile,
+              email: finalEmail,
+              mobile: finalMobile,
             },
           });
           return;
