@@ -830,6 +830,29 @@ const LayoutContent = ({ noScroll = false }) => {
                 )}
               </div>
 
+              {/* Guide Button (Web View Only) */}
+              {!isMobile && (
+                <button
+                  onClick={() => navigateTo("/tutorials")}
+                  aria-label="Open Tutorials Guide"
+                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full transition-all duration-200 border ${
+                    location.pathname.startsWith("/tutorials")
+                      ? "bg-primary-50 border-primary-300 text-primary-700 dark:bg-slate-800 dark:border-primary-900 dark:text-slate-200 shadow-sm"
+                      : "bg-white border-gray-200 text-slate-600 hover:bg-gray-50 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-200 dark:hover:bg-slate-800 hover:border-primary-300 dark:hover:border-primary-900/50 shadow-sm"
+                  }`}
+                >
+                  <FiBookOpen
+                    size={15}
+                    className={
+                      location.pathname.startsWith("/tutorials")
+                        ? "text-primary-700 dark:text-primary-400"
+                        : "text-primary-600 dark:text-primary-400"
+                    }
+                  />
+                  <span className="text-xs font-bold tracking-wide">Guide</span>
+                </button>
+              )}
+
               {/* Notifications */}
               <div className="relative">
                 <button
