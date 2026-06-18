@@ -7,6 +7,7 @@ import TreeConnections from './TreeConnections';
 import { useUser } from '../../Contexts/UserContext';
 import { useLanguage } from '../../Contexts/LanguageContext';
 import { useTheme } from '../../Contexts/ThemeContext';
+import { authFetch } from '../../utils/authFetch';
 
 const AssociatedFamilyTree = ({ familyCode, userId }) => {
   const navigate = useNavigate();
@@ -30,16 +31,12 @@ const AssociatedFamilyTree = ({ familyCode, userId }) => {
       setTreeLoading(true);
       setError(null);
       try {
-        const baseUrl = import.meta.env.VITE_API_BASE_URL || '';
-        
-        // Use userId-based API if userId is provided, otherwise fallback to familyCode
-        const apiUrl = userId 
-          ? `${baseUrl}/family/associated-by-user/${userId}`
-          : `${baseUrl}/family/associated/${familyCode}`;
+        const endpoint = userId 
+          ? `/family/associated-by-user/${userId}`
+          : `/family/associated/${familyCode}`;
           
-        const response = await fetch(apiUrl);
-        if (!response.ok) throw new Error('Failed to fetch associated family tree');
-        const data = await response.json();
+        const data = await authFetch(endpoint);
+        if (!data) throw new Error('Failed to fetch associated family tree');
         
         if (!data.people || data.people.length === 0) {
           setTree(null);
