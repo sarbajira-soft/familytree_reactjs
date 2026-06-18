@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { fetchTutorials } from '../services/tutorial.service';
+import { fetchTutorials, fetchTutorialLanguages } from '../services/tutorial.service';
+import { useLanguage } from '../Contexts/LanguageContext';
+
 import { 
   FiSearch, 
   FiGrid, 
@@ -39,6 +41,49 @@ export default function TutorialsPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
+  const [tutorialLanguages, setTutorialLanguages] = useState([
+    { code: 'english', label: 'English' },
+    { code: 'tamil', label: 'Tamil (தமிழ்)' },
+    { code: 'hindi', label: 'Hindi (हिन्दी)' },
+    { code: 'telugu', label: 'Telugu (తెలుగు)' },
+    { code: 'malayalam', label: 'Malayalam (മലയാളம்)' },
+    { code: 'japanese', label: 'Japanese (日本語)' },
+    { code: 'kannada', label: 'Kannada (ಕನ್ನಡ)' },
+    { code: 'spanish', label: 'Spanish (Español)' },
+  ]);
+
+  useEffect(() => {
+    async function loadLangs() {
+      try {
+        const res = await fetchTutorialLanguages();
+        if (res && Array.isArray(res)) {
+          const list = res.map(lang => ({
+            code: lang.name.toLowerCase().trim(),
+            label: lang.name,
+          }));
+          const labelsMap = {
+            english: 'English',
+            tamil: 'Tamil (தமிழ்)',
+            hindi: 'Hindi (हिन्दी)',
+            telugu: 'Telugu (తెలుగు)',
+            malayalam: 'Malayalam (മലയാളம்)',
+            japanese: 'Japanese (日本語)',
+            kannada: 'Kannada (ಕನ್ನಡ)',
+            spanish: 'Spanish (Español)',
+          };
+          const listWithLabels = list.map(item => ({
+            code: item.code,
+            label: labelsMap[item.code] || item.label,
+          }));
+          setTutorialLanguages(listWithLabels);
+        }
+      } catch (e) {
+        console.error('Failed to load dynamic tutorial languages:', e);
+      }
+    }
+    loadLangs();
+  }, []);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [rows, setRows] = useState([]);
@@ -50,6 +95,17 @@ export default function TutorialsPage() {
   const [qInput, setQInput] = useState('');
   const [activeQ, setActiveQ] = useState('');
   const [activeType, setActiveType] = useState('all'); // all | video | article | mixed
+
+  const { language: globalLanguage } = useLanguage();
+  const [tutorialLang, setTutorialLang] = useState(() => {
+    return localStorage.getItem('tutorialLanguage') || globalLanguage || 'english';
+  });
+
+  useEffect(() => {
+    if (!localStorage.getItem('tutorialLanguage') && globalLanguage) {
+      setTutorialLang(globalLanguage);
+    }
+  }, [globalLanguage]);
 
   // Sync state from SearchParams
   useEffect(() => {
@@ -97,6 +153,7 @@ export default function TutorialsPage() {
           limit,
           q: activeQ,
           contentType: activeType === 'all' ? '' : activeType,
+          lang: tutorialLang,
         });
 
         if (!alive) return;
@@ -115,7 +172,7 @@ export default function TutorialsPage() {
     return () => {
       alive = false;
     };
-  }, [page, limit, activeQ, activeType]);
+  }, [page, limit, activeQ, activeType, tutorialLang]);
 
   const totalPages = Math.ceil(total / limit) || 1;
 
@@ -202,6 +259,25 @@ export default function TutorialsPage() {
                   </button>
                 );
               })}
+
+            <div className="relative w-full sm:w-48 shrink-0">
+              <select
+                value={tutorialLang}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setTutorialLang(val);
+                  localStorage.setItem('tutorialLanguage', val);
+                }}
+                className="h-12 w-full rounded-2xl border-2 border-primary-500 bg-white px-3 text-sm font-bold text-slate-800 dark:text-slate-100 dark:bg-slate-900 outline-none transition focus:border-primary-600 focus:ring-4 focus:ring-primary-100 dark:focus:ring-primary-900/30 cursor-pointer shadow-sm"
+                aria-label="Select tutorial language"
+              >
+                {tutorialLanguages.map((lang) => (
+                  <option key={lang.code} value={lang.code}>
+                    🌐 {lang.label}
+                  </option>
+                ))}
+              </select>
+            </div>
 
             <form onSubmit={handleSearchSubmit} className="relative w-full sm:w-80 lg:w-96">
               <input
@@ -316,21 +392,22 @@ export default function TutorialsPage() {
               <div
                 key={tutorial.id}
                 onClick={() => navigate(`/tutorials/${tutorial.id}`)}
-                className="group flex flex-col justify-between rounded-3xl border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900 overflow-hidden shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer"
+                className="group relative flex flex-col justify-between rounded-3xl border border-slate-100 dark:border-slate-800/80 bg-white dark:bg-slate-900 overflow-hidden shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer transform-gpu isolate"
+                style={{ WebkitMaskImage: '-webkit-radial-gradient(white, black)' }}
               >
                 {/* Thumbnail block with overlay features */}
-                <div className="relative aspect-[16/10] w-full bg-slate-50 dark:bg-slate-950 overflow-hidden">
+                <div className="relative aspect-[16/10] w-full bg-slate-50 dark:bg-slate-950 overflow-hidden rounded-t-3xl">
                   
                   {tutorial.thumbnailUrl ? (
                     <img
                       src={tutorial.thumbnailUrl}
                       alt={tutorial.title}
-                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105 rounded-t-3xl"
                       loading="lazy"
                     />
                   ) : (
                     // Beautiful gradient fallback overlay
-                    <div className={`relative h-full w-full bg-gradient-to-br ${gradient} flex items-center justify-center p-6 text-center text-white overflow-hidden`}>
+                    <div className={`relative h-full w-full bg-gradient-to-br ${gradient} flex items-center justify-center p-6 text-center text-white overflow-hidden rounded-t-3xl`}>
                       {/* Grid overlay */}
                       <div className="absolute inset-0 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:16px_16px] opacity-10"></div>
                       
@@ -358,7 +435,7 @@ export default function TutorialsPage() {
                   )}
 
                   {/* Play/Read Overlay on Hover */}
-                  <div className="absolute inset-0 bg-primary-700/25 backdrop-blur-[2px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                  <div className="absolute inset-0 bg-primary-700/25 backdrop-blur-[2px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-t-3xl">
                     <div className="rounded-full bg-white text-primary-700 p-3.5 shadow-xl transform scale-75 group-hover:scale-100 transition-transform duration-300">
                       {hasVideo ? (
                         <svg className="h-6 w-6 text-primary-700" fill="currentColor" viewBox="0 0 24 24">
@@ -382,7 +459,7 @@ export default function TutorialsPage() {
                 </div>
 
                 {/* Card Meta Content */}
-                <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
+                <div className="p-5 flex-1 flex flex-col justify-between space-y-4 rounded-b-3xl">
                   <div className="space-y-2">
                     <h3 className="font-bold text-slate-800 dark:text-slate-50 text-base leading-snug break-words group-hover:text-primary-700 dark:group-hover:text-primary-300 transition-colors">
                       {tutorial.title}

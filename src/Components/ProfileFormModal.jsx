@@ -1846,7 +1846,7 @@ const ProfileFormModal = ({
                 {showFieldPrivacyControls && (
                   <div>
                     <label htmlFor="dobPrivacy" className={labelClassName}>
-                      Date of Birth Visibility
+                      Date of Birth and Age Visibility
                     </label>
                     <select
                       id="dobPrivacy"
