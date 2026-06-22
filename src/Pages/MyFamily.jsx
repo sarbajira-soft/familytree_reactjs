@@ -32,6 +32,7 @@ const FamilyHubPage = () => {
   const { userInfo, userLoading, refetchUser } = useUser();
   const [familyData, setFamilyData] = useState(null);
   const [isCreateFamilyModalOpen, setIsCreateFamilyModalOpen] = useState(false);
+  const [createModalMode, setCreateModalMode] = useState('create');
   const [isJoinFamilyModalOpen, setIsJoinFamilyModalOpen] = useState(false);
   const [totalMembers, setTotalMembers] = useState(0);
   const [males, setMales] = useState(0);
@@ -44,6 +45,7 @@ const FamilyHubPage = () => {
   const [showSuggestModal, setShowSuggestModal] = useState(false);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [leavingFamily, setLeavingFamily] = useState(false);
+  const [isSpouseMember, setIsSpouseMember] = useState(false);
 
   useEffect(() => {
       const storedToken = getToken();
@@ -64,19 +66,33 @@ const FamilyHubPage = () => {
       setError(null);
 
       try {
-        const response = await authFetchResponse(`/family/code/${userInfo.familyCode}`, {
-          method: 'GET',
-          skipThrow: true,
-          headers: { accept: 'application/json' },
-        });
+        const [response, spouseResponse] = await Promise.all([
+          authFetchResponse(`/family/code/${userInfo.familyCode}`, {
+            method: 'GET',
+            skipThrow: true,
+            headers: { accept: 'application/json' },
+          }),
+          authFetchResponse(`/family/is-spouse/${userInfo.familyCode}`, {
+            method: 'GET',
+            skipThrow: true,
+            headers: { accept: 'application/json' },
+          })
+        ]);
 
         if (!response.ok) {
           throw new Error('Failed to fetch family data');
         }
         const data = await response.json();
 
+        let isSpouse = false;
+        if (spouseResponse.ok) {
+          const spouseData = await spouseResponse.json();
+          isSpouse = !!spouseData?.isSpouse;
+        }
+
         if (!ignore) {
           setFamilyData(data);
+          setIsSpouseMember(isSpouse);
           setTotalMembers(data.totalMembers ?? 12);
           setMales(data.males ?? 5);
           setFemales(data.females ?? 7);
@@ -139,6 +155,7 @@ const FamilyHubPage = () => {
 
   const handleCreateNewFamily = () => {
     setShowSuggestModal(false);
+    setCreateModalMode('create');
     setIsCreateFamilyModalOpen(true);
   };
 
@@ -157,6 +174,7 @@ const FamilyHubPage = () => {
     });
 
     if (res.isConfirmed) {
+      setCreateModalMode('createSpouseFamily');
       setIsCreateFamilyModalOpen(true);
     }
   };
@@ -423,6 +441,7 @@ const FamilyHubPage = () => {
                   onManageGifts={handleManageGifts}
                   onEditFamily={handleEditFamily}
                   canEditFamily={isOwnFamilyAdmin}
+                  onCreateSeparateFamily={isSpouseMember ? handleCreateSeparateFamily : null}
                   onShareFamilyCode={handleShareFamilyCode}
                   onLeaveFamily={handleLeaveFamily}
                   leavingFamily={leavingFamily}
@@ -433,27 +452,6 @@ const FamilyHubPage = () => {
                   familyCode={userInfo?.familyCode}
                   token={token}
                 />
-
-                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div>
-                      <div className="text-base font-semibold text-gray-900">
-                        Need a separate family?
-                      </div>
-                      <div className="text-sm text-gray-600 mt-1">
-                        If you joined your spouse&apos;s family but want your own family space too,
-                        you can create a new family (this switches your primary family).
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleCreateSeparateFamily}
-                      className="inline-flex items-center justify-center px-4 py-2 rounded-xl border border-primary-200 text-primary-700 font-semibold hover:bg-primary-50 transition"
-                    >
-                      Create Separate Family
-                    </button>
-                  </div>
-                </div>
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-20">
@@ -471,6 +469,7 @@ const FamilyHubPage = () => {
         onClose={() => setIsCreateFamilyModalOpen(false)}
         onFamilyCreated={handleFamilyCreated}
         token={token}
+        mode={createModalMode}
       />
 
       <JoinFamilyModal

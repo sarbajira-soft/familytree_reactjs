@@ -44,6 +44,7 @@ const FamilyManagementMobile = () => {
 
   const [token, setToken] = useState(null);
   const [isCreateFamilyModalOpen, setIsCreateFamilyModalOpen] = useState(false);
+  const [createModalMode, setCreateModalMode] = useState('create');
   const [isJoinFamilyModalOpen, setIsJoinFamilyModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
@@ -55,6 +56,7 @@ const FamilyManagementMobile = () => {
   const [pendingLoading, setPendingLoading] = useState(false);
   const [inviteCopySuccess, setInviteCopySuccess] = useState(false);
   const [leavingFamily, setLeavingFamily] = useState(false);
+  const [isSpouseMember, setIsSpouseMember] = useState(false);
 
   // Handle mobile back button for CreateFamilyModal
   useEffect(() => {
@@ -152,14 +154,28 @@ const FamilyManagementMobile = () => {
       }
       try {
         setMembersLoading(true);
-        const res = await authFetchResponse(`${baseUrl}/family/member/${userInfo.familyCode}`, {
-          method: "GET",
-          skipThrow: true,
-          headers: {
-            Accept: "application/json",
-          },
-          signal,
-        });
+        const [res, spouseRes] = await Promise.all([
+          authFetchResponse(`${baseUrl}/family/member/${userInfo.familyCode}`, {
+            method: "GET",
+            skipThrow: true,
+            headers: {
+              Accept: "application/json",
+            },
+            signal,
+          }),
+          authFetchResponse(`${baseUrl}/family/is-spouse/${userInfo.familyCode}`, {
+            method: "GET",
+            skipThrow: true,
+            headers: {
+              Accept: "application/json",
+            },
+            signal,
+          })
+        ]);
+        if (spouseRes.ok) {
+          const spouseData = await spouseRes.json();
+          setIsSpouseMember(!!spouseData?.isSpouse);
+        }
         if (!res.ok) {
           setMembersPreview([]);
           return;
@@ -338,7 +354,28 @@ const FamilyManagementMobile = () => {
   };
 
   const handleCreateFamily = () => {
+    setCreateModalMode('create');
     setIsCreateFamilyModalOpen(true);
+  };
+
+  const handleCreateSeparateFamily = async () => {
+    const res = await Swal.fire({
+      icon: 'warning',
+      title: 'Create a separate family?',
+      text:
+        'Creating a new family will make it your primary family in this app. You will stop being an approved member of your current family, but you can still access it through spouse/linked access. Continue?',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, create',
+      cancelButtonText: 'Cancel',
+      showCloseButton: true,
+      allowOutsideClick: true,
+      allowEscapeKey: true,
+    });
+
+    if (res.isConfirmed) {
+      setCreateModalMode('createSpouseFamily');
+      setIsCreateFamilyModalOpen(true);
+    }
   };
 
   const handleJoinFamily = () => {
@@ -554,6 +591,7 @@ const FamilyManagementMobile = () => {
                 onManageGifts={handleManageGifts}
                 onEditFamily={handleEditFamily}
                 canEditFamily={isOwnFamilyAdmin}
+                onCreateSeparateFamily={isSpouseMember ? handleCreateSeparateFamily : null}
                 onShareFamilyCode={handleShareFamilyCode}
                 onLeaveFamily={handleLeaveFamily}
                 leavingFamily={leavingFamily}
@@ -817,6 +855,7 @@ const FamilyManagementMobile = () => {
         onClose={() => setIsCreateFamilyModalOpen(false)}
         onFamilyCreated={handleFamilyCreated}
         token={token}
+        mode={createModalMode}
       />
 
       <JoinFamilyModal
