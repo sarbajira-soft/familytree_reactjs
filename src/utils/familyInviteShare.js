@@ -18,7 +18,7 @@ export function buildFamilySignupLink(familyCode, rawBaseUrl) {
   }
 
   const baseUrl = normalizeInviteBaseUrl(rawBaseUrl);
-  return `${baseUrl}/register?familyCode=${encodeURIComponent(normalizedFamilyCode)}`;
+  return `${baseUrl}/register`;
 }
 
 export function buildFamilyInviteMessage(familyCode, signUpLink) {

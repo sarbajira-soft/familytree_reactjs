@@ -399,7 +399,7 @@ const FamilyHubPage = () => {
 
   if (hasFamily === false && hasPendingRequest === false) {
     accessView = (
-      <NoFamilyView onCreateFamily={handleCreateFamily} onJoinFamily={handleJoinFamily} />
+      <NoFamilyView onCreateFamily={handleCreateFamily} onJoinFamily={handleJoinFamily} type="default" />
     );
   } else if (isApproved === false) {
     accessView = (
@@ -413,11 +413,11 @@ const FamilyHubPage = () => {
   return (
     <>
       {accessView ? (
-        <div className="min-h-[calc(100vh-6rem)] bg-gray-50 flex items-center justify-center px-4 py-6">
+        <div className="min-h-[calc(100vh-6rem)] bg-gray-50 dark:bg-slate-950 flex items-center justify-center px-4 py-6">
           {accessView}
         </div>
       ) : (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-gray-50 dark:bg-slate-950">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
             <button
               type="button"

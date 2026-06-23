@@ -159,6 +159,7 @@ const FamilyHubPage = () => {
             <NoFamilyView
               onCreateFamily={handleCreateFamily}
               onJoinFamily={handleJoinFamily}
+              type="default"
             />
           )}
         </div>

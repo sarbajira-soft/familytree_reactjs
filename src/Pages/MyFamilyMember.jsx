@@ -272,6 +272,7 @@ const FamilyMemberListing = () => {
     <NoFamilyView
       onCreateFamily={handleCreateFamily}
       onJoinFamily={handleJoinFamily}
+      type="members"
     />
   ) : userInfo.approveStatus !== 'approved' ? (
     <PendingApprovalView
@@ -293,7 +294,7 @@ const FamilyMemberListing = () => {
         </button>
 
         {accessView ? (
-          <div className="min-h-[calc(100vh-10rem)] flex items-center justify-center">
+          <div className="min-h-[calc(100vh-6rem)] bg-gray-50 dark:bg-slate-950 flex items-center justify-center px-4 py-6">
             {accessView}
           </div>
         ) : (

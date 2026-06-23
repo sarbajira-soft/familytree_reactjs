@@ -549,7 +549,7 @@ const FamilyManagementMobile = () => {
   };
 
   const accessView = !hasFamily && !hasPendingRequest ? (
-    <NoFamilyView onCreateFamily={handleCreateFamily} onJoinFamily={handleJoinFamily} />
+    <NoFamilyView onCreateFamily={handleCreateFamily} onJoinFamily={handleJoinFamily} type="members" />
   ) : !isApproved ? (
     <PendingApprovalView
       familyCode={pendingFamilyCode || userInfo?.familyCode}
@@ -558,14 +558,14 @@ const FamilyManagementMobile = () => {
   ) : null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white dark:from-slate-950 dark:to-slate-900">
+    <>
       {accessView ? (
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-24">
-          <div className="min-h-[calc(100vh-10rem)] flex items-center justify-center">
-            {accessView}
-          </div>
+        <div className="min-h-[calc(100vh-6rem)] bg-gray-50 dark:bg-slate-950 flex items-center justify-center px-4 py-6">
+          {accessView}
         </div>
-      ) : familyLoading || !familyData ? (
+      ) : (
+        <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white dark:from-slate-950 dark:to-slate-900">
+      {familyLoading || !familyData ? (
         <FamilyManagementShimmer />
       ) : (
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-24">
@@ -849,6 +849,8 @@ const FamilyManagementMobile = () => {
           )}
         </div>
       )}
+        </div>
+      )}
 
       <CreateFamilyModal
         isOpen={isCreateFamilyModalOpen}
@@ -864,7 +866,7 @@ const FamilyManagementMobile = () => {
         onFamilyJoined={handleFamilyJoined}
         token={token}
       />
-    </div>
+    </>
   );
 };
 
