@@ -2424,8 +2424,8 @@ const ProfileFormModal = ({
 
             {/* Submit Button */}
             <div className="flex justify-between items-center pt-4 gap-3">
-              {/* Delete Profile Button - Only show for current user profile editing */}
-              {isCurrentUserProfile && (
+              {/* Delete Profile Button - Only show for current user profile editing, but hide for family admins */}
+              {isCurrentUserProfile && !(Number(userInfo?.role) === 2 || Number(userInfo?.role) === 3) && (
                 <button
                   type="button"
                   onClick={handleDeleteProfile}
@@ -2445,7 +2445,7 @@ const ProfileFormModal = ({
               )}
               
               {/* Action Buttons */}
-              <div className="flex gap-3">
+              <div className="flex gap-3 ml-auto">
                 <button
                   type="submit"
                   disabled={isLoading}

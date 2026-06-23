@@ -256,7 +256,7 @@ export const UserProvider = ({ children }) => {
         membershipStatus ||
         (resolvedFamilyCode ? 'approved' : (pendingFamilyCode ? 'pending' : ''));
 
-      setUserInfo({
+      const resolvedUser = {
         userId: userProfile.userId,
         firstName: userProfile.firstName || '',
         lastName: userProfile.lastName || '',
@@ -312,7 +312,10 @@ export const UserProvider = ({ children }) => {
         dobPrivacy: privacySettings.dobPrivacy || userProfile.dobPrivacy || 'FAMILY',
 
         raw: data,
-      });
+      };
+
+      setUserInfo(resolvedUser);
+      persistAuthData(token, resolvedUser);
       
     } catch (err) {
       console.error('Error fetching user:', err);

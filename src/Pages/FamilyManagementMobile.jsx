@@ -26,7 +26,7 @@ const isInactiveMembershipMessage = (message) => {
 
 const FamilyManagementMobile = () => {
   const navigate = useNavigate();
-  const { userInfo, refetchUser } = useUser();
+  const { userInfo, userLoading, refetchUser } = useUser();
 
   const hasFamily = !!userInfo?.familyCode;
   const pendingFamilyCode = userInfo?.pendingFamilyCode || '';
@@ -547,6 +547,14 @@ const FamilyManagementMobile = () => {
       setLeavingFamily(false);
     }
   };
+
+  if (userLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex items-center justify-center">
+        <FamilyManagementShimmer />
+      </div>
+    );
+  }
 
   const accessView = !hasFamily && !hasPendingRequest ? (
     <NoFamilyView onCreateFamily={handleCreateFamily} onJoinFamily={handleJoinFamily} type="members" />
