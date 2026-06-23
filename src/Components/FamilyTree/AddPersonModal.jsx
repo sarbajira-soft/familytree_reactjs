@@ -158,6 +158,16 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
             });
             return;
         }
+
+        if (phoneInvite.result?.user?.notInTree) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'User not in tree',
+                text: 'This user is not placed in their family tree yet. They must be added to their tree first.',
+                confirmButtonColor: PRIMARY_COLOR,
+            });
+            return;
+        }
         
         try {
             setPhoneInvite(prev => ({ ...prev, requesting: true }));
@@ -2726,52 +2736,37 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                                                     marginTop: "10px",
                                                   }}
                                                 >
-                                                  {/* Invite button hidden as requested */}
-                                                  {/* <button 
-                                                                            type="button" 
-                                                                            onClick={handleSendInvite} 
-                                                                            disabled={phoneInvite.sending}
-                                                                            style={{ 
-                                                                                padding: '8px 16px', 
-                                                                                background: '#4CAF50', 
-                                                                                color: '#fff', 
-                                                                                border: 'none', 
-                                                                                borderRadius: 8, 
-                                                                                cursor: 'pointer', 
-                                                                                fontWeight: 600,
-                                                                                display: 'flex',
-                                                                                alignItems: 'center',
-                                                                                gap: '5px'
-                                                                            }}
-                                                                        >
-                                                                            <Send size={16} />
-                                                                            {phoneInvite.sending ? 'Sending...' : 'Invite'}
-                                                                        </button> */}
-                                                  <button
-                                                    type="button"
-                                                    onClick={handleSendRequest}
-                                                    disabled={
-                                                      phoneInvite.requesting
-                                                    }
-                                                    title="Request to associate family"
-                                                    style={{
-                                                      padding: "8px 16px",
-                                                      background: "#2196F3",
-                                                      color: "#fff",
-                                                      border: "none",
-                                                      borderRadius: 8,
-                                                      cursor: "pointer",
-                                                      fontWeight: 600,
-                                                      display: "flex",
-                                                      alignItems: "center",
-                                                      gap: "5px",
-                                                    }}
-                                                  >
-                                                    <UserPlus size={16} />
-                                                    {phoneInvite.requesting
-                                                      ? "Requesting..."
-                                                      : "Request"}
-                                                  </button>
+                                                  {phoneInvite.result.user?.notInTree ? (
+                                                    <span style={{ color: "#dc2626", fontWeight: 600 }}>
+                                                      This user is not placed in their family tree yet. They must be added to their tree first.
+                                                    </span>
+                                                  ) : (
+                                                    <button
+                                                      type="button"
+                                                      onClick={handleSendRequest}
+                                                      disabled={
+                                                        phoneInvite.requesting
+                                                      }
+                                                      title="Request to associate family"
+                                                      style={{
+                                                        padding: "8px 16px",
+                                                        background: "#2196F3",
+                                                        color: "#fff",
+                                                        border: "none",
+                                                        borderRadius: 8,
+                                                        cursor: "pointer",
+                                                        fontWeight: 600,
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        gap: "5px",
+                                                      }}
+                                                    >
+                                                      <UserPlus size={16} />
+                                                      {phoneInvite.requesting
+                                                        ? "Requesting..."
+                                                        : "Request"}
+                                                    </button>
+                                                  )}
                                                 </div>
                                               )}
                                               {phoneInvite.result
