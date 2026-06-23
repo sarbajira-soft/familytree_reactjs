@@ -72,17 +72,39 @@ const fetchAndApplyUserDetails = async ({ userId, token, setUserLoading, setForm
     const jsonData = await response.json();
     const { userProfile } = jsonData.data;
 
+    let addressLine1 = userProfile.addressLine1 || "";
+    let addressLine2 = userProfile.addressLine2 || "";
+    let district = userProfile.district || "";
+    let state = userProfile.state || "";
+    let pincode = userProfile.pincode || "";
+
+    const addressString = userProfile.address || "";
+    const addressParts = addressString
+      ? addressString.split(',').map((p) => p.trim()).filter(Boolean)
+      : [];
+
+    if (!addressLine1 && !district && !state && !pincode && addressParts.length > 0) {
+      const parts = [...addressParts];
+      if (parts.length > 0 && /^\d{5,6}$/.test(parts[parts.length - 1])) {
+        pincode = parts.pop();
+      }
+      if (parts.length > 0) state = parts.pop();
+      if (parts.length > 0) district = parts.pop();
+      if (parts.length > 0) addressLine1 = parts[0];
+      if (parts.length > 1) addressLine2 = parts.slice(1).join(', ');
+    }
+
     setFormData((prev) => ({
       ...prev,
       dob: userProfile.dob ? userProfile.dob.split("T")[0] : "",
       gender: userProfile.gender || "",
       fatherName: userProfile.fatherName || "",
       motherName: userProfile.motherName || "",
-      addressLine1: userProfile.addressLine1 || "",
-      addressLine2: userProfile.addressLine2 || "",
-      district: userProfile.district || "",
-      state: userProfile.state || "",
-      pincode: userProfile.pincode || "",
+      addressLine1,
+      addressLine2,
+      district,
+      state,
+      pincode,
       profile: userProfile.profile || "",
       familyCode: prev.familyCode || userProfile.familyCode || "",
     }));

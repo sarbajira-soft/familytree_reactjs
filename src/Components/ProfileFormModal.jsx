@@ -96,6 +96,7 @@ const ProfileFormModal = ({
     addressLine1: '',
     addressLine2: '',
     city: '',
+    district: '',
     state: '',
     pincode: '',
     country: '',
@@ -188,11 +189,15 @@ const ProfileFormModal = ({
   // Effect to populate form data when modal opens or mode changes
   useEffect(() => {
     if (isOpen) {
-      if (!hasInitializedForm.current) {
-        if (mode === 'edit-profile' || mode === 'edit-member') {
-          const sourceDataRaw = mode === 'edit-profile' ? userInfo : memberData;
+      const sourceDataRaw = mode === 'edit-profile' ? userInfo : memberData;
+      const isNewUser = sourceDataRaw && (
+        lastMemberDataRef.current?.userId !== sourceDataRaw.userId ||
+        lastMemberDataRef.current?.id !== sourceDataRaw.id
+      );
 
-          if (!sourceDataRaw) return;
+      if (!hasInitializedForm.current || isNewUser) {
+        if (mode === 'edit-profile' || mode === 'edit-member') {
+          if (!sourceDataRaw || Object.keys(sourceDataRaw).length === 0) return;
           
           // Handle children names from either raw.childrenNames or individual childName fields
           let childrenNames = [];
@@ -255,11 +260,35 @@ const ProfileFormModal = ({
             ''
           );
 
-          const addressString = sourceDataRaw.address || '';
+          const userProfile = sourceDataRaw.raw?.userProfile || sourceDataRaw.userProfile || {};
+          const addressString = sourceDataRaw.address || userProfile.address || '';
           const addressParts = addressString
             ? addressString.split(',').map((p) => p.trim()).filter(Boolean)
             : [];
-          const [addressLine1 = '', addressLine2 = '', city = '', state = '', pincode = '', country = ''] = addressParts;
+
+          let addressLine1 = userProfile.addressLine1 || '';
+          let addressLine2 = userProfile.addressLine2 || '';
+          let district = userProfile.district || '';
+          let state = userProfile.state || '';
+          let pincode = userProfile.pincode || '';
+
+          // Fallback to parsing address string
+          if (!addressLine1 && !district && !state && !pincode && addressParts.length > 0) {
+            const parts = [...addressParts];
+
+            // Detect pincode: last part that is 5-6 digits
+            if (parts.length > 0 && /^\d{5,6}$/.test(parts[parts.length - 1])) {
+              pincode = parts.pop();
+            }
+
+            // Assign from the end: state, then district
+            if (parts.length > 0) state = parts.pop();
+            if (parts.length > 0) district = parts.pop();
+
+            // Remaining parts go to address lines
+            if (parts.length > 0) addressLine1 = parts[0];
+            if (parts.length > 1) addressLine2 = parts.slice(1).join(', ');
+          }
 
           const newFormData = {
             ...initialFormData,
@@ -275,14 +304,15 @@ const ProfileFormModal = ({
             address: addressString,
             addressLine1,
             addressLine2,
-            city,
+            district,
+            city: district,
             emailPrivacy: safeString(sourceDataRaw.emailPrivacy || sourceDataRaw.privacySettings?.emailPrivacy || sourceDataRaw.raw?.userProfile?.emailPrivacy || sourceDataRaw.raw?.userProfile?.privacySettings?.emailPrivacy || 'FAMILY') || 'FAMILY',
             addressPrivacy: safeString(sourceDataRaw.addressPrivacy || sourceDataRaw.privacySettings?.addressPrivacy || sourceDataRaw.raw?.userProfile?.addressPrivacy || sourceDataRaw.raw?.userProfile?.privacySettings?.addressPrivacy || 'FAMILY') || 'FAMILY',
             phonePrivacy: safeString(sourceDataRaw.phonePrivacy || sourceDataRaw.privacySettings?.phonePrivacy || sourceDataRaw.raw?.userProfile?.phonePrivacy || sourceDataRaw.raw?.userProfile?.privacySettings?.phonePrivacy || 'FAMILY') || 'FAMILY',
             dobPrivacy: safeString(sourceDataRaw.dobPrivacy || sourceDataRaw.privacySettings?.dobPrivacy || sourceDataRaw.raw?.userProfile?.dobPrivacy || sourceDataRaw.raw?.userProfile?.privacySettings?.dobPrivacy || 'FAMILY') || 'FAMILY',
             state,
             pincode,
-            country: country || '',
+            country: '',
             maritalStatus: sourceDataRaw.maritalStatus || '',
             spouseName: sourceDataRaw.spouseName || '',
             fatherName: sourceDataRaw.fatherName || '',
@@ -903,10 +933,9 @@ const ProfileFormModal = ({
       'countryId',
       'addressLine1',
       'addressLine2',
-      'city',
+      'district',
       'state',
       'pincode',
-      'country',
       'bio',
       ...(mode !== 'add' ? ['emailPrivacy', 'addressPrivacy', 'phonePrivacy', 'dobPrivacy'] : []),
       'familyCode',
@@ -923,10 +952,9 @@ const ProfileFormModal = ({
     const addressPartsToSend = [
       formData.addressLine1,
       formData.addressLine2,
-      formData.city,
+      formData.district,
       formData.state,
       formData.pincode,
-      formData.country,
     ]
       .map((p) => String(p || '').trim())
       .filter(Boolean);
@@ -1897,67 +1925,54 @@ const ProfileFormModal = ({
                     maxLength={150}
                   />
                 </div>
-                <div>
-                  <label htmlFor="city" className={labelClassName}>
-                    City
-                  </label>
-                  <input
-                    id="city"
-                    name="city"
-                    type="text"
-                    value={formData.city || ''}
-                    onChange={handleChange}
-                    className={inputClassName('city')}
-                    placeholder="City"
-                    maxLength={80}
-                  />
-                </div>
-                <div>
-                  <label htmlFor="state" className={labelClassName}>
-                    State
-                  </label>
-                  <input
-                    id="state"
-                    name="state"
-                    type="text"
-                    value={formData.state || ''}
-                    onChange={handleChange}
-                    className={inputClassName('state')}
-                    placeholder="State"
-                    maxLength={80}
-                  />
-                </div>
-                <div>
-                  <label htmlFor="pincode" className={labelClassName}>
-                    Pincode
-                  </label>
-                  <input
-                    id="pincode"
-                    name="pincode"
-                    type="text"
-                    value={formData.pincode || ''}
-                    onChange={handleChange}
-                    className={inputClassName('pincode')}
-                    placeholder="e.g., 600001"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    maxLength={6}
-                  />
-                </div>
-                <div>
-                  <label htmlFor="country" className={labelClassName}>
-                    Country
-                  </label>
-                  <input
-                    id="country"
-                    name="country"
-                    type="text"
-                    value={formData.country || ''}
-                    onChange={handleChange}
-                    className={inputClassName('country')}
-                    placeholder="Country"
-                    maxLength={80}
-                  />
+                <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label htmlFor="district" className={labelClassName}>
+                      District
+                    </label>
+                    <input
+                      id="district"
+                      name="district"
+                      type="text"
+                      value={formData.district || ''}
+                      onChange={handleChange}
+                      className={inputClassName('district')}
+                      placeholder="District"
+                      maxLength={80}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="state" className={labelClassName}>
+                      State
+                    </label>
+                    <input
+                      id="state"
+                      name="state"
+                      type="text"
+                      value={formData.state || ''}
+                      onChange={handleChange}
+                      className={inputClassName('state')}
+                      placeholder="State"
+                      maxLength={80}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="pincode" className={labelClassName}>
+                      Pincode
+                    </label>
+                    <input
+                      id="pincode"
+                      name="pincode"
+                      type="text"
+                      value={formData.pincode || ''}
+                      onChange={handleChange}
+                      className={inputClassName('pincode')}
+                      placeholder="e.g., 600001"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={6}
+                    />
+                  </div>
                 </div>
                 {showFieldPrivacyControls && (
                   <div className="md:col-span-2">
