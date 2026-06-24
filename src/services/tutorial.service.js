@@ -30,3 +30,19 @@ export const fetchTutorialById = async (id, lang = '') => {
 export const fetchTutorialLanguages = async () => {
   return authFetch('/tutorial/languages');
 };
+
+/**
+   Fetch the best matching tutorial for any category.
+ */
+export const fetchWatchTutorial = async (category, lang = '') => {
+  const qs = new URLSearchParams();
+  if (lang) qs.set('lang', String(lang));
+  return authFetch(`/tutorial/watch/${category}?${qs.toString()}`);
+};
+
+/**
+   Fetch the best matching tutorial for the create-family category.
+ */
+export const fetchCreateFamilyTutorial = async (lang = '') => {
+  return fetchWatchTutorial('create-family', lang);
+};

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { fetchTutorialById, fetchTutorials, fetchTutorialLanguages } from '../services/tutorial.service';
 import { useNetwork } from '../Contexts/NetworkContext';
 import { useLanguage } from '../Contexts/LanguageContext';
@@ -34,16 +34,21 @@ export default function TutorialDetailPage() {
   const [siblings, setSiblings] = useState([]);
   const [retryKey, setRetryKey] = useState(0);
 
+  const [searchParams] = useSearchParams();
+  const queryLang = searchParams.get('lang');
+
   const { language: globalLanguage } = useLanguage();
   const [tutorialLang, setTutorialLang] = useState(() => {
-    return localStorage.getItem('tutorialLanguage') || globalLanguage || 'english';
+    return queryLang || localStorage.getItem('tutorialLanguage') || globalLanguage || 'english';
   });
 
   useEffect(() => {
-    if (!localStorage.getItem('tutorialLanguage') && globalLanguage) {
+    if (queryLang) {
+      setTutorialLang(queryLang);
+    } else if (!localStorage.getItem('tutorialLanguage') && globalLanguage) {
       setTutorialLang(globalLanguage);
     }
-  }, [globalLanguage]);
+  }, [globalLanguage, queryLang]);
 
   useEffect(() => {
     let alive = true;
@@ -296,7 +301,7 @@ export default function TutorialDetailPage() {
 
         {hasVideo ? (
           <div className="grid grid-cols-1 gap-7 lg:grid-cols-[minmax(0,1.1fr)_minmax(380px,0.9fr)] lg:items-start">
-            <aside className="lg:sticky lg:top-24">
+            <aside className="w-full">
               {ytVideoId ? (
                 <div className="overflow-hidden rounded-[24px] bg-slate-950 shadow-2xl shadow-primary-900/20">
                   <div className="aspect-video w-full">
