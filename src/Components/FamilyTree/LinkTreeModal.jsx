@@ -1,8 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import { getToken } from "../../utils/auth";
 import { authFetch, authFetchResponse } from "../../utils/authFetch";
 import { useTheme } from "../../Contexts/ThemeContext";
+import { useLanguage } from "../../Contexts/LanguageContext";
+import { fetchWatchTutorial } from "../../services/tutorial.service";
 
 const DEFAULT_PRIMARY = "#1976D2";
 
@@ -34,6 +37,39 @@ export default function LinkTreeModal({
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const senderNodeUid = String(senderPerson?.nodeUid || "").trim();
+
+  const navigate = useNavigate();
+  const { language } = useLanguage();
+  const [loadingTutorial, setLoadingTutorial] = useState(false);
+
+  const handleWatchLinkTreeTutorial = async () => {
+    if (loadingTutorial) return;
+    setLoadingTutorial(true);
+    try {
+      const res = await fetchWatchTutorial("link-tree", language);
+      if (res && res.id) {
+        navigate(`/tutorials/${res.id}?lang=${language}`);
+        onClose();
+      } else {
+        await Swal.fire({
+          icon: "info",
+          title: "Tutorial not available",
+          text: "The tutorial video for linking family trees is not available in your language yet.",
+          confirmButtonColor: primaryColor,
+        });
+      }
+    } catch (err) {
+      console.error("Failed to load link-tree tutorial:", err);
+      await Swal.fire({
+        icon: "info",
+        title: "Tutorial not available",
+        text: "The tutorial video for linking family trees is not available in your language yet.",
+        confirmButtonColor: primaryColor,
+      });
+    } finally {
+      setLoadingTutorial(false);
+    }
+  };
 
   useEffect(() => {
     if (!isOpen) return;
@@ -750,22 +786,40 @@ export default function LinkTreeModal({
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ fontSize: 18 }}>Link Tree</span>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              border: "none",
-              background: isDark ? "rgba(15, 23, 42, 0.6)" : "rgba(255, 255, 255, 0.2)",
-              color: "#fff",
-              borderRadius: 10,
-              padding: "6px 10px",
-              cursor: "pointer",
-              fontWeight: 800,
-            }}
-            aria-label="Close"
-          >
-            ×
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <button
+  type="button"
+  onClick={handleWatchLinkTreeTutorial}
+  disabled={loadingTutorial}
+  className="flex items-center gap-2 px-2 py-2 rounded-full backdrop-blur-md bg-white/80 border border-white shadow-md hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5"
+>
+  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r from-[#1976D2] to-[#42A5F5] text-white">
+    <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+      <path d="M8 5v14l11-7z" />
+    </svg>
+  </div>
+
+  <span className="font-medium text-gray-700">
+    {loadingTutorial ? "Loading..." : "Help Video"}
+  </span>
+</button>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                border: "none",
+                background: isDark ? "rgba(15, 23, 42, 0.6)" : "rgba(255, 255, 255, 0.2)",
+                color: "#fff",
+                borderRadius: 10,
+                padding: "6px 10px",
+                cursor: "pointer",
+                fontWeight: 800,
+              }}
+              aria-label="Close"
+            >
+              ×
+            </button>
+          </div>
         </div>
 
         <div style={{ padding: 18, overflowY: "auto", flex: 1 }}>

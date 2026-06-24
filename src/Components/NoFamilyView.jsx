@@ -1,6 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import PropTypes from 'prop-types';
-import { FiUsers, FiPlus, FiLink, FiCalendar, FiGitBranch, FiImage } from 'react-icons/fi';
+import { useNavigate } from 'react-router-dom';
+import { FiUsers, FiPlus, FiLink, FiCalendar, FiGitBranch, FiImage, FiPlayCircle } from 'react-icons/fi';
+import { useLanguage } from '../Contexts/LanguageContext';
+import { fetchCreateFamilyTutorial } from '../services/tutorial.service';
+import { toast } from 'react-toastify';
 
 const renderEventsIllustration = () => (
   <svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-28 h-28">
@@ -385,6 +389,27 @@ const configs = {
 const NoFamilyView = ({ onCreateFamily, onJoinFamily, type }) => {
   const config = configs[type] || configs.default;
   const BadgeIcon = config.badgeIcon;
+  const navigate = useNavigate();
+  const { language } = useLanguage();
+  const [loadingTutorial, setLoadingTutorial] = useState(false);
+
+  const handleWatchTutorial = async () => {
+    if (loadingTutorial) return;
+    setLoadingTutorial(true);
+    try {
+      const res = await fetchCreateFamilyTutorial(language);
+      if (res && res.id) {
+        navigate(`/tutorials/${res.id}?lang=${language}`);
+      } else {
+        toast.error('Tutorial not available');
+      }
+    } catch (err) {
+      console.error('Failed to load onboarding tutorial:', err);
+      toast.error('Tutorial not available');
+    } finally {
+      setLoadingTutorial(false);
+    }
+  };
 
   return (
     <div className="w-full max-w-lg mx-auto bg-transparent p-6 sm:p-8 flex flex-col items-center justify-center gap-6 h-[400px] overflow-hidden animate-fadeIn">
@@ -404,28 +429,49 @@ const NoFamilyView = ({ onCreateFamily, onJoinFamily, type }) => {
           <p className="text-sm sm:text-base text-gray-700 dark:text-slate-200 font-bold max-w-md mx-auto leading-relaxed">
             {config.text}
           </p>
+          
         </div>
       </div>
 
-      <div className="flex flex-col items-center gap-4 w-full mt-4">
-        <div className="flex flex-col sm:flex-row w-full gap-3 sm:gap-4">
-          <button
-            onClick={onCreateFamily}
-            className="flex-1 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#1976D2] text-white font-bold shadow-sm hover:bg-[#1565C0] hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 transform text-sm sm:text-base whitespace-nowrap"
-          >
-            <FiPlus size={20} />
-            Create Family Tree
-          </button>
+     <div className="flex flex-col items-center gap-4 w-full mt-4">
+  <div className="flex flex-col sm:flex-row w-full gap-3 sm:gap-4">
+    <button
+      onClick={onCreateFamily}
+      className="flex-1 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#1976D2] text-white font-bold shadow-sm hover:bg-[#1565C0] hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
+    >
+      <FiPlus size={20} />
+      Create Family Tree
+    </button>
 
-          <button
-            onClick={onJoinFamily}
-            className="flex-1 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-orange-500 text-white font-bold shadow-sm hover:bg-orange-600 dark:bg-orange-600 dark:hover:bg-orange-700 hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 transform text-sm sm:text-base whitespace-nowrap"
-          >
-            <FiLink size={20} />
-            Join Family Tree
-          </button>
-        </div>
-      </div>
+    <button
+      onClick={onJoinFamily}
+      className="flex-1 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-orange-500 text-white font-bold shadow-sm hover:bg-orange-600 dark:bg-orange-600 dark:hover:bg-orange-700 hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
+    >
+      <FiLink size={20} />
+      Join Family Tree
+    </button>
+  </div>
+
+  {/* Tutorial Button */}
+  <button
+    onClick={handleWatchTutorial}
+    disabled={loadingTutorial}
+    className="group flex items-center justify-center mt-5 gap-3 px-5 py-3 w-full rounded-xl border border-[#1976D2]/20 bg-[#F0F7FF] dark:bg-slate-900 dark:border-blue-800 hover:bg-[#E3F2FD] dark:hover:bg-slate-800 transition-all duration-200 disabled:opacity-50"
+  >
+    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-[#1976D2] text-white shadow-sm group-hover:scale-110 transition-transform">
+      <FiPlayCircle size={20} />
+    </div>
+
+    <div className="text-left">
+      <p className="font-semibold text-[#1976D2] dark:text-blue-400">
+        {loadingTutorial ? 'Loading Tutorial...' : 'Watch Quick Tutorial'}
+      </p>
+      <p className="text-xs text-gray-500 dark:text-slate-400">
+        Learn how to create and join a family tree
+      </p>
+    </div>
+  </button>
+</div>
     </div>
   );
 };

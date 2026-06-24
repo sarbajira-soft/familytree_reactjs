@@ -1,18 +1,52 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import { useLanguage } from '../../Contexts/LanguageContext';
 import { useTheme } from '../../Contexts/ThemeContext';
-import { X, UserPlus, Users, Edit, Plus, UserMinus, Camera, Save, ArrowLeft, Send } from 'lucide-react';
+import { X, UserPlus, Users, Edit, Plus, UserMinus, Camera, Save, ArrowLeft, Send, Play, Sparkles } from 'lucide-react';
 import { fetchRelationships } from '../../utils/familyTreeApi';
 import Swal from 'sweetalert2';
 
 import { getToken } from '../../utils/auth';
 import { authFetch, authFetchResponse } from '../../utils/authFetch';
+import { fetchWatchTutorial } from '../../services/tutorial.service';
 
 const PRIMARY_COLOR = "#1976D2";
 const SECONDARY_COLOR = "#f97316";
 
 const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, token, existingMemberIds = [] }) => {
+
+    const navigate = useNavigate();
+    const [loadingTutorial, setLoadingTutorial] = useState(false);
+
+    const handleWatchAssociateLinkTutorial = async () => {
+        if (loadingTutorial) return;
+        setLoadingTutorial(true);
+        try {
+            const res = await fetchWatchTutorial('associate-link', language);
+            if (res && res.id) {
+                navigate(`/tutorials/${res.id}?lang=${language}`);
+                onClose();
+            } else {
+                Swal.fire({
+                    icon: 'info',
+                    title: 'Tutorial not available',
+                    text: 'The tutorial video for linking profiles is not available in your language yet.',
+                    confirmButtonColor: PRIMARY_COLOR,
+                });
+            }
+        } catch (err) {
+            console.error('Failed to load associate-link tutorial:', err);
+            Swal.fire({
+                icon: 'info',
+                title: 'Tutorial not available',
+                text: 'The tutorial video for linking profiles is not available in your language yet.',
+                confirmButtonColor: PRIMARY_COLOR,
+            });
+        } finally {
+            setLoadingTutorial(false);
+        }
+    };
 
     const [count, setCount] = useState(1);
     const [forms, setForms] = useState([]);
@@ -1146,27 +1180,90 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                             {titles[action.type] || 'Add Person'}
                         </h3>
                     </div>
-                    <button 
-                        type="button"
-                        onClick={onClose} 
-                        style={{ 
-                            background: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)', 
-                            border: 'none', 
-                            fontSize: 20, 
-                            cursor: 'pointer', 
-                            color: '#fff',
-                            width: 36,
-                            height: 36,
-                            borderRadius: 10,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            transition: 'all 0.2s ease'
-                        }}
-                        aria-label="Close"
-                    >
-                        <X size={18} />
-                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <button
+  type="button"
+  onClick={handleWatchAssociateLinkTutorial}
+  disabled={loadingTutorial}
+  style={{
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    padding: "8px 16px",
+    borderRadius: 9999,
+    border: "1px solid rgba(255,255,255,0.4)",
+    background: "rgba(255,255,255,0.75)",
+    backdropFilter: "blur(12px)",
+    WebkitBackdropFilter: "blur(12px)",
+    boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+    color: PRIMARY_COLOR,
+    fontWeight: 600,
+    fontSize: 13,
+    cursor: loadingTutorial ? "not-allowed" : "pointer",
+    transition: "all 0.25s ease",
+    opacity: loadingTutorial ? 0.7 : 1,
+  }}
+  onMouseEnter={(e) => {
+    e.currentTarget.style.transform = "translateY(-2px)";
+    e.currentTarget.style.boxShadow =
+      "0 8px 20px rgba(0,0,0,0.12)";
+  }}
+  onMouseLeave={(e) => {
+    e.currentTarget.style.transform = "translateY(0)";
+    e.currentTarget.style.boxShadow =
+      "0 4px 12px rgba(0,0,0,0.08)";
+  }}
+>
+  <div
+    style={{
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      width: 28,
+      height: 28,
+      borderRadius: "50%",
+      background: `linear-gradient(135deg, ${PRIMARY_COLOR}, #42A5F5)`,
+      color: "#fff",
+      flexShrink: 0,
+    }}
+  >
+    <svg
+      viewBox="0 0 24 24"
+      width="12"
+      height="12"
+      fill="#fff"
+      style={{ transform: "translateX(1px)" }}
+    >
+      <path d="M8 5v14l11-7z" />
+    </svg>
+  </div>
+
+  <span>
+    {loadingTutorial ? "Loading..." : "Help Video"}
+  </span>
+</button>
+                        <button 
+                            type="button"
+                            onClick={onClose} 
+                            style={{ 
+                                background: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)', 
+                                border: 'none', 
+                                fontSize: 20, 
+                                cursor: 'pointer', 
+                                color: '#fff',
+                                width: 36,
+                                height: 36,
+                                borderRadius: 10,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.2s ease'
+                            }}
+                            aria-label="Close"
+                        >
+                            <X size={18} />
+                        </button>
+                    </div>
                 </div>
 
                 {/* Modal Body (Scrollable) */}
@@ -1178,52 +1275,56 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                         const tab = activeTabs[form.type] || 'new';
                         return (
                         <div key={form.index} style={{ marginBottom: 24 }}>
-                            {/* Tab Toggle: Add New first, then Select Existing */}
-                            <div style={{ 
-                                display: 'flex', 
-                                gap: 0, 
-                                marginBottom: 16, 
-                                borderRadius: 12, 
-                                overflow: 'hidden', 
-                                border: `2px solid ${PRIMARY_COLOR}22`, 
-                                width: 'fit-content', 
-                                fontWeight: 600, 
-                                fontSize: 14,
-                                background: isDark ? 'rgba(15, 23, 42, 0.6)' : 'rgba(255, 255, 255, 0.9)',
-                                boxShadow: `0 4px 15px ${PRIMARY_COLOR}18`
+                            <div style={{
+                                display: 'flex',
+                                marginBottom: 16,
                             }}>
-                                <button 
-                                    type="button" 
-                                    onClick={() => handleTabSwitch(form.type, 'new')} 
-                                    style={{ 
-                                        padding: '10px 24px', 
-                                        background: tab === 'new' ? PRIMARY_COLOR : 'transparent', 
-                                        color: tab === 'new' ? '#fff' : PRIMARY_COLOR, 
-                                        border: 'none', 
-                                        outline: 'none', 
-                                        cursor: 'pointer', 
-                                        transition: 'all 0.3s ease',
-                                        fontWeight: 600
-                                    }}
-                                >
-                                    Add New
-                                </button>
-                                <button 
-                                    type="button" 
-                                    onClick={() => handleTabSwitch(form.type, 'existing')} 
-                                    style={{ 
-                                        padding: '10px 24px', 
-                                        background: tab === 'existing' ? PRIMARY_COLOR : 'transparent', 
-                                        color: tab === 'existing' ? '#fff' : PRIMARY_COLOR, 
-                                        border: 'none', 
-                                        outline: 'none', 
-                                        cursor: 'pointer', 
-                                        transition: 'all 0.3s ease',
-                                        fontWeight: 600
-                                    }} 
-                                >
-                                    Select Existing
-                                </button>
+                                {/* Tab Toggle: Add New first, then Select Existing */}
+                                <div style={{ 
+                                    display: 'flex', 
+                                    gap: 0, 
+                                    borderRadius: 12, 
+                                    overflow: 'hidden', 
+                                    border: `2px solid ${PRIMARY_COLOR}22`, 
+                                    width: 'fit-content', 
+                                    fontWeight: 600, 
+                                    fontSize: 14,
+                                    background: isDark ? 'rgba(15, 23, 42, 0.6)' : 'rgba(255, 255, 255, 0.9)',
+                                    boxShadow: `0 4px 15px ${PRIMARY_COLOR}18`
+                                }}>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => handleTabSwitch(form.type, 'new')} 
+                                        style={{ 
+                                            padding: '10px 24px', 
+                                            background: tab === 'new' ? PRIMARY_COLOR : 'transparent', 
+                                            color: tab === 'new' ? '#fff' : PRIMARY_COLOR, 
+                                            border: 'none', 
+                                            outline: 'none', 
+                                            cursor: 'pointer', 
+                                            transition: 'all 0.3s ease',
+                                            fontWeight: 600
+                                        }}
+                                    >
+                                        Add New
+                                    </button>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => handleTabSwitch(form.type, 'existing')} 
+                                        style={{ 
+                                            padding: '10px 24px', 
+                                            background: tab === 'existing' ? PRIMARY_COLOR : 'transparent', 
+                                            color: tab === 'existing' ? '#fff' : PRIMARY_COLOR, 
+                                            border: 'none', 
+                                            outline: 'none', 
+                                            cursor: 'pointer', 
+                                            transition: 'all 0.3s ease',
+                                            fontWeight: 600
+                                        }} 
+                                    >
+                                        Select Existing
+                                    </button>
+                                </div>
                             </div>
 
                             {/* Existing Member Dropdown */}
@@ -2014,65 +2115,56 @@ const AddPersonModal = ({ isOpen, onClose, action, onAddPersons, familyCode, tok
                         const tab = activeTabs[form.index] || 'new';
                         return (
                           <div key={form.index} style={{ marginBottom: 24 }}>
-                            {/* Tab Toggle: Add New first, then Select Existing */}
-                            <div
-                              style={{
+                            <div style={{
                                 display: "flex",
-                                gap: 0,
                                 marginBottom: 16,
-                                borderRadius: 12,
-                                overflow: "hidden",
-                                border: `2px solid ${PRIMARY_COLOR}22`,
-                                width: "fit-content",
-                                fontWeight: 600,
-                                fontSize: 14,
-                                background: isDark ? "rgba(15, 23, 42, 0.6)" : "rgba(255, 255, 255, 0.9)",
-                                boxShadow: `0 4px 15px ${PRIMARY_COLOR}18`,
-                              }}
-                            >
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleTabSwitch(form.index, "new")
-                                }
-                                style={{
-                                  padding: "10px 24px",
-                                  background:
-                                    tab === "new"
-                                      ? PRIMARY_COLOR
-                                      : "transparent",
-                                  color: tab === "new" ? "#fff" : PRIMARY_COLOR,
-                                  border: "none",
-                                  outline: "none",
-                                  cursor: "pointer",
-                                  transition: "all 0.3s ease",
-                                  fontWeight: 600,
-                                }}
-                              >
-                                Add New
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleTabSwitch(form.index, "existing")
-                                }
-                                style={{
-                                  padding: "10px 24px",
-                                  background:
-                                    tab === "existing"
-                                      ? PRIMARY_COLOR
-                                      : "transparent",
-                                  color:
-                                    tab === "existing" ? "#fff" : PRIMARY_COLOR,
-                                  border: "none",
-                                  outline: "none",
-                                  cursor: "pointer",
-                                  transition: "all 0.3s ease",
-                                  fontWeight: 600,
-                                }}
-                              >
-                                Select Existing
-                              </button>
+                            }}>
+                                {/* Tab Toggle: Add New first, then Select Existing */}
+                                <div style={{ 
+                                    display: "flex", 
+                                    gap: 0, 
+                                    borderRadius: 12, 
+                                    overflow: "hidden", 
+                                    border: `2px solid ${PRIMARY_COLOR}22`, 
+                                    width: "fit-content", 
+                                    fontWeight: 600, 
+                                    fontSize: 14,
+                                    background: isDark ? "rgba(15, 23, 42, 0.6)" : "rgba(255, 255, 255, 0.9)",
+                                    boxShadow: `0 4px 15px ${PRIMARY_COLOR}18`
+                                }}>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => handleTabSwitch(form.index, "new")} 
+                                        style={{ 
+                                            padding: "10px 24px", 
+                                            background: tab === "new" ? PRIMARY_COLOR : "transparent", 
+                                            color: tab === "new" ? "#fff" : PRIMARY_COLOR, 
+                                            border: "none", 
+                                            outline: "none", 
+                                            cursor: "pointer", 
+                                            transition: "all 0.3s ease",
+                                            fontWeight: 600
+                                        }}
+                                    >
+                                        Add New
+                                    </button>
+                                    <button 
+                                        type="button" 
+                                        onClick={() => handleTabSwitch(form.index, "existing")} 
+                                        style={{ 
+                                            padding: "10px 24px", 
+                                            background: tab === "existing" ? PRIMARY_COLOR : "transparent", 
+                                            color: tab === "existing" ? "#fff" : PRIMARY_COLOR, 
+                                            border: "none", 
+                                            outline: "none", 
+                                            cursor: "pointer", 
+                                            transition: "all 0.3s ease",
+                                            fontWeight: 600
+                                        }} 
+                                    >
+                                        Select Existing
+                                    </button>
+                                </div>
                             </div>
 
                             {/* Existing Member Dropdown */}
