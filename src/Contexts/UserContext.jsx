@@ -107,6 +107,10 @@ export const UserProvider = ({ children }) => {
       typeof data.hasAcceptedTerms === 'boolean'
         ? data.hasAcceptedTerms
         : !!currentUser.hasAcceptedTerms;
+    const onboarding_completed =
+      typeof data.onboarding_completed === 'boolean'
+        ? data.onboarding_completed
+        : !!currentUser.onboarding_completed;
 
     return {
       userId: tokenUserId,
@@ -120,6 +124,7 @@ export const UserProvider = ({ children }) => {
       purgeAfter: data.purgeAfter || currentUser.purgeAfter || null,
       isAppUser,
       hasAcceptedTerms,
+      onboarding_completed,
       termsVersion: data.termsVersion || 'v1.0.0',
       termsAcceptedAt: data.termsAcceptedAt || null,
       raw: null,
@@ -211,6 +216,7 @@ export const UserProvider = ({ children }) => {
         role,
         isAppUser,
         hasAcceptedTerms,
+        onboarding_completed,
         termsVersion,
         termsAcceptedAt,
       } = data;
@@ -300,6 +306,7 @@ export const UserProvider = ({ children }) => {
         purgeAfter: data.purgeAfter || null,
         isAppUser: typeof isAppUser === 'boolean' ? isAppUser : !!jsonData.currentUser?.isAppUser,
         hasAcceptedTerms: typeof hasAcceptedTerms === 'boolean' ? hasAcceptedTerms : !!jsonData.currentUser?.hasAcceptedTerms,
+        onboarding_completed: typeof onboarding_completed === 'boolean' ? onboarding_completed : !!jsonData.currentUser?.onboarding_completed,
         termsVersion: termsVersion || 'v1.0.0',
         termsAcceptedAt: termsAcceptedAt || null,
 

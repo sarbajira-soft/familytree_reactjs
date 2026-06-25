@@ -113,9 +113,9 @@ const VerifyOtp = () => {
       await refetchUser();
 
       if (familyCode) {
-        navigate(`/on-boarding?familyCode=${familyCode}`);
+        navigate(`/onboarding?familyCode=${familyCode}`);
       } else {
-        navigate('/on-boarding');
+        navigate('/onboarding');
       }
     } catch (err) {
       console.error('OTP verification failed:', err);

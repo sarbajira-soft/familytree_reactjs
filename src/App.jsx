@@ -147,12 +147,16 @@ function App() {
               />
                {/* ---------------- Onboarding (Authenticated) ---------------- */}
               <Route
-                path="/on-boarding"
+                path="/onboarding"
                 element={
                   <PrivateRoute>
                     <OnBoarding />
                   </PrivateRoute>
                 }
+              />
+              <Route
+                path="/on-boarding"
+                element={<Navigate to="/onboarding" replace />}
               />
 
               <Route

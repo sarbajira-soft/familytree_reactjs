@@ -106,7 +106,11 @@ const Login = () => {
   // (token exists but userInfo is not loaded/valid yet).
   useEffect(() => {
     if (!userLoading && userInfo && isAuthenticated()) {
-      navigate('/dashboard', { replace: true });
+      if (userInfo.onboarding_completed === false) {
+        navigate('/onboarding', { replace: true });
+      } else {
+        navigate('/dashboard', { replace: true });
+      }
     }
   }, [navigate, userInfo, userLoading]);
 
