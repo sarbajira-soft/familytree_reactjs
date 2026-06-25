@@ -14,6 +14,7 @@ import PropTypes from "prop-types";
 import { authFetchResponse } from "../utils/authFetch";
 import { getToken } from "../utils/auth";
 import { isValidPincode, sanitizePincodeInput } from "../utils/inputSanitizers";
+import { useUser } from "../Contexts/UserContext";
 
 /* ─── Constants ──────────────────────────────────────── */
 
@@ -200,6 +201,7 @@ const inputCls = (hasError) =>
 const OnBoarding = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { refetchUser } = useUser();
   const urlFamilyCode = new URLSearchParams(location.search).get("familyCode");
 
   const [userId, setUserId] = useState(null);
@@ -267,8 +269,20 @@ const OnBoarding = () => {
     const e = {};
     const dobErr = validateDob(d.dob); if (dobErr) e.dob = dobErr;
     if (isBlank(d.gender)) e.gender = "Gender is required";
-    if (isBlank(d.fatherName)) e.fatherName = "Father's name is required";
-    if (isBlank(d.motherName)) e.motherName = "Mother's name is required";
+
+    const nameRegex = /^[A-Za-z][A-Za-z .'-]*$/;
+    if (isBlank(d.fatherName)) {
+      e.fatherName = "Father's name is required";
+    } else if (!nameRegex.test(d.fatherName)) {
+      e.fatherName = "Father's name can contain only letters, spaces";
+    }
+
+    if (isBlank(d.motherName)) {
+      e.motherName = "Mother's name is required";
+    } else if (!nameRegex.test(d.motherName)) {
+      e.motherName = "Mother's name can contain only letters, spaces";
+    }
+
     if (isBlank(d.addressLine1)) e.addressLine1 = "Address is required";
     if (isBlank(d.district)) e.district = "District is required";
     if (isBlank(d.state)) e.state = "State is required";
@@ -299,15 +313,28 @@ const OnBoarding = () => {
         throw new Error(msg);
       }
 
-      setApiSuccess("Profile updated successfully!");
+      const completeResponse = await authFetchResponse('/users/complete-onboarding', {
+        method: "POST",
+        skipThrow: true,
+      });
+
+      if (!completeResponse.ok) {
+        let msg = "Failed to complete onboarding";
+        try { const d = await completeResponse.json(); if (d?.message) msg = d.message; } catch { /* ignore */ }
+        throw new Error(msg);
+      }
+
+      await refetchUser();
+
+      setApiSuccess("Profile updated and onboarding completed successfully!");
       Swal.fire({
         title: "Profile locked in",
         html: `<div class="ft-swal-body"><p class="ft-swal-lead">Your profile is now part of the family story.</p><p class="ft-swal-sub">Everything is saved and ready to explore.</p><div class="ft-swal-chip">Member status: Active</div></div>`,
-        icon: "success", iconColor: "var(--color-primary)", confirmButtonText: "Go to My Profile",
+        icon: "success", iconColor: "var(--color-primary)", confirmButtonText: "Go to Dashboard",
         backdrop: "rgba(25,118,210,0.08)", buttonsStyling: false,
         customClass: { popup: "ft-swal-popup", title: "ft-swal-title", htmlContainer: "ft-swal-text", confirmButton: "ft-swal-confirm", icon: "ft-swal-icon" },
         allowOutsideClick: false, allowEscapeKey: false,
-      }).then((r) => { if (r.isConfirmed) globalThis.location.href = "/myprofile"; });
+      }).then(() => { navigate("/dashboard"); });
     } catch (err) {
       const lower = String(err?.message || "").toLowerCase();
       if (lower.includes("file") || lower.includes("image")) {
