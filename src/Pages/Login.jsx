@@ -106,7 +106,11 @@ const Login = () => {
   // (token exists but userInfo is not loaded/valid yet).
   useEffect(() => {
     if (!userLoading && userInfo && isAuthenticated()) {
-      navigate('/dashboard', { replace: true });
+      if (userInfo.onboarding_completed === false) {
+        navigate('/onboarding', { replace: true });
+      } else {
+        navigate('/dashboard', { replace: true });
+      }
     }
   }, [navigate, userInfo, userLoading]);
 
@@ -190,16 +194,10 @@ const Login = () => {
     <>
       {/* Logo */}
       <div className="flex justify-center mb-1">
-        <AuthLogo className="w-28 h-28" />
+        <AuthLogo className="w-32 h-32" />
       </div>
 
-      {/* Title */}
-      <div className="text-center mb-9">
-        <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Welcome back!!!</h2>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          Please enter your login details
-        </p>
-      </div>
+    
 
         {/* API Error */}
         {apiError && (
@@ -379,13 +377,31 @@ const Login = () => {
           </button>
         </form>
 
+        {/* OR Divider */}
+<div className="flex items-center my-3">
+  <div className="flex-1 border-t border-gray-300 dark:border-slate-700"></div>
+  <span className="px-4 text-sm text-gray-500 dark:text-gray-400">
+    OR
+  </span>
+  <div className="flex-1 border-t border-gray-300 dark:border-slate-700"></div>
+</div>
+
+<p className="text-center text-sm text-gray-500 pb-3"> New User ?</p>
+
+{/* Create Account Button */}
+<Link
+  to="/register"
+  className="block w-full h-12 bg-white dark:bg-slate-900 border border-[#1976d2] text-[#1976d2] rounded-lg font-semibold text-center leading-[48px] hover:bg-blue-50 dark:hover:bg-slate-800 transition"
+>
+ Sign Up
+</Link>
         {/* Sign Up */}
-        <p className="text-center text-sm text-gray-500 mt-6 pb-8">
+        {/* <p className="text-center text-sm text-gray-500 mt-6 pb-8">
           Don't have an account?{" "}
           <Link to="/register" className="text-[#1976d2] hover:underline">
             Sign up
           </Link>
-        </p>
+        </p> */}
     </>
   );
 };

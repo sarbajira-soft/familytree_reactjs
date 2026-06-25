@@ -20,7 +20,7 @@ import { getTreeCardDimensions } from "../../utils/treeCardDimensions";
 import { BlockButton } from "../block/BlockButton";
 import { BlockedBadge } from "../block/BlockedBadge";
 import { logger } from "../../utils/logger";
-import { shareFamilyInvite } from "../../utils/familyInviteShare";
+import { shareFamilyInvite, shareMemberInvite } from "../../utils/familyInviteShare";
 
 // Helper function to get inverse/opposite relationship code
 
@@ -208,13 +208,22 @@ async function saveCustomLabel({ currentUserId, currentFamilyId, displayRelation
   }
 }
 // Extracted helper: share family sign-up invite
-async function shareInviteLink(currentFamilyCode) {
+async function shareInviteLink(currentFamilyCode, person) {
   if (!currentFamilyCode) {
     await Swal.fire({ icon: "warning", title: "Cannot share invite", text: "Family code is missing for this person." });
     return;
   }
+  const personUserId = person?.userId || person?.memberId || null;
+  const personName = person?.name || [person?.firstName, person?.lastName].filter(Boolean).join(" ").trim() || "family member";
+
   try {
-    const result = await shareFamilyInvite(currentFamilyCode);
+    let result;
+    if (personUserId && !person?.isAppUser) {
+      result = await shareMemberInvite(currentFamilyCode, personUserId, personName);
+    } else {
+      result = await shareFamilyInvite(currentFamilyCode);
+    }
+
     if (result?.method === "copy") {
       await Swal.fire({
         icon: "success",
@@ -812,7 +821,7 @@ const Person = ({
     if (!e.target.closest(".radial-menu-button")) onClick(person.id);
   };
   const handleRadialMenuClick = (e) => { e.stopPropagation(); onClick(person.id); };
-  const handleShareClick = (e) => { e.stopPropagation(); shareInviteLink(currentFamilyCode); };
+  const handleShareClick = (e) => { e.stopPropagation(); shareInviteLink(currentFamilyCode, person); };
   const handleMenuToggle = (e) => { e.stopPropagation(); setIsMenuOpen((prev) => !prev); };
   const handleViewProfileClick = (e) => {
     e.stopPropagation();

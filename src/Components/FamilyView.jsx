@@ -12,6 +12,7 @@ const FamilyView = ({
   onManageGifts,
   onEditFamily,
   canEditFamily = false,
+  onCreateSeparateFamily,
   onShareFamilyCode,
   onLeaveFamily,
   leavingFamily = false,
@@ -163,6 +164,40 @@ const FamilyView = ({
                   </span>
                 </span>
               </button>
+
+              {onCreateSeparateFamily && (
+                <button
+                  type="button"
+                  onClick={onCreateSeparateFamily}
+                  className="
+    group/btn
+    flex
+    items-center
+    justify-center
+    w-full
+    sm:w-auto
+    bg-white
+    text-primary-700
+    hover:text-primary-800
+    rounded-2xl
+    px-4
+    sm:px-6
+    py-3
+    text-sm
+    sm:text-base
+    font-black
+    shadow-[0_8px_20px_rgba(0,0,0,0.1)]
+    hover:shadow-[0_12px_25px_rgba(255,255,255,0.3)]
+    transition-all
+    duration-300
+    hover:-translate-y-1
+    active:scale-95
+    active:translate-y-0
+  "
+                >
+                  Create Separate Family
+                </button>
+              )}
 
               {canEditFamily && (
                 <button

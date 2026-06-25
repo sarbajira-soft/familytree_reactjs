@@ -330,6 +330,7 @@ const FamilyGalleryPage = () => {
     <NoFamilyView
       onCreateFamily={handleCreateFamily}
       onJoinFamily={handleJoinFamily}
+      type="gallery"
     />
   ) : !hasFamilyAccessStatus(userInfo?.approveStatus) ? (
     <PendingApprovalView
@@ -341,7 +342,7 @@ const FamilyGalleryPage = () => {
   return (
     <>
       {accessView ? (
-        <div className="min-h-[calc(100vh-6rem)] bg-gray-50 flex items-center justify-center px-4 py-6">
+        <div className="min-h-[calc(100vh-6rem)] bg-gray-50 dark:bg-slate-950 flex items-center justify-center px-4 py-6">
           {accessView}
         </div>
       ) : (

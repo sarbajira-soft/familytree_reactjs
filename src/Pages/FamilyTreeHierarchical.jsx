@@ -203,7 +203,11 @@ const FamilyTreeHierarchical = () => {
     const pendingFamilyCode = userInfo?.pendingFamilyCode || '';
 
     if (!userInfo.familyCode && !pendingFamilyCode) {
-        return <NoFamilyView onCreateFamily={() => navigate('/my-family')} onJoinFamily={() => navigate('/my-family')} />;
+        return (
+            <div className="min-h-[calc(100vh-6rem)] bg-gray-50 dark:bg-slate-950 flex items-center justify-center px-4 py-6">
+                <NoFamilyView onCreateFamily={() => navigate('/my-family')} onJoinFamily={() => navigate('/my-family')} type="tree" />
+            </div>
+        );
     }
 
     if (userInfo.approveStatus !== 'approved') {

@@ -16,6 +16,13 @@ const LanguageSwitcher = () => {
   const { theme } = useTheme();
   const isDark = theme === "dark";
 
+  const standardCodes = LANGUAGES.map(l => l.code);
+  const options = [...LANGUAGES];
+  if (language && !standardCodes.includes(language)) {
+    const capitalizedLabel = language.charAt(0).toUpperCase() + language.slice(1);
+    options.push({ code: language, label: capitalizedLabel });
+  }
+
   return (
     <div style={{ marginLeft: 12 }}>
       <select
@@ -35,7 +42,7 @@ const LanguageSwitcher = () => {
         }}
         aria-label="Switch language"
       >
-        {LANGUAGES.map(lang => (
+        {options.map(lang => (
           <option key={lang.code} value={lang.code}>{lang.label}</option>
         ))}
       </select>

@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
-import { fetchTutorialById, fetchTutorials } from '../services/tutorial.service';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { fetchTutorialById, fetchTutorials, fetchTutorialLanguages } from '../services/tutorial.service';
 import { useNetwork } from '../Contexts/NetworkContext';
+import { useLanguage } from '../Contexts/LanguageContext';
+
 import {
   FiAlertTriangle,
   FiArrowLeft,
@@ -25,11 +27,28 @@ export default function TutorialDetailPage() {
   const { id } = useParams();
   const { isOffline } = useNetwork();
 
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [tutorial, setTutorial] = useState(null);
   const [siblings, setSiblings] = useState([]);
   const [retryKey, setRetryKey] = useState(0);
+
+  const [searchParams] = useSearchParams();
+  const queryLang = searchParams.get('lang');
+
+  const { language: globalLanguage } = useLanguage();
+  const [tutorialLang, setTutorialLang] = useState(() => {
+    return queryLang || localStorage.getItem('tutorialLanguage') || globalLanguage || 'english';
+  });
+
+  useEffect(() => {
+    if (queryLang) {
+      setTutorialLang(queryLang);
+    } else if (!localStorage.getItem('tutorialLanguage') && globalLanguage) {
+      setTutorialLang(globalLanguage);
+    }
+  }, [globalLanguage, queryLang]);
 
   useEffect(() => {
     let alive = true;
@@ -38,7 +57,7 @@ export default function TutorialDetailPage() {
       setLoading(true);
       setError('');
       try {
-        const res = await fetchTutorialById(id);
+        const res = await fetchTutorialById(id, tutorialLang);
         if (!alive) return;
         if (!res) throw new Error('No data returned from backend.');
         setTutorial(res);
@@ -60,7 +79,7 @@ export default function TutorialDetailPage() {
     return () => {
       alive = false;
     };
-  }, [id, retryKey, isOffline]);
+  }, [id, retryKey, isOffline, tutorialLang]);
 
   useEffect(() => {
     let alive = true;
@@ -257,29 +276,32 @@ export default function TutorialDetailPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50/60 via-white to-secondary-50/40 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
       <div className="mx-auto max-w-7xl space-y-6 px-4 py-6 md:py-8">
-        <nav className="flex items-center gap-2 overflow-x-auto whitespace-nowrap text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-          <button
-            type="button"
-            onClick={() => navigate('/tutorials')}
-            className="flex items-center gap-1 transition-colors hover:text-primary-700 dark:hover:text-primary-300"
-          >
-            <FiBook size={12} /> Tutorials
-          </button>
-          <FiChevronRight size={10} className="text-slate-300 dark:text-slate-700" />
-          {tutorial.category ? (
-            <>
-              <span className="text-slate-500 dark:text-slate-400">{tutorial.category}</span>
-              <FiChevronRight size={10} className="text-slate-300 dark:text-slate-700" />
-            </>
-          ) : null}
-          <span className="max-w-[220px] truncate text-primary-700 dark:text-primary-300">
-            {tutorial.title}
-          </span>
-        </nav>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 dark:border-slate-800/60 pb-3">
+          <nav className="flex items-center gap-2 overflow-x-auto whitespace-nowrap text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+            <button
+              type="button"
+              onClick={() => navigate('/tutorials')}
+              className="flex items-center gap-1 transition-colors hover:text-primary-700 dark:hover:text-primary-300"
+            >
+              <FiBook size={12} /> Tutorials
+            </button>
+            <FiChevronRight size={10} className="text-slate-300 dark:text-slate-700" />
+            {tutorial.category ? (
+              <>
+                <span className="text-slate-500 dark:text-slate-400">{tutorial.category}</span>
+                <FiChevronRight size={10} className="text-slate-300 dark:text-slate-700" />
+              </>
+            ) : null}
+            <span className="max-w-[220px] truncate text-primary-700 dark:text-primary-300">
+              {tutorial.title}
+            </span>
+          </nav>
+
+        </div>
 
         {hasVideo ? (
           <div className="grid grid-cols-1 gap-7 lg:grid-cols-[minmax(0,1.1fr)_minmax(380px,0.9fr)] lg:items-start">
-            <aside className="lg:sticky lg:top-24">
+            <aside className="w-full">
               {ytVideoId ? (
                 <div className="overflow-hidden rounded-[24px] bg-slate-950 shadow-2xl shadow-primary-900/20">
                   <div className="aspect-video w-full">

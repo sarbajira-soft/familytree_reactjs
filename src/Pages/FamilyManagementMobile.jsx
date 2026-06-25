@@ -26,7 +26,7 @@ const isInactiveMembershipMessage = (message) => {
 
 const FamilyManagementMobile = () => {
   const navigate = useNavigate();
-  const { userInfo, refetchUser } = useUser();
+  const { userInfo, userLoading, refetchUser } = useUser();
 
   const hasFamily = !!userInfo?.familyCode;
   const pendingFamilyCode = userInfo?.pendingFamilyCode || '';
@@ -44,6 +44,7 @@ const FamilyManagementMobile = () => {
 
   const [token, setToken] = useState(null);
   const [isCreateFamilyModalOpen, setIsCreateFamilyModalOpen] = useState(false);
+  const [createModalMode, setCreateModalMode] = useState('create');
   const [isJoinFamilyModalOpen, setIsJoinFamilyModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
@@ -55,6 +56,7 @@ const FamilyManagementMobile = () => {
   const [pendingLoading, setPendingLoading] = useState(false);
   const [inviteCopySuccess, setInviteCopySuccess] = useState(false);
   const [leavingFamily, setLeavingFamily] = useState(false);
+  const [isSpouseMember, setIsSpouseMember] = useState(false);
 
   // Handle mobile back button for CreateFamilyModal
   useEffect(() => {
@@ -152,14 +154,28 @@ const FamilyManagementMobile = () => {
       }
       try {
         setMembersLoading(true);
-        const res = await authFetchResponse(`${baseUrl}/family/member/${userInfo.familyCode}`, {
-          method: "GET",
-          skipThrow: true,
-          headers: {
-            Accept: "application/json",
-          },
-          signal,
-        });
+        const [res, spouseRes] = await Promise.all([
+          authFetchResponse(`${baseUrl}/family/member/${userInfo.familyCode}`, {
+            method: "GET",
+            skipThrow: true,
+            headers: {
+              Accept: "application/json",
+            },
+            signal,
+          }),
+          authFetchResponse(`${baseUrl}/family/is-spouse/${userInfo.familyCode}`, {
+            method: "GET",
+            skipThrow: true,
+            headers: {
+              Accept: "application/json",
+            },
+            signal,
+          })
+        ]);
+        if (spouseRes.ok) {
+          const spouseData = await spouseRes.json();
+          setIsSpouseMember(!!spouseData?.isSpouse);
+        }
         if (!res.ok) {
           setMembersPreview([]);
           return;
@@ -338,7 +354,28 @@ const FamilyManagementMobile = () => {
   };
 
   const handleCreateFamily = () => {
+    setCreateModalMode('create');
     setIsCreateFamilyModalOpen(true);
+  };
+
+  const handleCreateSeparateFamily = async () => {
+    const res = await Swal.fire({
+      icon: 'warning',
+      title: 'Create a separate family?',
+      text:
+        'Creating a new family will make it your primary family in this app. You will stop being an approved member of your current family, but you can still access it through spouse/linked access. Continue?',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, create',
+      cancelButtonText: 'Cancel',
+      showCloseButton: true,
+      allowOutsideClick: true,
+      allowEscapeKey: true,
+    });
+
+    if (res.isConfirmed) {
+      setCreateModalMode('createSpouseFamily');
+      setIsCreateFamilyModalOpen(true);
+    }
   };
 
   const handleJoinFamily = () => {
@@ -511,8 +548,16 @@ const FamilyManagementMobile = () => {
     }
   };
 
+  if (userLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex items-center justify-center">
+        <FamilyManagementShimmer />
+      </div>
+    );
+  }
+
   const accessView = !hasFamily && !hasPendingRequest ? (
-    <NoFamilyView onCreateFamily={handleCreateFamily} onJoinFamily={handleJoinFamily} />
+    <NoFamilyView onCreateFamily={handleCreateFamily} onJoinFamily={handleJoinFamily} type="members" />
   ) : !isApproved ? (
     <PendingApprovalView
       familyCode={pendingFamilyCode || userInfo?.familyCode}
@@ -521,14 +566,14 @@ const FamilyManagementMobile = () => {
   ) : null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white dark:from-slate-950 dark:to-slate-900">
+    <>
       {accessView ? (
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-24">
-          <div className="min-h-[calc(100vh-10rem)] flex items-center justify-center">
-            {accessView}
-          </div>
+        <div className="min-h-[calc(100vh-6rem)] bg-gray-50 dark:bg-slate-950 flex items-center justify-center px-4 py-6">
+          {accessView}
         </div>
-      ) : familyLoading || !familyData ? (
+      ) : (
+        <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white dark:from-slate-950 dark:to-slate-900">
+      {familyLoading || !familyData ? (
         <FamilyManagementShimmer />
       ) : (
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-24">
@@ -554,6 +599,7 @@ const FamilyManagementMobile = () => {
                 onManageGifts={handleManageGifts}
                 onEditFamily={handleEditFamily}
                 canEditFamily={isOwnFamilyAdmin}
+                onCreateSeparateFamily={isSpouseMember ? handleCreateSeparateFamily : null}
                 onShareFamilyCode={handleShareFamilyCode}
                 onLeaveFamily={handleLeaveFamily}
                 leavingFamily={leavingFamily}
@@ -811,12 +857,15 @@ const FamilyManagementMobile = () => {
           )}
         </div>
       )}
+        </div>
+      )}
 
       <CreateFamilyModal
         isOpen={isCreateFamilyModalOpen}
         onClose={() => setIsCreateFamilyModalOpen(false)}
         onFamilyCreated={handleFamilyCreated}
         token={token}
+        mode={createModalMode}
       />
 
       <JoinFamilyModal
@@ -825,7 +874,7 @@ const FamilyManagementMobile = () => {
         onFamilyJoined={handleFamilyJoined}
         token={token}
       />
-    </div>
+    </>
   );
 };
 

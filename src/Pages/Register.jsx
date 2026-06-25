@@ -1,6 +1,10 @@
 import React, { useState, useRef } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import AuthLogo from "../Components/AuthLogo";
+import countryList from "react-select-country-list";
+import { getCountryCallingCode } from "react-phone-number-input";
+import { isValidPhoneNumber } from "libphonenumber-js";
+import Select from "react-select";
 
 const Register = () => {
   const navigate = useNavigate();
@@ -15,7 +19,7 @@ const Register = () => {
     lastName: "",
     email: "",
     mobile: "",
-    countryCode: "+91",
+   countryCode:"+91",
     password: "",
     confirmPassword: "",
     hasAcceptedTerms: false,
@@ -28,6 +32,21 @@ const Register = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const apiErrorRef = useRef(null);
   const [showTermsModal, setShowTermsModal] = useState(false);
+const countries = countryList().getData();
+
+const countryOptions = countries
+  .filter((country) => {
+    try {
+      getCountryCallingCode(country.value);
+      return true;
+    } catch {
+      return false;
+    }
+  })
+  .map((country) => ({
+    value: `+${getCountryCallingCode(country.value)}`,
+    label: `${country.label} (+${getCountryCallingCode(country.value)})`,
+  }));
 
   const NAME_MIN_LENGTH = 2;
   const NAME_MAX_LENGTH = 30;
@@ -89,11 +108,17 @@ const Register = () => {
     }
 
     // Mobile number validation - fixed for Indian numbers
-    if (!formData.mobile.trim()) {
-      newErrors.mobile = "Mobile number is required";
-    } else if (!/^\d{10}$/.test(formData.mobile)) {
-      newErrors.mobile = "Please enter a valid 10-digit mobile number";
-    }
+   if (!formData.mobile.trim()) {
+  newErrors.mobile = "Mobile number is required";
+} else {
+  const fullPhone =
+    formData.countryCode + formData.mobile;
+
+  if (!isValidPhoneNumber(fullPhone)) {
+    newErrors.mobile =
+      "Please enter a valid phone number";
+  }
+}
 
     // Password validation
     if (!formData.password.trim()) {
@@ -139,7 +164,7 @@ const Register = () => {
 
   const handleMobileChange = (value) => {
     // Allow only numbers and limit to 10 digits
-    const mobileValue = value.replace(/\D/g, "").slice(0, 10);
+    const mobileValue = value.replace(/\D/g, "");
     handleChange("mobile", mobileValue);
   };
 
@@ -158,7 +183,7 @@ const Register = () => {
         lastName: formData.lastName.trim(),
         email: formData.email.trim(),
         mobile: formData.mobile,
-        countryCode: "+91",
+        countryCode: formData.countryCode,
         password: formData.password,
         hasAcceptedTerms: true,
         termsVersion: "v1.0.0",
@@ -350,15 +375,21 @@ const Register = () => {
             </label>
             <div className="flex">
               {/* Country Code - Small Box */}
-              <div className="w-20 mr-2">
-                <div
-                  className={`w-full h-12 px-2 flex items-center justify-center border rounded-lg dark:bg-slate-900 dark:text-white dark:border-slate-700 ${
-                    errors.mobile ? "border-red-500" : "border-gray-300 dark:border-slate-700"
-                  } bg-gray-50 dark:bg-slate-900 font-medium`}
-                >
-                  +91
-                </div>
-              </div>
+             <div className="w-52 mr-2 p-2">
+  <Select
+    options={countryOptions}
+    value={
+      countryOptions.find(
+        (option) => option.value === formData.countryCode
+      )
+    }
+    onChange={(selected) =>
+      handleChange("countryCode", selected.value)
+    }
+    isSearchable
+    placeholder="Select Country"
+  />
+</div>
 
               {/* Mobile Number - Big Box */}
               <div className="flex-1">
@@ -372,8 +403,8 @@ const Register = () => {
                       ? "border-red-500 focus:ring-red-300"
                       : "border-gray-300 dark:border-slate-700 focus:ring-[#1976d2]"
                   }`}
-                  placeholder="Enter 10-digit mobile number"
-                  maxLength={10}
+                  placeholder="Enter mobile number"
+                  maxLength={15}
                   inputMode="numeric"
                 />
               </div>

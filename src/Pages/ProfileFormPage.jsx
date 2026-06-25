@@ -6,6 +6,7 @@ import PropTypes from 'prop-types';
 import AITextareaHelper from '../Components/AITextareaHelper';
 
 import { authFetchResponse } from '../utils/authFetch';
+import { sanitizePincodeInput } from '../utils/inputSanitizers';
 
 const reconcileChildKeys = (prevKeys, desiredCount) => {
   const safeCount = Math.max(0, Number(desiredCount) || 0);
@@ -113,6 +114,11 @@ const ProfileFormPage = () => {
     gender: '',
     dob: '',
     address: '',
+    addressLine1: '',
+    addressLine2: '',
+    district: '',
+    state: '',
+    pincode: '',
     maritalStatus: '',
     marriageDate: '',
     spouseName: '',
@@ -357,6 +363,10 @@ const ProfileFormPage = () => {
     validateOptionalNameField(newErrors, 'kuladevata', formData.kuladevata, 'Kuladevata can contain only letters and spaces');
     validateOptionalNameField(newErrors, 'region', formData.region, 'Region can contain only letters and spaces');
 
+    if (String(formData.pincode || '').trim() && !/^\d{6}$/.test(String(formData.pincode || '').trim())) {
+      newErrors.pincode = 'Pincode must be exactly 6 digits';
+    }
+
     setErrors(newErrors);
     if (Object.keys(newErrors).length > 0) {
       const firstErrorFieldName = Object.keys(newErrors)[0];
@@ -380,9 +390,11 @@ const ProfileFormPage = () => {
       'region',
     ]);
 
+    const normalizedValue = name === 'pincode' ? sanitizePincodeInput(value) : (value || '');
+
     const sanitizedValue = restrictedNameFields.has(name)
       ? String(value || '').replaceAll(/[^A-Za-z ]/g, '')
-      : (value || '');
+      : normalizedValue;
 
     setFormData(prevData => ({
       ...prevData,
@@ -460,7 +472,6 @@ const ProfileFormPage = () => {
       'dislikes',
       'favoriteFoods',
       'countryId',
-      'address',
       'bio',
       'familyCode',
       'email',
@@ -472,6 +483,25 @@ const ProfileFormPage = () => {
     ];
 
     const formDataToSend = new FormData();
+
+    // Build a single address string from structured fields (if present)
+    const addressPartsToSend = [
+      formData.addressLine1,
+      formData.addressLine2,
+      formData.district,
+      formData.state,
+      formData.pincode,
+    ]
+      .map((p) => String(p || '').trim())
+      .filter(Boolean);
+    const mergedAddress = addressPartsToSend.join(', ');
+
+    // Always send the combined address field expected by the backend
+    if (mergedAddress) {
+      formDataToSend.append('address', mergedAddress);
+    } else if (formData.address) {
+      formDataToSend.append('address', formData.address);
+    }
 
     // Append allowed fields
     allowedFields.forEach((field) => {
@@ -1144,18 +1174,84 @@ const ProfileFormPage = () => {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
-                <label htmlFor="address" className={labelClassName}>
-                  Address
+                <label htmlFor="addressLine1" className={labelClassName}>
+                  Address Line 1
                 </label>
-                <textarea
-                  id="address"
-                  name="address"
-                  value={formData.address}
+                <input
+                  id="addressLine1"
+                  name="addressLine1"
+                  type="text"
+                  value={formData.addressLine1 || ''}
                   onChange={handleChange}
-                  className={inputClassName('address')}
-                  placeholder="Full address"
-                  rows="2"
+                  className={inputClassName('addressLine1')}
+                  placeholder="Flat / House / Street"
+                  maxLength={150}
                 />
+              </div>
+              <div className="md:col-span-2">
+                <label htmlFor="addressLine2" className={labelClassName}>
+                  Address Line 2 (Optional)
+                </label>
+                <input
+                  id="addressLine2"
+                  name="addressLine2"
+                  type="text"
+                  value={formData.addressLine2 || ''}
+                  onChange={handleChange}
+                  className={inputClassName('addressLine2')}
+                  placeholder="Area / Landmark"
+                  maxLength={150}
+                />
+              </div>
+              <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label htmlFor="district" className={labelClassName}>
+                    District
+                  </label>
+                  <input
+                    id="district"
+                    name="district"
+                    type="text"
+                    value={formData.district || ''}
+                    onChange={handleChange}
+                    className={inputClassName('district')}
+                    placeholder="District"
+                    maxLength={80}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="state" className={labelClassName}>
+                    State
+                  </label>
+                  <input
+                    id="state"
+                    name="state"
+                    type="text"
+                    value={formData.state || ''}
+                    onChange={handleChange}
+                    className={inputClassName('state')}
+                    placeholder="State"
+                    maxLength={80}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="pincode" className={labelClassName}>
+                    Pincode
+                  </label>
+                  <input
+                    id="pincode"
+                    name="pincode"
+                    type="text"
+                    value={formData.pincode || ''}
+                    onChange={handleChange}
+                    className={inputClassName('pincode')}
+                    placeholder="e.g., 600001"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={6}
+                  />
+                  {errors.pincode && <p className="text-red-500 text-xs mt-1">{errors.pincode}</p>}
+                </div>
               </div>
             </div>
           </div>

@@ -6,7 +6,7 @@ const InviteFamilyMemberModal = ({ onClose, familyCode }) => {
   const baseUrl = /^https?:\/\//i.test(rawBaseUrl)
     ? rawBaseUrl
     : `https://${rawBaseUrl}`;
-  const inviteLink = `${baseUrl.replace(/\/$/, '')}/register?familyCode=${familyCode}`;
+  const inviteLink = `${baseUrl.replace(/\/$/, '')}/register`;
   // const [isCopied, setIsCopied] = useState(false);
   // const [email, setEmail] = useState('');
   // const [emailSent, setEmailSent] = useState(false);

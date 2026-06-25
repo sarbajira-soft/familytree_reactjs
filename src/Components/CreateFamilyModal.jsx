@@ -148,7 +148,9 @@ const CreateFamilyModal = ({ isOpen, onClose, token, onFamilyCreated, mode = "cr
         const endpoint =
             mode === 'edit'
             ? `${import.meta.env.VITE_API_BASE_URL}/family/${initialData.id}`
-            : `${import.meta.env.VITE_API_BASE_URL}/family/create`;
+            : mode === 'createSpouseFamily'
+              ? `${import.meta.env.VITE_API_BASE_URL}/family/create-spouse-family`
+              : `${import.meta.env.VITE_API_BASE_URL}/family/create`;
 
         setLoading(true);
         try {

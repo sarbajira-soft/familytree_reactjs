@@ -29,9 +29,22 @@ const PrivateRoute = ({ children }) => {
   }
 
   const isOnTermsPage = location.pathname === '/terms';
+  const isOnOnboardingPage = location.pathname === '/onboarding' || location.pathname === '/on-boarding';
+  const isOnPrivacyPage = location.pathname === '/privacy-policy';
+  const isOnLogout = location.pathname === '/logout';
 
   if (!isOnTermsPage && userInfo.hasAcceptedTerms === false) {
     return <Navigate to="/terms" replace />;
+  }
+
+  if (
+    !isOnTermsPage &&
+    !isOnOnboardingPage &&
+    !isOnPrivacyPage &&
+    !isOnLogout &&
+    userInfo.onboarding_completed === false
+  ) {
+    return <Navigate to="/onboarding" replace />;
   }
 
   // If user is authenticated and context is loaded, allow access
