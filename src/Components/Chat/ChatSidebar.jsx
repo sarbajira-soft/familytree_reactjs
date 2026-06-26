@@ -79,7 +79,7 @@ const ChatSidebar = ({
             type="button"
           >
             <FiPlus size={14} />
-            Create room
+            Create Room
           </button>
         ))}
     </div>
