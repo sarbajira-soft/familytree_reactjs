@@ -1187,9 +1187,11 @@ const CreatePostModal = ({
             <textarea
               ref={textareaRef}
               className="w-full pr-12 p-3 sm:p-4 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-800 placeholder-gray-400 resize-none min-h-[120px] sm:min-h-[140px] text-sm sm:text-base transition-all"
-              placeholder={`What's on your mind, ${
-                currentUser.firstName?.split("_")[0] || "there"
-              }? Or type keywords and click Sparkles to write with AI (e.g. birthday reunion cake)`}
+              placeholder={`What's on your mind, ${(() => {
+                const name = currentUser?.firstName || currentUser?.name || "there";
+                const cleanName = name.split("_")[0].split(" ")[0];
+                return !cleanName || /^otp$/i.test(cleanName) || cleanName.toLowerCase() === "user" || cleanName.toLowerCase() === "username" ? "there" : cleanName;
+              })()}? Or type keywords and click Sparkles to write with AI (e.g. birthday reunion cake)`}
               value={content}
               onChange={(e) => setContent(e.target.value.slice(0, MAX_CAPTION_LENGTH))}
               maxLength={MAX_CAPTION_LENGTH}

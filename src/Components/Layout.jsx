@@ -36,7 +36,6 @@ import { useUser } from "../Contexts/UserContext";
 import { useTheme } from "../Contexts/ThemeContext";
 import NotificationPanel from "./NotificationPanel";
 import SupportHelpModal from "./SupportHelpModal";
-import GlobalAIChat from "./GlobalAIChat";
 
 const PullToRefresh = ({ children, onRefresh, disabled }) => {
   const containerRef = useRef(null);
@@ -766,50 +765,7 @@ const LayoutContent = ({ noScroll = false }) => {
                 </div>
               )}
 
-              {/* AI Assistant */}
-              <div className="relative">
-                {isMobile ? (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleToggleAiChat();
-                    }}
-                    aria-label="Open AI Assistant"
-                    className={`flex items-center gap-1.5 py-1 px-2.5 rounded-full transition-all duration-200 border ${
-                      aiChatOpen
-                        ? "bg-gradient-to-r from-primary-600 to-indigo-600 text-white border-transparent shadow-sm"
-                        : "bg-white border-gray-200 text-primary-600 hover:bg-gray-50 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-200 dark:hover:bg-slate-800/80"
-                    }`}
-                  >
-                    <Sparkles size={13} className={aiChatOpen ? "text-white" : "text-indigo-500 dark:text-indigo-400"} />
-                    <span className="text-[10px] font-bold tracking-wider">AI</span>
-                    <span className="relative flex h-1.5 w-1.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500"></span>
-                    </span>
-                  </button>
-                ) : (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleToggleAiChat();
-                    }}
-                    aria-label="Open AI Assistant"
-                    className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full transition-all duration-200 border ${
-                      aiChatOpen
-                        ? "bg-gradient-to-r from-primary-600 to-indigo-600 text-white border-transparent shadow-md scale-[1.02]"
-                        : "bg-white border-gray-200 text-primary-600 hover:bg-gray-50 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-200 dark:hover:bg-slate-800 hover:border-primary-300 dark:hover:border-primary-900/50 shadow-sm"
-                    }`}
-                  >
-                    <Sparkles size={15} className={`${aiChatOpen ? "text-white" : "text-indigo-500 dark:text-indigo-400 animate-pulse"}`} />
-                    <span className="text-xs font-bold tracking-wide">Ask AI</span>
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                    </span>
-                  </button>
-                )}
-              </div>
+
 
               {/* Guide Button (Web View Only) */}
               {!isMobile && (
@@ -1184,9 +1140,6 @@ const LayoutContent = ({ noScroll = false }) => {
         isConnected={isConnected}
         refetchUnreadCount={refetchUnreadCount}
       />
-
-      {/* Global Floating AI Assistant Chat widget */}
-      <GlobalAIChat isOpen={aiChatOpen} setIsOpen={setAiChatOpen} />
 
     </div>
   );
