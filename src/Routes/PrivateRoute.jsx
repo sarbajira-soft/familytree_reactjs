@@ -31,16 +31,33 @@ const PrivateRoute = ({ children }) => {
   const isOnTermsPage = location.pathname === '/terms';
   const isOnOnboardingPage = location.pathname === '/onboarding' || location.pathname === '/on-boarding';
   const isOnPrivacyPage = location.pathname === '/privacy-policy';
+  const isOnLegalUpdatePage = location.pathname === '/legal-update';
   const isOnLogout = location.pathname === '/logout';
 
-  if (!isOnTermsPage && userInfo.hasAcceptedTerms === false) {
-    return <Navigate to="/terms" replace />;
+  // Scenario 4: Both changed (both are false)
+  if (userInfo.hasAcceptedTerms === false && userInfo.hasAcceptedPrivacy === false) {
+    if (!isOnLegalUpdatePage) {
+      return <Navigate to="/legal-update" replace />;
+    }
+  }
+  // Scenario 2: Only Terms changed
+  else if (userInfo.hasAcceptedTerms === false) {
+    if (!isOnTermsPage) {
+      return <Navigate to="/terms" replace />;
+    }
+  }
+  // Scenario 3: Only Privacy changed
+  else if (userInfo.hasAcceptedPrivacy === false) {
+    if (!isOnPrivacyPage) {
+      return <Navigate to="/privacy-policy" replace />;
+    }
   }
 
   if (
     !isOnTermsPage &&
     !isOnOnboardingPage &&
     !isOnPrivacyPage &&
+    !isOnLegalUpdatePage &&
     !isOnLogout &&
     userInfo.onboarding_completed === false
   ) {
