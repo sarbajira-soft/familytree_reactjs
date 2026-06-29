@@ -31,6 +31,9 @@ const ResetPassword = lazy(() => import("./Pages/ResetPassword"));
 const VerifyOtp = lazy(() => import("./Pages/VerifyOtp"));
 const AccountRecoveryPage = lazy(() => import("./Pages/AccountRecoveryPage"));
 const TermsAndConditions = lazy(() => import("./Pages/TermsAndConditions"));
+const PrivacyPolicy = lazy(() => import("./Pages/PrivacyPolicy"));
+const LegalUpdate = lazy(() => import("./Pages/LegalUpdate"));
+const PublicLegalPage = lazy(() => import("./Pages/PublicLegalPage"));
 const OnBoarding = lazy(() => import("./Pages/OnBoarding"));
 const Dashboard = lazy(() => import("./Pages/Dashboard"));
 const MyProfile = lazy(() => import("./Pages/MyProfile"));
@@ -119,6 +122,7 @@ function App() {
               <Route path="/g/:shareId" element={<PublicSharedGalleryPage />} />
               <Route path="/shared-post/:shareId" element={<SharedPostScreen />} />
               <Route path="/shared-gallery/:shareId" element={<SharedGalleryScreen />} />
+              <Route path="/terms-and-privacy" element={<PublicLegalPage />} />
               {/* ---------------- Guest-only Auth Routes (Persistent Layout) ---------------- */}
               <Route
                 element={
@@ -164,6 +168,24 @@ function App() {
                 element={
                   <PrivateRoute>
                     <TermsAndConditions />
+                  </PrivateRoute>
+                }
+              />
+
+              <Route
+                path="/privacy-policy"
+                element={
+                  <PrivateRoute>
+                    <PrivacyPolicy />
+                  </PrivateRoute>
+                }
+              />
+
+              <Route
+                path="/legal-update"
+                element={
+                  <PrivateRoute>
+                    <LegalUpdate />
                   </PrivateRoute>
                 }
               />

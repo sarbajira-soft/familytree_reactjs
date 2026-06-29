@@ -5,40 +5,40 @@ import { useUser } from '../Contexts/UserContext';
 import { getToken } from '../utils/auth';
 import { authFetchResponse } from '../utils/authFetch';
 
-const TermsAndConditions = () => {
+const PrivacyPolicy = () => {
   const navigate = useNavigate();
   const { userInfo, refetchUser } = useUser();
   const [accepted, setAccepted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [apiError, setApiError] = useState('');
   const [document, setDocument] = useState({
-    title: 'Terms & Conditions',
+    title: 'Privacy Policy',
     version: 'v1.0.0',
-    content: '<p>Loading terms and conditions...</p>',
+    content: '<p>Loading privacy policy...</p>',
   });
 
   useEffect(() => {
-    // Fetch active Terms & Conditions content
+    // Fetch active privacy policy content
     const fetchDoc = async () => {
       try {
-        const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/legal/terms`);
+        const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/legal/privacy`);
         if (res.ok) {
           const data = await res.json();
           setDocument({
-            title: data.title || 'Terms & Conditions',
+            title: data.title || 'Privacy Policy',
             version: data.version || 'v1.0.0',
             content: data.content || '<p>No content available.</p>',
           });
         }
       } catch (err) {
-        console.error('Failed to fetch terms:', err);
+        console.error('Failed to fetch privacy policy:', err);
       }
     };
     fetchDoc();
   }, []);
 
   useEffect(() => {
-    if (userInfo && userInfo.hasAcceptedTerms) {
+    if (userInfo && userInfo.hasAcceptedPrivacy) {
       navigate('/dashboard', { replace: true });
     }
   }, [userInfo, navigate]);
@@ -48,7 +48,7 @@ const TermsAndConditions = () => {
     setApiError('');
 
     if (!accepted) {
-      setApiError('You must accept the Terms & Conditions to continue.');
+      setApiError('You must accept the Privacy Policy to continue.');
       return;
     }
 
@@ -63,8 +63,8 @@ const TermsAndConditions = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          acceptTerms: true,
-          acceptPrivacy: false,
+          acceptTerms: false,
+          acceptPrivacy: true,
         }),
       });
 
@@ -98,7 +98,7 @@ const TermsAndConditions = () => {
         <div className="text-center mb-6">
           <h1 className="text-2xl font-bold text-gray-800">{document.title}</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Please read these terms carefully. You must accept them to continue using the application.
+            Please read our Privacy Policy carefully. You must accept it to continue using the application.
           </p>
         </div>
 
@@ -119,14 +119,14 @@ const TermsAndConditions = () => {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="flex items-start space-x-2">
             <input
-              id="acceptTerms"
+              id="acceptPrivacy"
               type="checkbox"
               checked={accepted}
               onChange={(e) => setAccepted(e.target.checked)}
               className="mt-1 h-4 w-4 rounded border-gray-300 text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
             />
-            <label htmlFor="acceptTerms" className="text-sm text-gray-700 select-none">
-              I have read and accept the updated Terms & Conditions.
+            <label htmlFor="acceptPrivacy" className="text-sm text-gray-700 select-none">
+              I have read and accept the updated Privacy Policy.
             </label>
           </div>
 
@@ -145,4 +145,4 @@ const TermsAndConditions = () => {
   );
 };
 
-export default TermsAndConditions;
+export default PrivacyPolicy;

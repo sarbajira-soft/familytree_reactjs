@@ -3774,7 +3774,7 @@ const ChatPage = () => {
 
       <ChatPickerModal
         isOpen={createRoomOpen}
-        title="Create room"
+        title="Create Room"
         subtitle="Pick a room name and choose the Familyss app users you want to include."
         members={availableDirectMembers}
         selectedIds={createRoomMemberIds}
@@ -3786,7 +3786,7 @@ const ChatPage = () => {
           setCreateRoomMemberIds([]);
         }}
         onSubmit={handleCreateRoom}
-        submitLabel="Create room"
+        submitLabel="Create Room"
         isSubmitting={createRoomSubmitting}
         error={createRoomError}
         emptyStateTitle="No family app users available"

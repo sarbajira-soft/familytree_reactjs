@@ -36,8 +36,6 @@ import { useUser } from "../Contexts/UserContext";
 import { useTheme } from "../Contexts/ThemeContext";
 import NotificationPanel from "./NotificationPanel";
 import SupportHelpModal from "./SupportHelpModal";
-import TermsAndConditionsModal from "./TermsAndConditionsModal";
-import GlobalAIChat from "./GlobalAIChat";
 
 const PullToRefresh = ({ children, onRefresh, disabled }) => {
   const containerRef = useRef(null);
@@ -189,8 +187,6 @@ const LayoutContent = ({ noScroll = false }) => {
   const [aiChatOpen, setAiChatOpen] = useState(false);
   const [supportHelpOpen, setSupportHelpOpen] = useState(false);
   const [supportHelpMode, setSupportHelpMode] = useState("report");
-  const [termsModalOpen, setTermsModalOpen] = useState(false);
-
   const menuButtonRef = useRef(null);
   const sidebarRef = useRef(null);
   const familyMenuButtonRef = useRef(null);
@@ -205,7 +201,6 @@ const LayoutContent = ({ noScroll = false }) => {
     profileMenuView: "root",
     familyMenuOpen: false,
     supportHelpOpen: false,
-    termsModalOpen: false,
     aiChatOpen: false,
   });
 
@@ -217,7 +212,6 @@ const LayoutContent = ({ noScroll = false }) => {
       profileMenuView,
       familyMenuOpen,
       supportHelpOpen,
-      termsModalOpen,
       aiChatOpen,
     };
   }, [
@@ -227,7 +221,6 @@ const LayoutContent = ({ noScroll = false }) => {
     profileMenuView,
     familyMenuOpen,
     supportHelpOpen,
-    termsModalOpen,
     aiChatOpen,
   ]);
 
@@ -293,10 +286,6 @@ const LayoutContent = ({ noScroll = false }) => {
     if (current.supportHelpOpen) {
       setSupportHelpOpen(false);
       setSupportHelpMode("report");
-      return true;
-    }
-    if (current.termsModalOpen) {
-      setTermsModalOpen(false);
       return true;
     }
     if (current.profileOpen && current.profileMenuView !== "root") {
@@ -454,8 +443,8 @@ const LayoutContent = ({ noScroll = false }) => {
     if (shouldLockScroll) return true;
     if (isChatRoute) return true;
     if (isRestrictedUser) return true;
-    return sidebarOpen || notificationOpen || supportHelpOpen || termsModalOpen;
-  }, [shouldLockScroll, isChatRoute, isRestrictedUser, sidebarOpen, notificationOpen, supportHelpOpen, termsModalOpen]);
+    return sidebarOpen || notificationOpen || supportHelpOpen;
+  }, [shouldLockScroll, isChatRoute, isRestrictedUser, sidebarOpen, notificationOpen, supportHelpOpen]);
 
   const handlePullRefresh = useCallback(async () => {
     window.location.reload();
@@ -559,7 +548,6 @@ const LayoutContent = ({ noScroll = false }) => {
     closeProfileMenu();
     setSupportHelpOpen(false);
     setSupportHelpMode("report");
-    setTermsModalOpen(false);
     setAiChatOpen(false);
     logout();
     localStorage.removeItem("userInfo");
@@ -586,15 +574,7 @@ const LayoutContent = ({ noScroll = false }) => {
     setSupportHelpOpen(true);
   };
 
-  const handleOpenPrivacy = () => {
-    closeProfileMenu();
-    navigate("/blocked-members");
-  };
 
-  const handleOpenTerms = () => {
-    closeProfileMenu();
-    setTermsModalOpen(true);
-  };
 
   const handleToggleTheme = () => {
     toggleTheme();
@@ -785,50 +765,7 @@ const LayoutContent = ({ noScroll = false }) => {
                 </div>
               )}
 
-              {/* AI Assistant */}
-              <div className="relative">
-                {isMobile ? (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleToggleAiChat();
-                    }}
-                    aria-label="Open AI Assistant"
-                    className={`flex items-center gap-1.5 py-1 px-2.5 rounded-full transition-all duration-200 border ${
-                      aiChatOpen
-                        ? "bg-gradient-to-r from-primary-600 to-indigo-600 text-white border-transparent shadow-sm"
-                        : "bg-white border-gray-200 text-primary-600 hover:bg-gray-50 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-200 dark:hover:bg-slate-800/80"
-                    }`}
-                  >
-                    <Sparkles size={13} className={aiChatOpen ? "text-white" : "text-indigo-500 dark:text-indigo-400"} />
-                    <span className="text-[10px] font-bold tracking-wider">AI</span>
-                    <span className="relative flex h-1.5 w-1.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500"></span>
-                    </span>
-                  </button>
-                ) : (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleToggleAiChat();
-                    }}
-                    aria-label="Open AI Assistant"
-                    className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full transition-all duration-200 border ${
-                      aiChatOpen
-                        ? "bg-gradient-to-r from-primary-600 to-indigo-600 text-white border-transparent shadow-md scale-[1.02]"
-                        : "bg-white border-gray-200 text-primary-600 hover:bg-gray-50 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-200 dark:hover:bg-slate-800 hover:border-primary-300 dark:hover:border-primary-900/50 shadow-sm"
-                    }`}
-                  >
-                    <Sparkles size={15} className={`${aiChatOpen ? "text-white" : "text-indigo-500 dark:text-indigo-400 animate-pulse"}`} />
-                    <span className="text-xs font-bold tracking-wide">Ask AI</span>
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                    </span>
-                  </button>
-                )}
-              </div>
+
 
               {/* Guide Button (Web View Only) */}
               {!isMobile && (
@@ -1037,26 +974,29 @@ const LayoutContent = ({ noScroll = false }) => {
                       ) : profileMenuView === "settings" ? (
                         <>
                           <button
-                            onClick={handleOpenPrivacy}
+                            onClick={() => navigateTo("/blocked-members")}
                             className="bg-unset flex w-full items-center gap-2 rounded-xl px-2.5 py-1.5 text-left transition hover:bg-gray-100 dark:hover:bg-slate-700"
                           >
                             <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-200">
                               <FiShield size={15} />
                             </span>
                             <span className="min-w-0 flex-1">
-                              <span className="block text-[13px] font-medium leading-5 text-gray-800 dark:text-slate-100">Privacy</span>
+                              <span className="block text-[13px] font-medium leading-5 text-gray-800 dark:text-slate-100">Blocked Members</span>
                             </span>
                           </button>
 
                           <button
-                            onClick={handleOpenTerms}
+                            onClick={() => {
+                              closeProfileMenu();
+                              window.open("/terms-and-privacy", "_blank", "noopener,noreferrer");
+                            }}
                             className="bg-unset flex w-full items-center gap-2 rounded-xl px-2.5 py-1.5 text-left transition hover:bg-gray-100 dark:hover:bg-slate-700"
                           >
                             <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-200">
                               <FiFileText size={15} />
                             </span>
                             <span className="min-w-0 flex-1">
-                              <span className="block text-[13px] font-medium leading-5 text-gray-800 dark:text-slate-100">Terms & Conditions</span>
+                              <span className="block text-[13px] font-medium leading-5 text-gray-800 dark:text-slate-100">Terms & Privacy</span>
                             </span>
                           </button>
 
@@ -1189,10 +1129,7 @@ const LayoutContent = ({ noScroll = false }) => {
         mode={supportHelpMode}
       />
 
-      <TermsAndConditionsModal
-        isOpen={termsModalOpen}
-        onClose={() => setTermsModalOpen(false)}
-      />
+
 
       {/* Notification Panel */}
       <NotificationPanel
@@ -1203,9 +1140,6 @@ const LayoutContent = ({ noScroll = false }) => {
         isConnected={isConnected}
         refetchUnreadCount={refetchUnreadCount}
       />
-
-      {/* Global Floating AI Assistant Chat widget */}
-      <GlobalAIChat isOpen={aiChatOpen} setIsOpen={setAiChatOpen} />
 
     </div>
   );

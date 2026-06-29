@@ -497,7 +497,11 @@ const PostsAndFeedsPage = () => {
                                 onClick={() => setIsCreateModalOpen(true)}
                                 className="flex-1 text-left bg-gray-100 text-gray-500 rounded-full py-2.5 px-4 cursor-pointer hover:bg-gray-200 transition-colors text-base font-medium"
                             >
-                                What's on your mind, {user.name.split('_')[0]}?
+                                What's on your mind, {(() => {
+                                    const name = user?.name || user?.firstName || "there";
+                                    const cleanName = name.split("_")[0].split(" ")[0];
+                                    return !cleanName || /^otp$/i.test(cleanName) || cleanName.toLowerCase() === "user" || cleanName.toLowerCase() === "username" ? "there" : cleanName;
+                                })()}?
                             </button>
                             <button
                                 onClick={() => setIsCreateModalOpen(true)}
