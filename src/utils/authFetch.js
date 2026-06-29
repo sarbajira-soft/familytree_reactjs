@@ -29,12 +29,31 @@ const isJwtExpired = (token) => {
   }
 };
 
+// Global set to track active AbortControllers for all in-flight requests
+const activeRequests = new Set();
+
+/**
+ * Aborts all active requests currently in flight.
+ * This is called during the logout flow to immediately discard pending async fetches.
+ */
+export const abortAllRequests = () => {
+  console.log(`Aborting all active requests (${activeRequests.size} in flight)...`);
+  for (const controller of activeRequests) {
+    try {
+      controller.abort();
+    } catch (err) {
+      console.warn('Failed to abort request:', err);
+    }
+  }
+  activeRequests.clear();
+};
+
 export const authFetchResponse = async (endpoint, options = {}) => {
 
   console.log("-------authFetchResponse Centeralized--------");
  
   const token = getToken();
-  const { skipThrow, ...fetchOptions } = options || {};
+  const { skipThrow, signal: customSignal, ...fetchOptions } = options || {};
   const isFormData =
     typeof FormData !== 'undefined' && fetchOptions?.body instanceof FormData;
 
@@ -56,6 +75,15 @@ export const authFetchResponse = async (endpoint, options = {}) => {
     });
   }
 
+  // Create an AbortController for this request if none is provided
+  const controller = new AbortController();
+  const signal = customSignal || controller.signal;
+
+  // Only track the controller if we created it
+  if (!customSignal) {
+    activeRequests.add(controller);
+  }
+
   const headers = {
     ...(!isFormData && { 'Content-Type': 'application/json' }),
     ...(token && { Authorization: `Bearer ${token}` }),
@@ -70,10 +98,16 @@ export const authFetchResponse = async (endpoint, options = {}) => {
   try {
     response = await fetch(url, {
       ...fetchOptions,
+      signal,
       cache: token ? 'no-store' : fetchOptions.cache,
       headers,
     });
-  } catch (_) {
+  } catch (err) {
+    // If the request was aborted, re-throw AbortError so caller can handle/ignore it
+    if (err.name === 'AbortError') {
+      throw err;
+    }
+    
     if (!skipThrow) {
       throw new Error('Network error. Please check your internet connection and try again.');
     }
@@ -85,6 +119,10 @@ export const authFetchResponse = async (endpoint, options = {}) => {
         headers: { 'Content-Type': 'application/json' },
       }
     );
+  } finally {
+    if (!customSignal) {
+      activeRequests.delete(controller);
+    }
   }
 
   if (response?.status === 401) {
@@ -118,5 +156,6 @@ export const authFetch = async (endpoint, options = {}) => {
     return null;
   }
 };
+
 
 

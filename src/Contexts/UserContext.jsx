@@ -10,7 +10,7 @@ import {
   initializeAuth 
 } from '../utils/auth';
 
-import { authFetchResponse } from '../utils/authFetch';
+import { authFetchResponse, abortAllRequests } from '../utils/authFetch';
 import { hasFamilyAccessStatus } from '../utils/familyAccess';
 import {
   initializeChatPush,
@@ -18,6 +18,7 @@ import {
 } from '../services/chatPush.service';
 import { disconnectNotificationSocket } from '../hooks/useNotificationSocket';
 import { disconnectChatSocket } from '../hooks/useChatSocket';
+import { queryClient } from '../utils/queryClient';
 
 const UserContext = createContext();
 
@@ -37,12 +38,46 @@ export const UserProvider = ({ children }) => {
     return isAuthenticated();
   });
 
+  const sessionGenerationRef = useRef(0);
+  const lastTokenRef = useRef(getToken());
+
+  // Synchronously detects token changes and increments the session generation counter
+  const syncSessionGeneration = useCallback(() => {
+    const currentToken = getToken();
+    if (currentToken !== lastTokenRef.current) {
+      console.log(`Session token changed. Previous: ${lastTokenRef.current ? 'present' : 'null'}, Current: ${currentToken ? 'present' : 'null'}`);
+      lastTokenRef.current = currentToken;
+      sessionGenerationRef.current += 1;
+      console.log(`Session generation auto-incremented to ${sessionGenerationRef.current}`);
+    }
+  }, []);
+
+  // Sync token changes on every render/eval
+  syncSessionGeneration();
+
   // Initialize auth state when context mounts
   useEffect(() => {
     initializeAuth();
   }, []);
 
   const clearUserData = useCallback(() => {
+    // 1. Increment session generation to invalidate stale callbacks
+    sessionGenerationRef.current += 1;
+    console.log(`Session generation incremented to ${sessionGenerationRef.current} (logout)`);
+
+    // 2. Abort all active network requests
+    abortAllRequests();
+
+    // 3. Clear and cancel React Query cache and requests
+    try {
+      queryClient.cancelQueries();
+      queryClient.removeQueries();
+      queryClient.clear();
+      console.log('React Query cache and active queries cancelled/cleared.');
+    } catch (err) {
+      console.warn('Failed to clear query cache during logout:', err);
+    }
+
     disconnectNotificationSocket('logout');
     disconnectChatSocket('logout');
 
@@ -55,6 +90,8 @@ export const UserProvider = ({ children }) => {
     setUserInfo(null);
     setUserLoading(false);
     clearAuthData();
+
+    lastTokenRef.current = null; // Sync with cleared state
 
     return pushCleanupPromise;
   }, []);
@@ -159,8 +196,11 @@ export const UserProvider = ({ children }) => {
   });
 
   const fetchUserDetails = useCallback(async (options = {}) => {
-    const token = getToken();
-    if (!token) {
+    // Sync session version if token changed before request
+    syncSessionGeneration();
+
+    const tokenCapturedAtRequestStart = getToken();
+    if (!tokenCapturedAtRequestStart) {
       console.warn('Authentication token not found or expired.');
       clearUserData();
       return;
@@ -181,6 +221,9 @@ export const UserProvider = ({ children }) => {
     state.inFlight = true;
     state.lastRefreshAt = now;
 
+    // Capture current session generation count
+    const capturedGeneration = sessionGenerationRef.current;
+
     try {
       const silent = !!options?.silent;
       const didSetLoading = !silent || !userInfoRef.current;
@@ -193,17 +236,29 @@ export const UserProvider = ({ children }) => {
         skipThrow: true,
       });
 
+      // Guard 1: Session generation check
+      if (sessionGenerationRef.current !== capturedGeneration) {
+        console.warn('fetchUserDetails: session generation changed during request. Discarding response.');
+        return;
+      }
+      // Guard 2: Token consistency check
+      const currentToken = getToken();
+      if (!currentToken || currentToken !== tokenCapturedAtRequestStart) {
+        console.warn('fetchUserDetails: token consistency check failed during request. Discarding response.');
+        return;
+      }
+
       if (response.status === 304) {
         const existingUser = getUserInfo();
         if (existingUser) {
           setUserInfo(existingUser);
-          persistAuthData(token, existingUser);
+          persistAuthData(tokenCapturedAtRequestStart, existingUser);
           return;
         }
 
-        const minimalUser = buildMinimalUser(token, null);
+        const minimalUser = buildMinimalUser(tokenCapturedAtRequestStart, null);
         setUserInfo(minimalUser);
-        persistAuthData(token, minimalUser);
+        persistAuthData(tokenCapturedAtRequestStart, minimalUser);
         return;
       }
       if (response.status === 401) {
@@ -213,6 +268,19 @@ export const UserProvider = ({ children }) => {
       if (!response.ok) throw new Error('Failed to fetch user details');
 
       const jsonData = await response.json();
+
+      // Guard 1: Session generation check
+      if (sessionGenerationRef.current !== capturedGeneration) {
+        console.warn('fetchUserDetails: session generation changed during JSON parsing. Discarding response.');
+        return;
+      }
+      // Guard 2: Token consistency check
+      const currentTokenAfterJson = getToken();
+      if (!currentTokenAfterJson || currentTokenAfterJson !== tokenCapturedAtRequestStart) {
+        console.warn('fetchUserDetails: token consistency check failed during JSON parsing. Discarding response.');
+        return;
+      }
+
       const data = jsonData.data || {};
       const {
         userProfile,
@@ -232,9 +300,9 @@ export const UserProvider = ({ children }) => {
       } = data;
 
       if (!userProfile) {
-        const minimalUser = buildMinimalUser(token, jsonData);
+        const minimalUser = buildMinimalUser(tokenCapturedAtRequestStart, jsonData);
         setUserInfo(minimalUser);
-        persistAuthData(token, minimalUser);
+        persistAuthData(tokenCapturedAtRequestStart, minimalUser);
         return;
       }
 
@@ -285,7 +353,7 @@ export const UserProvider = ({ children }) => {
         spouseName: userProfile.spouseName || '',
         region: userProfile.region || '',
         childrenCount: childrenArray.length || 0,
-        ...childFields, // Safe generated fields like childName0, childName1, etc.
+        ...childFields,
 
         fatherName: userProfile.fatherName || '',
         motherName: userProfile.motherName || '',
@@ -335,41 +403,42 @@ export const UserProvider = ({ children }) => {
       };
 
       setUserInfo(resolvedUser);
-      persistAuthData(token, resolvedUser);
+      persistAuthData(tokenCapturedAtRequestStart, resolvedUser);
       
     } catch (err) {
+      if (err.name === 'AbortError') {
+        console.log('Profile fetch aborted cleanly.');
+        return;
+      }
+
+      // Guard 1 & 2: Session and Token consistency in catch block
+      if (sessionGenerationRef.current !== capturedGeneration) return;
+      const currentToken = getToken();
+      if (!currentToken || currentToken !== tokenCapturedAtRequestStart) return;
+
       console.error('Error fetching user:', err);
-      // Only hard-logout on explicit 401 handling above.
-      // For other errors (network/server), keep the session so the user isn't
-      // unexpectedly logged out during onboarding.
+      // Fail safely: try to load existing cache if valid, but do NOT reconstruct user from stale token
       try {
         const existingUser = getUserInfo();
         if (existingUser) {
           setUserInfo(existingUser);
-        } else {
-          const tokenUserId = getUserIdFromToken(token);
-          setUserInfo({
-            userId: tokenUserId,
-            email: '',
-            mobile: '',
-            raw: null,
-          });
         }
       } catch (storageError) {
         console.warn('Failed to recover user from storage:', storageError);
       }
     } finally {
-      // Only flip loading off if we turned it on for this request.
-      // This avoids app-wide loading flashes on focus/restore.
-      const silent = !!options?.silent;
-      const didSetLoading = !silent || !userInfoRef.current;
-      if (didSetLoading) {
-        setUserLoading(false);
-      }
+      // Only flip loading off if our request is still the active session request
+      if (sessionGenerationRef.current === capturedGeneration) {
+        const silent = !!options?.silent;
+        const didSetLoading = !silent || !userInfoRef.current;
+        if (didSetLoading) {
+          setUserLoading(false);
+        }
 
-      profileRefreshRef.current.inFlight = false;
+        profileRefreshRef.current.inFlight = false;
+      }
     }
-  }, [buildMinimalUser, clearUserData, handleUnauthorized, parseChildrenNames, persistAuthData, toIntOrZero]);
+  }, [buildMinimalUser, clearUserData, handleUnauthorized, parseChildrenNames, persistAuthData, toIntOrZero, syncSessionGeneration]);
 
   useEffect(() => {
     fetchUserDetails();
