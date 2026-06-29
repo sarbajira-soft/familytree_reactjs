@@ -111,6 +111,10 @@ export const UserProvider = ({ children }) => {
       typeof data.onboarding_completed === 'boolean'
         ? data.onboarding_completed
         : !!currentUser.onboarding_completed;
+    const hasAcceptedPrivacy =
+      typeof data.hasAcceptedPrivacy === 'boolean'
+        ? data.hasAcceptedPrivacy
+        : !!currentUser.hasAcceptedPrivacy;
 
     return {
       userId: tokenUserId,
@@ -127,6 +131,9 @@ export const UserProvider = ({ children }) => {
       onboarding_completed,
       termsVersion: data.termsVersion || 'v1.0.0',
       termsAcceptedAt: data.termsAcceptedAt || null,
+      hasAcceptedPrivacy,
+      privacyVersion: data.privacyVersion || 'v1.0.0',
+      privacyAcceptedAt: data.privacyAcceptedAt || null,
       raw: null,
     };
   }, []);
@@ -219,6 +226,9 @@ export const UserProvider = ({ children }) => {
         onboarding_completed,
         termsVersion,
         termsAcceptedAt,
+        hasAcceptedPrivacy,
+        privacyVersion,
+        privacyAcceptedAt,
       } = data;
 
       if (!userProfile) {
@@ -309,6 +319,9 @@ export const UserProvider = ({ children }) => {
         onboarding_completed: typeof onboarding_completed === 'boolean' ? onboarding_completed : !!jsonData.currentUser?.onboarding_completed,
         termsVersion: termsVersion || 'v1.0.0',
         termsAcceptedAt: termsAcceptedAt || null,
+        hasAcceptedPrivacy: typeof hasAcceptedPrivacy === 'boolean' ? hasAcceptedPrivacy : !!jsonData.currentUser?.hasAcceptedPrivacy,
+        privacyVersion: privacyVersion || 'v1.0.0',
+        privacyAcceptedAt: privacyAcceptedAt || null,
 
         isPrivate: typeof userProfile.isPrivate === 'boolean' ? userProfile.isPrivate : false,
         privacySettings,

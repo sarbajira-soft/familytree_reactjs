@@ -36,7 +36,6 @@ import { useUser } from "../Contexts/UserContext";
 import { useTheme } from "../Contexts/ThemeContext";
 import NotificationPanel from "./NotificationPanel";
 import SupportHelpModal from "./SupportHelpModal";
-import TermsAndConditionsModal from "./TermsAndConditionsModal";
 import GlobalAIChat from "./GlobalAIChat";
 
 const PullToRefresh = ({ children, onRefresh, disabled }) => {
@@ -189,8 +188,6 @@ const LayoutContent = ({ noScroll = false }) => {
   const [aiChatOpen, setAiChatOpen] = useState(false);
   const [supportHelpOpen, setSupportHelpOpen] = useState(false);
   const [supportHelpMode, setSupportHelpMode] = useState("report");
-  const [termsModalOpen, setTermsModalOpen] = useState(false);
-
   const menuButtonRef = useRef(null);
   const sidebarRef = useRef(null);
   const familyMenuButtonRef = useRef(null);
@@ -205,7 +202,6 @@ const LayoutContent = ({ noScroll = false }) => {
     profileMenuView: "root",
     familyMenuOpen: false,
     supportHelpOpen: false,
-    termsModalOpen: false,
     aiChatOpen: false,
   });
 
@@ -217,7 +213,6 @@ const LayoutContent = ({ noScroll = false }) => {
       profileMenuView,
       familyMenuOpen,
       supportHelpOpen,
-      termsModalOpen,
       aiChatOpen,
     };
   }, [
@@ -227,7 +222,6 @@ const LayoutContent = ({ noScroll = false }) => {
     profileMenuView,
     familyMenuOpen,
     supportHelpOpen,
-    termsModalOpen,
     aiChatOpen,
   ]);
 
@@ -293,10 +287,6 @@ const LayoutContent = ({ noScroll = false }) => {
     if (current.supportHelpOpen) {
       setSupportHelpOpen(false);
       setSupportHelpMode("report");
-      return true;
-    }
-    if (current.termsModalOpen) {
-      setTermsModalOpen(false);
       return true;
     }
     if (current.profileOpen && current.profileMenuView !== "root") {
@@ -454,8 +444,8 @@ const LayoutContent = ({ noScroll = false }) => {
     if (shouldLockScroll) return true;
     if (isChatRoute) return true;
     if (isRestrictedUser) return true;
-    return sidebarOpen || notificationOpen || supportHelpOpen || termsModalOpen;
-  }, [shouldLockScroll, isChatRoute, isRestrictedUser, sidebarOpen, notificationOpen, supportHelpOpen, termsModalOpen]);
+    return sidebarOpen || notificationOpen || supportHelpOpen;
+  }, [shouldLockScroll, isChatRoute, isRestrictedUser, sidebarOpen, notificationOpen, supportHelpOpen]);
 
   const handlePullRefresh = useCallback(async () => {
     window.location.reload();
@@ -559,7 +549,6 @@ const LayoutContent = ({ noScroll = false }) => {
     closeProfileMenu();
     setSupportHelpOpen(false);
     setSupportHelpMode("report");
-    setTermsModalOpen(false);
     setAiChatOpen(false);
     logout();
     localStorage.removeItem("userInfo");
@@ -586,15 +575,7 @@ const LayoutContent = ({ noScroll = false }) => {
     setSupportHelpOpen(true);
   };
 
-  const handleOpenPrivacy = () => {
-    closeProfileMenu();
-    navigate("/blocked-members");
-  };
 
-  const handleOpenTerms = () => {
-    closeProfileMenu();
-    setTermsModalOpen(true);
-  };
 
   const handleToggleTheme = () => {
     toggleTheme();
@@ -1037,26 +1018,29 @@ const LayoutContent = ({ noScroll = false }) => {
                       ) : profileMenuView === "settings" ? (
                         <>
                           <button
-                            onClick={handleOpenPrivacy}
+                            onClick={() => navigateTo("/blocked-members")}
                             className="bg-unset flex w-full items-center gap-2 rounded-xl px-2.5 py-1.5 text-left transition hover:bg-gray-100 dark:hover:bg-slate-700"
                           >
                             <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-200">
                               <FiShield size={15} />
                             </span>
                             <span className="min-w-0 flex-1">
-                              <span className="block text-[13px] font-medium leading-5 text-gray-800 dark:text-slate-100">Privacy</span>
+                              <span className="block text-[13px] font-medium leading-5 text-gray-800 dark:text-slate-100">Blocked Members</span>
                             </span>
                           </button>
 
                           <button
-                            onClick={handleOpenTerms}
+                            onClick={() => {
+                              closeProfileMenu();
+                              window.open("/terms-and-privacy", "_blank", "noopener,noreferrer");
+                            }}
                             className="bg-unset flex w-full items-center gap-2 rounded-xl px-2.5 py-1.5 text-left transition hover:bg-gray-100 dark:hover:bg-slate-700"
                           >
                             <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-slate-200">
                               <FiFileText size={15} />
                             </span>
                             <span className="min-w-0 flex-1">
-                              <span className="block text-[13px] font-medium leading-5 text-gray-800 dark:text-slate-100">Terms & Conditions</span>
+                              <span className="block text-[13px] font-medium leading-5 text-gray-800 dark:text-slate-100">Terms & Privacy</span>
                             </span>
                           </button>
 
@@ -1189,10 +1173,7 @@ const LayoutContent = ({ noScroll = false }) => {
         mode={supportHelpMode}
       />
 
-      <TermsAndConditionsModal
-        isOpen={termsModalOpen}
-        onClose={() => setTermsModalOpen(false)}
-      />
+
 
       {/* Notification Panel */}
       <NotificationPanel
