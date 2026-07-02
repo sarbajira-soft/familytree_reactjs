@@ -40,6 +40,7 @@ const MyProfile = lazy(() => import("./Pages/MyProfile"));
 const MyFamilyMember = lazy(() => import("./Pages/MyFamilyMember"));
 const MyFamily = lazy(() => import("./Pages/MyFamily"));
 const FamilyTreePage = lazy(() => import("./Pages/FamilyTreePage"));
+const CreateAndRequestPage = lazy(() => import("./Pages/createAndRequest/CreateAndRequestPage"));
 const FamilyTreeHierarchical = lazy(() =>
   import("./Pages/FamilyTreeHierarchical")
 );
@@ -218,6 +219,7 @@ function App() {
                 {/* Family Trees */}
                 <Route path="/family-tree" element={<FamilyTreePage />} />
                 <Route path="/family-tree/:code" element={<FamilyTreePage />} />
+                <Route path="/family-tree/create-and-request" element={<CreateAndRequestPage />} />
                 <Route
                   path="/family-tree-hierarchical"
                   element={<FamilyTreeHierarchical />}

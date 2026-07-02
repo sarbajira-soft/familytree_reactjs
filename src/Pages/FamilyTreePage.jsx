@@ -3097,6 +3097,13 @@ const FamilyTreePage = () => {
                         />
                       </div>
 
+                      <button
+                        className="flex-shrink-0 px-2 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold active:scale-95 transition-all duration-200 shadow-sm"
+                        onClick={() => navigate("/family-tree/create-and-request")}
+                      >
+                        Create & Request
+                      </button>
+
                       <div className="flex-shrink-0">
                         <LanguageSwitcher />
                       </div>
@@ -3261,6 +3268,14 @@ const FamilyTreePage = () => {
                         </div>
 
                         <div className="flex items-center gap-1.5 flex-shrink-0">
+                          {/* Create & Request */}
+                          <button
+                            className="flex items-center gap-1 px-3 py-2 bg-gray-100 dark:bg-slate-800 hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-800 dark:text-slate-100 border border-gray-300 dark:border-slate-700 rounded-lg text-xs font-semibold active:scale-95 transition-all duration-200 shadow-sm mr-1"
+                            onClick={() => navigate("/family-tree/create-and-request")}
+                          >
+                            Create & Request
+                          </button>
+
                           {/* Save */}
 
                           <button
